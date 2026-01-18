@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Political Research Hub</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>📚 Political Research Hub</h1>
+            <p class="subtitle">Your comprehensive tool for current affairs & political science research</p>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="news">News & Search</button>
+            <button class="tab-btn" data-tab="notes">Notes & Annotations</button>
+            <button class="tab-btn" data-tab="sources">Sources & Citations</button>
+            <button class="tab-btn" data-tab="analytics">Data & Analytics</button>
+        </nav>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+            <!-- News & Search Tab -->
+            <div id="news" class="tab-pane active">
+                <div class="search-section">
+                    <h2>News Aggregation & Search</h2>
+                    <div class="search-box">
+                        <input type="text" id="newsSearch" placeholder="Search political topics, events, or keywords...">
+                        <button onclick="searchNews()">Search</button>
+                    </div>
+                    <div class="filter-tags">
+                        <button class="tag" onclick="quickSearch('politics')">Politics</button>
+                        <button class="tag" onclick="quickSearch('international relations')">International Relations</button>
+                        <button class="tag" onclick="quickSearch('policy')">Policy</button>
+                        <button class="tag" onclick="quickSearch('elections')">Elections</button>
+                        <button class="tag" onclick="quickSearch('legislation')">Legislation</button>
+                    </div>
+                </div>
+                <div id="newsResults" class="results-container">
+                    <p class="placeholder">Search for topics to see relevant news articles and research materials</p>
+                </div>
+            </div>
+
+            <!-- Notes & Annotations Tab -->
+            <div id="notes" class="tab-pane">
+                <h2>Research Notes & Annotations</h2>
+                <div class="notes-controls">
+                    <button onclick="createNote()">+ New Note</button>
+                    <input type="text" id="noteFilter" placeholder="Filter notes by tag or keyword...">
+                </div>
+                <div class="notes-container" id="notesContainer">
+                    <div class="note-card sample">
+                        <div class="note-header">
+                            <input type="text" class="note-title" placeholder="Note title..." value="Sample Research Note">
+                            <button class="delete-btn" onclick="deleteNote(this)">×</button>
+                        </div>
+                        <textarea class="note-content" placeholder="Write your research notes, annotations, and insights here...">This is a sample note. Click "New Note" to create your own research notes.</textarea>
+                        <div class="note-meta">
+                            <input type="text" class="note-tags" placeholder="Add tags (comma-separated)..." value="sample, demo">
+                            <span class="note-date">Created: <span class="date-value">2026-01-18</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sources & Citations Tab -->
+            <div id="sources" class="tab-pane">
+                <h2>Source Management & Citations</h2>
+                <div class="source-input">
+                    <h3>Add New Source</h3>
+                    <form id="sourceForm" onsubmit="addSource(event)">
+                        <input type="text" id="sourceTitle" placeholder="Article/Book Title" required>
+                        <input type="text" id="sourceAuthor" placeholder="Author(s)">
+                        <input type="url" id="sourceURL" placeholder="URL (optional)">
+                        <input type="text" id="sourcePublisher" placeholder="Publisher/Publication">
+                        <input type="date" id="sourceDate" required>
+                        <select id="sourceType">
+                            <option value="article">Journal Article</option>
+                            <option value="news">News Article</option>
+                            <option value="book">Book</option>
+                            <option value="report">Report</option>
+                            <option value="website">Website</option>
+                        </select>
+                        <button type="submit">Add Source</button>
+                    </form>
+                </div>
+                <div class="sources-list" id="sourcesList">
+                    <h3>Your Sources</h3>
+                    <div class="citation-format">
+                        <label>Citation Format:</label>
+                        <select id="citationFormat" onchange="updateCitations()">
+                            <option value="apa">APA 7th Edition</option>
+                            <option value="mla">MLA 9th Edition</option>
+                            <option value="chicago">Chicago</option>
+                        </select>
+                    </div>
+                    <div id="sourcesContainer"></div>
+                </div>
+            </div>
+
+            <!-- Analytics Tab -->
+            <div id="analytics" class="tab-pane">
+                <h2>Data Analysis & Visualization</h2>
+                <div class="analytics-grid">
+                    <div class="stat-card">
+                        <h3>Research Statistics</h3>
+                        <div class="stat-item">
+                            <span class="stat-label">Total Notes:</span>
+                            <span class="stat-value" id="statNotes">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Total Sources:</span>
+                            <span class="stat-value" id="statSources">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Topics Tracked:</span>
+                            <span class="stat-value" id="statTopics">0</span>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Research Topics Distribution</h3>
+                        <canvas id="topicsChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Research Activity Over Time</h3>
+                        <canvas id="timelineChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Source Types Breakdown</h3>
+                        <canvas id="sourceTypesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
