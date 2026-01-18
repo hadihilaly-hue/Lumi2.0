@@ -6,21 +6,56 @@
     <title>Political Research Hub</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- Fun Background Elements -->
+    <div class="bg-decoration"></div>
+
     <div class="container">
         <!-- Header -->
         <header>
-            <h1>📚 Political Research Hub</h1>
-            <p class="subtitle">Your comprehensive tool for current affairs & political science research</p>
+            <div class="header-content">
+                <div class="logo-area">
+                    <span class="logo-icon">🎓</span>
+                    <div>
+                        <h1>Political Research Hub</h1>
+                        <p class="subtitle">Supercharge your political science research!</p>
+                    </div>
+                </div>
+                <div class="header-stats">
+                    <div class="mini-stat">
+                        <span class="mini-stat-icon">📝</span>
+                        <span id="headerNotes">0</span> notes
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-stat-icon">📚</span>
+                        <span id="headerSources">0</span> sources
+                    </div>
+                </div>
+            </div>
         </header>
 
         <!-- Navigation -->
         <nav class="tabs">
-            <button class="tab-btn active" data-tab="news">News & Search</button>
-            <button class="tab-btn" data-tab="notes">Notes & Annotations</button>
-            <button class="tab-btn" data-tab="sources">Sources & Citations</button>
-            <button class="tab-btn" data-tab="analytics">Data & Analytics</button>
+            <button class="tab-btn active" data-tab="news">
+                <span class="tab-icon">🔍</span>
+                <span>Discover</span>
+            </button>
+            <button class="tab-btn" data-tab="notes">
+                <span class="tab-icon">📝</span>
+                <span>My Notes</span>
+            </button>
+            <button class="tab-btn" data-tab="sources">
+                <span class="tab-icon">📚</span>
+                <span>Sources</span>
+            </button>
+            <button class="tab-btn" data-tab="analytics">
+                <span class="tab-icon">📊</span>
+                <span>Insights</span>
+            </button>
         </nav>
 
         <!-- Tab Content -->
@@ -28,41 +63,67 @@
             <!-- News & Search Tab -->
             <div id="news" class="tab-pane active">
                 <div class="search-section">
-                    <h2>News Aggregation & Search</h2>
-                    <div class="search-box">
-                        <input type="text" id="newsSearch" placeholder="Search political topics, events, or keywords...">
-                        <button onclick="searchNews()">Search</button>
+                    <div class="section-header">
+                        <h2>🔍 Discover Research</h2>
+                        <p class="section-subtitle">Find the latest political news and academic resources</p>
                     </div>
-                    <div class="filter-tags">
-                        <button class="tag" onclick="quickSearch('politics')">Politics</button>
-                        <button class="tag" onclick="quickSearch('international relations')">International Relations</button>
-                        <button class="tag" onclick="quickSearch('policy')">Policy</button>
-                        <button class="tag" onclick="quickSearch('elections')">Elections</button>
-                        <button class="tag" onclick="quickSearch('legislation')">Legislation</button>
+                    <div class="search-box">
+                        <span class="search-icon">🔎</span>
+                        <input type="text" id="newsSearch" placeholder="What are you researching today?">
+                        <button onclick="searchNews()" class="search-btn">
+                            <span>Search</span>
+                            <span class="btn-arrow">→</span>
+                        </button>
+                    </div>
+                    <div class="quick-topics">
+                        <span class="quick-label">Quick topics:</span>
+                        <div class="filter-tags">
+                            <button class="tag" onclick="quickSearch('politics')">🏛️ Politics</button>
+                            <button class="tag" onclick="quickSearch('international relations')">🌍 International</button>
+                            <button class="tag" onclick="quickSearch('policy')">📋 Policy</button>
+                            <button class="tag" onclick="quickSearch('elections')">🗳️ Elections</button>
+                            <button class="tag" onclick="quickSearch('legislation')">⚖️ Legislation</button>
+                        </div>
                     </div>
                 </div>
                 <div id="newsResults" class="results-container">
-                    <p class="placeholder">Search for topics to see relevant news articles and research materials</p>
+                    <div class="empty-state">
+                        <span class="empty-icon">🔍</span>
+                        <h3>Start Your Research Journey</h3>
+                        <p>Search for political topics or click a quick topic above to discover relevant articles and research materials</p>
+                    </div>
                 </div>
             </div>
 
             <!-- Notes & Annotations Tab -->
             <div id="notes" class="tab-pane">
-                <h2>Research Notes & Annotations</h2>
+                <div class="section-header">
+                    <h2>📝 My Research Notes</h2>
+                    <p class="section-subtitle">Capture your insights and organize your thoughts</p>
+                </div>
                 <div class="notes-controls">
-                    <button onclick="createNote()">+ New Note</button>
-                    <input type="text" id="noteFilter" placeholder="Filter notes by tag or keyword...">
+                    <button onclick="createNote()" class="new-note-btn">
+                        <span class="btn-plus">+</span>
+                        <span>New Note</span>
+                    </button>
+                    <div class="filter-box">
+                        <span class="filter-icon">🔎</span>
+                        <input type="text" id="noteFilter" placeholder="Filter by tag or keyword...">
+                    </div>
                 </div>
                 <div class="notes-container" id="notesContainer">
                     <div class="note-card sample">
                         <div class="note-header">
-                            <input type="text" class="note-title" placeholder="Note title..." value="Sample Research Note">
-                            <button class="delete-btn" onclick="deleteNote(this)">×</button>
+                            <input type="text" class="note-title" placeholder="Give your note a catchy title..." value="Sample Research Note">
+                            <button class="delete-btn" onclick="deleteNote(this)" title="Delete note">🗑️</button>
                         </div>
-                        <textarea class="note-content" placeholder="Write your research notes, annotations, and insights here...">This is a sample note. Click "New Note" to create your own research notes.</textarea>
+                        <textarea class="note-content" placeholder="Write your brilliant ideas here...">This is a sample note. Click "New Note" to create your own research notes and start building your knowledge base!</textarea>
                         <div class="note-meta">
-                            <input type="text" class="note-tags" placeholder="Add tags (comma-separated)..." value="sample, demo">
-                            <span class="note-date">Created: <span class="date-value">2026-01-18</span></span>
+                            <div class="tags-input">
+                                <span class="tag-icon">🏷️</span>
+                                <input type="text" class="note-tags" placeholder="Add tags..." value="sample, demo">
+                            </div>
+                            <span class="note-date">📅 <span class="date-value">2026-01-18</span></span>
                         </div>
                     </div>
                 </div>
@@ -70,34 +131,48 @@
 
             <!-- Sources & Citations Tab -->
             <div id="sources" class="tab-pane">
-                <h2>Source Management & Citations</h2>
+                <div class="section-header">
+                    <h2>📚 Source Library</h2>
+                    <p class="section-subtitle">Build your bibliography with auto-generated citations</p>
+                </div>
                 <div class="source-input">
-                    <h3>Add New Source</h3>
+                    <h3>➕ Add New Source</h3>
                     <form id="sourceForm" onsubmit="addSource(event)">
-                        <input type="text" id="sourceTitle" placeholder="Article/Book Title" required>
-                        <input type="text" id="sourceAuthor" placeholder="Author(s)">
-                        <input type="url" id="sourceURL" placeholder="URL (optional)">
-                        <input type="text" id="sourcePublisher" placeholder="Publisher/Publication">
-                        <input type="date" id="sourceDate" required>
-                        <select id="sourceType">
-                            <option value="article">Journal Article</option>
-                            <option value="news">News Article</option>
-                            <option value="book">Book</option>
-                            <option value="report">Report</option>
-                            <option value="website">Website</option>
-                        </select>
-                        <button type="submit">Add Source</button>
+                        <div class="form-row">
+                            <input type="text" id="sourceTitle" placeholder="📖 Article/Book Title" required>
+                            <input type="text" id="sourceAuthor" placeholder="✍️ Author(s)">
+                        </div>
+                        <div class="form-row">
+                            <input type="url" id="sourceURL" placeholder="🔗 URL (optional)">
+                            <input type="text" id="sourcePublisher" placeholder="🏢 Publisher/Publication">
+                        </div>
+                        <div class="form-row">
+                            <input type="date" id="sourceDate" required>
+                            <select id="sourceType">
+                                <option value="article">📄 Journal Article</option>
+                                <option value="news">📰 News Article</option>
+                                <option value="book">📚 Book</option>
+                                <option value="report">📊 Report</option>
+                                <option value="website">🌐 Website</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="add-source-btn">
+                            <span>Add to Library</span>
+                            <span class="btn-arrow">→</span>
+                        </button>
                     </form>
                 </div>
                 <div class="sources-list" id="sourcesList">
-                    <h3>Your Sources</h3>
-                    <div class="citation-format">
-                        <label>Citation Format:</label>
-                        <select id="citationFormat" onchange="updateCitations()">
-                            <option value="apa">APA 7th Edition</option>
-                            <option value="mla">MLA 9th Edition</option>
-                            <option value="chicago">Chicago</option>
-                        </select>
+                    <div class="sources-header">
+                        <h3>📖 Your Bibliography</h3>
+                        <div class="citation-format">
+                            <label>Format:</label>
+                            <select id="citationFormat" onchange="updateCitations()">
+                                <option value="apa">APA 7th</option>
+                                <option value="mla">MLA 9th</option>
+                                <option value="chicago">Chicago</option>
+                            </select>
+                        </div>
                     </div>
                     <div id="sourcesContainer"></div>
                 </div>
@@ -105,33 +180,51 @@
 
             <!-- Analytics Tab -->
             <div id="analytics" class="tab-pane">
-                <h2>Data Analysis & Visualization</h2>
+                <div class="section-header">
+                    <h2>📊 Research Insights</h2>
+                    <p class="section-subtitle">Visualize your research progress and patterns</p>
+                </div>
                 <div class="analytics-grid">
-                    <div class="stat-card">
-                        <h3>Research Statistics</h3>
+                    <div class="stat-card stats-overview">
+                        <h3>🎯 Your Progress</h3>
                         <div class="stat-item">
-                            <span class="stat-label">Total Notes:</span>
-                            <span class="stat-value" id="statNotes">0</span>
+                            <div class="stat-content">
+                                <span class="stat-icon">📝</span>
+                                <div>
+                                    <span class="stat-value" id="statNotes">0</span>
+                                    <span class="stat-label">Research Notes</span>
+                                </div>
+                            </div>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-label">Total Sources:</span>
-                            <span class="stat-value" id="statSources">0</span>
+                            <div class="stat-content">
+                                <span class="stat-icon">📚</span>
+                                <div>
+                                    <span class="stat-value" id="statSources">0</span>
+                                    <span class="stat-label">Sources Cited</span>
+                                </div>
+                            </div>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-label">Topics Tracked:</span>
-                            <span class="stat-value" id="statTopics">0</span>
+                            <div class="stat-content">
+                                <span class="stat-icon">🏷️</span>
+                                <div>
+                                    <span class="stat-value" id="statTopics">0</span>
+                                    <span class="stat-label">Topics Explored</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="chart-card">
-                        <h3>Research Topics Distribution</h3>
+                        <h3>🏷️ Topic Distribution</h3>
                         <canvas id="topicsChart"></canvas>
                     </div>
                     <div class="chart-card">
-                        <h3>Research Activity Over Time</h3>
+                        <h3>📈 Activity Timeline</h3>
                         <canvas id="timelineChart"></canvas>
                     </div>
                     <div class="chart-card">
-                        <h3>Source Types Breakdown</h3>
+                        <h3>📚 Source Types</h3>
                         <canvas id="sourceTypesChart"></canvas>
                     </div>
                 </div>

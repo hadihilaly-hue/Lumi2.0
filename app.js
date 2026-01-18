@@ -49,7 +49,13 @@ function quickSearch(term) {
 
 function performSearch(query) {
     const resultsContainer = document.getElementById('newsResults');
-    resultsContainer.innerHTML = '<p class="placeholder">Searching for: "' + query + '"...</p>';
+    resultsContainer.innerHTML = `
+        <div class="empty-state loading">
+            <span class="empty-icon">🔍</span>
+            <h3>Searching...</h3>
+            <p>Finding the best research on "${query}"</p>
+        </div>
+    `;
 
     // Simulated news data (in a real app, this would call an API)
     setTimeout(() => {
@@ -109,7 +115,13 @@ function displayNewsResults(results) {
     const resultsContainer = document.getElementById('newsResults');
 
     if (results.length === 0) {
-        resultsContainer.innerHTML = '<p class="placeholder">No results found. Try a different search term.</p>';
+        resultsContainer.innerHTML = `
+            <div class="empty-state">
+                <span class="empty-icon">😕</span>
+                <h3>No Results Found</h3>
+                <p>We couldn't find any articles matching your search. Try different keywords or explore our quick topics!</p>
+            </div>
+        `;
         return;
     }
 
@@ -120,10 +132,12 @@ function displayNewsResults(results) {
                 <h3>${item.title}</h3>
                 <p>${item.snippet}</p>
                 <div class="news-meta">
-                    <span>Source: ${item.source}</span>
-                    <span>Date: ${item.date}</span>
+                    <span>📰 ${item.source}</span>
+                    <span>📅 ${item.date}</span>
                 </div>
-                <button onclick="saveAsNote(${index}, '${escapeHtml(item.title)}')" style="margin-top: 10px; padding: 8px 16px; font-size: 0.9em;">Save to Notes</button>
+                <button onclick="saveAsNote(${index}, '${escapeHtml(item.title)}')" style="margin-top: 15px;">
+                    <span>💾 Save to Notes</span>
+                </button>
             </div>
         `;
     });
@@ -141,11 +155,15 @@ function saveAsNote(index, title) {
     const content = item.querySelector('p').textContent;
     const source = item.querySelector('.news-meta span:first-child').textContent;
 
-    createNote(title, content + '\n\nSource: ' + source);
+    createNote(title, content + '\n\n' + source);
 
-    // Switch to notes tab
-    document.querySelector('[data-tab="notes"]').click();
-    alert('Article saved to notes!');
+    // Show notification
+    showNotification('✅ Article saved to notes!');
+
+    // Switch to notes tab after a short delay
+    setTimeout(() => {
+        document.querySelector('[data-tab="notes"]').click();
+    }, 500);
 }
 
 // ===== NOTES & ANNOTATIONS FUNCTIONALITY =====
@@ -277,7 +295,13 @@ function displaySources() {
     const format = document.getElementById('citationFormat').value;
 
     if (sources.length === 0) {
-        container.innerHTML = '<p class="placeholder">No sources added yet. Add your first source above.</p>';
+        container.innerHTML = `
+            <div class="empty-state">
+                <span class="empty-icon">📚</span>
+                <h3>No Sources Yet</h3>
+                <p>Start building your bibliography by adding your first source above!</p>
+            </div>
+        `;
         return;
     }
 
@@ -288,8 +312,12 @@ function displaySources() {
             <div class="source-item" data-source-id="${source.id}">
                 <div class="citation">${citation}</div>
                 <div class="source-actions">
-                    <button class="copy-btn" onclick="copyCitation('${escapeHtml(citation)}')">Copy Citation</button>
-                    <button class="remove-btn" onclick="removeSource('${source.id}')">Remove</button>
+                    <button class="copy-btn" onclick="copyCitation('${escapeHtml(citation)}')">
+                        <span>📋 Copy Citation</span>
+                    </button>
+                    <button class="remove-btn" onclick="removeSource('${source.id}')">
+                        <span>🗑️ Remove</span>
+                    </button>
                 </div>
             </div>
         `;
@@ -364,8 +392,43 @@ function copyCitation(citation) {
     // Remove HTML tags for clipboard
     const text = citation.replace(/<[^>]*>/g, '');
     navigator.clipboard.writeText(text).then(() => {
+        showNotification('✅ Citation copied to clipboard!');
+    }).catch(() => {
         alert('Citation copied to clipboard!');
     });
+}
+
+// Show temporary notification
+function showNotification(message) {
+    // Remove any existing notification
+    const existing = document.querySelector('.notification');
+    if (existing) existing.remove();
+
+    // Create notification
+    const notification = document.createElement('div');
+    notification.className = 'notification';
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+        color: white;
+        padding: 15px 25px;
+        border-radius: 15px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        z-index: 10000;
+        font-weight: 600;
+        animation: slideIn 0.3s ease;
+    `;
+
+    document.body.appendChild(notification);
+
+    // Remove after 3 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
 }
 
 function removeSource(sourceId) {
@@ -380,9 +443,15 @@ function removeSource(sourceId) {
 // ===== ANALYTICS & VISUALIZATION =====
 
 function updateStatistics() {
-    // Update stat numbers
+    // Update stat numbers in analytics tab
     document.getElementById('statNotes').textContent = notes.length;
     document.getElementById('statSources').textContent = sources.length;
+
+    // Update header stats
+    const headerNotes = document.getElementById('headerNotes');
+    const headerSources = document.getElementById('headerSources');
+    if (headerNotes) headerNotes.textContent = notes.length;
+    if (headerSources) headerSources.textContent = sources.length;
 
     // Count unique tags
     const allTags = notes.map(note => note.tags).join(',').split(',');
