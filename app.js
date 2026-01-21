@@ -3,6 +3,10 @@ let notes = [];
 let sources = [];
 let charts = {};
 
+// NewsAPI Configuration
+const NEWS_API_KEY = '4ccfb9012ee34dca90045e4065140533';
+const NEWS_API_URL = 'https://newsapi.org/v2/everything';
+
 // Load saved data from localStorage on page load
 window.addEventListener('DOMContentLoaded', () => {
     loadData();
@@ -57,11 +61,34 @@ function performSearch(query) {
         </div>
     `;
 
-    // Simulated news data (in a real app, this would call an API)
-    setTimeout(() => {
-        const mockResults = generateMockNews(query);
-        displayNewsResults(mockResults);
-    }, 800);
+    // Call the real NewsAPI
+    const searchQuery = encodeURIComponent(query);
+    const apiUrl = `${NEWS_API_URL}?q=${searchQuery}&language=en&sortBy=relevancy&pageSize=20&apiKey=${NEWS_API_KEY}`;
+
+    fetch(apiUrl)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('API request failed');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'ok' && data.articles) {
+                displayNewsResults(data.articles);
+            } else {
+                throw new Error('No articles found');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching news:', error);
+            resultsContainer.innerHTML = `
+                <div class="empty-state">
+                    <span class="empty-icon">😕</span>
+                    <h3>Something went wrong</h3>
+                    <p>We couldn't fetch articles right now. Please try again later or check your internet connection.</p>
+                </div>
+            `;
+        });
 }
 
 function generateMockNews(query) {
@@ -114,7 +141,7 @@ function generateMockNews(query) {
 function displayNewsResults(results) {
     const resultsContainer = document.getElementById('newsResults');
 
-    if (results.length === 0) {
+    if (!results || results.length === 0) {
         resultsContainer.innerHTML = `
             <div class="empty-state">
                 <span class="empty-icon">😕</span>
@@ -126,36 +153,58 @@ function displayNewsResults(results) {
     }
 
     let html = '';
-    results.forEach((item, index) => {
+    results.forEach((article, index) => {
+        // Format the date
+        const articleDate = article.publishedAt ? new Date(article.publishedAt).toLocaleDateString() : 'N/A';
+
+        // Get description or content preview
+        const description = article.description || article.content || 'No description available.';
+        const snippet = description.length > 200 ? description.substring(0, 200) + '...' : description;
+
+        // Get source name
+        const sourceName = article.source?.name || 'Unknown Source';
+
         html += `
             <div class="news-item">
-                <h3>${item.title}</h3>
-                <p>${item.snippet}</p>
+                <h3>${article.title}</h3>
+                <p>${snippet}</p>
                 <div class="news-meta">
-                    <span>📰 ${item.source}</span>
-                    <span>📅 ${item.date}</span>
+                    <span>📰 ${sourceName}</span>
+                    <span>📅 ${articleDate}</span>
                 </div>
-                <button onclick="saveAsNote(${index}, '${escapeHtml(item.title)}')" style="margin-top: 15px;">
-                    <span>💾 Save to Notes</span>
-                </button>
+                <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
+                    <button onclick="window.open('${article.url}', '_blank')" class="read-btn">
+                        <span>📖 Read Full Article</span>
+                    </button>
+                    <button onclick="saveArticleAsNote(${index})" class="save-note-btn">
+                        <span>💾 Save to Notes</span>
+                    </button>
+                </div>
             </div>
         `;
     });
 
     resultsContainer.innerHTML = html;
+
+    // Store articles globally so we can access them when saving notes
+    window.currentArticles = results;
 }
 
 function escapeHtml(text) {
     return text.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }
 
-function saveAsNote(index, title) {
-    const newsItems = document.querySelectorAll('.news-item');
-    const item = newsItems[index];
-    const content = item.querySelector('p').textContent;
-    const source = item.querySelector('.news-meta span:first-child').textContent;
+function saveArticleAsNote(index) {
+    if (!window.currentArticles || !window.currentArticles[index]) {
+        alert('Article not found!');
+        return;
+    }
 
-    createNote(title, content + '\n\n' + source);
+    const article = window.currentArticles[index];
+    const title = article.title;
+    const content = `${article.description || article.content || ''}\n\nSource: ${article.source?.name || 'Unknown'}\nPublished: ${new Date(article.publishedAt).toLocaleDateString()}\nURL: ${article.url}`;
+
+    createNote(title, content);
 
     // Show notification
     showNotification('✅ Article saved to notes!');

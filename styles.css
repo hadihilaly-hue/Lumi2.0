@@ -453,6 +453,14 @@ button:hover .btn-arrow {
     font-weight: 500;
 }
 
+.read-btn {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--purple) 100%);
+}
+
+.save-note-btn {
+    background: linear-gradient(135deg, var(--success) 0%, var(--cyan) 100%);
+}
+
 /* Notes Styles */
 .notes-controls {
     display: flex;
