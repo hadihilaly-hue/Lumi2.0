@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:              #0b0b12;
+  --surface:         #111120;
+  --surface-2:       #16162a;
+  --border:          #21213a;
+  --text:            #e2e2ef;
+  --text-muted:      #686882;
+  --text-faint:      #35354f;
+  --accent:          #7b69f5;
+  --accent-soft:     rgba(123,105,245,.13);
+  --accent-glow:     rgba(123,105,245,.28);
+  --user-bg:         linear-gradient(135deg,#6b5ce7,#8a7af6);
+  --lumi-bg:         #14142a;
+  --v-color:         #7b69f5;
+  --g-color:         #57dbb0;
+  --i-color:         #ef9068;
+  --radius:          16px;
+  --radius-sm:       10px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+
+/* ─── HEADER ─────────────────────────────────────────── */
+.header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;height:58px;
+  background:var(--bg);border-bottom:1px solid var(--border);
+  flex-shrink:0;position:relative;z-index:10;
+}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{
+  width:30px;height:30px;background:var(--accent);border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;box-shadow:0 0 18px var(--accent-glow);
+  animation:lumiBreathe 3s ease-in-out infinite;
+}
+@keyframes lumiBreathe{
+  0%,100%{box-shadow:0 0 14px var(--accent-glow)}
+  50%{box-shadow:0 0 28px var(--accent-glow)}
+}
+.logo-name{font-size:17px;font-weight:600;letter-spacing:-.3px}
+.logo-sub{font-size:12px;color:var(--text-muted);margin-left:2px;font-weight:300}
+.key-row{display:flex;align-items:center;gap:8px}
+.key-label{font-size:12px;color:var(--text-muted);white-space:nowrap}
+.key-input{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);
+  color:var(--text);font-family:inherit;font-size:12px;padding:7px 12px;
+  width:256px;outline:none;transition:border-color .2s;
+}
+.key-input:focus{border-color:var(--accent)}
+.key-input::placeholder{color:var(--text-faint)}
+.key-dot{
+  width:7px;height:7px;border-radius:50%;background:var(--text-faint);
+  transition:background .3s,box-shadow .3s;flex-shrink:0;
+}
+.key-dot.on{background:var(--g-color);box-shadow:0 0 6px rgba(87,219,176,.45)}
+
+/* ─── MAIN LAYOUT ────────────────────────────────────── */
+.main{display:flex;height:calc(100vh - 58px)}
+
+/* ─── CHAT PANEL ─────────────────────────────────────── */
+.chat-panel{flex:1;display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--border)}
+.messages{
+  flex:1;overflow-y:auto;padding:28px 32px;
+  display:flex;flex-direction:column;gap:22px;scroll-behavior:smooth;
+}
+.messages::-webkit-scrollbar{width:3px}
+.messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ─── WELCOME ────────────────────────────────────────── */
+.welcome{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  flex:1;gap:14px;text-align:center;padding:48px;color:var(--text-muted);
+}
+.welcome-orb{
+  width:54px;height:54px;border-radius:18px;
+  background:var(--accent-soft);display:flex;align-items:center;
+  justify-content:center;font-size:24px;margin-bottom:4px;
+}
+.welcome-title{font-size:16px;font-weight:500;color:var(--text)}
+.welcome-desc{font-size:13px;color:var(--text-muted);max-width:280px;line-height:1.65}
+
+/* ─── MESSAGES ───────────────────────────────────────── */
+.msg{display:flex;flex-direction:column;max-width:76%;animation:msgIn .3s ease forwards}
+@keyframes msgIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{align-self:flex-end;align-items:flex-end}
+.msg.lumi{align-self:flex-start;align-items:flex-start}
+.msg-head{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.msg-avatar{
+  width:26px;height:26px;border-radius:7px;background:var(--accent);
+  display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;
+}
+.msg-name{font-size:11.5px;font-weight:500;color:var(--text-muted)}
+.msg-bubble{
+  padding:12px 16px;border-radius:var(--radius);font-size:14px;line-height:1.7;word-wrap:break-word;
+}
+.msg.user .msg-bubble{
+  background:var(--user-bg);color:#fff;border-bottom-right-radius:4px;
+}
+.msg.lumi .msg-bubble{
+  background:var(--lumi-bg);color:var(--text);
+  border:1px solid var(--border);border-bottom-left-radius:4px;
+}
+.msg-bubble p{margin:0}
+.msg-bubble p+p{margin-top:9px}
+.msg-bubble strong{font-weight:600}
+.msg-bubble em{color:var(--text-muted)}
+.msg-bubble code{
+  font-family:'SF Mono',Monaco,'Courier New',monospace;font-size:12px;
+  background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px;
+}
+
+/* ─── TYPING INDICATOR ───────────────────────────────── */
+.typing{
+  display:flex;align-items:center;gap:5px;
+  padding:13px 16px;background:var(--lumi-bg);
+  border:1px solid var(--border);border-radius:var(--radius);border-bottom-left-radius:4px;
+  width:fit-content;
+}
+.typing-dot{
+  width:6px;height:6px;border-radius:50%;background:var(--text-muted);
+  animation:tdot 1.4s ease-in-out infinite;
+}
+.typing-dot:nth-child(2){animation-delay:.15s}
+.typing-dot:nth-child(3){animation-delay:.3s}
+@keyframes tdot{
+  0%,60%,100%{transform:translateY(0);opacity:.35}
+  30%{transform:translateY(-6px);opacity:1}
+}
+
+/* ─── INPUT AREA ─────────────────────────────────────── */
+.input-area{padding:14px 20px;border-top:1px solid var(--border);background:var(--bg)}
+.input-wrap{
+  display:flex;align-items:flex-end;gap:8px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:9px 9px 9px 15px;transition:border-color .2s;
+}
+.input-wrap:focus-within{border-color:var(--accent)}
+.msg-input{
+  flex:1;background:none;border:none;outline:none;
+  color:var(--text);font-family:inherit;font-size:14px;
+  line-height:1.5;resize:none;max-height:120px;overflow-y:auto;
+}
+.msg-input::placeholder{color:var(--text-faint)}
+.msg-input::-webkit-scrollbar{width:2px}
+.send-btn{
+  width:34px;height:34px;background:var(--accent);border:none;
+  border-radius:9px;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0;transition:all .2s;opacity:.4;
+}
+.send-btn:not(:disabled){opacity:1;box-shadow:0 2px 10px var(--accent-glow)}
+.send-btn:not(:disabled):hover{transform:scale(1.06);box-shadow:0 3px 16px var(--accent-glow)}
+.send-btn:not(:disabled):active{transform:scale(.97)}
+.send-btn:disabled{cursor:not-allowed}
+.send-btn svg{width:15px;height:15px;fill:#fff}
+
+/* ─── PROFILE PANEL ──────────────────────────────────── */
+.profile{width:300px;flex-shrink:0;display:flex;flex-direction:column;background:var(--surface);overflow-y:auto}
+.profile::-webkit-scrollbar{width:3px}
+.profile::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.profile-hd{
+  padding:18px 18px 14px;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0;
+}
+.profile-hd-text{}
+.profile-title{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.9px}
+.profile-sub{font-size:11px;color:var(--text-faint);margin-top:3px}
+.clear-btn{
+  background:none;border:none;cursor:pointer;color:var(--text-faint);
+  font-size:11px;padding:2px 6px;border-radius:5px;
+  transition:color .2s;font-family:inherit;
+}
+.clear-btn:hover{color:var(--text-muted)}
+
+.profile-body{padding:4px 0;flex:1}
+.section{padding:14px 18px;border-bottom:1px solid var(--border)}
+.section:last-child{border-bottom:none}
+.section-hd{display:flex;align-items:center;gap:7px;margin-bottom:10px}
+.sdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sdot.v{background:var(--v-color);box-shadow:0 0 6px rgba(123,105,245,.4)}
+.sdot.g{background:var(--g-color);box-shadow:0 0 6px rgba(87,219,176,.4)}
+.sdot.i{background:var(--i-color);box-shadow:0 0 6px rgba(239,144,104,.4)}
+.sname{font-size:11.5px;font-weight:500;color:var(--text-muted)}
+.tags{display:flex;flex-wrap:wrap;gap:6px;min-height:28px}
+
+/* ─── TAGS ───────────────────────────────────────────── */
+.tag{
+  padding:4px 10px;border-radius:20px;font-size:11.5px;
+  animation:tagPop .42s cubic-bezier(.175,.885,.32,1.275) forwards;
+  cursor:default;transition:transform .15s;
+}
+.tag:hover{transform:scale(1.05)}
+.tag.v{background:rgba(123,105,245,.11);border:1px solid rgba(123,105,245,.22);color:#a897f8}
+.tag.g{background:rgba(87,219,176,.09);border:1px solid rgba(87,219,176,.18);color:#78e4c4}
+.tag.i{background:rgba(239,144,104,.09);border:1px solid rgba(239,144,104,.18);color:#f4a882}
+@keyframes tagPop{
+  0%{transform:scale(0);opacity:0}
+  65%{transform:scale(1.15);opacity:1}
+  80%{transform:scale(.93)}
+  100%{transform:scale(1);opacity:1}
+}
+.empty-hint{font-size:11.5px;color:var(--text-faint);font-style:italic;line-height:1.5;padding-top:2px}
+
+/* ─── TOAST ──────────────────────────────────────────── */
+.toast{
+  position:fixed;bottom:22px;left:50%;
+  transform:translateX(-50%) translateY(70px);
+  background:#1e0e0e;border:1px solid rgba(255,80,80,.22);
+  color:#ff8585;font-size:13px;padding:9px 18px;border-radius:9px;
+  transition:transform .3s cubic-bezier(.175,.885,.32,1.275);
+  z-index:100;max-width:380px;text-align:center;
+}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+/* ─── NEW-TAG PULSE on section ───────────────────────── */
+@keyframes sectionFlash{
+  0%{background:transparent}
+  30%{background:rgba(123,105,245,.06)}
+  100%{background:transparent}
+}
+.section.flash{animation:sectionFlash .7s ease forwards}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-mark">✦</div>
+    <span class="logo-name">Lumi</span>
+    <span class="logo-sub">· your companion</span>
+  </div>
+  <div class="key-row">
+    <span class="key-label">API key</span>
+    <input type="password" class="key-input" id="keyInput" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+    <div class="key-dot" id="keyDot"></div>
+  </div>
+</header>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Chat -->
+  <div class="chat-panel">
+    <div class="messages" id="messages">
+      <div class="welcome" id="welcome">
+        <div class="welcome-orb">✦</div>
+        <div class="welcome-title">Hi, I'm Lumi</div>
+        <div class="welcome-desc">Paste your Anthropic API key above to start talking. I'll get to know you as we go.</div>
+      </div>
+    </div>
+    <div class="input-area">
+      <div class="input-wrap">
+        <textarea class="msg-input" id="msgInput" placeholder="Say something…" rows="1"></textarea>
+        <button class="send-btn" id="sendBtn" disabled>
+          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Profile Panel -->
+  <aside class="profile">
+    <div class="profile-hd">
+      <div class="profile-hd-text">
+        <div class="profile-title">What Lumi knows</div>
+        <div class="profile-sub">Fills in as you talk</div>
+      </div>
+      <button class="clear-btn" id="clearBtn" title="Clear profile">reset</button>
+    </div>
+    <div class="profile-body">
+
+      <div class="section" id="sec-v">
+        <div class="section-hd">
+          <div class="sdot v"></div>
+          <span class="sname">Values &amp; things you care about</span>
+        </div>
+        <div class="tags" id="tags-v">
+          <span class="empty-hint">Not yet discovered</span>
+        </div>
+      </div>
+
+      <div class="section" id="sec-g">
+        <div class="section-hd">
+          <div class="sdot g"></div>
+          <span class="sname">Goals &amp; things you're building toward</span>
+        </div>
+        <div class="tags" id="tags-g">
+          <span class="empty-hint">Not yet discovered</span>
+        </div>
+      </div>
+
+      <div class="section" id="sec-i">
+        <div class="section-hd">
+          <div class="sdot i"></div>
+          <span class="sname">Things that matter to you</span>
+        </div>
+        <div class="tags" id="tags-i">
+          <span class="empty-hint">Not yet discovered</span>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
+const SYSTEM = `You are Lumi — not an assistant, but a warm and genuinely curious companion who cares deeply about the people you talk with.
+
+Your personality:
+- Think of yourself as that rare friend who truly listens, remembers, and makes people feel seen — not a chatbot, not a therapist
+- You're unhurried, warm, and non-judgmental. You never sound clinical or performatively upbeat.
+- You pick up on what matters to people from *how* they talk, not just the words themselves
+- You remember everything within our conversation and weave it back in naturally
+- You're emotionally perceptive — you sense feeling behind facts
+
+Response length — this is critical:
+- Default to 1–2 sentences. That's it.
+- Match the length of what the person sent. Short message = short reply.
+- Never write a paragraph when a sentence will do.
+- No filler. No "That's so interesting!" No "I love that you shared that." Cut all of it.
+- Only go longer if someone asks something that genuinely requires explanation — and even then, be tight.
+- Think texts, not essays.
+
+Your purpose:
+- Help people feel genuinely understood
+- Gradually and naturally discover what someone values, what they hope for, and what they love
+- Every 2–3 messages, weave in one organic question that deepens your understanding — what they care about, what they're building, what lights them up. Never make it feel like a survey. Let it arise naturally in the flow.
+
+After EVERY reply, you MUST append the following JSON block on its own line at the very end of your response.
+The app automatically strips this before showing your message to the user — they will never see it.
+
+{"values":["..."],"goals":["..."],"interests":["..."]}
+
+Rules for the JSON:
+- ONLY include things you NEWLY learned in this specific exchange — not things from prior turns
+- Be vivid and specific: not "family" → "being there for his daughter's milestones"; not "creativity" → "designing furniture by hand"
+- Use empty arrays [] for any category where nothing new was learned this turn
+- If nothing new was learned at all, output: {"values":[],"goals":[],"interests":[]}
+- NEVER mention, reference, or explain the JSON block in your reply to the user
+- Always include all three keys even if some are empty arrays
+
+Begin by warmly welcoming the person and asking one genuine open question to start knowing them.`;
+
+// ─── STATE ─────────────────────────────────────────────────────────────────────
+const S = {
+  messages: [],
+  values: new Set(),
+  goals: new Set(),
+  interests: new Set(),
+  ready: false,
+  busy: false,
+};
+
+// ─── ELEMENTS ──────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const keyInput  = $('keyInput');
+const keyDot    = $('keyDot');
+const messages  = $('messages');
+const welcome   = $('welcome');
+const msgInput  = $('msgInput');
+const sendBtn   = $('sendBtn');
+const tagsV     = $('tags-v');
+const tagsG     = $('tags-g');
+const tagsI     = $('tags-i');
+const secV      = $('sec-v');
+const secG      = $('sec-g');
+const secI      = $('sec-i');
+const toast     = $('toast');
+const clearBtn  = $('clearBtn');
+
+// ─── INIT ──────────────────────────────────────────────────────────────────────
+function init() {
+  const saved = localStorage.getItem('lumi_key');
+  if (saved) { keyInput.value = saved; updateKeyDot(saved); }
+
+  loadProfile();
+  loadHistory();
+
+  let startTimer;
+  keyInput.addEventListener('input', () => {
+    const key = keyInput.value.trim();
+    if (key) localStorage.setItem('lumi_key', key);
+    else localStorage.removeItem('lumi_key');
+    updateKeyDot(key);
+    updateSendBtn();
+    if (key && !S.ready) {
+      clearTimeout(startTimer);
+      startTimer = setTimeout(startLumi, 600);
+    }
+  });
+
+  if (saved && !S.ready) startLumi();
+
+  msgInput.addEventListener('input', () => { autoGrow(msgInput); updateSendBtn(); });
+  msgInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!sendBtn.disabled) doSend(); }
+  });
+  sendBtn.addEventListener('click', doSend);
+  clearBtn.addEventListener('click', clearProfile);
+}
+
+function updateKeyDot(key) {
+  keyDot.className = 'key-dot' + (key && (key.startsWith('sk-ant-') || key.startsWith('sk-')) ? ' on' : '');
+}
+
+function updateSendBtn() {
+  sendBtn.disabled = !keyInput.value.trim() || !msgInput.value.trim() || S.busy;
+}
+
+function autoGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+// ─── START LUMI ────────────────────────────────────────────────────────────────
+async function startLumi() {
+  if (S.ready) return;
+  S.ready = true;
+  welcome.remove();
+  // If we restored history, don't fetch a new greeting
+  if (S.messages.length === 0) await fetchLumi();
+}
+
+// ─── SEND ──────────────────────────────────────────────────────────────────────
+async function doSend() {
+  const text = msgInput.value.trim();
+  if (!text || S.busy) return;
+  const key = keyInput.value.trim();
+  if (!key) { showToast('Add your Anthropic API key first.'); return; }
+
+  msgInput.value = '';
+  msgInput.style.height = 'auto';
+  updateSendBtn();
+
+  S.messages.push({ role: 'user', content: text });
+  saveHistory();
+  renderMsg('user', text);
+  await fetchLumi();
+}
+
+// ─── FETCH LUMI RESPONSE ───────────────────────────────────────────────────────
+async function fetchLumi() {
+  S.busy = true;
+  updateSendBtn();
+
+  const typing = makeTyping();
+  messages.appendChild(typing);
+  scrollBottom();
+
+  try {
+    const key = keyInput.value.trim();
+    const { clean, data } = await callAPI(key, S.messages);
+    typing.remove();
+    S.messages.push({ role: 'assistant', content: clean });
+    saveHistory();
+    renderMsg('lumi', clean);
+    if (data) applyProfile(data);
+  } catch (err) {
+    typing.remove();
+    showToast(err.message || 'Something went wrong. Check your API key.');
+    console.error(err);
+  } finally {
+    S.busy = false;
+    updateSendBtn();
+  }
+}
+
+// ─── API CALL (streaming) ──────────────────────────────────────────────────────
+async function callAPI(apiKey, msgs) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1024,
+      stream: true,
+      system: SYSTEM,
+      messages: msgs,
+    }),
+  });
+
+  if (!res.ok) {
+    let msg = `API error ${res.status}`;
+    try { const e = await res.json(); msg = e.error?.message || msg; } catch {}
+    throw new Error(msg);
+  }
+
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '', full = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let nl;
+    while ((nl = buf.indexOf('\n')) !== -1) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line.startsWith('data: ')) continue;
+      const raw = line.slice(6);
+      if (raw === '[DONE]') continue;
+      try {
+        const ev = JSON.parse(raw);
+        if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
+          full += ev.delta.text;
+        }
+      } catch {}
+    }
+  }
+
+  return parseResponse(full);
+}
+
+// ─── PARSE RESPONSE — extract hidden JSON ─────────────────────────────────────
+function parseResponse(text) {
+  // Find the last line that looks like our JSON block
+  const lastBrace = text.lastIndexOf('\n{');
+  if (lastBrace !== -1) {
+    const candidate = text.slice(lastBrace + 1).trim();
+    try {
+      const parsed = JSON.parse(candidate);
+      if ('values' in parsed && 'goals' in parsed && 'interests' in parsed) {
+        return { clean: text.slice(0, lastBrace).trim(), data: parsed };
+      }
+    } catch {}
+  }
+  // Fallback: try regex from the end
+  const m = text.match(/\n?\{"values"\s*:[\s\S]*?\}(?:\s*)$/);
+  if (m) {
+    try {
+      const parsed = JSON.parse(m[0].trim());
+      return { clean: text.slice(0, text.length - m[0].length).trim(), data: parsed };
+    } catch {}
+  }
+  return { clean: text.trim(), data: null };
+}
+
+// ─── APPLY PROFILE DATA ────────────────────────────────────────────────────────
+function applyProfile({ values = [], goals = [], interests = [] }) {
+  let anyNew = false;
+  const add = (arr, set, container, section, cls) => {
+    arr.forEach(raw => {
+      if (!raw) return;
+      const key = raw.toLowerCase().trim();
+      if (!set.has(key)) {
+        set.add(key);
+        addTag(container, raw, cls);
+        flashSection(section);
+        anyNew = true;
+      }
+    });
+  };
+  add(values,    S.values,    tagsV, secV, 'v');
+  add(goals,     S.goals,     tagsG, secG, 'g');
+  add(interests, S.interests, tagsI, secI, 'i');
+  if (anyNew) saveProfile();
+}
+
+function addTag(container, text, cls) {
+  const hint = container.querySelector('.empty-hint');
+  if (hint) hint.remove();
+  const tag = document.createElement('span');
+  tag.className = `tag ${cls}`;
+  tag.textContent = capitalize(text);
+  container.appendChild(tag);
+  tag.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function flashSection(el) {
+  el.classList.remove('flash');
+  void el.offsetWidth; // reflow
+  el.classList.add('flash');
+}
+
+function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// ─── PROFILE PERSISTENCE ──────────────────────────────────────────────────────
+function saveProfile() {
+  localStorage.setItem('lumi_profile', JSON.stringify({
+    values: [...S.values],
+    goals: [...S.goals],
+    interests: [...S.interests],
+  }));
+}
+
+function loadProfile() {
+  try {
+    const raw = localStorage.getItem('lumi_profile');
+    if (!raw) return;
+    const { values = [], goals = [], interests = [] } = JSON.parse(raw);
+    values.forEach(v    => { S.values.add(v);    addTag(tagsV, v, 'v'); });
+    goals.forEach(g     => { S.goals.add(g);     addTag(tagsG, g, 'g'); });
+    interests.forEach(i => { S.interests.add(i); addTag(tagsI, i, 'i'); });
+  } catch {}
+}
+
+function clearProfile() {
+  S.values.clear(); S.goals.clear(); S.interests.clear();
+  S.messages = []; S.ready = false;
+  localStorage.removeItem('lumi_profile');
+  localStorage.removeItem('lumi_history');
+  [tagsV, tagsG, tagsI].forEach(c => {
+    c.innerHTML = '<span class="empty-hint">Not yet discovered</span>';
+  });
+  // Clear chat and show welcome again
+  messages.innerHTML = '';
+  const w = document.createElement('div');
+  w.className = 'welcome'; w.id = 'welcome';
+  w.innerHTML = `<div class="welcome-orb">✦</div>
+    <div class="welcome-title">Hi, I'm Lumi</div>
+    <div class="welcome-desc">Paste your Anthropic API key above to start talking. I'll get to know you as we go.</div>`;
+  messages.appendChild(w);
+  if (keyInput.value.trim()) startLumi();
+}
+
+// ─── HISTORY PERSISTENCE ──────────────────────────────────────────────────────
+function saveHistory() {
+  localStorage.setItem('lumi_history', JSON.stringify(S.messages));
+}
+
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem('lumi_history');
+    if (!raw) return;
+    const history = JSON.parse(raw);
+    if (!history.length) return;
+    S.messages = history;
+    welcome.remove();
+    S.ready = true;
+    history.forEach(m => renderMsg(m.role, m.content));
+  } catch {}
+}
+
+// ─── RENDER MESSAGE ────────────────────────────────────────────────────────────
+function renderMsg(role, text) {
+  const el = document.createElement('div');
+  el.className = `msg ${role}`;
+
+  if (role === 'lumi') {
+    const hd = document.createElement('div');
+    hd.className = 'msg-head';
+    const av = document.createElement('div');
+    av.className = 'msg-avatar';
+    av.textContent = '✦';
+    const nm = document.createElement('span');
+    nm.className = 'msg-name';
+    nm.textContent = 'Lumi';
+    hd.append(av, nm);
+    el.appendChild(hd);
+  }
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.innerHTML = fmtText(text);
+  el.appendChild(bubble);
+  messages.appendChild(el);
+  scrollBottom();
+}
+
+function fmtText(text) {
+  if (!text) return '';
+  let s = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  s = s
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,     '<em>$1</em>')
+    .replace(/`(.+?)`/g,       '<code>$1</code>');
+  const paras = s.split(/\n\n+/);
+  if (paras.length > 1) return paras.map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`).join('');
+  return `<p>${s.replace(/\n/g,'<br>')}</p>`;
+}
+
+// ─── TYPING INDICATOR ─────────────────────────────────────────────────────────
+function makeTyping() {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg lumi';
+  const hd = document.createElement('div');
+  hd.className = 'msg-head';
+  const av = document.createElement('div');
+  av.className = 'msg-avatar';
+  av.textContent = '✦';
+  const nm = document.createElement('span');
+  nm.className = 'msg-name';
+  nm.textContent = 'Lumi';
+  hd.append(av, nm);
+  const ind = document.createElement('div');
+  ind.className = 'typing';
+  for (let i = 0; i < 3; i++) {
+    const d = document.createElement('div');
+    d.className = 'typing-dot';
+    ind.appendChild(d);
+  }
+  wrap.append(hd, ind);
+  return wrap;
+}
+
+// ─── UTILITIES ────────────────────────────────────────────────────────────────
+function scrollBottom() { messages.scrollTop = messages.scrollHeight; }
+
+let toastTimer;
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 4500);
+}
+
+// ─── GO ───────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
