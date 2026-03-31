@@ -474,89 +474,94 @@ body{display:flex;height:100vh}
 
 <script>
 // ─── CURRICULUM DATA ──────────────────────────────────────────────────────────
-const SUBJECTS = [
-  { id:'english', name:'English', courses:Object.keys({
-    "English 1 (9th Grade)":1,"English 2 (10th Grade)":1,
-    "Junior English Seminar":1,"Senior English Electives":1
-  })},
-  { id:'history', name:'History & Social Sciences', courses:Object.keys({
-    "Modern World History":1,"US History":1,"Philosophy":1,
-    "Psychology":1,"Economics":1,"Government & Politics":1,
-    "Ethnic Studies":1,"Humanities":1,"History Electives":1
-  })},
-  { id:'math', name:'Math', courses:Object.keys({
-    "Analytic Geometry & Algebra":1,"Algebra 2":1,"Precalculus":1,
-    "Introductory Calculus":1,"Advanced Calculus I (H)":1,
-    "Advanced Calculus II (H)":1,"AP Calculus BC":1,
-    "Statistics":1,"Advanced Topics in Math":1,"Applied Math & Data Science":1
-  })},
-  { id:'cs', name:'Computer Science', courses:Object.keys({
-    "CS1: Intro to CS":1,"CS2: Data Structures & Algorithms":1,
-    "Advanced Topics in CS":1,"Principles of Game Design":1
-  })},
-  { id:'science', name:'Science', courses:Object.keys({
-    "Living Systems (Bio 9)":1,"Chemistry":1,"Chemistry (H)":1,
-    "Physics 1":1,"Physics 2 (H)":1,"Molecular Biology":1,
-    "Advanced Biology (H)":1,"Advanced Chemistry (H)":1,
-    "Advanced Physics (H)":1,"Environmental Science":1,
-    "Anatomy & Physiology":1,"Neuroscience":1,"BioTech Research (H)":1
-  })},
-  { id:'applied', name:'Applied Science & Engineering', courses:Object.keys({
-    "Mechanical/Electrical Engineering":1,"Applied Science Research (H)":1,
-    "Sustainable Engineering":1,"Design":1
-  })},
-  { id:'language', name:'World Language', courses:Object.keys({
-    "Spanish 1":1,"Spanish 2":1,"Spanish 3-4 (Heritage)":1,"Advanced Spanish (H)":1,
-    "French 1":1,"French 2":1,"French 3":1,"French 4":1,"Advanced French (H)":1,
-    "Mandarin 1":1,"Mandarin 2":1,"Mandarin 3":1,"Mandarin 4":1,
-    "Mandarin 5":1,"Advanced Mandarin (H)":1,
-    "Latin 1":1,"Latin 2":1,"Latin 3":1,"Latin 4":1,"Advanced Latin (H)":1
-  })}
-];
-
-const TEACHERS = {
+const MENLO_CURRICULUM = {
   "English": {
-    "English 1 (9th Grade)": ["Rachel Blumenthal","Whitney Newton","Margaret Ramsey","Andrew Warren"],
-    "English 2 (10th Grade)": ["Jay Bush","Lily Chan","Rebecca Gertmenian","Meghann Schroers-Martin"],
+    "English 1": ["Rachel Blumenthal","Whitney Newton","Margaret Ramsey","Andrew Warren"],
+    "English 2": ["Jay Bush","Lily Chan","Rebecca Gertmenian","Meghann Schroers-Martin"],
     "Junior English Seminar": ["Tom Garvey","Oscar King","Maura Sincoff","Lily Chan","Cara Plamondon"],
-    "Senior English Electives": ["Cara Plamondon","Bridgett Longust","Whitney Newton","Oscar King","Jay Bush","Andrew Warren","Margaret Ramsey","Rachel Blumenthal","Tom Garvey","Maren Wolf"]
+    "Cafe Society": ["Bridgett Longust"],
+    "Contemporary World Literature": ["Lily Chan"],
+    "Creative Nonfiction Workshop (H)": ["Whitney Newton"],
+    "Dystopian Fiction & Film": ["Cara Plamondon"],
+    "East Asian Pop Culture": ["Oscar King"],
+    "Fairy Tales": ["Oscar King"],
+    "Global Mythologies": ["Jay Bush"],
+    "Humanities I: Renaissances": ["Rebecca Gertmenian"],
+    "Humanities II: Self-Portraits": ["Rebecca Gertmenian"],
+    "Literature & Science": ["Andrew Warren"],
+    "Literature in the Age of AI": ["Rachel Blumenthal"],
+    "Literature of the American Wilderness (H)": ["Whitney Newton"],
+    "Lyric & Lifeline": ["Margaret Ramsey"],
+    "Media & Cultural Studies (H)": ["Oscar King"],
+    "Medicine & Narrative": ["Rachel Blumenthal"],
+    "Modernist Poetry Workshop (H)": ["Jay Bush"],
+    "Novella Workshop (H)": ["Oscar King"],
+    "On Being": ["Margaret Ramsey"],
+    "Science Fiction & the Classics (H)": ["Tom Garvey"],
+    "Shakespeare Now (H)": ["Andrew Warren"],
+    "5 Months, 4 Books": ["Cara Plamondon"],
+    "Argumentation & Communication (H)": ["Maura Sincoff"]
   },
   "History & Social Sciences": {
     "Modern World History": ["Sabahat Adil","Franco Cruz-Ochoa","Katharine Hanson","Nicholas Merlesena"],
     "US History": ["Miles Bennett-Smith","Glenn Davis","Trevor McNeil","Nicholas Merlesena","Joseph Mitchell"],
-    "Philosophy": ["Jack Bowen"],
-    "Psychology": ["Dylan Citrin Cummins","Joseph Mitchell"],
-    "Economics": ["Charles Hanson"],
-    "Government & Politics": ["Miles Bennett-Smith","Joseph Mitchell","Matthew Nelson"],
-    "Ethnic Studies": ["Glenn Davis"],
-    "Humanities": ["Rebecca Gertmenian"],
-    "History Electives": ["Matthew Nelson","John Schafer","Trevor McNeil","Peter Brown","Sabahat Adil"]
+    "US History (H)": ["Glenn Davis","Trevor McNeil","Nicholas Merlesena","Joseph Mitchell"],
+    "Government & Politics (H)": ["Miles Bennett-Smith","Joseph Mitchell","Matthew Nelson"],
+    "Modern Europe (H)": ["Katharine Hanson"],
+    "Philosophy I": ["Jack Bowen"],
+    "Philosophy II": ["Jack Bowen"],
+    "Psychology I": ["Dylan Citrin Cummins","Joseph Mitchell"],
+    "Psychology II": ["Dylan Citrin Cummins","Joseph Mitchell"],
+    "Economic Theory": ["Charles Hanson"],
+    "American Economic History": ["Charles Hanson"],
+    "Environmental & Development Economics": ["Charles Hanson"],
+    "History of US Foreign Relations": ["Charles Hanson"],
+    "Ethnic Studies I": ["Glenn Davis"],
+    "Ethnic Studies II": ["Glenn Davis"],
+    "Gender Studies": ["Matthew Nelson"],
+    "Global Issues for Global Citizens": ["Matthew Nelson"],
+    "In Gods We Trust": ["Matthew Nelson"],
+    "Comparative Legal Systems": ["Trevor McNeil"],
+    "Current Affairs & Civil Discourse": ["John Schafer"],
+    "Pursuit of Happiness": ["Peter Brown"],
+    "Sultans, Shahs, and Sovereigns": ["Sabahat Adil"],
+    "Humanities I: Renaissances": ["Rebecca Gertmenian"],
+    "Humanities II: Self-Portraits": ["Rebecca Gertmenian"],
+    "IP Capstone Seminar (H)": ["Peter Brown","Matthew Nelson"]
   },
   "Math": {
-    "Analytic Geometry & Algebra": ["Rebecca Akers","Joe Rabison","Sujata Ganpule"],
-    "Algebra 2": ["Randall Joss","Nandhini Namasivayam","Rebecca Akers","Jacqueline Arreaga","Danielle Jensen"],
+    "Integrated Geometry & Algebra": ["Christine Walters"],
+    "Analytic Geometry & Algebra": ["Rebecca Akers","Joe Rabison"],
+    "Analytic Geometry & Algebra (H)": ["Sujata Ganpule"],
+    "Algebra 2": ["Randall Joss","Nandhini Namasivayam"],
+    "Algebra 2 with Trig": ["Rebecca Akers","Jacqueline Arreaga"],
+    "Algebra 2 with Trig (H)": ["Danielle Jensen"],
     "Precalculus": ["Yu-Loung Chang","Christine Walters"],
-    "Introductory Calculus": ["Jacqueline Arreaga","Dave Lowell","Reeve Garrett"],
+    "Introductory Calculus": ["Jacqueline Arreaga","Dave Lowell"],
+    "Introductory Calculus (H)": ["Reeve Garrett"],
+    "Calculus": ["Jude Loeffler"],
     "Advanced Calculus I (H)": ["Sujata Ganpule","Dave Lowell"],
     "Advanced Calculus II (H)": ["Yu-Loung Chang","Reeve Garrett"],
-    "AP Calculus BC": ["Reeve Garrett"],
-    "Statistics": ["Dennis Millstein"],
-    "Advanced Topics in Math": ["Reeve Garrett","Dennis Millstein"],
-    "Applied Math & Data Science": ["Jude Loeffler"]
+    "Advanced Topics in Math (H)": ["Reeve Garrett"],
+    "Probability & Statistics (H)": ["Dennis Millstein"],
+    "Advanced Topics in Statistics (H)": ["Dennis Millstein"],
+    "Applied Statistics & Epidemiology": ["Dennis Millstein"],
+    "Intro to Applied Math & Data Science": ["Jude Loeffler"]
   },
   "Computer Science": {
-    "CS1: Intro to CS": ["Douglas Kiang","Nandhini Namasivayam"],
-    "CS2: Data Structures & Algorithms": ["Nandhini Namasivayam"],
-    "Advanced Topics in CS": ["Zachary Blickensderfer"],
+    "CS1: Intro to Computer Science": ["Douglas Kiang","Nandhini Namasivayam"],
+    "CS2: Data Structures & Algorithms (H)": ["Nandhini Namasivayam"],
+    "Advanced Topics in CS (H)": ["Zachary Blickensderfer"],
     "Principles of Game Design": ["Douglas Kiang"]
   },
   "Science": {
-    "Living Systems (Bio 9)": ["Chrissy Orangio"],
+    "Living Systems: Biology in Balance": ["Chrissy Orangio"],
     "Chemistry": ["Laura Huntley","Mary McKenna"],
     "Chemistry (H)": ["Zachary Eagleton","Eugenia McCauley"],
+    "Conceptual Physics": ["Zachary Eagleton"],
     "Physics 1": ["Nina Arnberg","Laura Huntley","Zane Moore","Matthew Varvir"],
     "Physics 2 (H)": ["Matthew Varvir"],
-    "Molecular Biology": ["Nina Arnberg","Todd Hardie","Cristina Weaver"],
+    "Molecular Mechanisms in Biology": ["Nina Arnberg","Todd Hardie","Cristina Weaver"],
     "Advanced Biology (H)": ["Tatyana Buxton"],
     "Advanced Chemistry (H)": ["Eugenia McCauley"],
     "Advanced Physics (H)": ["James Dann"],
@@ -566,7 +571,7 @@ const TEACHERS = {
     "BioTech Research (H)": ["Tatyana Buxton"]
   },
   "Applied Science & Engineering": {
-    "Mechanical/Electrical Engineering": ["James Formato","Leo Jaimez"],
+    "Mechanical & Electrical Engineering": ["James Formato","Leo Jaimez"],
     "Applied Science Research (H)": ["James Dann"],
     "Sustainable Engineering": ["James Dann"],
     "Design": ["James Formato"]
@@ -574,7 +579,8 @@ const TEACHERS = {
   "World Language": {
     "Spanish 1": ["Janet Tennyson"],
     "Spanish 2": ["Janet Tennyson","Adolfo Guevara"],
-    "Spanish 3-4 (Heritage)": ["Perla Amaral"],
+    "Heritage Spanish 3": ["Perla Amaral"],
+    "Heritage Spanish 4": ["Perla Amaral"],
     "Advanced Spanish (H)": ["Patricia Frias"],
     "French 1": ["Marie Sajja"],
     "French 2": ["Corinne Chung"],
@@ -595,8 +601,24 @@ const TEACHERS = {
   }
 };
 
+// Build SUBJECTS array from MENLO_CURRICULUM for the sidebar renderer
+const SUBJECT_IDS = {
+  "English": "english",
+  "History & Social Sciences": "history",
+  "Math": "math",
+  "Computer Science": "cs",
+  "Science": "science",
+  "Applied Science & Engineering": "applied",
+  "World Language": "language"
+};
+const SUBJECTS = Object.entries(MENLO_CURRICULUM).map(([name, courses]) => ({
+  id: SUBJECT_IDS[name] || name.toLowerCase().replace(/\s+/g,'-'),
+  name,
+  courses: Object.keys(courses)
+}));
+
 function getTeachers(subjectName, course) {
-  return (TEACHERS[subjectName] && TEACHERS[subjectName][course]) || [];
+  return (MENLO_CURRICULUM[subjectName] && MENLO_CURRICULUM[subjectName][course]) || [];
 }
 
 // ─── SYSTEM PROMPTS ───────────────────────────────────────────────────────────
