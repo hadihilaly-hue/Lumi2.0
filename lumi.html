@@ -23,9 +23,6 @@
   --accent-glow: rgba(123,105,245,.28);
   --user-bg:     linear-gradient(135deg,#6b5ce7,#8a7af6);
   --lumi-bg:     #14142a;
-  --v-color:     #7b69f5;
-  --g-color:     #57dbb0;
-  --i-color:     #ef9068;
   --radius:      16px;
   --radius-sm:   10px;
   --shadow:      0 4px 24px rgba(0,0,0,.45);
@@ -226,7 +223,7 @@ body{display:flex;height:100vh}
 .main{flex:1;display:flex;overflow:hidden;}
 
 /* ─── CHAT PANEL ──────────────────────────────────────── */
-.chat-panel{flex:1;display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--border)}
+.chat-panel{flex:1;display:flex;flex-direction:column;min-width:0}
 .messages{flex:1;overflow-y:auto;padding:28px 32px;display:flex;flex-direction:column;gap:22px;scroll-behavior:smooth;}
 .messages::-webkit-scrollbar{width:3px}
 .messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
@@ -278,38 +275,10 @@ body{display:flex;height:100vh}
 .send-btn:not(:disabled):hover{transform:scale(1.06)}.send-btn:not(:disabled):active{transform:scale(.97)}
 .send-btn:disabled{cursor:not-allowed}.send-btn svg{width:15px;height:15px;fill:#fff}
 
-/* ─── PROFILE PANEL ───────────────────────────────────── */
-.profile{width:286px;flex-shrink:0;display:flex;flex-direction:column;background:var(--surface);overflow-y:auto}
-.profile::-webkit-scrollbar{width:3px}
-.profile::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-.profile-hd{padding:18px 18px 14px;border-bottom:1px solid var(--border);flex-shrink:0;}
-.profile-title{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.9px}
-.profile-sub{font-size:11px;color:var(--text-faint);margin-top:3px}
-.profile-body{padding:4px 0;flex:1}
-.section{padding:14px 18px;border-bottom:1px solid var(--border)}.section:last-child{border-bottom:none}
-.section-hd{display:flex;align-items:center;gap:7px;margin-bottom:10px}
-.sdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.sdot.v{background:var(--v-color);box-shadow:0 0 6px rgba(123,105,245,.4)}
-.sdot.g{background:var(--g-color);box-shadow:0 0 6px rgba(87,219,176,.4)}
-.sdot.i{background:var(--i-color);box-shadow:0 0 6px rgba(239,144,104,.4)}
-.sname{font-size:11.5px;font-weight:500;color:var(--text-muted)}
-.tags{display:flex;flex-wrap:wrap;gap:6px;min-height:28px}
-.tag{padding:4px 10px;border-radius:20px;font-size:11.5px;cursor:default;transition:transform .15s;}
-.tag:hover{transform:scale(1.05)}
-.tag.new{animation:tagPop .42s cubic-bezier(.175,.885,.32,1.275) forwards;}
-.tag.v{background:rgba(123,105,245,.11);border:1px solid rgba(123,105,245,.22);color:#a897f8}
-.tag.g{background:rgba(87,219,176,.09);border:1px solid rgba(87,219,176,.18);color:#78e4c4}
-.tag.i{background:rgba(239,144,104,.09);border:1px solid rgba(239,144,104,.18);color:#f4a882}
-@keyframes tagPop{0%{transform:scale(0);opacity:0}65%{transform:scale(1.15);opacity:1}80%{transform:scale(.93)}100%{transform:scale(1);opacity:1}}
-.empty-hint{font-size:11.5px;color:var(--text-faint);font-style:italic;line-height:1.5;padding-top:2px}
-
 /* ─── TOAST ───────────────────────────────────────────── */
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(70px);background:#1e0e0e;border:1px solid rgba(255,80,80,.22);color:#ff8585;font-size:13px;padding:9px 18px;border-radius:9px;transition:transform .3s cubic-bezier(.175,.885,.32,1.275);z-index:400;max-width:380px;text-align:center;}
 .toast.show{transform:translateX(-50%) translateY(0)}
 .toast.ok{background:#0e1e18;border-color:rgba(87,219,176,.25);color:#78e4c4}
-
-@keyframes sectionFlash{0%{background:transparent}30%{background:rgba(123,105,245,.06)}100%{background:transparent}}
-.section.flash{animation:sectionFlash .7s ease forwards}
 
 /* ─── SETTINGS DRAWER ─────────────────────────────────── */
 .settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .25s;z-index:200;}
@@ -346,7 +315,6 @@ body{display:flex;height:100vh}
   .sidebar.open{transform:translateX(0)}
   .sb-overlay{display:block}
   .mob-header{display:flex}
-  .profile{display:none}
 }
 </style>
 </head>
@@ -425,26 +393,6 @@ body{display:flex;height:100vh}
       </div>
     </div>
 
-    <aside class="profile">
-      <div class="profile-hd">
-        <div class="profile-title">What Lumi knows</div>
-        <div class="profile-sub">Fills in as you talk</div>
-      </div>
-      <div class="profile-body">
-        <div class="section" id="sec-v">
-          <div class="section-hd"><div class="sdot v"></div><span class="sname">Values &amp; things you care about</span></div>
-          <div class="tags" id="tags-v"><span class="empty-hint">Not yet discovered</span></div>
-        </div>
-        <div class="section" id="sec-g">
-          <div class="section-hd"><div class="sdot g"></div><span class="sname">Goals &amp; things you're building toward</span></div>
-          <div class="tags" id="tags-g"><span class="empty-hint">Not yet discovered</span></div>
-        </div>
-        <div class="section" id="sec-i">
-          <div class="section-hd"><div class="sdot i"></div><span class="sname">Things that matter to you</span></div>
-          <div class="tags" id="tags-i"><span class="empty-hint">Not yet discovered</span></div>
-        </div>
-      </div>
-    </aside>
   </div>
 </div>
 
@@ -608,12 +556,6 @@ const $ = id => document.getElementById(id);
 const messagesEl  = $('messages');
 const msgInput    = $('msgInput');
 const sendBtn     = $('sendBtn');
-const tagsV       = $('tags-v');
-const tagsG       = $('tags-g');
-const tagsI       = $('tags-i');
-const secV        = $('sec-v');
-const secG        = $('sec-g');
-const secI        = $('sec-i');
 const toast       = $('toast');
 const sbNav       = $('sbNav');
 const sbSearch    = $('sbSearch');
@@ -673,12 +615,11 @@ function loadConv(id) {
 
   messagesEl.innerHTML = '';
   S.values.clear(); S.goals.clear(); S.interests.clear();
-  [tagsV,tagsG,tagsI].forEach(c=>{ c.innerHTML='<span class="empty-hint">Not yet discovered</span>'; });
 
   S.messages.forEach(m => renderMsg(m.role, m.content, false));
-  (conv.values||[]).forEach(v    => { S.values.add(v);    addTag(tagsV,v,'v',false); });
-  (conv.goals||[]).forEach(g     => { S.goals.add(g);     addTag(tagsG,g,'g',false); });
-  (conv.interests||[]).forEach(i => { S.interests.add(i); addTag(tagsI,i,'i',false); });
+  (conv.values||[]).forEach(v    => S.values.add(v));
+  (conv.goals||[]).forEach(g     => S.goals.add(g));
+  (conv.interests||[]).forEach(i => S.interests.add(i));
 
   // Sync SB state with loaded tutor context
   if (S.tutorCtx) {
@@ -704,7 +645,6 @@ function newChat() {
   SB.activeTeacher = null;
 
   messagesEl.innerHTML = '';
-  [tagsV,tagsG,tagsI].forEach(c=>{ c.innerHTML='<span class="empty-hint">Not yet discovered</span>'; });
 
   const w = document.createElement('div');
   w.className='welcome'; w.id='welcome';
@@ -733,7 +673,6 @@ function openTutor(subjectId, course, teacher) {
   SB.activeTeacher = { subjectId, course, teacher };
 
   messagesEl.innerHTML = '';
-  [tagsV,tagsG,tagsI].forEach(c=>{ c.innerHTML='<span class="empty-hint">Not yet discovered</span>'; });
 
   // Inject greeting (no API call)
   const greeting = `You're now studying ${course} with ${teacher}. How can I help?`;
@@ -1106,29 +1045,17 @@ function parseResponse(text) {
 // ─── PROFILE ─────────────────────────────────────────────────────────────────
 function applyProfile({ values=[], goals=[], interests=[] }) {
   let anyNew=false;
-  const add=(arr,set,container,section,cls)=>{
+  const add=(arr,set)=>{
     arr.forEach(raw=>{
       if(!raw)return; const k=raw.toLowerCase().trim();
-      if(!set.has(k)){ set.add(k); addTag(container,raw,cls,true); flashSection(section); anyNew=true; }
+      if(!set.has(k)){ set.add(k); anyNew=true; }
     });
   };
-  add(values,S.values,tagsV,secV,'v');
-  add(goals,S.goals,tagsG,secG,'g');
-  add(interests,S.interests,tagsI,secI,'i');
+  add(values,S.values);
+  add(goals,S.goals);
+  add(interests,S.interests);
   if(anyNew)saveCurrentConv();
 }
-
-function addTag(container, text, cls, animate) {
-  const hint=container.querySelector('.empty-hint'); if(hint)hint.remove();
-  const tag=document.createElement('span');
-  tag.className=`tag ${cls}${animate?' new':''}`;
-  tag.textContent=capitalize(text);
-  container.appendChild(tag);
-  if(animate)tag.scrollIntoView({behavior:'smooth',block:'nearest'});
-}
-
-function flashSection(el) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
-function capitalize(s) { return s.charAt(0).toUpperCase()+s.slice(1); }
 
 // ─── RENDER MESSAGE ──────────────────────────────────────────────────────────
 function renderMsg(role, text, animate) {
