@@ -276,7 +276,7 @@ html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-
         <div class="profile-title">What Lumi knows</div>
         <div class="profile-sub">Fills in as you talk</div>
       </div>
-      <button class="clear-btn" id="clearBtn" title="Clear profile">reset</button>
+      <button class="clear-btn" id="clearBtn" title="Clear profile" style="display:none"></button>
     </div>
     <div class="profile-body">
 
@@ -315,6 +315,9 @@ html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-
 </div>
 
 <div class="toast" id="toast"></div>
+<div style="position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:50;">
+  <button id="clearMemBtn" style="background:none;border:none;color:#35354f;font-family:inherit;font-size:11px;cursor:pointer;padding:4px 10px;border-radius:6px;transition:color .2s;" onmouseover="this.style.color='#686882'" onmouseout="this.style.color='#35354f'">Clear memory</button>
+</div>
 
 <script>
 // ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
@@ -361,6 +364,7 @@ const S = {
   values: new Set(),
   goals: new Set(),
   interests: new Set(),
+  exchangeCount: 0,
   ready: false,
   busy: false,
 };
@@ -387,8 +391,7 @@ function init() {
   const saved = localStorage.getItem('lumi_key');
   if (saved) { keyInput.value = saved; updateKeyDot(saved); }
 
-  loadProfile();
-  loadHistory();
+  loadData();
 
   let startTimer;
   keyInput.addEventListener('input', () => {
@@ -410,7 +413,10 @@ function init() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!sendBtn.disabled) doSend(); }
   });
   sendBtn.addEventListener('click', doSend);
-  clearBtn.addEventListener('click', clearProfile);
+  clearBtn.addEventListener('click', clearAll);
+  $('clearMemBtn').addEventListener('click', () => {
+    if (confirm("Are you sure? This will erase Lumi's memory of you.")) clearAll();
+  });
 }
 
 function updateKeyDot(key) {
@@ -447,7 +453,7 @@ async function doSend() {
   updateSendBtn();
 
   S.messages.push({ role: 'user', content: text });
-  saveHistory();
+  saveData();
   renderMsg('user', text);
   await fetchLumi();
 }
@@ -466,7 +472,8 @@ async function fetchLumi() {
     const { clean, data } = await callAPI(key, S.messages);
     typing.remove();
     S.messages.push({ role: 'assistant', content: clean });
-    saveHistory();
+    S.exchangeCount++;
+    saveData();
     renderMsg('lumi', clean);
     if (data) applyProfile(data);
   } catch (err) {
@@ -596,35 +603,41 @@ function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-// ─── PROFILE PERSISTENCE ──────────────────────────────────────────────────────
-function saveProfile() {
-  localStorage.setItem('lumi_profile', JSON.stringify({
-    values: [...S.values],
-    goals: [...S.goals],
-    interests: [...S.interests],
+// ─── PERSISTENCE ──────────────────────────────────────────────────────────────
+function saveData() {
+  localStorage.setItem('lumi_data', JSON.stringify({
+    messages:      S.messages,
+    values:        [...S.values],
+    goals:         [...S.goals],
+    interests:     [...S.interests],
+    exchangeCount: S.exchangeCount,
   }));
 }
 
-function loadProfile() {
+function loadData() {
   try {
-    const raw = localStorage.getItem('lumi_profile');
+    const raw = localStorage.getItem('lumi_data');
     if (!raw) return;
-    const { values = [], goals = [], interests = [] } = JSON.parse(raw);
+    const { messages = [], values = [], goals = [], interests = [], exchangeCount = 0 } = JSON.parse(raw);
+    if (!messages.length) return;
+    S.messages      = messages;
+    S.exchangeCount = exchangeCount;
     values.forEach(v    => { S.values.add(v);    addTag(tagsV, v, 'v'); });
     goals.forEach(g     => { S.goals.add(g);     addTag(tagsG, g, 'g'); });
     interests.forEach(i => { S.interests.add(i); addTag(tagsI, i, 'i'); });
+    welcome.remove();
+    S.ready = true;
+    messages.forEach(m => renderMsg(m.role, m.content));
   } catch {}
 }
 
-function clearProfile() {
+function clearAll() {
   S.values.clear(); S.goals.clear(); S.interests.clear();
-  S.messages = []; S.ready = false;
-  localStorage.removeItem('lumi_profile');
-  localStorage.removeItem('lumi_history');
+  S.messages = []; S.exchangeCount = 0; S.ready = false;
+  localStorage.removeItem('lumi_data');
   [tagsV, tagsG, tagsI].forEach(c => {
     c.innerHTML = '<span class="empty-hint">Not yet discovered</span>';
   });
-  // Clear chat and show welcome again
   messages.innerHTML = '';
   const w = document.createElement('div');
   w.className = 'welcome'; w.id = 'welcome';
@@ -633,24 +646,6 @@ function clearProfile() {
     <div class="welcome-desc">Paste your Anthropic API key above to start talking. I'll get to know you as we go.</div>`;
   messages.appendChild(w);
   if (keyInput.value.trim()) startLumi();
-}
-
-// ─── HISTORY PERSISTENCE ──────────────────────────────────────────────────────
-function saveHistory() {
-  localStorage.setItem('lumi_history', JSON.stringify(S.messages));
-}
-
-function loadHistory() {
-  try {
-    const raw = localStorage.getItem('lumi_history');
-    if (!raw) return;
-    const history = JSON.parse(raw);
-    if (!history.length) return;
-    S.messages = history;
-    welcome.remove();
-    S.ready = true;
-    history.forEach(m => renderMsg(m.role, m.content));
-  } catch {}
 }
 
 // ─── RENDER MESSAGE ────────────────────────────────────────────────────────────
