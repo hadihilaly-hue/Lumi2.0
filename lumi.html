@@ -8,76 +8,183 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
+/* ─── THEME VARIABLES ─────────────────────────────────── */
 :root {
-  --bg:              #0b0b12;
-  --surface:         #111120;
-  --surface-2:       #16162a;
-  --border:          #21213a;
-  --text:            #e2e2ef;
-  --text-muted:      #686882;
-  --text-faint:      #35354f;
-  --accent:          #7b69f5;
-  --accent-soft:     rgba(123,105,245,.13);
-  --accent-glow:     rgba(123,105,245,.28);
-  --user-bg:         linear-gradient(135deg,#6b5ce7,#8a7af6);
-  --lumi-bg:         #14142a;
-  --v-color:         #7b69f5;
-  --g-color:         #57dbb0;
-  --i-color:         #ef9068;
-  --radius:          16px;
-  --radius-sm:       10px;
-  --shadow:          0 4px 24px rgba(0,0,0,.4);
+  --bg:          #0b0b12;
+  --surface:     #111120;
+  --surface-2:   #16162a;
+  --sb-bg:       #0d0d1a;
+  --border:      #21213a;
+  --text:        #e2e2ef;
+  --text-muted:  #686882;
+  --text-faint:  #35354f;
+  --accent:      #7b69f5;
+  --accent-soft: rgba(123,105,245,.13);
+  --accent-glow: rgba(123,105,245,.28);
+  --user-bg:     linear-gradient(135deg,#6b5ce7,#8a7af6);
+  --lumi-bg:     #14142a;
+  --v-color:     #7b69f5;
+  --g-color:     #57dbb0;
+  --i-color:     #ef9068;
+  --radius:      16px;
+  --radius-sm:   10px;
+  --shadow:      0 4px 24px rgba(0,0,0,.45);
 }
 html.light {
-  --bg:              #f5f5f7;
-  --surface:         #ffffff;
-  --surface-2:       #ececf1;
-  --border:          #dcdce8;
-  --text:            #1a1a2e;
-  --text-muted:      #72728a;
-  --text-faint:      #b8b8cc;
-  --accent:          #6b59e5;
-  --accent-soft:     rgba(107,89,229,.1);
-  --accent-glow:     rgba(107,89,229,.2);
-  --user-bg:         linear-gradient(135deg,#6b59e5,#8a7af6);
-  --lumi-bg:         #f0f0fa;
-  --shadow:          0 4px 24px rgba(0,0,0,.1);
+  --bg:          #f5f5f7;
+  --surface:     #ffffff;
+  --surface-2:   #ececf1;
+  --sb-bg:       #ebebf0;
+  --border:      #dcdce8;
+  --text:        #1a1a2e;
+  --text-muted:  #72728a;
+  --text-faint:  #b8b8cc;
+  --accent:      #6b59e5;
+  --accent-soft: rgba(107,89,229,.1);
+  --accent-glow: rgba(107,89,229,.2);
+  --user-bg:     linear-gradient(135deg,#6b59e5,#8a7af6);
+  --lumi-bg:     #f0f0fa;
+  --shadow:      0 4px 24px rgba(0,0,0,.1);
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
 
-/* ─── HEADER ─────────────────────────────────────────── */
-.header{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:0 24px;height:58px;
-  background:var(--bg);border-bottom:1px solid var(--border);
-  flex-shrink:0;position:relative;z-index:10;
+/* ─── ROOT LAYOUT ─────────────────────────────────────── */
+body{display:flex;height:100vh}
+
+/* ─── SIDEBAR ─────────────────────────────────────────── */
+.sidebar{
+  width:260px;flex-shrink:0;
+  background:var(--sb-bg);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;height:100vh;overflow:hidden;
+  transition:transform .28s cubic-bezier(.4,0,.2,1);
+  position:relative;z-index:50;
 }
-.logo{display:flex;align-items:center;gap:10px}
+.sb-scroll{flex:1;overflow-y:auto;display:flex;flex-direction:column;padding:12px 10px 8px;}
+.sb-scroll::-webkit-scrollbar{width:3px}
+.sb-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* logo in sidebar */
+.sb-logo{display:flex;align-items:center;gap:9px;padding:4px 6px 16px;}
 .logo-mark{
-  width:30px;height:30px;background:var(--accent);border-radius:9px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:15px;box-shadow:0 0 18px var(--accent-glow);
-  animation:lumiBreathe 3s ease-in-out infinite;
+  width:28px;height:28px;background:var(--accent);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:13px;
+  box-shadow:0 0 14px var(--accent-glow);
+  animation:lumiBreathe 3s ease-in-out infinite;flex-shrink:0;
 }
 @keyframes lumiBreathe{
-  0%,100%{box-shadow:0 0 14px var(--accent-glow)}
-  50%{box-shadow:0 0 28px var(--accent-glow)}
+  0%,100%{box-shadow:0 0 10px var(--accent-glow)}
+  50%{box-shadow:0 0 22px var(--accent-glow)}
 }
-.logo-name{font-size:17px;font-weight:600;letter-spacing:-.3px}
-.logo-sub{font-size:12px;color:var(--text-muted);margin-left:2px;font-weight:300}
-.gear-btn{
-  width:34px;height:34px;background:none;border:1px solid var(--border);
-  border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;
-  color:var(--text-muted);transition:all .2s;
+.sb-logo-name{font-size:16px;font-weight:600;letter-spacing:-.3px}
+.sb-logo-sub{font-size:11px;color:var(--text-muted);font-weight:300}
+
+/* new chat */
+.sb-new{
+  display:flex;align-items:center;gap:8px;
+  width:100%;padding:8px 12px;margin-bottom:10px;
+  background:var(--accent-soft);border:1px solid rgba(123,105,245,.22);
+  border-radius:var(--radius-sm);color:var(--accent);
+  font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;
+  transition:all .2s;
 }
-.gear-btn:hover{border-color:var(--accent);color:var(--accent)}
-.gear-btn svg{width:16px;height:16px;fill:currentColor}
+.sb-new:hover{background:rgba(123,105,245,.2);border-color:var(--accent)}
+.sb-new svg{width:14px;height:14px;stroke:currentColor;fill:none;flex-shrink:0}
 
-/* ─── MAIN LAYOUT ────────────────────────────────────── */
-.main{display:flex;height:calc(100vh - 58px)}
+/* search */
+.sb-search-wrap{position:relative;margin-bottom:14px;}
+.sb-search{
+  width:100%;background:var(--surface-2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);color:var(--text);font-family:inherit;
+  font-size:12px;padding:7px 10px 7px 30px;outline:none;transition:border-color .2s;
+}
+.sb-search:focus{border-color:var(--accent)}
+.sb-search::placeholder{color:var(--text-faint)}
+.sb-search-icon{
+  position:absolute;left:9px;top:50%;transform:translateY(-50%);
+  color:var(--text-faint);pointer-events:none;
+}
+.sb-search-icon svg{width:13px;height:13px;stroke:currentColor;fill:none}
 
-/* ─── CHAT PANEL ─────────────────────────────────────── */
+/* section label */
+.sb-label{
+  font-size:10px;font-weight:600;color:var(--text-faint);
+  text-transform:uppercase;letter-spacing:.9px;
+  padding:0 6px;margin-bottom:7px;
+}
+
+/* subject pills */
+.sb-pills{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px;}
+.sb-pill{
+  padding:4px 10px;border-radius:20px;font-size:11.5px;font-family:inherit;
+  cursor:pointer;border:1px solid var(--border);background:none;
+  color:var(--text-muted);transition:all .15s;
+}
+.sb-pill:hover{border-color:var(--accent);color:var(--accent)}
+.sb-pill.active{background:var(--accent-soft);border-color:rgba(123,105,245,.35);color:var(--accent);font-weight:500}
+
+/* chat list */
+.sb-chats{flex:1;display:flex;flex-direction:column;gap:2px;}
+.sb-empty{font-size:12px;color:var(--text-faint);font-style:italic;padding:8px 6px;}
+.sb-item{
+  display:flex;flex-direction:column;gap:3px;
+  padding:9px 10px;border-radius:var(--radius-sm);
+  cursor:pointer;transition:background .15s;border:1px solid transparent;
+}
+.sb-item:hover{background:var(--surface-2)}
+.sb-item.active{background:var(--accent-soft);border-color:rgba(123,105,245,.2)}
+.sb-item-preview{
+  font-size:12.5px;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.sb-item.active .sb-item-preview{color:var(--accent)}
+.sb-item-time{font-size:10.5px;color:var(--text-faint)}
+
+/* sidebar bottom */
+.sb-bottom{
+  padding:10px;border-top:1px solid var(--border);flex-shrink:0;
+}
+.sb-settings{
+  display:flex;align-items:center;gap:8px;
+  width:100%;padding:8px 12px;
+  background:none;border:1px solid var(--border);border-radius:var(--radius-sm);
+  color:var(--text-muted);font-family:inherit;font-size:13px;cursor:pointer;
+  transition:all .2s;
+}
+.sb-settings:hover{border-color:var(--accent);color:var(--accent)}
+.sb-settings svg{width:15px;height:15px;fill:currentColor;flex-shrink:0}
+
+/* sidebar mobile overlay */
+.sb-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
+  z-index:49;opacity:0;pointer-events:none;transition:opacity .25s;
+}
+.sb-overlay.open{opacity:1;pointer-events:all}
+
+/* ─── CONTENT AREA ────────────────────────────────────── */
+.content{flex:1;display:flex;flex-direction:column;min-width:0;height:100vh;overflow:hidden;}
+
+/* mobile header (hidden on desktop) */
+.mob-header{
+  display:none;align-items:center;justify-content:space-between;
+  height:48px;padding:0 16px;
+  background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.hamburger{
+  width:34px;height:34px;background:none;border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text-muted);border-radius:8px;transition:color .2s;
+}
+.hamburger:hover{color:var(--text)}
+.hamburger svg{width:18px;height:18px;stroke:currentColor;fill:none}
+.mob-logo{display:flex;align-items:center;gap:8px;}
+.mob-logo-mark{width:24px;height:24px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;}
+.mob-logo-name{font-size:15px;font-weight:600}
+
+/* ─── MAIN AREA ───────────────────────────────────────── */
+.main{flex:1;display:flex;overflow:hidden;}
+
+/* ─── CHAT PANEL ──────────────────────────────────────── */
 .chat-panel{flex:1;display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--border)}
 .messages{
   flex:1;overflow-y:auto;padding:28px 32px;
@@ -86,10 +193,10 @@ html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-
 .messages::-webkit-scrollbar{width:3px}
 .messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
-/* ─── WELCOME ────────────────────────────────────────── */
+/* ─── WELCOME ─────────────────────────────────────────── */
 .welcome{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  flex:1;gap:14px;text-align:center;padding:48px;color:var(--text-muted);
+  flex:1;gap:14px;text-align:center;padding:48px;
 }
 .welcome-orb{
   width:54px;height:54px;border-radius:18px;
@@ -99,7 +206,7 @@ html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-
 .welcome-title{font-size:16px;font-weight:500;color:var(--text)}
 .welcome-desc{font-size:13px;color:var(--text-muted);max-width:280px;line-height:1.65}
 
-/* ─── MESSAGES ───────────────────────────────────────── */
+/* ─── MESSAGES ────────────────────────────────────────── */
 .msg{display:flex;flex-direction:column;max-width:76%;animation:msgIn .3s ease forwards}
 @keyframes msgIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
 .msg.user{align-self:flex-end;align-items:flex-end}
@@ -110,87 +217,42 @@ html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-
   display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;
 }
 .msg-name{font-size:11.5px;font-weight:500;color:var(--text-muted)}
-.msg-bubble{
-  padding:12px 16px;border-radius:var(--radius);font-size:14px;line-height:1.7;word-wrap:break-word;
-}
-.msg.user .msg-bubble{
-  background:var(--user-bg);color:#fff;border-bottom-right-radius:4px;
-}
-.msg.lumi .msg-bubble{
-  background:var(--lumi-bg);color:var(--text);
-  border:1px solid var(--border);border-bottom-left-radius:4px;
-}
+.msg-bubble{padding:12px 16px;border-radius:var(--radius);font-size:14px;line-height:1.7;word-wrap:break-word;}
+.msg.user .msg-bubble{background:var(--user-bg);color:#fff;border-bottom-right-radius:4px;}
+.msg.lumi .msg-bubble{background:var(--lumi-bg);color:var(--text);border:1px solid var(--border);border-bottom-left-radius:4px;}
 .msg-bubble p{margin:0}
 .msg-bubble p+p{margin-top:9px}
 .msg-bubble strong{font-weight:600}
 .msg-bubble em{color:var(--text-muted)}
-.msg-bubble code{
-  font-family:'SF Mono',Monaco,'Courier New',monospace;font-size:12px;
-  background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px;
-}
+.msg-bubble code{font-family:'SF Mono',Monaco,'Courier New',monospace;font-size:12px;background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px;}
 
-/* ─── TYPING INDICATOR ───────────────────────────────── */
-.typing{
-  display:flex;align-items:center;gap:5px;
-  padding:13px 16px;background:var(--lumi-bg);
-  border:1px solid var(--border);border-radius:var(--radius);border-bottom-left-radius:4px;
-  width:fit-content;
-}
-.typing-dot{
-  width:6px;height:6px;border-radius:50%;background:var(--text-muted);
-  animation:tdot 1.4s ease-in-out infinite;
-}
+/* ─── TYPING INDICATOR ────────────────────────────────── */
+.typing{display:flex;align-items:center;gap:5px;padding:13px 16px;background:var(--lumi-bg);border:1px solid var(--border);border-radius:var(--radius);border-bottom-left-radius:4px;width:fit-content;}
+.typing-dot{width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:tdot 1.4s ease-in-out infinite;}
 .typing-dot:nth-child(2){animation-delay:.15s}
 .typing-dot:nth-child(3){animation-delay:.3s}
-@keyframes tdot{
-  0%,60%,100%{transform:translateY(0);opacity:.35}
-  30%{transform:translateY(-6px);opacity:1}
-}
+@keyframes tdot{0%,60%,100%{transform:translateY(0);opacity:.35}30%{transform:translateY(-6px);opacity:1}}
 
-/* ─── INPUT AREA ─────────────────────────────────────── */
+/* ─── INPUT AREA ──────────────────────────────────────── */
 .input-area{padding:14px 20px;border-top:1px solid var(--border);background:var(--bg)}
-.input-wrap{
-  display:flex;align-items:flex-end;gap:8px;
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:14px;padding:9px 9px 9px 15px;transition:border-color .2s;
-}
+.input-wrap{display:flex;align-items:flex-end;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:9px 9px 9px 15px;transition:border-color .2s;}
 .input-wrap:focus-within{border-color:var(--accent)}
-.msg-input{
-  flex:1;background:none;border:none;outline:none;
-  color:var(--text);font-family:inherit;font-size:14px;
-  line-height:1.5;resize:none;max-height:120px;overflow-y:auto;
-}
+.msg-input{flex:1;background:none;border:none;outline:none;color:var(--text);font-family:inherit;font-size:14px;line-height:1.5;resize:none;max-height:120px;overflow-y:auto;}
 .msg-input::placeholder{color:var(--text-faint)}
-.msg-input::-webkit-scrollbar{width:2px}
-.send-btn{
-  width:34px;height:34px;background:var(--accent);border:none;
-  border-radius:9px;cursor:pointer;display:flex;align-items:center;
-  justify-content:center;flex-shrink:0;transition:all .2s;opacity:.4;
-}
+.send-btn{width:34px;height:34px;background:var(--accent);border:none;border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;opacity:.4;}
 .send-btn:not(:disabled){opacity:1;box-shadow:0 2px 10px var(--accent-glow)}
 .send-btn:not(:disabled):hover{transform:scale(1.06);box-shadow:0 3px 16px var(--accent-glow)}
 .send-btn:not(:disabled):active{transform:scale(.97)}
 .send-btn:disabled{cursor:not-allowed}
 .send-btn svg{width:15px;height:15px;fill:#fff}
 
-/* ─── PROFILE PANEL ──────────────────────────────────── */
-.profile{width:300px;flex-shrink:0;display:flex;flex-direction:column;background:var(--surface);overflow-y:auto}
+/* ─── PROFILE PANEL ───────────────────────────────────── */
+.profile{width:290px;flex-shrink:0;display:flex;flex-direction:column;background:var(--surface);overflow-y:auto}
 .profile::-webkit-scrollbar{width:3px}
 .profile::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-.profile-hd{
-  padding:18px 18px 14px;border-bottom:1px solid var(--border);
-  display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0;
-}
-.profile-hd-text{}
+.profile-hd{padding:18px 18px 14px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .profile-title{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.9px}
 .profile-sub{font-size:11px;color:var(--text-faint);margin-top:3px}
-.clear-btn{
-  background:none;border:none;cursor:pointer;color:var(--text-faint);
-  font-size:11px;padding:2px 6px;border-radius:5px;
-  transition:color .2s;font-family:inherit;
-}
-.clear-btn:hover{color:var(--text-muted)}
-
 .profile-body{padding:4px 0;flex:1}
 .section{padding:14px 18px;border-bottom:1px solid var(--border)}
 .section:last-child{border-bottom:none}
@@ -201,143 +263,190 @@ html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-
 .sdot.i{background:var(--i-color);box-shadow:0 0 6px rgba(239,144,104,.4)}
 .sname{font-size:11.5px;font-weight:500;color:var(--text-muted)}
 .tags{display:flex;flex-wrap:wrap;gap:6px;min-height:28px}
-
-/* ─── TAGS ───────────────────────────────────────────── */
-.tag{
-  padding:4px 10px;border-radius:20px;font-size:11.5px;
-  animation:tagPop .42s cubic-bezier(.175,.885,.32,1.275) forwards;
-  cursor:default;transition:transform .15s;
-}
+.tag{padding:4px 10px;border-radius:20px;font-size:11.5px;cursor:default;transition:transform .15s;}
 .tag:hover{transform:scale(1.05)}
+.tag.new{animation:tagPop .42s cubic-bezier(.175,.885,.32,1.275) forwards;}
 .tag.v{background:rgba(123,105,245,.11);border:1px solid rgba(123,105,245,.22);color:#a897f8}
 .tag.g{background:rgba(87,219,176,.09);border:1px solid rgba(87,219,176,.18);color:#78e4c4}
 .tag.i{background:rgba(239,144,104,.09);border:1px solid rgba(239,144,104,.18);color:#f4a882}
-@keyframes tagPop{
-  0%{transform:scale(0);opacity:0}
-  65%{transform:scale(1.15);opacity:1}
-  80%{transform:scale(.93)}
-  100%{transform:scale(1);opacity:1}
-}
+@keyframes tagPop{0%{transform:scale(0);opacity:0}65%{transform:scale(1.15);opacity:1}80%{transform:scale(.93)}100%{transform:scale(1);opacity:1}}
 .empty-hint{font-size:11.5px;color:var(--text-faint);font-style:italic;line-height:1.5;padding-top:2px}
 
-/* ─── TOAST ──────────────────────────────────────────── */
-.toast{
-  position:fixed;bottom:22px;left:50%;
-  transform:translateX(-50%) translateY(70px);
-  background:#1e0e0e;border:1px solid rgba(255,80,80,.22);
-  color:#ff8585;font-size:13px;padding:9px 18px;border-radius:9px;
-  transition:transform .3s cubic-bezier(.175,.885,.32,1.275);
-  z-index:100;max-width:380px;text-align:center;
-}
+/* ─── TOAST ───────────────────────────────────────────── */
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(70px);background:#1e0e0e;border:1px solid rgba(255,80,80,.22);color:#ff8585;font-size:13px;padding:9px 18px;border-radius:9px;transition:transform .3s cubic-bezier(.175,.885,.32,1.275);z-index:400;max-width:380px;text-align:center;}
 .toast.show{transform:translateX(-50%) translateY(0)}
+.toast.ok{background:#0e1e18;border-color:rgba(87,219,176,.25);color:#78e4c4}
 
-/* ─── NEW-TAG PULSE on section ───────────────────────── */
-@keyframes sectionFlash{
-  0%{background:transparent}
-  30%{background:rgba(123,105,245,.06)}
-  100%{background:transparent}
-}
+/* ─── TAG FLASH ───────────────────────────────────────── */
+@keyframes sectionFlash{0%{background:transparent}30%{background:rgba(123,105,245,.06)}100%{background:transparent}}
 .section.flash{animation:sectionFlash .7s ease forwards}
 
-/* ─── SETTINGS DRAWER ────────────────────────────────── */
-.settings-overlay{
-  position:fixed;inset:0;background:rgba(0,0,0,.35);
-  opacity:0;pointer-events:none;transition:opacity .25s;z-index:200;
-}
+/* ─── SETTINGS DRAWER ─────────────────────────────────── */
+.settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .25s;z-index:200;}
 .settings-overlay.open{opacity:1;pointer-events:all}
-.settings-drawer{
-  position:fixed;top:0;right:0;bottom:0;width:300px;
-  background:var(--surface);border-left:1px solid var(--border);
-  box-shadow:var(--shadow);
-  transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
-  z-index:201;display:flex;flex-direction:column;
-}
+.settings-drawer{position:fixed;top:0;right:0;bottom:0;width:300px;background:var(--surface);border-left:1px solid var(--border);box-shadow:var(--shadow);transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);z-index:201;display:flex;flex-direction:column;}
 .settings-drawer.open{transform:translateX(0)}
-.settings-head{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:18px 20px;border-bottom:1px solid var(--border);flex-shrink:0;
-}
-.settings-title{font-size:13px;font-weight:600;color:var(--text);letter-spacing:-.1px}
-.settings-close{
-  width:28px;height:28px;background:none;border:none;cursor:pointer;
-  color:var(--text-muted);display:flex;align-items:center;justify-content:center;
-  border-radius:6px;transition:background .15s;font-size:18px;line-height:1;
-}
+.settings-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.settings-title{font-size:13px;font-weight:600;color:var(--text)}
+.settings-close{width:28px;height:28px;background:none;border:none;cursor:pointer;color:var(--text-muted);display:flex;align-items:center;justify-content:center;border-radius:6px;transition:background .15s;font-size:18px;line-height:1;}
 .settings-close:hover{background:var(--surface-2)}
 .settings-body{flex:1;overflow-y:auto;padding:8px 0;}
 .settings-section{padding:18px 20px;border-bottom:1px solid var(--border)}
 .settings-section:last-child{border-bottom:none}
-.settings-section-title{
-  font-size:10px;font-weight:600;color:var(--text-faint);
-  text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;
-}
-/* toggle */
+.settings-section-title{font-size:10px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;}
 .toggle-row{display:flex;align-items:center;justify-content:space-between}
 .toggle-label{font-size:13px;color:var(--text)}
 .toggle{position:relative;width:38px;height:22px;flex-shrink:0}
 .toggle input{opacity:0;width:0;height:0;position:absolute}
-.toggle-track{
-  position:absolute;inset:0;background:var(--border);border-radius:11px;
-  cursor:pointer;transition:background .2s;
-}
+.toggle-track{position:absolute;inset:0;background:var(--border);border-radius:11px;cursor:pointer;transition:background .2s;}
 .toggle input:checked + .toggle-track{background:var(--accent)}
-.toggle-thumb{
-  position:absolute;top:3px;left:3px;width:16px;height:16px;
-  background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none;
-  box-shadow:0 1px 4px rgba(0,0,0,.25);
-}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.25);}
 .toggle input:checked ~ .toggle-thumb{transform:translateX(16px)}
-/* api key in settings */
-.settings-input{
-  width:100%;background:var(--surface-2);border:1px solid var(--border);
-  border-radius:var(--radius-sm);color:var(--text);font-family:inherit;
-  font-size:12px;padding:8px 12px;outline:none;transition:border-color .2s;
-  margin-bottom:8px;
-}
+.settings-input{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:12px;padding:8px 12px;outline:none;transition:border-color .2s;margin-bottom:8px;}
 .settings-input:focus{border-color:var(--accent)}
 .settings-input::placeholder{color:var(--text-faint)}
-.settings-save-btn{
-  width:100%;padding:8px;background:var(--accent);color:#fff;
-  border:none;border-radius:var(--radius-sm);font-family:inherit;
-  font-size:12px;font-weight:500;cursor:pointer;transition:opacity .2s;
-}
+.settings-save-btn{width:100%;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;transition:opacity .2s;}
 .settings-save-btn:hover{opacity:.85}
 .settings-hint{font-size:11px;color:var(--text-faint);margin-top:8px;line-height:1.5}
-/* danger button */
-.danger-btn{
-  width:100%;padding:8px;background:none;
-  border:1px solid rgba(255,80,80,.25);color:#ff7070;
-  border-radius:var(--radius-sm);font-family:inherit;
-  font-size:12px;cursor:pointer;transition:all .2s;
-}
+.danger-btn{width:100%;padding:8px;background:none;border:1px solid rgba(255,80,80,.25);color:#ff7070;border-radius:var(--radius-sm);font-family:inherit;font-size:12px;cursor:pointer;transition:all .2s;}
 .danger-btn:hover{background:rgba(255,80,80,.08)}
+
+/* ─── MOBILE ──────────────────────────────────────────── */
+@media (max-width:768px) {
+  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:300;transform:translateX(-260px);}
+  .sidebar.open{transform:translateX(0)}
+  .sb-overlay{display:block}
+  .mob-header{display:flex}
+  .main{height:calc(100vh - 48px)}
+  .profile{display:none}
+}
 </style>
 </head>
 <body>
 
-<!-- Header -->
-<header class="header">
-  <div class="logo">
-    <div class="logo-mark">✦</div>
-    <span class="logo-name">Lumi</span>
-    <span class="logo-sub">· your companion</span>
+<!-- ─── SIDEBAR ────────────────────────────────────────── -->
+<nav class="sidebar" id="sidebar">
+  <div class="sb-scroll">
+    <!-- Logo -->
+    <div class="sb-logo">
+      <div class="logo-mark">✦</div>
+      <div>
+        <div class="sb-logo-name">Lumi</div>
+        <div class="sb-logo-sub">your companion</div>
+      </div>
+    </div>
+
+    <!-- New Chat -->
+    <button class="sb-new" id="newChatBtn">
+      <svg viewBox="0 0 24 24" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      New Chat
+    </button>
+
+    <!-- Search -->
+    <div class="sb-search-wrap">
+      <span class="sb-search-icon"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+      <input class="sb-search" id="sbSearch" placeholder="Search chats…" autocomplete="off">
+    </div>
+
+    <!-- Subjects -->
+    <div class="sb-label">Subjects</div>
+    <div class="sb-pills" id="subjectPills">
+      <button class="sb-pill active">All</button>
+      <button class="sb-pill">English</button>
+      <button class="sb-pill">Math</button>
+      <button class="sb-pill">Science</button>
+      <button class="sb-pill">Electives</button>
+    </div>
+
+    <!-- Recent Chats -->
+    <div class="sb-label">Recent Chats</div>
+    <div class="sb-chats" id="sbChats">
+      <div class="sb-empty">No chats yet</div>
+    </div>
   </div>
-  <button class="gear-btn" id="gearBtn" title="Settings">
-    <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
-  </button>
-</header>
 
-<!-- Settings Overlay -->
+  <!-- Settings at bottom -->
+  <div class="sb-bottom">
+    <button class="sb-settings" id="gearBtn">
+      <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+      Settings
+    </button>
+  </div>
+</nav>
+
+<!-- Sidebar overlay (mobile) -->
+<div class="sb-overlay" id="sbOverlay"></div>
+
+<!-- ─── CONTENT ────────────────────────────────────────── -->
+<div class="content">
+
+  <!-- Mobile header -->
+  <header class="mob-header">
+    <button class="hamburger" id="hamburger">
+      <svg viewBox="0 0 24 24" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="mob-logo">
+      <div class="mob-logo-mark">✦</div>
+      <span class="mob-logo-name">Lumi</span>
+    </div>
+    <div style="width:34px"></div>
+  </header>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- Chat panel -->
+    <div class="chat-panel">
+      <div class="messages" id="messages">
+        <div class="welcome" id="welcome">
+          <div class="welcome-orb">✦</div>
+          <div class="welcome-title">Hi, I'm Lumi</div>
+          <div class="welcome-desc">Add your Anthropic API key in Settings (bottom left), then start talking.</div>
+        </div>
+      </div>
+      <div class="input-area">
+        <div class="input-wrap">
+          <textarea class="msg-input" id="msgInput" placeholder="Say something…" rows="1"></textarea>
+          <button class="send-btn" id="sendBtn" disabled>
+            <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile panel -->
+    <aside class="profile">
+      <div class="profile-hd">
+        <div class="profile-title">What Lumi knows</div>
+        <div class="profile-sub">Fills in as you talk</div>
+      </div>
+      <div class="profile-body">
+        <div class="section" id="sec-v">
+          <div class="section-hd"><div class="sdot v"></div><span class="sname">Values &amp; things you care about</span></div>
+          <div class="tags" id="tags-v"><span class="empty-hint">Not yet discovered</span></div>
+        </div>
+        <div class="section" id="sec-g">
+          <div class="section-hd"><div class="sdot g"></div><span class="sname">Goals &amp; things you're building toward</span></div>
+          <div class="tags" id="tags-g"><span class="empty-hint">Not yet discovered</span></div>
+        </div>
+        <div class="section" id="sec-i">
+          <div class="section-hd"><div class="sdot i"></div><span class="sname">Things that matter to you</span></div>
+          <div class="tags" id="tags-i"><span class="empty-hint">Not yet discovered</span></div>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<!-- Settings overlay + drawer -->
 <div class="settings-overlay" id="settingsOverlay"></div>
-
-<!-- Settings Drawer -->
 <div class="settings-drawer" id="settingsDrawer">
   <div class="settings-head">
     <span class="settings-title">Settings</span>
     <button class="settings-close" id="settingsClose">×</button>
   </div>
   <div class="settings-body">
-
     <div class="settings-section">
       <div class="settings-section-title">Appearance</div>
       <div class="toggle-row">
@@ -349,87 +458,17 @@ html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-
         </label>
       </div>
     </div>
-
     <div class="settings-section">
       <div class="settings-section-title">API Key</div>
       <input type="password" class="settings-input" id="keyInput" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
       <button class="settings-save-btn" id="saveKeyBtn">Save key</button>
       <div class="settings-hint">Your key is stored locally and never shared.</div>
     </div>
-
     <div class="settings-section">
       <div class="settings-section-title">Memory</div>
-      <button class="danger-btn" id="clearMemBtn">Clear memory</button>
-    </div>
-
-  </div>
-</div>
-
-<!-- Main -->
-<div class="main">
-
-  <!-- Chat -->
-  <div class="chat-panel">
-    <div class="messages" id="messages">
-      <div class="welcome" id="welcome">
-        <div class="welcome-orb">✦</div>
-        <div class="welcome-title">Hi, I'm Lumi</div>
-        <div class="welcome-desc">Open Settings (top right) to add your Anthropic API key, then start talking. I'll get to know you as we go.</div>
-      </div>
-    </div>
-    <div class="input-area">
-      <div class="input-wrap">
-        <textarea class="msg-input" id="msgInput" placeholder="Say something…" rows="1"></textarea>
-        <button class="send-btn" id="sendBtn" disabled>
-          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-        </button>
-      </div>
+      <button class="danger-btn" id="clearMemBtn">Clear all memory</button>
     </div>
   </div>
-
-  <!-- Profile Panel -->
-  <aside class="profile">
-    <div class="profile-hd">
-      <div class="profile-hd-text">
-        <div class="profile-title">What Lumi knows</div>
-        <div class="profile-sub">Fills in as you talk</div>
-      </div>
-      <button class="clear-btn" id="clearBtn" title="Clear profile" style="display:none"></button>
-    </div>
-    <div class="profile-body">
-
-      <div class="section" id="sec-v">
-        <div class="section-hd">
-          <div class="sdot v"></div>
-          <span class="sname">Values &amp; things you care about</span>
-        </div>
-        <div class="tags" id="tags-v">
-          <span class="empty-hint">Not yet discovered</span>
-        </div>
-      </div>
-
-      <div class="section" id="sec-g">
-        <div class="section-hd">
-          <div class="sdot g"></div>
-          <span class="sname">Goals &amp; things you're building toward</span>
-        </div>
-        <div class="tags" id="tags-g">
-          <span class="empty-hint">Not yet discovered</span>
-        </div>
-      </div>
-
-      <div class="section" id="sec-i">
-        <div class="section-hd">
-          <div class="sdot i"></div>
-          <span class="sname">Things that matter to you</span>
-        </div>
-        <div class="tags" id="tags-i">
-          <span class="empty-hint">Not yet discovered</span>
-        </div>
-      </div>
-
-    </div>
-  </aside>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -473,8 +512,9 @@ Rules for the JSON:
 
 Begin by warmly welcoming the person and asking one genuine open question to start knowing them.`;
 
-// ─── STATE ─────────────────────────────────────────────────────────────────────
+// ─── CONVERSATION STATE ───────────────────────────────────────────────────────
 const S = {
+  currentId: null,
   messages: [],
   values: new Set(),
   goals: new Set(),
@@ -484,57 +524,248 @@ const S = {
   busy: false,
 };
 
-// ─── ELEMENTS ──────────────────────────────────────────────────────────────────
+// ─── ELEMENTS ─────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
-const keyInput       = $('keyInput');
-const messages       = $('messages');
-const welcome        = $('welcome');
-const msgInput       = $('msgInput');
-const sendBtn        = $('sendBtn');
-const tagsV          = $('tags-v');
-const tagsG          = $('tags-g');
-const tagsI          = $('tags-i');
-const secV           = $('sec-v');
-const secG           = $('sec-g');
-const secI           = $('sec-i');
-const toast          = $('toast');
-const clearBtn       = $('clearBtn');
-const gearBtn        = $('gearBtn');
-const settingsDrawer = $('settingsDrawer');
-const settingsOverlay= $('settingsOverlay');
-const themeToggle    = $('themeToggle');
+const messagesEl    = $('messages');
+const msgInput      = $('msgInput');
+const sendBtn       = $('sendBtn');
+const tagsV         = $('tags-v');
+const tagsG         = $('tags-g');
+const tagsI         = $('tags-i');
+const secV          = $('sec-v');
+const secG          = $('sec-g');
+const secI          = $('sec-i');
+const toast         = $('toast');
+const sbChats       = $('sbChats');
+const sbSearch      = $('sbSearch');
+const themeToggle   = $('themeToggle');
+const keyInput      = $('keyInput');
 
-// ─── INIT ──────────────────────────────────────────────────────────────────────
+// ─── CONVERSATION STORAGE ─────────────────────────────────────────────────────
+function genId() { return 'conv_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
+
+function getConvs() {
+  try { return JSON.parse(localStorage.getItem('lumi_convs') || '{}'); } catch { return {}; }
+}
+
+function saveConvs(c) { localStorage.setItem('lumi_convs', JSON.stringify(c)); }
+
+function saveCurrentConv() {
+  if (!S.currentId || !S.messages.length) return;
+  const convs = getConvs();
+  const existing = convs[S.currentId] || {};
+  convs[S.currentId] = {
+    id:           S.currentId,
+    ts:           existing.ts || Date.now(),
+    preview:      S.messages.find(m => m.role === 'user')?.content?.slice(0, 55) || 'New chat',
+    messages:     S.messages,
+    values:       [...S.values],
+    goals:        [...S.goals],
+    interests:    [...S.interests],
+    exchangeCount: S.exchangeCount,
+  };
+  saveConvs(convs);
+  localStorage.setItem('lumi_current', S.currentId);
+}
+
+// ─── MIGRATION from old lumi_data ────────────────────────────────────────────
+function migrateOldData() {
+  if (localStorage.getItem('lumi_convs')) return;
+  const old = localStorage.getItem('lumi_data');
+  if (!old) return;
+  try {
+    const data = JSON.parse(old);
+    if (!data.messages?.length) return;
+    const id = genId();
+    const convs = {};
+    convs[id] = {
+      id, ts: Date.now(),
+      preview: data.messages.find(m => m.role === 'user')?.content?.slice(0,55) || 'Chat',
+      messages: data.messages,
+      values: data.values || [],
+      goals: data.goals || [],
+      interests: data.interests || [],
+      exchangeCount: data.exchangeCount || 0,
+    };
+    saveConvs(convs);
+    localStorage.setItem('lumi_current', id);
+    localStorage.removeItem('lumi_data');
+  } catch {}
+}
+
+// ─── LOAD A CONVERSATION ──────────────────────────────────────────────────────
+function loadConv(id, animate) {
+  const convs = getConvs();
+  const conv = convs[id];
+  if (!conv) return;
+
+  S.currentId    = id;
+  S.messages     = conv.messages || [];
+  S.exchangeCount = conv.exchangeCount || 0;
+  S.ready        = true;
+  S.busy         = false;
+
+  // Clear chat UI
+  messagesEl.innerHTML = '';
+
+  // Clear profile UI
+  S.values.clear(); S.goals.clear(); S.interests.clear();
+  [tagsV, tagsG, tagsI].forEach(c => { c.innerHTML = '<span class="empty-hint">Not yet discovered</span>'; });
+
+  // Re-render messages
+  S.messages.forEach(m => renderMsg(m.role, m.content, false));
+
+  // Re-render profile (no animation when loading)
+  (conv.values || []).forEach(v    => { S.values.add(v);    addTag(tagsV, v, 'v', false); });
+  (conv.goals  || []).forEach(g    => { S.goals.add(g);     addTag(tagsG, g, 'g', false); });
+  (conv.interests || []).forEach(i => { S.interests.add(i); addTag(tagsI, i, 'i', false); });
+
+  renderSidebar();
+  scrollBottom();
+}
+
+// ─── NEW CHAT ─────────────────────────────────────────────────────────────────
+function newChat() {
+  saveCurrentConv();
+
+  S.currentId     = genId();
+  S.messages      = [];
+  S.exchangeCount = 0;
+  S.ready         = false;
+  S.values.clear(); S.goals.clear(); S.interests.clear();
+
+  messagesEl.innerHTML = '';
+  [tagsV, tagsG, tagsI].forEach(c => { c.innerHTML = '<span class="empty-hint">Not yet discovered</span>'; });
+
+  // Show welcome
+  const w = document.createElement('div');
+  w.className = 'welcome'; w.id = 'welcome';
+  w.innerHTML = `<div class="welcome-orb">✦</div>
+    <div class="welcome-title">Hi, I'm Lumi</div>
+    <div class="welcome-desc">Start typing to begin a new conversation.</div>`;
+  messagesEl.appendChild(w);
+
+  renderSidebar();
+
+  if (localStorage.getItem('lumi_key')) startLumi();
+}
+
+// ─── RENDER SIDEBAR ───────────────────────────────────────────────────────────
+function renderSidebar() {
+  const convs = getConvs();
+  const query = sbSearch.value.toLowerCase().trim();
+  const sorted = Object.values(convs)
+    .filter(c => !query || c.preview.toLowerCase().includes(query))
+    .sort((a, b) => b.ts - a.ts);
+
+  sbChats.innerHTML = '';
+  if (!sorted.length) {
+    sbChats.innerHTML = '<div class="sb-empty">No chats yet</div>';
+    return;
+  }
+
+  sorted.forEach(conv => {
+    const el = document.createElement('div');
+    el.className = 'sb-item' + (conv.id === S.currentId ? ' active' : '');
+    el.innerHTML = `<div class="sb-item-preview">${escHtml(conv.preview)}</div>
+      <div class="sb-item-time">${timeAgo(conv.ts)}</div>`;
+    el.addEventListener('click', () => {
+      saveCurrentConv();
+      loadConv(conv.id);
+      closeSidebar();
+    });
+    sbChats.appendChild(el);
+  });
+}
+
+function timeAgo(ts) {
+  const d = Date.now() - ts;
+  const m = Math.floor(d / 60000), h = Math.floor(d / 3600000), days = Math.floor(d / 86400000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  if (h < 24) return `${h}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return new Date(ts).toLocaleDateString();
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
 function init() {
   // Theme
-  const savedTheme = localStorage.getItem('lumi_theme');
-  if (savedTheme === 'light') { document.documentElement.classList.add('light'); themeToggle.checked = true; }
+  if (localStorage.getItem('lumi_theme') === 'light') {
+    document.documentElement.classList.add('light');
+    themeToggle.checked = true;
+  }
 
   // API key
   const savedKey = localStorage.getItem('lumi_key');
   if (savedKey) keyInput.value = savedKey;
 
-  loadData();
-  if (savedKey && !S.ready) startLumi();
+  // Migrate old data format
+  migrateOldData();
 
-  // Settings drawer
-  gearBtn.addEventListener('click', () => openSettings());
+  // Load conversations
+  const convs = getConvs();
+  const savedCurrentId = localStorage.getItem('lumi_current');
+
+  if (savedCurrentId && convs[savedCurrentId]) {
+    loadConv(savedCurrentId);
+    if (savedKey) S.ready = true;
+  } else {
+    const latest = Object.values(convs).sort((a,b) => b.ts - a.ts)[0];
+    if (latest) {
+      loadConv(latest.id);
+      if (savedKey) S.ready = true;
+    } else {
+      // Fresh start
+      S.currentId = genId();
+      renderSidebar();
+      if (savedKey) startLumi();
+    }
+  }
+
+  // Sidebar events
+  $('newChatBtn').addEventListener('click', () => {
+    if (S.messages.length > 0) {
+      if (confirm('Start a new chat? Your memory will be saved.')) newChat();
+    } else {
+      newChat();
+    }
+  });
+
+  sbSearch.addEventListener('input', renderSidebar);
+
+  // Subject pills (visual only)
+  $('subjectPills').addEventListener('click', e => {
+    const pill = e.target.closest('.sb-pill');
+    if (!pill) return;
+    document.querySelectorAll('.sb-pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+  });
+
+  // Mobile sidebar
+  $('hamburger').addEventListener('click', openSidebar);
+  $('sbOverlay').addEventListener('click', closeSidebar);
+
+  // Settings
+  $('gearBtn').addEventListener('click', openSettings);
   $('settingsClose').addEventListener('click', closeSettings);
-  settingsOverlay.addEventListener('click', closeSettings);
+  $('settingsOverlay').addEventListener('click', closeSettings);
 
-  // Theme toggle
   themeToggle.addEventListener('change', () => {
     const light = themeToggle.checked;
     document.documentElement.classList.toggle('light', light);
     localStorage.setItem('lumi_theme', light ? 'light' : 'dark');
   });
 
-  // Save key button
   $('saveKeyBtn').addEventListener('click', () => {
     const key = keyInput.value.trim();
     if (key) {
       localStorage.setItem('lumi_key', key);
-      showToast('API key saved.');
+      showToast('API key saved.', 'ok');
       closeSettings();
       if (!S.ready) startLumi();
     } else {
@@ -542,21 +773,31 @@ function init() {
     }
   });
 
-  // Clear memory
   $('clearMemBtn').addEventListener('click', () => {
-    if (confirm("Are you sure? This will erase Lumi's memory of you.")) { clearAll(); closeSettings(); }
+    if (confirm("Are you sure? This will erase all conversations and memory.")) {
+      localStorage.removeItem('lumi_convs');
+      localStorage.removeItem('lumi_current');
+      closeSettings();
+      S.currentId = genId();
+      newChat();
+    }
   });
 
+  // Chat input
   msgInput.addEventListener('input', () => { autoGrow(msgInput); updateSendBtn(); });
   msgInput.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!sendBtn.disabled) doSend(); }
   });
   sendBtn.addEventListener('click', doSend);
-  clearBtn.addEventListener('click', clearAll);
 }
 
-function openSettings()  { settingsDrawer.classList.add('open'); settingsOverlay.classList.add('open'); }
-function closeSettings() { settingsDrawer.classList.remove('open'); settingsOverlay.classList.remove('open'); }
+// ─── SIDEBAR OPEN/CLOSE ───────────────────────────────────────────────────────
+function openSidebar()  { $('sidebar').classList.add('open'); $('sbOverlay').classList.add('open'); }
+function closeSidebar() { $('sidebar').classList.remove('open'); $('sbOverlay').classList.remove('open'); }
+
+// ─── SETTINGS OPEN/CLOSE ─────────────────────────────────────────────────────
+function openSettings()  { $('settingsDrawer').classList.add('open'); $('settingsOverlay').classList.add('open'); }
+function closeSettings() { $('settingsDrawer').classList.remove('open'); $('settingsOverlay').classList.remove('open'); }
 
 function updateSendBtn() {
   sendBtn.disabled = !localStorage.getItem('lumi_key') || !msgInput.value.trim() || S.busy;
@@ -567,39 +808,43 @@ function autoGrow(el) {
   el.style.height = Math.min(el.scrollHeight, 120) + 'px';
 }
 
-// ─── START LUMI ────────────────────────────────────────────────────────────────
+// ─── START LUMI (greeting) ────────────────────────────────────────────────────
 async function startLumi() {
   if (S.ready) return;
   S.ready = true;
-  welcome.remove();
-  // If we restored history, don't fetch a new greeting
+  const w = document.getElementById('welcome');
+  if (w) w.remove();
   if (S.messages.length === 0) await fetchLumi();
 }
 
-// ─── SEND ──────────────────────────────────────────────────────────────────────
+// ─── SEND ─────────────────────────────────────────────────────────────────────
 async function doSend() {
   const text = msgInput.value.trim();
   if (!text || S.busy) return;
   const key = localStorage.getItem('lumi_key');
   if (!key) { showToast('Add your API key in Settings first.'); openSettings(); return; }
 
+  // Auto-start if needed
+  if (!S.ready) { S.ready = true; const w = document.getElementById('welcome'); if (w) w.remove(); }
+
   msgInput.value = '';
   msgInput.style.height = 'auto';
   updateSendBtn();
 
   S.messages.push({ role: 'user', content: text });
-  saveData();
-  renderMsg('user', text);
+  saveCurrentConv();
+  renderMsg('user', text, true);
+  renderSidebar();
   await fetchLumi();
 }
 
-// ─── FETCH LUMI RESPONSE ───────────────────────────────────────────────────────
+// ─── FETCH LUMI RESPONSE ──────────────────────────────────────────────────────
 async function fetchLumi() {
   S.busy = true;
   updateSendBtn();
 
   const typing = makeTyping();
-  messages.appendChild(typing);
+  messagesEl.appendChild(typing);
   scrollBottom();
 
   try {
@@ -608,8 +853,9 @@ async function fetchLumi() {
     typing.remove();
     S.messages.push({ role: 'assistant', content: clean });
     S.exchangeCount++;
-    saveData();
-    renderMsg('lumi', clean);
+    saveCurrentConv();
+    renderMsg('lumi', clean, true);
+    renderSidebar();
     if (data) applyProfile(data);
   } catch (err) {
     typing.remove();
@@ -621,7 +867,7 @@ async function fetchLumi() {
   }
 }
 
-// ─── API CALL (streaming) ──────────────────────────────────────────────────────
+// ─── API CALL ─────────────────────────────────────────────────────────────────
 async function callAPI(apiKey, msgs) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -663,9 +909,7 @@ async function callAPI(apiKey, msgs) {
       if (raw === '[DONE]') continue;
       try {
         const ev = JSON.parse(raw);
-        if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
-          full += ev.delta.text;
-        }
+        if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') full += ev.delta.text;
       } catch {}
     }
   }
@@ -673,20 +917,17 @@ async function callAPI(apiKey, msgs) {
   return parseResponse(full);
 }
 
-// ─── PARSE RESPONSE — extract hidden JSON ─────────────────────────────────────
+// ─── PARSE RESPONSE ───────────────────────────────────────────────────────────
 function parseResponse(text) {
-  // Find the last line that looks like our JSON block
   const lastBrace = text.lastIndexOf('\n{');
   if (lastBrace !== -1) {
     const candidate = text.slice(lastBrace + 1).trim();
     try {
       const parsed = JSON.parse(candidate);
-      if ('values' in parsed && 'goals' in parsed && 'interests' in parsed) {
+      if ('values' in parsed && 'goals' in parsed && 'interests' in parsed)
         return { clean: text.slice(0, lastBrace).trim(), data: parsed };
-      }
     } catch {}
   }
-  // Fallback: try regex from the end
   const m = text.match(/\n?\{"values"\s*:[\s\S]*?\}(?:\s*)$/);
   if (m) {
     try {
@@ -697,106 +938,53 @@ function parseResponse(text) {
   return { clean: text.trim(), data: null };
 }
 
-// ─── APPLY PROFILE DATA ────────────────────────────────────────────────────────
+// ─── APPLY PROFILE ────────────────────────────────────────────────────────────
 function applyProfile({ values = [], goals = [], interests = [] }) {
   let anyNew = false;
   const add = (arr, set, container, section, cls) => {
     arr.forEach(raw => {
       if (!raw) return;
       const key = raw.toLowerCase().trim();
-      if (!set.has(key)) {
-        set.add(key);
-        addTag(container, raw, cls);
-        flashSection(section);
-        anyNew = true;
-      }
+      if (!set.has(key)) { set.add(key); addTag(container, raw, cls, true); flashSection(section); anyNew = true; }
     });
   };
-  add(values,    S.values,    tagsV, secV, 'v');
-  add(goals,     S.goals,     tagsG, secG, 'g');
+  add(values, S.values, tagsV, secV, 'v');
+  add(goals,  S.goals,  tagsG, secG, 'g');
   add(interests, S.interests, tagsI, secI, 'i');
-  if (anyNew) saveData();
+  if (anyNew) saveCurrentConv();
 }
 
-function addTag(container, text, cls) {
+function addTag(container, text, cls, animate) {
   const hint = container.querySelector('.empty-hint');
   if (hint) hint.remove();
   const tag = document.createElement('span');
-  tag.className = `tag ${cls}`;
+  tag.className = `tag ${cls}${animate ? ' new' : ''}`;
   tag.textContent = capitalize(text);
   container.appendChild(tag);
-  tag.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  if (animate) tag.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function flashSection(el) {
   el.classList.remove('flash');
-  void el.offsetWidth; // reflow
+  void el.offsetWidth;
   el.classList.add('flash');
 }
 
-function capitalize(str) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
-// ─── PERSISTENCE ──────────────────────────────────────────────────────────────
-function saveData() {
-  localStorage.setItem('lumi_data', JSON.stringify({
-    messages:      S.messages,
-    values:        [...S.values],
-    goals:         [...S.goals],
-    interests:     [...S.interests],
-    exchangeCount: S.exchangeCount,
-  }));
-}
-
-function loadData() {
-  try {
-    const raw = localStorage.getItem('lumi_data');
-    if (!raw) return;
-    const { messages = [], values = [], goals = [], interests = [], exchangeCount = 0 } = JSON.parse(raw);
-    if (!messages.length) return;
-    S.messages      = messages;
-    S.exchangeCount = exchangeCount;
-    values.forEach(v    => { S.values.add(v);    addTag(tagsV, v, 'v'); });
-    goals.forEach(g     => { S.goals.add(g);     addTag(tagsG, g, 'g'); });
-    interests.forEach(i => { S.interests.add(i); addTag(tagsI, i, 'i'); });
-    welcome.remove();
-    S.ready = true;
-    messages.forEach(m => renderMsg(m.role, m.content));
-  } catch {}
-}
-
-function clearAll() {
-  S.values.clear(); S.goals.clear(); S.interests.clear();
-  S.messages = []; S.exchangeCount = 0; S.ready = false;
-  localStorage.removeItem('lumi_data');
-  [tagsV, tagsG, tagsI].forEach(c => {
-    c.innerHTML = '<span class="empty-hint">Not yet discovered</span>';
-  });
-  messages.innerHTML = '';
-  const w = document.createElement('div');
-  w.className = 'welcome'; w.id = 'welcome';
-  w.innerHTML = `<div class="welcome-orb">✦</div>
-    <div class="welcome-title">Hi, I'm Lumi</div>
-    <div class="welcome-desc">Open Settings (top right) to add your Anthropic API key, then start talking. I'll get to know you as we go.</div>`;
-  messages.appendChild(w);
-  if (localStorage.getItem('lumi_key')) startLumi();
-}
-
-// ─── RENDER MESSAGE ────────────────────────────────────────────────────────────
-function renderMsg(role, text) {
+// ─── RENDER MESSAGE ───────────────────────────────────────────────────────────
+function renderMsg(role, text, animate) {
   const el = document.createElement('div');
   el.className = `msg ${role}`;
+  if (!animate) el.style.animation = 'none';
 
   if (role === 'lumi') {
     const hd = document.createElement('div');
     hd.className = 'msg-head';
     const av = document.createElement('div');
-    av.className = 'msg-avatar';
-    av.textContent = '✦';
+    av.className = 'msg-avatar'; av.textContent = '✦';
     const nm = document.createElement('span');
-    nm.className = 'msg-name';
-    nm.textContent = 'Lumi';
+    nm.className = 'msg-name'; nm.textContent = 'Lumi';
     hd.append(av, nm);
     el.appendChild(hd);
   }
@@ -805,20 +993,16 @@ function renderMsg(role, text) {
   bubble.className = 'msg-bubble';
   bubble.innerHTML = fmtText(text);
   el.appendChild(bubble);
-  messages.appendChild(el);
-  scrollBottom();
+  messagesEl.appendChild(el);
+  if (animate) scrollBottom();
 }
 
 function fmtText(text) {
   if (!text) return '';
-  let s = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-  s = s
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g,     '<em>$1</em>')
-    .replace(/`(.+?)`/g,       '<code>$1</code>');
+  let s = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  s = s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+       .replace(/\*(.+?)\*/g,'<em>$1</em>')
+       .replace(/`(.+?)`/g,'<code>$1</code>');
   const paras = s.split(/\n\n+/);
   if (paras.length > 1) return paras.map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`).join('');
   return `<p>${s.replace(/\n/g,'<br>')}</p>`;
@@ -828,35 +1012,26 @@ function fmtText(text) {
 function makeTyping() {
   const wrap = document.createElement('div');
   wrap.className = 'msg lumi';
-  const hd = document.createElement('div');
-  hd.className = 'msg-head';
-  const av = document.createElement('div');
-  av.className = 'msg-avatar';
-  av.textContent = '✦';
-  const nm = document.createElement('span');
-  nm.className = 'msg-name';
-  nm.textContent = 'Lumi';
+  const hd = document.createElement('div'); hd.className = 'msg-head';
+  const av = document.createElement('div'); av.className = 'msg-avatar'; av.textContent = '✦';
+  const nm = document.createElement('span'); nm.className = 'msg-name'; nm.textContent = 'Lumi';
   hd.append(av, nm);
-  const ind = document.createElement('div');
-  ind.className = 'typing';
-  for (let i = 0; i < 3; i++) {
-    const d = document.createElement('div');
-    d.className = 'typing-dot';
-    ind.appendChild(d);
-  }
+  const ind = document.createElement('div'); ind.className = 'typing';
+  for (let i = 0; i < 3; i++) { const d = document.createElement('div'); d.className = 'typing-dot'; ind.appendChild(d); }
   wrap.append(hd, ind);
   return wrap;
 }
 
 // ─── UTILITIES ────────────────────────────────────────────────────────────────
-function scrollBottom() { messages.scrollTop = messages.scrollHeight; }
+function scrollBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
 
 let toastTimer;
-function showToast(msg) {
+function showToast(msg, type) {
   toast.textContent = msg;
+  toast.className = 'toast' + (type === 'ok' ? ' ok' : '');
   toast.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('show'), 4500);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
 }
 
 // ─── GO ───────────────────────────────────────────────────────────────────────
