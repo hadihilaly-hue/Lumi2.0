@@ -10,19 +10,29 @@ let currentUser = null;
   // Hide auth loading screen and show the app
   document.getElementById('authLoading').style.display = 'none';
 
-  // Populate account info in settings
-  const meta = currentUser.user_metadata || {};
-  document.getElementById('userName').textContent  = meta.full_name || meta.name || 'Student';
-  document.getElementById('userEmail').textContent = currentUser.email || '';
+  // Populate user info (settings drawer + sidebar chip)
+  const meta      = currentUser.user_metadata || {};
+  const fullName  = meta.full_name || meta.name || 'Student';
+  const email     = currentUser.email || '';
+  const initials  = fullName[0].toUpperCase();
+
+  // Settings drawer
+  document.getElementById('userName').textContent  = fullName;
+  document.getElementById('userEmail').textContent = email;
   const avatarEl = document.getElementById('userAvatar');
   if (meta.avatar_url) {
-    const img = document.createElement('img');
-    img.src = meta.avatar_url;
-    img.alt = '';
+    const img = document.createElement('img'); img.src = meta.avatar_url; img.alt = '';
     avatarEl.appendChild(img);
-  } else {
-    avatarEl.textContent = (meta.full_name || currentUser.email || 'S')[0].toUpperCase();
-  }
+  } else { avatarEl.textContent = initials; }
+
+  // Sidebar user chip
+  document.getElementById('sbUserName').textContent  = fullName;
+  document.getElementById('sbUserEmail').textContent = email;
+  const sbAvatarEl = document.getElementById('sbUserAvatar');
+  if (meta.avatar_url) {
+    const img2 = document.createElement('img'); img2.src = meta.avatar_url; img2.alt = '';
+    sbAvatarEl.appendChild(img2);
+  } else { sbAvatarEl.textContent = initials; }
 
   // Load profile from Supabase if this is a new device
   await loadProfileFromSupabase();
@@ -272,30 +282,62 @@ let pendingAttachment = null;
 
 // ─── SUPABASE SYNC ────────────────────────────────────────────────────────────
 
-// Load all conversations from Supabase (called once on fresh device)
+// Helper: look up subjectId + subjectName for a given course name
+function lookupSubjectForCourse(courseName) {
+  for (const [subjectName, courses] of Object.entries(MENLO_CURRICULUM)) {
+    if (courses[courseName]) {
+      return {
+        subjectId:   SUBJECT_IDS[subjectName] || subjectName.toLowerCase().replace(/\s+/g, '-'),
+        subjectName,
+      };
+    }
+  }
+  return { subjectId: null, subjectName: courseName || null };
+}
+
+// Load all conversations from Supabase into localStorage (called once on fresh device)
 async function loadConvsFromSupabase() {
   if (!currentUser) return;
   try {
     const { data, error } = await sb
       .from('conversations')
-      .select('*')
+      .select('id, title, messages, teacher, course, created_at, updated_at')
       .eq('user_id', currentUser.id)
       .order('created_at', { ascending: false })
       .limit(50);
     if (error || !data || !data.length) return;
+
     const convs = {};
     data.forEach(row => {
-      convs[row.id] = {
-        id:           row.id,
+      const msgs = row.messages || [];
+      // Derive preview from first user message
+      const firstUser = msgs.find(m => m.role === 'user');
+      const preview   = typeof firstUser?.content === 'string'
+        ? firstUser.content.slice(0, 60)
+        : (Array.isArray(firstUser?.content)
+            ? (firstUser.content.find(p => p.type === 'text')?.text || '').slice(0, 60)
+            : '');
+      // Count exchanges from message pairs
+      const exchangeCount = msgs.filter(m => m.role === 'assistant').length;
+      // Reconstruct tutorCtx from teacher/course columns
+      const tutorCtx = row.teacher && row.course
+        ? { ...lookupSubjectForCourse(row.course), course: row.course, teacher: row.teacher }
+        : null;
+
+      // Use Supabase UUID as both local ID and sbId
+      const localId = 'sb_' + row.id.replace(/-/g, '').slice(0, 16);
+      convs[localId] = {
+        id:           localId,
+        sbId:         row.id,
         ts:           new Date(row.created_at).getTime(),
         title:        row.title || null,
-        preview:      row.preview || 'Chat',
-        messages:     row.messages_json   || [],
-        values:       row.values_json     || [],
-        goals:        row.goals_json      || [],
-        interests:    row.interests_json  || [],
-        exchangeCount: row.exchange_count || 0,
-        tutorCtx:     row.tutor_ctx       || null,
+        preview:      preview || 'Chat',
+        messages:     msgs,
+        values:       [],
+        goals:        [],
+        interests:    [],
+        exchangeCount,
+        tutorCtx,
       };
     });
     saveConvs(convs);
@@ -304,64 +346,103 @@ async function loadConvsFromSupabase() {
   }
 }
 
-// Upsert a single conversation to Supabase (fire and forget)
+// Sync a single conversation to Supabase — INSERT first time, UPDATE after
 function syncConvToSupabase(convId) {
   if (!currentUser) return;
-  const convs = getConvs();
-  const conv  = convs[convId];
-  if (!conv) return;
-  sb.from('conversations').upsert({
-    id:            conv.id,
-    user_id:       currentUser.id,
-    title:         conv.title   || null,
-    preview:       conv.preview || null,
-    messages_json: conv.messages,
-    values_json:   conv.values,
-    goals_json:    conv.goals,
-    interests_json: conv.interests,
-    exchange_count: conv.exchangeCount,
-    tutor_ctx:     conv.tutorCtx || null,
-    updated_at:    new Date().toISOString(),
-  }, { onConflict: 'id' })
-    .then(({ error }) => { if (error) console.warn('Supabase conv sync error:', error); });
+  _doSyncConv(convId).catch(err => console.warn('Supabase conv sync:', err));
 }
 
-// Delete a conversation from Supabase
+async function _doSyncConv(convId) {
+  const convs = getConvs();
+  const conv  = convs[convId];
+  if (!conv || !conv.messages.length) return;
+
+  const row = {
+    user_id:    currentUser.id,
+    title:      conv.title   || null,
+    messages:   conv.messages,
+    teacher:    conv.tutorCtx?.teacher || null,
+    course:     conv.tutorCtx?.course  || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (conv.sbId) {
+    // Already exists in Supabase — update
+    const { error } = await sb
+      .from('conversations')
+      .update(row)
+      .eq('id', conv.sbId)
+      .eq('user_id', currentUser.id);
+    if (error) console.warn('Supabase update error:', error);
+  } else {
+    // New conversation — insert and capture the UUID
+    const { data, error } = await sb
+      .from('conversations')
+      .insert(row)
+      .select('id')
+      .single();
+    if (error) { console.warn('Supabase insert error:', error); return; }
+    if (data?.id) {
+      // Store sbId back into local storage
+      const c2 = getConvs();
+      if (c2[convId]) { c2[convId].sbId = data.id; saveConvs(c2); }
+    }
+  }
+}
+
+// Delete a conversation from Supabase by its sbId
 function deleteConvFromSupabase(convId) {
   if (!currentUser) return;
+  const convs = getConvs();
+  const sbId  = convs[convId]?.sbId;
+  if (!sbId) return;
   sb.from('conversations')
     .delete()
-    .eq('id', convId)
+    .eq('id', sbId)
     .eq('user_id', currentUser.id)
     .then(({ error }) => { if (error) console.warn('Supabase delete error:', error); });
 }
 
-// Sync profile (name + grade) to Supabase
+// Sync user profile (name, grade, accumulated values) to Supabase
 function syncProfileToSupabase() {
   if (!currentUser) return;
   const name  = localStorage.getItem('lumi_name');
   const grade = localStorage.getItem('lumi_grade');
+  const values_profile = {
+    values:    [...S.values],
+    goals:     [...S.goals],
+    interests: [...S.interests],
+  };
   sb.from('profiles').upsert({
-    id:         currentUser.id,
-    name:       name  || null,
-    grade:      grade || null,
-    updated_at: new Date().toISOString(),
+    id:             currentUser.id,
+    name:           name  || null,
+    grade:          grade || null,
+    values_profile,
   }, { onConflict: 'id' })
     .then(({ error }) => { if (error) console.warn('Supabase profile sync error:', error); });
 }
 
-// Load profile from Supabase on new device (only if localStorage is empty)
+// Load profile from Supabase on new device (only if localStorage has no name)
 async function loadProfileFromSupabase() {
-  if (!currentUser || localStorage.getItem('lumi_name')) return;
+  if (!currentUser) return;
+  const hasName = !!localStorage.getItem('lumi_name');
   try {
     const { data, error } = await sb
       .from('profiles')
-      .select('name, grade')
+      .select('name, grade, values_profile')
       .eq('id', currentUser.id)
       .single();
     if (error || !data) return;
-    if (data.name)  localStorage.setItem('lumi_name',  data.name);
-    if (data.grade) localStorage.setItem('lumi_grade', data.grade);
+    // Always restore name/grade (overwrite if Supabase is newer)
+    if (!hasName && data.name)  localStorage.setItem('lumi_name',  data.name);
+    if (!hasName && data.grade) localStorage.setItem('lumi_grade', data.grade);
+    // Seed global values/goals/interests from profile (loaded conv will override for current session)
+    if (data.values_profile) {
+      const vp = data.values_profile;
+      (vp.values    || []).forEach(v => S.values.add(v));
+      (vp.goals     || []).forEach(g => S.goals.add(g));
+      (vp.interests || []).forEach(i => S.interests.add(i));
+    }
   } catch (err) {
     console.warn('Supabase profile load failed:', err);
   }
@@ -385,6 +466,7 @@ function saveCurrentConv() {
         : '');
   convs[S.currentId] = {
     id:           S.currentId,
+    sbId:         existing.sbId || null,    // preserve Supabase UUID across saves
     ts:           existing.ts || Date.now(),
     title:        existing.title || null,
     preview:      previewText.slice(0, 60) || 'New chat',
@@ -799,12 +881,14 @@ function initOnboarding(onDone) {
   const gradeBtn = $('obGradeNext');
   let chosenGrade = null;
 
-  // Pre-fill name from Google profile if available
+  // Pre-fill name from Google profile — if we have it, skip straight to grade step
   const googleName = currentUser?.user_metadata?.full_name || currentUser?.user_metadata?.name || '';
   const firstName  = googleName.split(' ')[0] || '';
   if (firstName) {
-    nameIn.value = firstName;
+    nameIn.value     = firstName;
     nameBtn.disabled = false;
+    // Auto-advance to grade step so user only has to pick a grade
+    goToStep2();
   }
 
   nameIn.addEventListener('input', () => { nameBtn.disabled = !nameIn.value.trim(); });
@@ -907,12 +991,16 @@ function wireListeners(savedKey) {
 
   $('clearMemBtn').addEventListener('click', async () => {
     if (confirm('Are you sure? This will erase all conversations and memory.')) {
-      // Delete from Supabase
+      // Delete from Supabase (both tables, for this user)
       if (currentUser) {
         try {
           await Promise.all([
             sb.from('conversations').delete().eq('user_id', currentUser.id),
-            sb.from('profiles').delete().eq('id', currentUser.id),
+            sb.from('profiles').upsert({
+              id: currentUser.id,
+              name: null, grade: null,
+              values_profile: { values: [], goals: [], interests: [] },
+            }, { onConflict: 'id' }),
           ]);
         } catch (e) { console.warn('Supabase clear failed:', e); }
       }
