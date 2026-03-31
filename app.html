@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumi — Menlo School</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<!-- Supabase must load before auth.js -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth.js"></script>
+</head>
+<body>
+
+<!-- Auth loading screen (shown until session is verified) -->
+<div class="auth-loading" id="authLoading">
+  <div class="auth-loading-orb">✦</div>
+  <div class="auth-loading-text">Loading Lumi…</div>
+</div>
+
+<!-- ─── ONBOARDING ─────────────────────────────────────── -->
+<div class="onboarding" id="onboarding" style="display:none">
+  <div class="ob-logo">
+    <div class="ob-logo-mark">✦</div>
+    <div class="ob-logo-name">Lumi</div>
+    <div class="ob-logo-school">Menlo School</div>
+  </div>
+  <div class="ob-card">
+    <!-- Step 1: name -->
+    <div class="ob-step active" id="obStep1">
+      <div class="ob-q">Hey! I'm Lumi, your Menlo study companion.<span class="ob-q-sub">What should I call you?</span></div>
+      <input class="ob-name-input" id="obNameInput" placeholder="Your first name…" autocomplete="given-name" maxlength="40">
+      <button class="ob-cta" id="obNameNext" disabled>Continue →</button>
+    </div>
+    <!-- Step 2: grade -->
+    <div class="ob-step" id="obStep2">
+      <div class="ob-q" id="obGradeQ">Nice to meet you!<span class="ob-q-sub">What grade are you in?</span></div>
+      <div class="ob-grades">
+        <button class="ob-grade-btn" data-grade="9">9th</button>
+        <button class="ob-grade-btn" data-grade="10">10th</button>
+        <button class="ob-grade-btn" data-grade="11">11th</button>
+        <button class="ob-grade-btn" data-grade="12">12th</button>
+      </div>
+      <button class="ob-cta" id="obGradeNext" disabled>Let's go →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── SIDEBAR ───────────────────────────────────────── -->
+<nav class="sidebar" id="sidebar">
+  <div class="sb-scroll">
+
+    <!-- Logo -->
+    <div class="sb-logo">
+      <div class="logo-mark">✦</div>
+      <div>
+        <div class="sb-logo-name">Lumi</div>
+        <div class="sb-logo-school">Menlo School</div>
+      </div>
+    </div>
+
+    <!-- New Chat -->
+    <button class="sb-new" id="newChatBtn">
+      <svg viewBox="0 0 24 24" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      New Chat
+    </button>
+
+    <!-- Search -->
+    <div class="sb-search-wrap">
+      <span class="sb-search-ico"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+      <input class="sb-search" id="sbSearch" placeholder="Search subjects & courses…" autocomplete="off">
+    </div>
+
+    <!-- Navigation tree (rendered by JS) -->
+    <div id="sbNav"></div>
+
+  </div>
+
+  <!-- Settings at bottom -->
+  <div class="sb-bottom">
+    <button class="sb-settings-btn" id="gearBtn">
+      <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+      Settings
+    </button>
+  </div>
+</nav>
+
+<div class="sb-overlay" id="sbOverlay"></div>
+
+<!-- ─── CONTENT ───────────────────────────────────────── -->
+<div class="content">
+  <header class="mob-header">
+    <button class="hamburger" id="hamburger">
+      <svg viewBox="0 0 24 24" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="mob-logo">
+      <div class="mob-logo-mark">✦</div>
+      <span class="mob-logo-name">Lumi</span>
+    </div>
+    <div style="width:34px"></div>
+  </header>
+
+  <div class="main">
+    <div class="chat-panel" id="chatPanel">
+      <div class="drop-overlay" id="dropOverlay">
+        <div class="drop-overlay-icon">📎</div>
+        <div class="drop-overlay-label">Drop to upload</div>
+        <div class="drop-overlay-sub">Images, PDFs, and text files</div>
+      </div>
+      <div class="messages" id="messages"></div>
+      <div class="input-area">
+        <div class="attach-preview" id="attachPreview"></div>
+        <div class="input-wrap">
+          <button class="attach-btn" id="attachBtn" title="Attach image, PDF, or text file">
+            <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <input type="file" id="fileInput" accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,.txt" style="display:none">
+          <textarea class="msg-input" id="msgInput" placeholder="Say something…" rows="1"></textarea>
+          <button class="send-btn" id="sendBtn" disabled>
+            <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── SETTINGS DRAWER ───────────────────────────────── -->
+<div class="settings-overlay" id="settingsOverlay"></div>
+<div class="settings-drawer" id="settingsDrawer">
+  <div class="settings-head">
+    <span class="settings-title">Settings</span>
+    <button class="settings-close" id="settingsClose">×</button>
+  </div>
+  <div class="settings-body">
+
+    <!-- Account -->
+    <div class="settings-section">
+      <div class="settings-section-title">Account</div>
+      <div class="user-chip" id="userChip">
+        <div class="user-avatar" id="userAvatar"></div>
+        <div class="user-info">
+          <div class="user-name" id="userName">Loading…</div>
+          <div class="user-email" id="userEmail"></div>
+        </div>
+      </div>
+      <button class="danger-btn" id="signOutBtn" style="margin-top:10px">Sign out</button>
+    </div>
+
+    <!-- Appearance -->
+    <div class="settings-section">
+      <div class="settings-section-title">Appearance</div>
+      <div class="toggle-row">
+        <span class="toggle-label">Light mode</span>
+        <label class="toggle">
+          <input type="checkbox" id="themeToggle">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+    </div>
+
+    <!-- API Key -->
+    <div class="settings-section">
+      <div class="settings-section-title">API Key</div>
+      <input type="password" class="settings-input" id="keyInput" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+      <button class="settings-save-btn" id="saveKeyBtn">Save key</button>
+      <div class="settings-hint">Your key is stored locally and never shared.</div>
+    </div>
+
+    <!-- Memory -->
+    <div class="settings-section">
+      <div class="settings-section-title">Memory</div>
+      <button class="danger-btn" id="clearMemBtn">Clear all memory</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
