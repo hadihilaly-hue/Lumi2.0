@@ -28,7 +28,7 @@ async function signInWithGoogle() {
     provider: 'google',
     options: {
       redirectTo,
-      queryParams: { hd: 'menlo.org' },   // hint to Google to pre-select menlo.org accounts
+      queryParams: { hd: 'menloschool.org' },   // hint to Google to pre-select menloschool.org accounts
     },
   });
   if (error) throw error;

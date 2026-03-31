@@ -134,7 +134,7 @@ The sign-in page is `index.html` — set that as your entry point.
 
 | Feature | Implementation |
 |---|---|
-| Auth | Supabase Google OAuth, `@menlo.org` domain check |
+| Auth | Supabase Google OAuth, `@menloschool.org` domain check |
 | Session | Supabase session persists across refreshes |
 | Conversations | localStorage (fast cache) + Supabase (source of truth) |
 | New device | Loads from Supabase on first visit |
