@@ -26,6 +26,22 @@
   --i-color:         #ef9068;
   --radius:          16px;
   --radius-sm:       10px;
+  --shadow:          0 4px 24px rgba(0,0,0,.4);
+}
+html.light {
+  --bg:              #f5f5f7;
+  --surface:         #ffffff;
+  --surface-2:       #ececf1;
+  --border:          #dcdce8;
+  --text:            #1a1a2e;
+  --text-muted:      #72728a;
+  --text-faint:      #b8b8cc;
+  --accent:          #6b59e5;
+  --accent-soft:     rgba(107,89,229,.1);
+  --accent-glow:     rgba(107,89,229,.2);
+  --user-bg:         linear-gradient(135deg,#6b59e5,#8a7af6);
+  --lumi-bg:         #f0f0fa;
+  --shadow:          0 4px 24px rgba(0,0,0,.1);
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
@@ -50,20 +66,13 @@ html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-
 }
 .logo-name{font-size:17px;font-weight:600;letter-spacing:-.3px}
 .logo-sub{font-size:12px;color:var(--text-muted);margin-left:2px;font-weight:300}
-.key-row{display:flex;align-items:center;gap:8px}
-.key-label{font-size:12px;color:var(--text-muted);white-space:nowrap}
-.key-input{
-  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);
-  color:var(--text);font-family:inherit;font-size:12px;padding:7px 12px;
-  width:256px;outline:none;transition:border-color .2s;
+.gear-btn{
+  width:34px;height:34px;background:none;border:1px solid var(--border);
+  border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--text-muted);transition:all .2s;
 }
-.key-input:focus{border-color:var(--accent)}
-.key-input::placeholder{color:var(--text-faint)}
-.key-dot{
-  width:7px;height:7px;border-radius:50%;background:var(--text-faint);
-  transition:background .3s,box-shadow .3s;flex-shrink:0;
-}
-.key-dot.on{background:var(--g-color);box-shadow:0 0 6px rgba(87,219,176,.45)}
+.gear-btn:hover{border-color:var(--accent);color:var(--accent)}
+.gear-btn svg{width:16px;height:16px;fill:currentColor}
 
 /* ─── MAIN LAYOUT ────────────────────────────────────── */
 .main{display:flex;height:calc(100vh - 58px)}
@@ -229,6 +238,79 @@ html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-
   100%{background:transparent}
 }
 .section.flash{animation:sectionFlash .7s ease forwards}
+
+/* ─── SETTINGS DRAWER ────────────────────────────────── */
+.settings-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.35);
+  opacity:0;pointer-events:none;transition:opacity .25s;z-index:200;
+}
+.settings-overlay.open{opacity:1;pointer-events:all}
+.settings-drawer{
+  position:fixed;top:0;right:0;bottom:0;width:300px;
+  background:var(--surface);border-left:1px solid var(--border);
+  box-shadow:var(--shadow);
+  transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
+  z-index:201;display:flex;flex-direction:column;
+}
+.settings-drawer.open{transform:translateX(0)}
+.settings-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 20px;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.settings-title{font-size:13px;font-weight:600;color:var(--text);letter-spacing:-.1px}
+.settings-close{
+  width:28px;height:28px;background:none;border:none;cursor:pointer;
+  color:var(--text-muted);display:flex;align-items:center;justify-content:center;
+  border-radius:6px;transition:background .15s;font-size:18px;line-height:1;
+}
+.settings-close:hover{background:var(--surface-2)}
+.settings-body{flex:1;overflow-y:auto;padding:8px 0;}
+.settings-section{padding:18px 20px;border-bottom:1px solid var(--border)}
+.settings-section:last-child{border-bottom:none}
+.settings-section-title{
+  font-size:10px;font-weight:600;color:var(--text-faint);
+  text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;
+}
+/* toggle */
+.toggle-row{display:flex;align-items:center;justify-content:space-between}
+.toggle-label{font-size:13px;color:var(--text)}
+.toggle{position:relative;width:38px;height:22px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0;position:absolute}
+.toggle-track{
+  position:absolute;inset:0;background:var(--border);border-radius:11px;
+  cursor:pointer;transition:background .2s;
+}
+.toggle input:checked + .toggle-track{background:var(--accent)}
+.toggle-thumb{
+  position:absolute;top:3px;left:3px;width:16px;height:16px;
+  background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none;
+  box-shadow:0 1px 4px rgba(0,0,0,.25);
+}
+.toggle input:checked ~ .toggle-thumb{transform:translateX(16px)}
+/* api key in settings */
+.settings-input{
+  width:100%;background:var(--surface-2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);color:var(--text);font-family:inherit;
+  font-size:12px;padding:8px 12px;outline:none;transition:border-color .2s;
+  margin-bottom:8px;
+}
+.settings-input:focus{border-color:var(--accent)}
+.settings-input::placeholder{color:var(--text-faint)}
+.settings-save-btn{
+  width:100%;padding:8px;background:var(--accent);color:#fff;
+  border:none;border-radius:var(--radius-sm);font-family:inherit;
+  font-size:12px;font-weight:500;cursor:pointer;transition:opacity .2s;
+}
+.settings-save-btn:hover{opacity:.85}
+.settings-hint{font-size:11px;color:var(--text-faint);margin-top:8px;line-height:1.5}
+/* danger button */
+.danger-btn{
+  width:100%;padding:8px;background:none;
+  border:1px solid rgba(255,80,80,.25);color:#ff7070;
+  border-radius:var(--radius-sm);font-family:inherit;
+  font-size:12px;cursor:pointer;transition:all .2s;
+}
+.danger-btn:hover{background:rgba(255,80,80,.08)}
 </style>
 </head>
 <body>
@@ -240,12 +322,48 @@ html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-
     <span class="logo-name">Lumi</span>
     <span class="logo-sub">· your companion</span>
   </div>
-  <div class="key-row">
-    <span class="key-label">API key</span>
-    <input type="password" class="key-input" id="keyInput" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
-    <div class="key-dot" id="keyDot"></div>
-  </div>
+  <button class="gear-btn" id="gearBtn" title="Settings">
+    <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+  </button>
 </header>
+
+<!-- Settings Overlay -->
+<div class="settings-overlay" id="settingsOverlay"></div>
+
+<!-- Settings Drawer -->
+<div class="settings-drawer" id="settingsDrawer">
+  <div class="settings-head">
+    <span class="settings-title">Settings</span>
+    <button class="settings-close" id="settingsClose">×</button>
+  </div>
+  <div class="settings-body">
+
+    <div class="settings-section">
+      <div class="settings-section-title">Appearance</div>
+      <div class="toggle-row">
+        <span class="toggle-label">Light mode</span>
+        <label class="toggle">
+          <input type="checkbox" id="themeToggle">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">API Key</div>
+      <input type="password" class="settings-input" id="keyInput" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+      <button class="settings-save-btn" id="saveKeyBtn">Save key</button>
+      <div class="settings-hint">Your key is stored locally and never shared.</div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Memory</div>
+      <button class="danger-btn" id="clearMemBtn">Clear memory</button>
+    </div>
+
+  </div>
+</div>
 
 <!-- Main -->
 <div class="main">
@@ -256,7 +374,7 @@ html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-
       <div class="welcome" id="welcome">
         <div class="welcome-orb">✦</div>
         <div class="welcome-title">Hi, I'm Lumi</div>
-        <div class="welcome-desc">Paste your Anthropic API key above to start talking. I'll get to know you as we go.</div>
+        <div class="welcome-desc">Open Settings (top right) to add your Anthropic API key, then start talking. I'll get to know you as we go.</div>
       </div>
     </div>
     <div class="input-area">
@@ -315,9 +433,6 @@ html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-
 </div>
 
 <div class="toast" id="toast"></div>
-<div style="position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:50;">
-  <button id="clearMemBtn" style="background:none;border:none;color:#35354f;font-family:inherit;font-size:11px;cursor:pointer;padding:4px 10px;border-radius:6px;transition:color .2s;" onmouseover="this.style.color='#686882'" onmouseout="this.style.color='#35354f'">Clear memory</button>
-</div>
 
 <script>
 // ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
@@ -371,42 +486,66 @@ const S = {
 
 // ─── ELEMENTS ──────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
-const keyInput  = $('keyInput');
-const keyDot    = $('keyDot');
-const messages  = $('messages');
-const welcome   = $('welcome');
-const msgInput  = $('msgInput');
-const sendBtn   = $('sendBtn');
-const tagsV     = $('tags-v');
-const tagsG     = $('tags-g');
-const tagsI     = $('tags-i');
-const secV      = $('sec-v');
-const secG      = $('sec-g');
-const secI      = $('sec-i');
-const toast     = $('toast');
-const clearBtn  = $('clearBtn');
+const keyInput       = $('keyInput');
+const messages       = $('messages');
+const welcome        = $('welcome');
+const msgInput       = $('msgInput');
+const sendBtn        = $('sendBtn');
+const tagsV          = $('tags-v');
+const tagsG          = $('tags-g');
+const tagsI          = $('tags-i');
+const secV           = $('sec-v');
+const secG           = $('sec-g');
+const secI           = $('sec-i');
+const toast          = $('toast');
+const clearBtn       = $('clearBtn');
+const gearBtn        = $('gearBtn');
+const settingsDrawer = $('settingsDrawer');
+const settingsOverlay= $('settingsOverlay');
+const themeToggle    = $('themeToggle');
 
 // ─── INIT ──────────────────────────────────────────────────────────────────────
 function init() {
-  const saved = localStorage.getItem('lumi_key');
-  if (saved) { keyInput.value = saved; updateKeyDot(saved); }
+  // Theme
+  const savedTheme = localStorage.getItem('lumi_theme');
+  if (savedTheme === 'light') { document.documentElement.classList.add('light'); themeToggle.checked = true; }
+
+  // API key
+  const savedKey = localStorage.getItem('lumi_key');
+  if (savedKey) keyInput.value = savedKey;
 
   loadData();
+  if (savedKey && !S.ready) startLumi();
 
-  let startTimer;
-  keyInput.addEventListener('input', () => {
+  // Settings drawer
+  gearBtn.addEventListener('click', () => openSettings());
+  $('settingsClose').addEventListener('click', closeSettings);
+  settingsOverlay.addEventListener('click', closeSettings);
+
+  // Theme toggle
+  themeToggle.addEventListener('change', () => {
+    const light = themeToggle.checked;
+    document.documentElement.classList.toggle('light', light);
+    localStorage.setItem('lumi_theme', light ? 'light' : 'dark');
+  });
+
+  // Save key button
+  $('saveKeyBtn').addEventListener('click', () => {
     const key = keyInput.value.trim();
-    if (key) localStorage.setItem('lumi_key', key);
-    else localStorage.removeItem('lumi_key');
-    updateKeyDot(key);
-    updateSendBtn();
-    if (key && !S.ready) {
-      clearTimeout(startTimer);
-      startTimer = setTimeout(startLumi, 600);
+    if (key) {
+      localStorage.setItem('lumi_key', key);
+      showToast('API key saved.');
+      closeSettings();
+      if (!S.ready) startLumi();
+    } else {
+      showToast('Please enter an API key.');
     }
   });
 
-  if (saved && !S.ready) startLumi();
+  // Clear memory
+  $('clearMemBtn').addEventListener('click', () => {
+    if (confirm("Are you sure? This will erase Lumi's memory of you.")) { clearAll(); closeSettings(); }
+  });
 
   msgInput.addEventListener('input', () => { autoGrow(msgInput); updateSendBtn(); });
   msgInput.addEventListener('keydown', e => {
@@ -414,17 +553,13 @@ function init() {
   });
   sendBtn.addEventListener('click', doSend);
   clearBtn.addEventListener('click', clearAll);
-  $('clearMemBtn').addEventListener('click', () => {
-    if (confirm("Are you sure? This will erase Lumi's memory of you.")) clearAll();
-  });
 }
 
-function updateKeyDot(key) {
-  keyDot.className = 'key-dot' + (key && (key.startsWith('sk-ant-') || key.startsWith('sk-')) ? ' on' : '');
-}
+function openSettings()  { settingsDrawer.classList.add('open'); settingsOverlay.classList.add('open'); }
+function closeSettings() { settingsDrawer.classList.remove('open'); settingsOverlay.classList.remove('open'); }
 
 function updateSendBtn() {
-  sendBtn.disabled = !keyInput.value.trim() || !msgInput.value.trim() || S.busy;
+  sendBtn.disabled = !localStorage.getItem('lumi_key') || !msgInput.value.trim() || S.busy;
 }
 
 function autoGrow(el) {
@@ -445,8 +580,8 @@ async function startLumi() {
 async function doSend() {
   const text = msgInput.value.trim();
   if (!text || S.busy) return;
-  const key = keyInput.value.trim();
-  if (!key) { showToast('Add your Anthropic API key first.'); return; }
+  const key = localStorage.getItem('lumi_key');
+  if (!key) { showToast('Add your API key in Settings first.'); openSettings(); return; }
 
   msgInput.value = '';
   msgInput.style.height = 'auto';
@@ -468,7 +603,7 @@ async function fetchLumi() {
   scrollBottom();
 
   try {
-    const key = keyInput.value.trim();
+    const key = localStorage.getItem('lumi_key');
     const { clean, data } = await callAPI(key, S.messages);
     typing.remove();
     S.messages.push({ role: 'assistant', content: clean });
@@ -643,9 +778,9 @@ function clearAll() {
   w.className = 'welcome'; w.id = 'welcome';
   w.innerHTML = `<div class="welcome-orb">✦</div>
     <div class="welcome-title">Hi, I'm Lumi</div>
-    <div class="welcome-desc">Paste your Anthropic API key above to start talking. I'll get to know you as we go.</div>`;
+    <div class="welcome-desc">Open Settings (top right) to add your Anthropic API key, then start talking. I'll get to know you as we go.</div>`;
   messages.appendChild(w);
-  if (keyInput.value.trim()) startLumi();
+  if (localStorage.getItem('lumi_key')) startLumi();
 }
 
 // ─── RENDER MESSAGE ────────────────────────────────────────────────────────────
