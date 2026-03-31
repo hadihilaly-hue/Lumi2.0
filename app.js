@@ -977,10 +977,13 @@ function wireListeners(savedKey) {
     const key = keyInput.value.trim();
     if (key) {
       localStorage.setItem('lumi_key', key);
-      showToast('API key saved.', 'ok');
+      showToast('API key saved. You\'re ready to chat!', 'ok');
       closeSettings();
+      updateSendBtn();
       if (!S.ready) startLumi();
-    } else showToast('Please enter an API key.');
+    } else {
+      showToast('Please enter a valid API key (starts with sk-ant-).');
+    }
   });
 
   $('signOutBtn').addEventListener('click', async () => {
@@ -1053,6 +1056,22 @@ function startApp(savedKey) {
   S.currentId = genId();
   renderSidebar();
   showWelcome();
+  if (!savedKey) showNoKeyBanner();
+}
+
+function showNoKeyBanner() {
+  if ($('noKeyBanner')) return;
+  const b = document.createElement('div');
+  b.id = 'noKeyBanner';
+  b.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a0a00;border:1px solid rgba(255,160,50,.3);color:#ffb060;font-size:13px;padding:10px 18px;border-radius:10px;z-index:300;text-align:center;max-width:340px;line-height:1.5;cursor:pointer;';
+  b.innerHTML = '🔑 <strong>Add your Anthropic API key</strong> to start chatting.<br><span style="font-size:11px;opacity:.8">Click Settings (bottom-left) → API Key</span>';
+  b.addEventListener('click', () => { openSettings(); b.remove(); });
+  document.body.appendChild(b);
+  // Auto-hide when key is saved
+  const observer = new MutationObserver(() => {
+    if (localStorage.getItem('lumi_key') && $('noKeyBanner')) $('noKeyBanner').remove();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 }
 
 function openSidebar()   { $('sidebar').classList.add('open');    $('sbOverlay').classList.add('open'); }
@@ -1213,11 +1232,19 @@ async function fetchLumi() {
   messagesEl.appendChild(typing);
   scrollBottom();
 
+  const apiKey = localStorage.getItem('lumi_key');
+  if (!apiKey) {
+    typing.remove();
+    renderError('No API key found. Open Settings (bottom-left) and paste your Anthropic API key.');
+    S.busy = false; updateSendBtn();
+    return;
+  }
+
   try {
     const system = S.tutorCtx
       ? buildTutorSystem(S.tutorCtx.subjectName, S.tutorCtx.course, S.tutorCtx.teacher)
       : buildCompanionSystem();
-    const { clean, data } = await callAPI(localStorage.getItem('lumi_key'), S.messages, system);
+    const { clean, data } = await callAPI(apiKey, S.messages, system);
     typing.remove();
     S.messages.push({ role: 'assistant', content: clean });
     S.exchangeCount++;
@@ -1234,11 +1261,22 @@ async function fetchLumi() {
     }
   } catch (err) {
     typing.remove();
-    showToast(err.message || 'Something went wrong. Check your API key.');
-    console.error(err);
+    const errMsg = err.message || 'Something went wrong.';
+    renderError(`API error: ${errMsg}`);
+    showToast(errMsg);
+    console.error('Lumi API error:', err);
   } finally {
     S.busy = false; updateSendBtn();
   }
+}
+
+// Render a visible error bubble in the chat
+function renderError(msg) {
+  const el = document.createElement('div');
+  el.className = 'msg lumi';
+  el.innerHTML = `<div class="msg-bubble" style="background:rgba(255,80,80,.08);border-color:rgba(255,80,80,.25);color:#ff8585;">⚠️ ${escHtml(msg)}</div>`;
+  messagesEl.appendChild(el);
+  scrollBottom();
 }
 
 // ─── API CALL ────────────────────────────────────────────────────────────────
