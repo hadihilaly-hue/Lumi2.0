@@ -266,7 +266,21 @@ body{display:flex;height:100vh}
 
 /* input */
 .input-area{padding:14px 20px;border-top:1px solid var(--border);background:var(--bg)}
-.input-wrap{display:flex;align-items:flex-end;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:9px 9px 9px 15px;transition:border-color .2s;}
+.attach-preview{display:none;align-items:center;gap:8px;margin-bottom:8px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;position:relative;}
+.attach-preview.visible{display:flex}
+.attach-thumb{width:44px;height:44px;object-fit:cover;border-radius:7px;flex-shrink:0;}
+.attach-file-icon{width:44px;height:44px;background:var(--surface-2);border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;flex-shrink:0;}
+.attach-file-icon svg{width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:1.5}
+.attach-file-ext{font-size:8px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px}
+.attach-info{flex:1;min-width:0}
+.attach-name{font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.attach-size{font-size:10.5px;color:var(--text-muted);margin-top:2px}
+.attach-remove{width:22px;height:22px;background:var(--surface-2);border:none;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-muted);flex-shrink:0;transition:all .15s;font-size:14px;line-height:1;}
+.attach-remove:hover{background:rgba(255,80,80,.15);color:#ff7070}
+.attach-btn{width:30px;height:30px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-faint);border-radius:8px;transition:color .2s;flex-shrink:0;}
+.attach-btn:hover{color:var(--accent)}
+.attach-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8}
+.input-wrap{display:flex;align-items:flex-end;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:9px 9px 9px 10px;transition:border-color .2s;}
 .input-wrap:focus-within{border-color:var(--accent)}
 .msg-input{flex:1;background:none;border:none;outline:none;color:var(--text);font-family:inherit;font-size:14px;line-height:1.5;resize:none;max-height:120px;overflow-y:auto;}
 .msg-input::placeholder{color:var(--text-faint)}
@@ -274,6 +288,10 @@ body{display:flex;height:100vh}
 .send-btn:not(:disabled){opacity:1;box-shadow:0 2px 10px var(--accent-glow)}
 .send-btn:not(:disabled):hover{transform:scale(1.06)}.send-btn:not(:disabled):active{transform:scale(.97)}
 .send-btn:disabled{cursor:not-allowed}.send-btn svg{width:15px;height:15px;fill:#fff}
+/* message image thumbnail */
+.msg-img{max-width:260px;max-height:200px;border-radius:10px;display:block;margin-bottom:6px;object-fit:cover;}
+.msg-file-chip{display:inline-flex;align-items:center;gap:7px;background:rgba(123,105,245,.1);border:1px solid rgba(123,105,245,.2);border-radius:8px;padding:6px 10px;margin-bottom:6px;font-size:12px;color:var(--accent);}
+.msg-file-chip svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8;flex-shrink:0}
 
 /* ─── TOAST ───────────────────────────────────────────── */
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(70px);background:#1e0e0e;border:1px solid rgba(255,80,80,.22);color:#ff8585;font-size:13px;padding:9px 18px;border-radius:9px;transition:transform .3s cubic-bezier(.175,.885,.32,1.275);z-index:400;max-width:380px;text-align:center;}
@@ -384,7 +402,12 @@ body{display:flex;height:100vh}
         </div>
       </div>
       <div class="input-area">
+        <div class="attach-preview" id="attachPreview"></div>
         <div class="input-wrap">
+          <button class="attach-btn" id="attachBtn" title="Attach image, PDF, or text file">
+            <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <input type="file" id="fileInput" accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,.txt" style="display:none">
           <textarea class="msg-input" id="msgInput" placeholder="Say something…" rows="1"></textarea>
           <button class="send-btn" id="sendBtn" disabled>
             <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
@@ -553,10 +576,16 @@ const SB = {
 
 // ─── ELEMENTS ─────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
-const messagesEl  = $('messages');
-const msgInput    = $('msgInput');
-const sendBtn     = $('sendBtn');
-const toast       = $('toast');
+const messagesEl   = $('messages');
+const msgInput     = $('msgInput');
+const sendBtn      = $('sendBtn');
+const toast        = $('toast');
+const attachPreview = $('attachPreview');
+const fileInput    = $('fileInput');
+
+// ─── ATTACHMENT STATE ─────────────────────────────────────────────────────────
+// { file, base64, mediaType, isImage }
+let pendingAttachment = null;
 const sbNav       = $('sbNav');
 const sbSearch    = $('sbSearch');
 const themeToggle = $('themeToggle');
@@ -910,6 +939,10 @@ function init() {
     }
   });
 
+  // File attachment
+  $('attachBtn').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => handleFileSelect(fileInput.files[0]));
+
   // Chat input
   msgInput.addEventListener('input', () => { autoGrow(msgInput); updateSendBtn(); });
   msgInput.addEventListener('keydown', e => {
@@ -924,7 +957,7 @@ function openSettings()  { $('settingsDrawer').classList.add('open'); $('setting
 function closeSettings() { $('settingsDrawer').classList.remove('open'); $('settingsOverlay').classList.remove('open'); }
 
 function updateSendBtn() {
-  sendBtn.disabled = !localStorage.getItem('lumi_key') || !msgInput.value.trim() || S.busy;
+  sendBtn.disabled = !localStorage.getItem('lumi_key') || (!msgInput.value.trim() && !pendingAttachment) || S.busy;
 }
 function autoGrow(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
 
@@ -937,10 +970,77 @@ async function startLumi() {
   if (S.messages.length === 0) await fetchLumi();
 }
 
+// ─── ATTACHMENT HANDLING ─────────────────────────────────────────────────────
+function fmtBytes(b) {
+  if (b < 1024) return b+'B';
+  if (b < 1048576) return (b/1024).toFixed(1)+'KB';
+  return (b/1048576).toFixed(1)+'MB';
+}
+
+function clearAttachment() {
+  pendingAttachment = null;
+  fileInput.value = '';
+  attachPreview.innerHTML = '';
+  attachPreview.classList.remove('visible');
+  updateSendBtn();
+}
+
+function showAttachPreview(file, base64, mediaType, isImage) {
+  attachPreview.innerHTML = '';
+  if (isImage) {
+    const img = document.createElement('img');
+    img.className = 'attach-thumb';
+    img.src = `data:${mediaType};base64,${base64}`;
+    attachPreview.appendChild(img);
+  } else {
+    const ext = file.name.split('.').pop().toUpperCase().slice(0,4);
+    const icon = document.createElement('div');
+    icon.className = 'attach-file-icon';
+    icon.innerHTML = `<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="attach-file-ext">${ext}</span>`;
+    attachPreview.appendChild(icon);
+  }
+  const info = document.createElement('div');
+  info.className = 'attach-info';
+  info.innerHTML = `<div class="attach-name">${escHtml(file.name)}</div><div class="attach-size">${fmtBytes(file.size)}</div>`;
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'attach-remove';
+  removeBtn.title = 'Remove';
+  removeBtn.textContent = '×';
+  removeBtn.addEventListener('click', clearAttachment);
+  attachPreview.appendChild(info);
+  attachPreview.appendChild(removeBtn);
+  attachPreview.classList.add('visible');
+}
+
+function handleFileSelect(file) {
+  if (!file) return;
+  const maxMB = file.type === 'application/pdf' ? 32 : 5;
+  if (file.size > maxMB * 1024 * 1024) {
+    showToast(`File too large. Max ${maxMB}MB.`); return;
+  }
+  const isImage = file.type.startsWith('image/');
+  const isText = file.type === 'text/plain' || file.name.endsWith('.txt');
+  if (!isImage && file.type !== 'application/pdf' && !isText) {
+    showToast('Unsupported file type.'); return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    // e.target.result is a data URL; strip the prefix to get raw base64
+    const dataUrl = e.target.result;
+    const base64 = dataUrl.split(',')[1];
+    const mediaType = file.type || 'text/plain';
+    pendingAttachment = { file, base64, mediaType, isImage, isText };
+    showAttachPreview(file, base64, mediaType, isImage);
+    updateSendBtn();
+  };
+  reader.readAsDataURL(file);
+}
+
 // ─── SEND ────────────────────────────────────────────────────────────────────
 async function doSend() {
   const text = msgInput.value.trim();
-  if (!text || S.busy) return;
+  if (!text && !pendingAttachment) return;
+  if (S.busy) return;
   if (!localStorage.getItem('lumi_key')) { showToast('Add your API key in Settings.'); openSettings(); return; }
 
   if (!S.ready) {
@@ -948,10 +1048,35 @@ async function doSend() {
     const w = document.getElementById('welcome'); if (w) w.remove();
   }
 
-  msgInput.value = ''; msgInput.style.height='auto'; updateSendBtn();
-  S.messages.push({ role:'user', content:text });
+  // Build content array for this user message
+  const att = pendingAttachment;
+  let contentParts = [];
+  if (att) {
+    if (att.isImage) {
+      contentParts.push({ type:'image', source:{ type:'base64', media_type:att.mediaType, data:att.base64 } });
+    } else if (att.isText) {
+      // Decode base64 text and send as text block
+      const decoded = atob(att.base64);
+      contentParts.push({ type:'text', text:`[Attached file: ${att.file.name}]\n${decoded}` });
+    } else {
+      // PDF
+      contentParts.push({ type:'document', source:{ type:'base64', media_type:'application/pdf', data:att.base64 } });
+    }
+  }
+  if (text) contentParts.push({ type:'text', text });
+
+  const msgContent = contentParts.length === 1 && contentParts[0].type === 'text'
+    ? contentParts[0].text   // plain text — store as string for simplicity
+    : contentParts;          // multi-part — store array
+
+  msgInput.value = ''; msgInput.style.height = 'auto';
+  const sentAtt = att;
+  clearAttachment();
+  updateSendBtn();
+
+  S.messages.push({ role:'user', content: msgContent });
   saveCurrentConv();
-  renderMsg('user', text, true);
+  renderMsg('user', text, true, sentAtt);
   renderSidebar();
   await fetchLumi();
 }
@@ -1058,7 +1183,7 @@ function applyProfile({ values=[], goals=[], interests=[] }) {
 }
 
 // ─── RENDER MESSAGE ──────────────────────────────────────────────────────────
-function renderMsg(role, text, animate) {
+function renderMsg(role, content, animate, att) {
   const el=document.createElement('div');
   el.className=`msg ${role}`;
   if(!animate) el.style.animation='none';
@@ -1072,7 +1197,48 @@ function renderMsg(role, text, animate) {
   }
 
   const bubble=document.createElement('div'); bubble.className='msg-bubble';
-  bubble.innerHTML=fmtText(text);
+
+  // content may be a string or a content-parts array (when file was attached)
+  if(Array.isArray(content)) {
+    content.forEach(part => {
+      if(part.type==='image' && part.source?.data) {
+        const img=document.createElement('img');
+        img.className='msg-img';
+        img.src=`data:${part.source.media_type};base64,${part.source.data}`;
+        bubble.appendChild(img);
+      } else if(part.type==='document') {
+        const chip=document.createElement('div');
+        chip.className='msg-file-chip';
+        chip.innerHTML=`<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>PDF document`;
+        bubble.appendChild(chip);
+      } else if(part.type==='text' && part.text) {
+        const textNode=document.createElement('div');
+        textNode.innerHTML=fmtText(part.text);
+        bubble.appendChild(textNode);
+      }
+    });
+  } else {
+    // Plain send with optional live attachment preview
+    if(att) {
+      if(att.isImage) {
+        const img=document.createElement('img');
+        img.className='msg-img';
+        img.src=`data:${att.mediaType};base64,${att.base64}`;
+        bubble.appendChild(img);
+      } else {
+        const chip=document.createElement('div');
+        chip.className='msg-file-chip';
+        chip.innerHTML=`<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>${escHtml(att.file.name)}`;
+        bubble.appendChild(chip);
+      }
+    }
+    if(content) {
+      const textNode=document.createElement('div');
+      textNode.innerHTML=fmtText(content);
+      bubble.appendChild(textNode);
+    }
+  }
+
   el.appendChild(bubble);
   messagesEl.appendChild(el);
   if(animate)scrollBottom();
