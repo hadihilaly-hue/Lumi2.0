@@ -580,7 +580,7 @@ function applyProfile({ values = [], goals = [], interests = [] }) {
   add(values,    S.values,    tagsV, secV, 'v');
   add(goals,     S.goals,     tagsG, secG, 'g');
   add(interests, S.interests, tagsI, secI, 'i');
-  if (anyNew) saveProfile();
+  if (anyNew) saveData();
 }
 
 function addTag(container, text, cls) {
