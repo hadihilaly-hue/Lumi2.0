@@ -36,7 +36,7 @@
       Sign in with Google
     </button>
 
-    <div class="signin-footer">Menlo School students only · @menlo.org accounts</div>
+    <div class="signin-footer">Menlo School students only · @menloschool.org accounts</div>
   </div>
 </div>
 
@@ -53,12 +53,12 @@ const GOOGLE_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden=
   const params = new URLSearchParams(window.location.search);
   if (params.get('error') === 'domain') {
     const errEl = document.getElementById('signinError');
-    errEl.textContent = 'Access is limited to Menlo School students. Please sign in with your @menlo.org account.';
+    errEl.textContent = 'Access is limited to Menlo School students. Please sign in with your @menloschool.org account.';
     errEl.style.display = 'block';
     history.replaceState({}, '', window.location.pathname);
   }
 
-  // Redirect to app if already signed in with a valid @menlo.org account
+  // Redirect to app if already signed in with a valid @menloschool.org account
   await requireGuest();
 
   // Wire sign-in button

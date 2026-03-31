@@ -13,7 +13,7 @@ async function getUser() {
 }
 
 function isMenloEmail(email) {
-  return email && email.toLowerCase().endsWith('@menlo.org');
+  return email && email.toLowerCase().endsWith('@menloschool.org');
 }
 
 // ─── SIGN IN ──────────────────────────────────────────────────────────────────
@@ -39,7 +39,7 @@ async function doSignOut() {
 }
 
 // ─── ROUTE GUARDS ─────────────────────────────────────────────────────────────
-// Call on index.html — redirect to app if already signed in with @menlo.org
+// Call on index.html — redirect to app if already signed in with @menloschool.org
 async function requireGuest() {
   const user = await getUser();
   if (user && isMenloEmail(user.email)) {
