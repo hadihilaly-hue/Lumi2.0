@@ -347,10 +347,87 @@ body{display:flex;height:100vh}
   .sidebar.open{transform:translateX(0)}
   .sb-overlay{display:block}
   .mob-header{display:flex}
+  .sb-teacher,.sb-course-hd,.sb-subj-hd,.sb-all,.sb-general,.sb-new{min-height:44px}
+  .send-btn{width:44px;height:44px}
+  .attach-btn{width:44px;height:44px}
+  .messages{padding:16px 14px}
+  .input-area{padding:10px 12px}
+  .msg{max-width:92%}
+  .empty-cards{flex-direction:column;align-items:stretch;max-width:100%}
+  .empty-card{min-width:unset}
 }
+
+/* ─── ONBOARDING ─────────────────────────────────────── */
+.onboarding{position:fixed;inset:0;z-index:2000;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;transition:opacity .5s ease;}
+.onboarding.hidden{opacity:0;pointer-events:none}
+.ob-logo{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:36px}
+.ob-logo-mark{width:52px;height:52px;background:var(--accent);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 0 28px var(--accent-glow);animation:lumiBreathe 3s ease-in-out infinite;}
+.ob-logo-name{font-size:22px;font-weight:600;letter-spacing:-.4px}
+.ob-logo-school{font-size:12px;color:var(--text-muted)}
+.ob-card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px;}
+.ob-step{display:none;flex-direction:column;gap:16px}
+.ob-step.active{display:flex}
+.ob-q{font-size:16px;font-weight:500;color:var(--text);line-height:1.5}
+.ob-q-sub{font-size:14px;color:var(--text-muted);font-weight:400;display:block;margin-top:4px}
+.ob-name-input{width:100%;background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:15px;padding:12px 14px;outline:none;transition:border-color .2s;}
+.ob-name-input:focus{border-color:var(--accent)}
+.ob-name-input::placeholder{color:var(--text-faint)}
+.ob-grades{display:flex;gap:8px}
+.ob-grade-btn{flex:1;padding:13px 8px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:all .18s;min-height:44px;}
+.ob-grade-btn:hover{border-color:var(--accent);color:var(--accent)}
+.ob-grade-btn.selected{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.ob-cta{width:100%;padding:13px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;opacity:.4;min-height:44px;}
+.ob-cta:not([disabled]){opacity:1;box-shadow:0 2px 14px var(--accent-glow)}
+.ob-cta:not([disabled]):hover{opacity:.88}
+
+/* ─── EMPTY STATE ────────────────────────────────────── */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:16px;padding:40px 28px;text-align:center;}
+.empty-orb{width:58px;height:58px;border-radius:18px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:4px;animation:lumiBreathe 3s ease-in-out infinite;}
+.empty-greeting{font-size:18px;font-weight:500;color:var(--text)}
+.empty-sub{font-size:13px;color:var(--text-muted);max-width:260px;line-height:1.65}
+.empty-cards{display:flex;gap:12px;margin-top:6px;width:100%;max-width:440px;justify-content:center;}
+.empty-card{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 16px;cursor:pointer;transition:all .18s;text-align:left;min-width:140px;}
+.empty-card:hover{border-color:var(--accent);background:var(--accent-soft);transform:translateY(-2px)}
+.empty-card-icon{font-size:22px;margin-bottom:8px}
+.empty-card-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px}
+.empty-card-sub{font-size:11.5px;color:var(--text-muted);line-height:1.5}
+
+/* General chat button */
+.sb-general{display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;color:var(--text-muted);transition:all .15s;margin-bottom:2px;}
+.sb-general:hover{color:var(--text);background:var(--surface-2)}
+.sb-general.active{color:var(--accent);background:var(--accent-soft)}
+.sb-general svg{width:14px;height:14px;stroke:currentColor;fill:none;flex-shrink:0}
 </style>
 </head>
 <body>
+
+<!-- ─── ONBOARDING ─────────────────────────────────────── -->
+<div class="onboarding" id="onboarding">
+  <div class="ob-logo">
+    <div class="ob-logo-mark">✦</div>
+    <div class="ob-logo-name">Lumi</div>
+    <div class="ob-logo-school">Menlo School</div>
+  </div>
+  <div class="ob-card">
+    <!-- Step 1: name -->
+    <div class="ob-step active" id="obStep1">
+      <div class="ob-q">Hey! I'm Lumi, your Menlo study companion.<span class="ob-q-sub">What's your name?</span></div>
+      <input class="ob-name-input" id="obNameInput" placeholder="Your first name…" autocomplete="given-name" maxlength="40">
+      <button class="ob-cta" id="obNameNext" disabled>Continue →</button>
+    </div>
+    <!-- Step 2: grade -->
+    <div class="ob-step" id="obStep2">
+      <div class="ob-q" id="obGradeQ">Nice to meet you!<span class="ob-q-sub">What grade are you in?</span></div>
+      <div class="ob-grades">
+        <button class="ob-grade-btn" data-grade="9">9th</button>
+        <button class="ob-grade-btn" data-grade="10">10th</button>
+        <button class="ob-grade-btn" data-grade="11">11th</button>
+        <button class="ob-grade-btn" data-grade="12">12th</button>
+      </div>
+      <button class="ob-cta" id="obGradeNext" disabled>Let's go →</button>
+    </div>
+  </div>
+</div>
 
 <!-- ─── SIDEBAR ───────────────────────────────────────── -->
 <nav class="sidebar" id="sidebar">
@@ -413,13 +490,7 @@ body{display:flex;height:100vh}
         <div class="drop-overlay-label">Drop to upload</div>
         <div class="drop-overlay-sub">Images, PDFs, and text files</div>
       </div>
-      <div class="messages" id="messages">
-        <div class="welcome" id="welcome">
-          <div class="welcome-orb">✦</div>
-          <div class="welcome-title">Hi, I'm Lumi</div>
-          <div class="welcome-desc">Choose a subject and course from the sidebar, or click <strong>New Chat</strong> to start talking.</div>
-        </div>
-      </div>
+      <div class="messages" id="messages"></div>
       <div class="input-area">
         <div class="attach-preview" id="attachPreview"></div>
         <div class="input-wrap">
@@ -622,7 +693,20 @@ function getTeachers(subjectName, course) {
 }
 
 // ─── SYSTEM PROMPTS ───────────────────────────────────────────────────────────
-const SYSTEM_COMPANION = `You are Lumi — not an assistant, but a warm and genuinely curious companion who cares deeply about the people you talk with.
+function getStudentName() { return localStorage.getItem('lumi_name') || 'there'; }
+function getStudentGrade() { return localStorage.getItem('lumi_grade') || null; }
+function studentCtx() {
+  const name = localStorage.getItem('lumi_name');
+  const grade = localStorage.getItem('lumi_grade');
+  if (name && grade) return `The student's name is ${name} and they are in grade ${grade} at Menlo School.`;
+  if (name) return `The student's name is ${name} and they attend Menlo School.`;
+  return 'The student attends Menlo School.';
+}
+
+function buildCompanionSystem() {
+  return `You are Lumi — not an assistant, but a warm and genuinely curious companion who cares deeply about the people you talk with.
+
+${studentCtx()}
 
 Your personality:
 - Think of yourself as that rare friend who truly listens, remembers, and makes people feel seen
@@ -640,12 +724,13 @@ Every 2–3 messages, weave in one organic question to understand them better.
 After EVERY reply, append this JSON on its own line at the very end (stripped before display):
 {"values":["..."],"goals":["..."],"interests":["..."]}
 Only include NEWLY learned things. Empty arrays if nothing new.
-NEVER mention the JSON.
-
-Begin by warmly welcoming the person and asking one genuine question.`;
+NEVER mention the JSON.`;
+}
 
 function buildTutorSystem(subject, course, teacher) {
   return `You are tutoring a Menlo School student in ${course}. You are helping them in the style of ${teacher}, a real teacher at Menlo School. Be helpful, specific to this subject, and calibrated to high school level.
+
+${studentCtx()}
 
 Your tutoring style:
 - Warm, encouraging, and patient — you believe every student can succeed
@@ -677,7 +762,7 @@ const S = {
 
 // Sidebar UI state
 const SB = {
-  mode:            'all',   // 'all' | 'tutor'
+  mode:            'all',   // 'all' | 'general' | 'tutor'
   expandedSubject: null,
   expandedCourse:  null,
   activeTeacher:   null,    // { subjectId, course, teacher }
@@ -764,6 +849,9 @@ function loadConv(id) {
     SB.mode = 'tutor';
     SB.activeTeacher = { subjectId: S.tutorCtx.subjectId, course: S.tutorCtx.course, teacher: S.tutorCtx.teacher };
     SB.expandedSubject = S.tutorCtx.subjectId;
+  } else {
+    SB.mode = 'general';
+    SB.activeTeacher = null;
   }
 
   scrollBottom();
@@ -783,13 +871,7 @@ function newChat() {
   SB.activeTeacher = null;
 
   messagesEl.innerHTML = '';
-
-  const w = document.createElement('div');
-  w.className='welcome'; w.id='welcome';
-  w.innerHTML=`<div class="welcome-orb">✦</div>
-    <div class="welcome-title">Hi, I'm Lumi</div>
-    <div class="welcome-desc">Choose a course from the sidebar, or just start talking.</div>`;
-  messagesEl.appendChild(w);
+  showWelcome();
 
   renderSidebar();
   if (localStorage.getItem('lumi_key')) startLumi();
@@ -823,24 +905,58 @@ function openTutor(subjectId, course, teacher) {
   msgInput.focus();
 }
 
+// ─── OPEN GENERAL CHAT ───────────────────────────────────────────────────────
+function openGeneralChat() {
+  saveCurrentConv();
+  const name = getStudentName();
+  S.currentId     = genId();
+  S.messages      = [];
+  S.exchangeCount = 0;
+  S.tutorCtx      = null;
+  S.ready         = true;
+  S.values.clear(); S.goals.clear(); S.interests.clear();
+  SB.mode = 'general';
+  SB.activeTeacher = null;
+
+  messagesEl.innerHTML = '';
+
+  const greeting = name !== 'there' ? `Hey ${name}! What's on your mind?` : `Hey! What's on your mind?`;
+  S.messages.push({ role:'assistant', content: greeting });
+  renderMsg('lumi', greeting, true);
+  saveCurrentConv();
+
+  renderSidebar();
+  scrollBottom();
+  msgInput.focus();
+}
+
 // ─── SIDEBAR RENDERING ───────────────────────────────────────────────────────
 function renderSidebar() {
   const query = sbSearch.value.toLowerCase().trim();
   sbNav.innerHTML = '';
 
+  // ── General Chat button ──
+  const genRow = document.createElement('div');
+  genRow.className = 'sb-general' + (SB.mode==='general' ? ' active' : '');
+  genRow.innerHTML = `<svg viewBox="0 0 24 24" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> General Chat`;
+  genRow.addEventListener('click', () => {
+    openGeneralChat();
+    closeSidebar();
+  });
+  sbNav.appendChild(genRow);
+
   // ── "All" row ──
   const allRow = document.createElement('div');
   allRow.className = 'sb-all' + (SB.mode==='all'&&!query ? ' active' : '');
-  allRow.innerHTML = `<svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> All`;
+  allRow.innerHTML = `<svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> All Chats`;
   allRow.addEventListener('click', () => {
     SB.mode = 'all';
     SB.activeTeacher = null;
     renderSidebar();
-    // Show welcome if no current chat loaded
     const convs = getConvs();
     const latest = Object.values(convs).sort((a,b)=>b.ts-a.ts)[0];
     if (latest) loadConv(latest.id);
-    else if (!S.messages.length) showWelcome();
+    else showWelcome();
   });
   sbNav.appendChild(allRow);
 
@@ -863,7 +979,7 @@ function renderSidebar() {
         el.addEventListener('click', () => {
           saveCurrentConv();
           SB.activeTeacher = conv.tutorCtx ? { subjectId:conv.tutorCtx.subjectId, course:conv.tutorCtx.course, teacher:conv.tutorCtx.teacher } : null;
-          SB.mode = conv.tutorCtx ? 'tutor' : 'all';
+          SB.mode = conv.tutorCtx ? 'tutor' : 'general';
           loadConv(conv.id);
           closeSidebar();
         });
@@ -966,12 +1082,84 @@ function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 function showWelcome() {
   if (document.getElementById('welcome')) return;
   messagesEl.innerHTML = '';
+  const name = getStudentName();
+  const greeting = name !== 'there' ? `Welcome back, ${escHtml(name)}!` : `Hi, I'm Lumi!`;
   const w = document.createElement('div');
-  w.className='welcome'; w.id='welcome';
-  w.innerHTML=`<div class="welcome-orb">✦</div>
-    <div class="welcome-title">Hi, I'm Lumi</div>
-    <div class="welcome-desc">Choose a course from the sidebar, or just start talking.</div>`;
+  w.className = 'empty-state'; w.id = 'welcome';
+  w.innerHTML = `
+    <div class="empty-orb">✦</div>
+    <div class="empty-greeting">${greeting}</div>
+    <div class="empty-sub">Pick up where you left off, or start something new.</div>
+    <div class="empty-cards">
+      <div class="empty-card" id="emptyGenBtn">
+        <div class="empty-card-icon">💬</div>
+        <div class="empty-card-title">General Chat</div>
+        <div class="empty-card-sub">Just talk to Lumi about anything</div>
+      </div>
+      <div class="empty-card" id="emptyStudyBtn">
+        <div class="empty-card-icon">📚</div>
+        <div class="empty-card-title">Study with a Teacher</div>
+        <div class="empty-card-sub">Pick a subject from the sidebar</div>
+      </div>
+    </div>`;
   messagesEl.appendChild(w);
+  w.querySelector('#emptyGenBtn').addEventListener('click', openGeneralChat);
+  w.querySelector('#emptyStudyBtn').addEventListener('click', () => {
+    if (window.innerWidth <= 768) openSidebar();
+    else {
+      // Expand subjects section visually
+      SB.expandedSubject = null;
+      renderSidebar();
+    }
+  });
+}
+
+// ─── ONBOARDING ───────────────────────────────────────────────────────────────
+function initOnboarding(onDone) {
+  const ob      = $('onboarding');
+  const step1   = $('obStep1');
+  const step2   = $('obStep2');
+  const nameIn  = $('obNameInput');
+  const nameBtn = $('obNameNext');
+  const gradeQ  = $('obGradeQ');
+  const gradeBtn= $('obGradeNext');
+  let chosenGrade = null;
+
+  // Enable continue when name has text
+  nameIn.addEventListener('input', () => {
+    nameBtn.disabled = !nameIn.value.trim();
+  });
+  nameIn.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && nameIn.value.trim()) goToStep2();
+  });
+  nameBtn.addEventListener('click', goToStep2);
+
+  function goToStep2() {
+    const name = nameIn.value.trim();
+    if (!name) return;
+    gradeQ.innerHTML = `Nice to meet you, ${escHtml(name)}!<span class="ob-q-sub">What grade are you in?</span>`;
+    step1.classList.remove('active');
+    step2.classList.add('active');
+  }
+
+  // Grade selection
+  step2.querySelectorAll('.ob-grade-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      step2.querySelectorAll('.ob-grade-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      chosenGrade = btn.dataset.grade;
+      gradeBtn.disabled = false;
+    });
+  });
+
+  gradeBtn.addEventListener('click', () => {
+    if (!chosenGrade) return;
+    const name = nameIn.value.trim();
+    localStorage.setItem('lumi_name', name);
+    localStorage.setItem('lumi_grade', chosenGrade);
+    ob.classList.add('hidden');
+    setTimeout(() => { ob.style.display='none'; onDone(); }, 500);
+  });
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
@@ -986,22 +1174,18 @@ function init() {
   const savedKey = localStorage.getItem('lumi_key');
   if (savedKey) keyInput.value = savedKey;
 
-  migrateOldData();
-
-  // Load last conversation
-  const convs = getConvs();
-  const lastId = localStorage.getItem('lumi_current');
-  const latest = lastId && convs[lastId] ? convs[lastId]
-    : Object.values(convs).sort((a,b)=>b.ts-a.ts)[0];
-
-  if (latest) {
-    loadConv(latest.id);
-  } else {
-    S.currentId = genId();
-    renderSidebar();
-    if (savedKey) startLumi();
+  // Check onboarding
+  const onboarded = localStorage.getItem('lumi_name');
+  if (!onboarded) {
+    initOnboarding(() => { wireListeners(savedKey); startApp(savedKey); });
+    return;
   }
+  $('onboarding').style.display = 'none';
+  startApp(savedKey);
+  wireListeners(savedKey);
+}
 
+function wireListeners(savedKey) {
   // New Chat
   $('newChatBtn').addEventListener('click', () => {
     if (S.messages.length > 0) {
@@ -1041,10 +1225,11 @@ function init() {
     if (confirm("Are you sure? This will erase all conversations and memory.")) {
       localStorage.removeItem('lumi_convs');
       localStorage.removeItem('lumi_current');
+      localStorage.removeItem('lumi_name');
+      localStorage.removeItem('lumi_grade');
       SB.mode='all'; SB.activeTeacher=null; SB.expandedSubject=null; SB.expandedCourse=null;
       closeSettings();
-      S.currentId = genId();
-      newChat();
+      location.reload();
     }
   });
 
@@ -1084,6 +1269,25 @@ function init() {
     if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); if (!sendBtn.disabled) doSend(); }
   });
   sendBtn.addEventListener('click', doSend);
+}
+
+function startApp(savedKey) {
+  migrateOldData();
+
+  // Load last conversation or show empty state
+  const convs = getConvs();
+  const lastId = localStorage.getItem('lumi_current');
+  const latest = lastId && convs[lastId] ? convs[lastId]
+    : Object.values(convs).sort((a,b)=>b.ts-a.ts)[0];
+
+  if (latest) {
+    loadConv(latest.id);
+  } else {
+    S.currentId = genId();
+    renderSidebar();
+    showWelcome();
+    if (savedKey) { /* don't auto-start companion — let user choose from empty state */ }
+  }
 }
 
 function openSidebar()   { $('sidebar').classList.add('open');    $('sbOverlay').classList.add('open'); }
@@ -1226,7 +1430,7 @@ async function fetchLumi() {
   try {
     const system = S.tutorCtx
       ? buildTutorSystem(S.tutorCtx.subjectName, S.tutorCtx.course, S.tutorCtx.teacher)
-      : SYSTEM_COMPANION;
+      : buildCompanionSystem();
     const { clean, data } = await callAPI(localStorage.getItem('lumi_key'), S.messages, system);
     typing.remove();
     S.messages.push({ role:'assistant', content:clean });
