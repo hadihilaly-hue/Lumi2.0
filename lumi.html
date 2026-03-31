@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lumi</title>
+<title>Lumi — Menlo School</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-/* ─── THEME VARIABLES ─────────────────────────────────── */
+/* ─── THEME ───────────────────────────────────────────── */
 :root {
   --bg:          #0b0b12;
   --surface:     #111120;
@@ -48,51 +48,47 @@ html.light {
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
-
-/* ─── ROOT LAYOUT ─────────────────────────────────────── */
 body{display:flex;height:100vh}
 
 /* ─── SIDEBAR ─────────────────────────────────────────── */
 .sidebar{
-  width:260px;flex-shrink:0;
-  background:var(--sb-bg);border-right:1px solid var(--border);
+  width:264px;flex-shrink:0;background:var(--sb-bg);
+  border-right:1px solid var(--border);
   display:flex;flex-direction:column;height:100vh;overflow:hidden;
-  transition:transform .28s cubic-bezier(.4,0,.2,1);
-  position:relative;z-index:50;
+  transition:transform .28s cubic-bezier(.4,0,.2,1);z-index:50;
 }
-.sb-scroll{flex:1;overflow-y:auto;display:flex;flex-direction:column;padding:12px 10px 8px;}
+.sb-scroll{
+  flex:1;overflow-y:auto;padding:12px 8px 8px;
+  display:flex;flex-direction:column;
+}
 .sb-scroll::-webkit-scrollbar{width:3px}
 .sb-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
-/* logo in sidebar */
-.sb-logo{display:flex;align-items:center;gap:9px;padding:4px 6px 16px;}
+/* logo */
+.sb-logo{display:flex;align-items:center;gap:9px;padding:2px 6px 14px;}
 .logo-mark{
   width:28px;height:28px;background:var(--accent);border-radius:8px;
-  display:flex;align-items:center;justify-content:center;font-size:13px;
+  display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;
   box-shadow:0 0 14px var(--accent-glow);
-  animation:lumiBreathe 3s ease-in-out infinite;flex-shrink:0;
+  animation:lumiBreathe 3s ease-in-out infinite;
 }
-@keyframes lumiBreathe{
-  0%,100%{box-shadow:0 0 10px var(--accent-glow)}
-  50%{box-shadow:0 0 22px var(--accent-glow)}
-}
-.sb-logo-name{font-size:16px;font-weight:600;letter-spacing:-.3px}
-.sb-logo-sub{font-size:11px;color:var(--text-muted);font-weight:300}
+@keyframes lumiBreathe{0%,100%{box-shadow:0 0 10px var(--accent-glow)}50%{box-shadow:0 0 22px var(--accent-glow)}}
+.sb-logo-name{font-size:15px;font-weight:600;letter-spacing:-.3px}
+.sb-logo-school{font-size:10px;color:var(--text-muted);font-weight:400;margin-top:1px}
 
 /* new chat */
 .sb-new{
-  display:flex;align-items:center;gap:8px;
-  width:100%;padding:8px 12px;margin-bottom:10px;
+  display:flex;align-items:center;gap:7px;width:100%;
+  padding:8px 12px;margin-bottom:10px;
   background:var(--accent-soft);border:1px solid rgba(123,105,245,.22);
   border-radius:var(--radius-sm);color:var(--accent);
-  font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;
-  transition:all .2s;
+  font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer;transition:all .2s;
 }
 .sb-new:hover{background:rgba(123,105,245,.2);border-color:var(--accent)}
-.sb-new svg{width:14px;height:14px;stroke:currentColor;fill:none;flex-shrink:0}
+.sb-new svg{width:13px;height:13px;stroke:currentColor;fill:none;flex-shrink:0}
 
 /* search */
-.sb-search-wrap{position:relative;margin-bottom:14px;}
+.sb-search-wrap{position:relative;margin-bottom:10px;}
 .sb-search{
   width:100%;background:var(--surface-2);border:1px solid var(--border);
   border-radius:var(--radius-sm);color:var(--text);font-family:inherit;
@@ -100,71 +96,117 @@ body{display:flex;height:100vh}
 }
 .sb-search:focus{border-color:var(--accent)}
 .sb-search::placeholder{color:var(--text-faint)}
-.sb-search-icon{
+.sb-search-ico{
   position:absolute;left:9px;top:50%;transform:translateY(-50%);
   color:var(--text-faint);pointer-events:none;
 }
-.sb-search-icon svg{width:13px;height:13px;stroke:currentColor;fill:none}
+.sb-search-ico svg{width:12px;height:12px;stroke:currentColor;fill:none}
 
-/* section label */
-.sb-label{
-  font-size:10px;font-weight:600;color:var(--text-faint);
-  text-transform:uppercase;letter-spacing:.9px;
-  padding:0 6px;margin-bottom:7px;
+/* ── "All" row ── */
+.sb-all{
+  display:flex;align-items:center;gap:7px;
+  padding:7px 8px;border-radius:8px;cursor:pointer;
+  font-size:13px;font-weight:500;color:var(--text-muted);
+  transition:all .15s;margin-bottom:2px;
 }
+.sb-all:hover{color:var(--text);background:var(--surface-2)}
+.sb-all.active{color:var(--accent);background:var(--accent-soft)}
+.sb-all svg{width:13px;height:13px;stroke:currentColor;fill:none;flex-shrink:0}
 
-/* subject pills */
-.sb-pills{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px;}
-.sb-pill{
-  padding:4px 10px;border-radius:20px;font-size:11.5px;font-family:inherit;
-  cursor:pointer;border:1px solid var(--border);background:none;
-  color:var(--text-muted);transition:all .15s;
-}
-.sb-pill:hover{border-color:var(--accent);color:var(--accent)}
-.sb-pill.active{background:var(--accent-soft);border-color:rgba(123,105,245,.35);color:var(--accent);font-weight:500}
-
-/* chat list */
-.sb-chats{flex:1;display:flex;flex-direction:column;gap:2px;}
-.sb-empty{font-size:12px;color:var(--text-faint);font-style:italic;padding:8px 6px;}
-.sb-item{
-  display:flex;flex-direction:column;gap:3px;
-  padding:9px 10px;border-radius:var(--radius-sm);
-  cursor:pointer;transition:background .15s;border:1px solid transparent;
-}
-.sb-item:hover{background:var(--surface-2)}
-.sb-item.active{background:var(--accent-soft);border-color:rgba(123,105,245,.2)}
-.sb-item-preview{
-  font-size:12.5px;color:var(--text);
+/* recent chats under "All" */
+.sb-recent{overflow:hidden;max-height:0;transition:max-height .28s ease;}
+.sb-recent.open{max-height:600px}
+.sb-recent-inner{padding:2px 0 6px;}
+.sb-chat-item{
+  padding:7px 8px 7px 22px;border-radius:7px;cursor:pointer;
+  font-size:12px;color:var(--text-muted);transition:all .15s;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-.sb-item.active .sb-item-preview{color:var(--accent)}
-.sb-item-time{font-size:10.5px;color:var(--text-faint)}
+.sb-chat-item:hover{color:var(--text);background:var(--surface-2)}
+.sb-chat-item.active{color:var(--accent);background:var(--accent-soft)}
+.sb-chat-time{font-size:10.5px;color:var(--text-faint);margin-top:1px}
+.sb-empty{font-size:11.5px;color:var(--text-faint);font-style:italic;padding:6px 22px;}
+
+/* divider + section label */
+.sb-divider{height:1px;background:var(--border);margin:8px 0;}
+.sb-section-label{
+  font-size:9.5px;font-weight:600;color:var(--text-faint);
+  text-transform:uppercase;letter-spacing:1px;padding:0 8px;margin:8px 0 4px;
+}
+
+/* ── Subject rows ── */
+.sb-subject{}
+.sb-subj-hd{
+  display:flex;align-items:center;gap:6px;
+  padding:7px 8px;border-radius:8px;cursor:pointer;
+  font-size:12.5px;font-weight:500;color:var(--text-muted);transition:all .15s;
+}
+.sb-subj-hd:hover{color:var(--text);background:var(--surface-2)}
+.sb-subject.open .sb-subj-hd{color:var(--text)}
+.sb-subj-arrow{
+  width:13px;height:13px;flex-shrink:0;margin-left:auto;
+  fill:none;stroke:currentColor;stroke-width:2;
+  transition:transform .22s ease;
+}
+.sb-subject.open .sb-subj-arrow{transform:rotate(90deg)}
+
+/* ── Courses ── */
+.sb-courses{overflow:hidden;max-height:0;transition:max-height .3s ease;}
+.sb-subject.open .sb-courses{max-height:2000px}
+.sb-course{}
+.sb-course-hd{
+  display:flex;align-items:center;gap:5px;
+  padding:5px 8px 5px 22px;border-radius:7px;cursor:pointer;
+  font-size:12px;color:var(--text-muted);transition:all .15s;
+}
+.sb-course-hd:hover{color:var(--text);background:var(--surface-2)}
+.sb-course.open .sb-course-hd{color:var(--text)}
+.sb-course-arrow{
+  width:11px;height:11px;flex-shrink:0;margin-left:auto;
+  fill:none;stroke:currentColor;stroke-width:2;
+  transition:transform .18s ease;
+}
+.sb-course.open .sb-course-arrow{transform:rotate(90deg)}
+
+/* ── Teachers ── */
+.sb-teachers{overflow:hidden;max-height:0;transition:max-height .22s ease;}
+.sb-course.open .sb-teachers{max-height:300px}
+.sb-teacher{
+  display:flex;align-items:center;gap:7px;
+  padding:5px 8px 5px 36px;
+  border-radius:6px;cursor:pointer;width:100%;
+  background:none;border:none;font-family:inherit;
+  text-align:left;font-size:11.5px;color:var(--text-faint);transition:all .15s;
+}
+.sb-teacher:hover{color:var(--text-muted);background:var(--surface-2)}
+.sb-teacher.active{color:var(--accent)!important;background:var(--accent-soft)}
+.sb-teacher-dot{
+  width:5px;height:5px;border-radius:50%;background:currentColor;
+  flex-shrink:0;opacity:.6;
+}
 
 /* sidebar bottom */
-.sb-bottom{
-  padding:10px;border-top:1px solid var(--border);flex-shrink:0;
+.sb-bottom{padding:8px;border-top:1px solid var(--border);flex-shrink:0;}
+.sb-settings-btn{
+  display:flex;align-items:center;gap:8px;width:100%;
+  padding:8px 12px;background:none;border:1px solid var(--border);
+  border-radius:var(--radius-sm);color:var(--text-muted);
+  font-family:inherit;font-size:12.5px;cursor:pointer;transition:all .2s;
 }
-.sb-settings{
-  display:flex;align-items:center;gap:8px;
-  width:100%;padding:8px 12px;
-  background:none;border:1px solid var(--border);border-radius:var(--radius-sm);
-  color:var(--text-muted);font-family:inherit;font-size:13px;cursor:pointer;
-  transition:all .2s;
-}
-.sb-settings:hover{border-color:var(--accent);color:var(--accent)}
-.sb-settings svg{width:15px;height:15px;fill:currentColor;flex-shrink:0}
+.sb-settings-btn:hover{border-color:var(--accent);color:var(--accent)}
+.sb-settings-btn svg{width:14px;height:14px;fill:currentColor;flex-shrink:0}
 
-/* sidebar mobile overlay */
+/* mobile overlay */
 .sb-overlay{
   display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
   z-index:49;opacity:0;pointer-events:none;transition:opacity .25s;
 }
 .sb-overlay.open{opacity:1;pointer-events:all}
 
-/* ─── CONTENT AREA ────────────────────────────────────── */
+/* ─── CONTENT ─────────────────────────────────────────── */
 .content{flex:1;display:flex;flex-direction:column;min-width:0;height:100vh;overflow:hidden;}
 
-/* mobile header (hidden on desktop) */
+/* mobile header */
 .mob-header{
   display:none;align-items:center;justify-content:space-between;
   height:48px;padding:0 16px;
@@ -175,65 +217,57 @@ body{display:flex;height:100vh}
   display:flex;align-items:center;justify-content:center;
   color:var(--text-muted);border-radius:8px;transition:color .2s;
 }
-.hamburger:hover{color:var(--text)}
 .hamburger svg{width:18px;height:18px;stroke:currentColor;fill:none}
 .mob-logo{display:flex;align-items:center;gap:8px;}
 .mob-logo-mark{width:24px;height:24px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;}
 .mob-logo-name{font-size:15px;font-weight:600}
 
-/* ─── MAIN AREA ───────────────────────────────────────── */
+/* ─── MAIN ────────────────────────────────────────────── */
 .main{flex:1;display:flex;overflow:hidden;}
 
 /* ─── CHAT PANEL ──────────────────────────────────────── */
 .chat-panel{flex:1;display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--border)}
-.messages{
-  flex:1;overflow-y:auto;padding:28px 32px;
-  display:flex;flex-direction:column;gap:22px;scroll-behavior:smooth;
-}
+.messages{flex:1;overflow-y:auto;padding:28px 32px;display:flex;flex-direction:column;gap:22px;scroll-behavior:smooth;}
 .messages::-webkit-scrollbar{width:3px}
 .messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
-/* ─── WELCOME ─────────────────────────────────────────── */
-.welcome{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  flex:1;gap:14px;text-align:center;padding:48px;
-}
-.welcome-orb{
-  width:54px;height:54px;border-radius:18px;
-  background:var(--accent-soft);display:flex;align-items:center;
-  justify-content:center;font-size:24px;margin-bottom:4px;
-}
+/* welcome */
+.welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:14px;text-align:center;padding:48px;}
+.welcome-orb{width:54px;height:54px;border-radius:18px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:4px;}
 .welcome-title{font-size:16px;font-weight:500;color:var(--text)}
 .welcome-desc{font-size:13px;color:var(--text-muted);max-width:280px;line-height:1.65}
 
-/* ─── MESSAGES ────────────────────────────────────────── */
+/* tutor badge */
+.tutor-badge{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 14px;border-radius:10px;
+  background:var(--accent-soft);border:1px solid rgba(123,105,245,.2);
+  font-size:12px;color:var(--text-muted);margin-bottom:4px;flex-shrink:0;
+}
+.tutor-badge strong{color:var(--accent);font-weight:600}
+
+/* messages */
 .msg{display:flex;flex-direction:column;max-width:76%;animation:msgIn .3s ease forwards}
 @keyframes msgIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
 .msg.user{align-self:flex-end;align-items:flex-end}
 .msg.lumi{align-self:flex-start;align-items:flex-start}
 .msg-head{display:flex;align-items:center;gap:7px;margin-bottom:5px}
-.msg-avatar{
-  width:26px;height:26px;border-radius:7px;background:var(--accent);
-  display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;
-}
+.msg-avatar{width:26px;height:26px;border-radius:7px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;}
 .msg-name{font-size:11.5px;font-weight:500;color:var(--text-muted)}
 .msg-bubble{padding:12px 16px;border-radius:var(--radius);font-size:14px;line-height:1.7;word-wrap:break-word;}
 .msg.user .msg-bubble{background:var(--user-bg);color:#fff;border-bottom-right-radius:4px;}
 .msg.lumi .msg-bubble{background:var(--lumi-bg);color:var(--text);border:1px solid var(--border);border-bottom-left-radius:4px;}
-.msg-bubble p{margin:0}
-.msg-bubble p+p{margin-top:9px}
-.msg-bubble strong{font-weight:600}
-.msg-bubble em{color:var(--text-muted)}
+.msg-bubble p{margin:0}.msg-bubble p+p{margin-top:9px}
+.msg-bubble strong{font-weight:600}.msg-bubble em{color:var(--text-muted)}
 .msg-bubble code{font-family:'SF Mono',Monaco,'Courier New',monospace;font-size:12px;background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px;}
 
-/* ─── TYPING INDICATOR ────────────────────────────────── */
+/* typing */
 .typing{display:flex;align-items:center;gap:5px;padding:13px 16px;background:var(--lumi-bg);border:1px solid var(--border);border-radius:var(--radius);border-bottom-left-radius:4px;width:fit-content;}
 .typing-dot{width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:tdot 1.4s ease-in-out infinite;}
-.typing-dot:nth-child(2){animation-delay:.15s}
-.typing-dot:nth-child(3){animation-delay:.3s}
+.typing-dot:nth-child(2){animation-delay:.15s}.typing-dot:nth-child(3){animation-delay:.3s}
 @keyframes tdot{0%,60%,100%{transform:translateY(0);opacity:.35}30%{transform:translateY(-6px);opacity:1}}
 
-/* ─── INPUT AREA ──────────────────────────────────────── */
+/* input */
 .input-area{padding:14px 20px;border-top:1px solid var(--border);background:var(--bg)}
 .input-wrap{display:flex;align-items:flex-end;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:9px 9px 9px 15px;transition:border-color .2s;}
 .input-wrap:focus-within{border-color:var(--accent)}
@@ -241,21 +275,18 @@ body{display:flex;height:100vh}
 .msg-input::placeholder{color:var(--text-faint)}
 .send-btn{width:34px;height:34px;background:var(--accent);border:none;border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;opacity:.4;}
 .send-btn:not(:disabled){opacity:1;box-shadow:0 2px 10px var(--accent-glow)}
-.send-btn:not(:disabled):hover{transform:scale(1.06);box-shadow:0 3px 16px var(--accent-glow)}
-.send-btn:not(:disabled):active{transform:scale(.97)}
-.send-btn:disabled{cursor:not-allowed}
-.send-btn svg{width:15px;height:15px;fill:#fff}
+.send-btn:not(:disabled):hover{transform:scale(1.06)}.send-btn:not(:disabled):active{transform:scale(.97)}
+.send-btn:disabled{cursor:not-allowed}.send-btn svg{width:15px;height:15px;fill:#fff}
 
 /* ─── PROFILE PANEL ───────────────────────────────────── */
-.profile{width:290px;flex-shrink:0;display:flex;flex-direction:column;background:var(--surface);overflow-y:auto}
+.profile{width:286px;flex-shrink:0;display:flex;flex-direction:column;background:var(--surface);overflow-y:auto}
 .profile::-webkit-scrollbar{width:3px}
 .profile::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .profile-hd{padding:18px 18px 14px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .profile-title{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.9px}
 .profile-sub{font-size:11px;color:var(--text-faint);margin-top:3px}
 .profile-body{padding:4px 0;flex:1}
-.section{padding:14px 18px;border-bottom:1px solid var(--border)}
-.section:last-child{border-bottom:none}
+.section{padding:14px 18px;border-bottom:1px solid var(--border)}.section:last-child{border-bottom:none}
 .section-hd{display:flex;align-items:center;gap:7px;margin-bottom:10px}
 .sdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .sdot.v{background:var(--v-color);box-shadow:0 0 6px rgba(123,105,245,.4)}
@@ -277,7 +308,6 @@ body{display:flex;height:100vh}
 .toast.show{transform:translateX(-50%) translateY(0)}
 .toast.ok{background:#0e1e18;border-color:rgba(87,219,176,.25);color:#78e4c4}
 
-/* ─── TAG FLASH ───────────────────────────────────────── */
 @keyframes sectionFlash{0%{background:transparent}30%{background:rgba(123,105,245,.06)}100%{background:transparent}}
 .section.flash{animation:sectionFlash .7s ease forwards}
 
@@ -291,8 +321,7 @@ body{display:flex;height:100vh}
 .settings-close{width:28px;height:28px;background:none;border:none;cursor:pointer;color:var(--text-muted);display:flex;align-items:center;justify-content:center;border-radius:6px;transition:background .15s;font-size:18px;line-height:1;}
 .settings-close:hover{background:var(--surface-2)}
 .settings-body{flex:1;overflow-y:auto;padding:8px 0;}
-.settings-section{padding:18px 20px;border-bottom:1px solid var(--border)}
-.settings-section:last-child{border-bottom:none}
+.settings-section{padding:18px 20px;border-bottom:1px solid var(--border)}.settings-section:last-child{border-bottom:none}
 .settings-section-title{font-size:10px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;}
 .toggle-row{display:flex;align-items:center;justify-content:space-between}
 .toggle-label{font-size:13px;color:var(--text)}
@@ -312,75 +341,60 @@ body{display:flex;height:100vh}
 .danger-btn:hover{background:rgba(255,80,80,.08)}
 
 /* ─── MOBILE ──────────────────────────────────────────── */
-@media (max-width:768px) {
-  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:300;transform:translateX(-260px);}
+@media(max-width:768px){
+  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:300;transform:translateX(-264px);}
   .sidebar.open{transform:translateX(0)}
   .sb-overlay{display:block}
   .mob-header{display:flex}
-  .main{height:calc(100vh - 48px)}
   .profile{display:none}
 }
 </style>
 </head>
 <body>
 
-<!-- ─── SIDEBAR ────────────────────────────────────────── -->
+<!-- ─── SIDEBAR ───────────────────────────────────────── -->
 <nav class="sidebar" id="sidebar">
   <div class="sb-scroll">
+
     <!-- Logo -->
     <div class="sb-logo">
       <div class="logo-mark">✦</div>
       <div>
         <div class="sb-logo-name">Lumi</div>
-        <div class="sb-logo-sub">your companion</div>
+        <div class="sb-logo-school">Menlo School</div>
       </div>
     </div>
 
     <!-- New Chat -->
     <button class="sb-new" id="newChatBtn">
-      <svg viewBox="0 0 24 24" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <svg viewBox="0 0 24 24" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       New Chat
     </button>
 
     <!-- Search -->
     <div class="sb-search-wrap">
-      <span class="sb-search-icon"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
-      <input class="sb-search" id="sbSearch" placeholder="Search chats…" autocomplete="off">
+      <span class="sb-search-ico"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+      <input class="sb-search" id="sbSearch" placeholder="Search subjects & courses…" autocomplete="off">
     </div>
 
-    <!-- Subjects -->
-    <div class="sb-label">Subjects</div>
-    <div class="sb-pills" id="subjectPills">
-      <button class="sb-pill active">All</button>
-      <button class="sb-pill">English</button>
-      <button class="sb-pill">Math</button>
-      <button class="sb-pill">Science</button>
-      <button class="sb-pill">Electives</button>
-    </div>
+    <!-- Navigation tree -->
+    <div id="sbNav"></div>
 
-    <!-- Recent Chats -->
-    <div class="sb-label">Recent Chats</div>
-    <div class="sb-chats" id="sbChats">
-      <div class="sb-empty">No chats yet</div>
-    </div>
   </div>
 
   <!-- Settings at bottom -->
   <div class="sb-bottom">
-    <button class="sb-settings" id="gearBtn">
+    <button class="sb-settings-btn" id="gearBtn">
       <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
       Settings
     </button>
   </div>
 </nav>
 
-<!-- Sidebar overlay (mobile) -->
 <div class="sb-overlay" id="sbOverlay"></div>
 
-<!-- ─── CONTENT ────────────────────────────────────────── -->
+<!-- ─── CONTENT ───────────────────────────────────────── -->
 <div class="content">
-
-  <!-- Mobile header -->
   <header class="mob-header">
     <button class="hamburger" id="hamburger">
       <svg viewBox="0 0 24 24" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -392,16 +406,13 @@ body{display:flex;height:100vh}
     <div style="width:34px"></div>
   </header>
 
-  <!-- Main -->
   <div class="main">
-
-    <!-- Chat panel -->
     <div class="chat-panel">
       <div class="messages" id="messages">
         <div class="welcome" id="welcome">
           <div class="welcome-orb">✦</div>
           <div class="welcome-title">Hi, I'm Lumi</div>
-          <div class="welcome-desc">Add your Anthropic API key in Settings (bottom left), then start talking.</div>
+          <div class="welcome-desc">Choose a subject and course from the sidebar, or click <strong>New Chat</strong> to start talking.</div>
         </div>
       </div>
       <div class="input-area">
@@ -414,7 +425,6 @@ body{display:flex;height:100vh}
       </div>
     </div>
 
-    <!-- Profile panel -->
     <aside class="profile">
       <div class="profile-hd">
         <div class="profile-title">What Lumi knows</div>
@@ -435,11 +445,10 @@ body{display:flex;height:100vh}
         </div>
       </div>
     </aside>
-
   </div>
 </div>
 
-<!-- Settings overlay + drawer -->
+<!-- Settings -->
 <div class="settings-overlay" id="settingsOverlay"></div>
 <div class="settings-drawer" id="settingsDrawer">
   <div class="settings-head">
@@ -474,101 +483,167 @@ body{display:flex;height:100vh}
 <div class="toast" id="toast"></div>
 
 <script>
-// ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
-const SYSTEM = `You are Lumi — not an assistant, but a warm and genuinely curious companion who cares deeply about the people you talk with.
+// ─── CURRICULUM DATA ──────────────────────────────────────────────────────────
+const SUBJECTS = [
+  { id:'english', name:'English', courses:[
+    'English 9','English 10','English 11',
+    'AP English Language','AP English Literature',
+    'Creative Writing','Journalism',
+    'Senior Electives'
+  ]},
+  { id:'history', name:'History & Social Sciences', courses:[
+    'World History','US History','US History (H)',
+    'Junior History Electives','Senior History Electives',
+    'AP US History','AP World History',
+    'Economics','Psychology'
+  ]},
+  { id:'math', name:'Math', courses:[
+    'Analytic Geometry & Algebra (H)',
+    'Algebra 2 with Trigonometry','Algebra 2 with Trigonometry (H)',
+    'Precalculus','Precalculus (H)',
+    'Introductory Calculus','Introductory Calculus (H)',
+    'Advanced Calculus I (H)','Advanced Calculus II (H)',
+    'AP Calculus BC','AP Statistics',
+    'Advanced Topics in Mathematics',
+    'Probabilistic Modeling & Machine Learning'
+  ]},
+  { id:'cs', name:'Computer Science', courses:[
+    'CS1','CS2','Advanced Topics in CS',
+    'App Design','AP Computer Science A'
+  ]},
+  { id:'science', name:'Science', courses:[
+    'Living Systems (Bio 9)','Chemistry','Chemistry (H)',
+    'Physics','Physics (H)',
+    'AP Biology','AP Chemistry','AP Physics',
+    'Molecular Biology','Research Science'
+  ]},
+  { id:'applied', name:'Applied Science & Engineering', courses:[
+    'Mechanical Engineering','Electrical Engineering',
+    'Applied Science Research (H)'
+  ]},
+  { id:'language', name:'World Language', courses:[
+    'Spanish (Levels 1–5)','French (Levels 1–5)',
+    'Mandarin (Levels 1–5)','Latin (Levels 1–4)'
+  ]},
+  { id:'arts', name:'Creative Arts', courses:[
+    'Studio Art','Photography','Drama','Dance',
+    'Vocal Music','Instrumental Music','Moviemaking','Yearbook'
+  ]},
+  { id:'electives', name:'Electives', courses:[
+    'Introduction to Journalism','Advanced Journalism',
+    'Menlo IP Capstone','9th Grade Seminar'
+  ]}
+];
+
+// Placeholder teachers per course (will be replaced with real names later)
+function getTeachers() { return ['Teacher 1', 'Teacher 2']; }
+
+// ─── SYSTEM PROMPTS ───────────────────────────────────────────────────────────
+const SYSTEM_COMPANION = `You are Lumi — not an assistant, but a warm and genuinely curious companion who cares deeply about the people you talk with.
 
 Your personality:
-- Think of yourself as that rare friend who truly listens, remembers, and makes people feel seen — not a chatbot, not a therapist
-- You're unhurried, warm, and non-judgmental. You never sound clinical or performatively upbeat.
-- You pick up on what matters to people from *how* they talk, not just the words themselves
+- Think of yourself as that rare friend who truly listens, remembers, and makes people feel seen
+- You're unhurried, warm, and non-judgmental. Never clinical or performatively upbeat.
+- You pick up on what matters to people from how they talk, not just the words
 - You remember everything within our conversation and weave it back in naturally
-- You're emotionally perceptive — you sense feeling behind facts
 
-Response length — this is the most important rule:
+Response length:
 - MAX 1-2 sentences for casual messages. Hard limit.
-- If the person sends 5 words, you send 5-10 words back.
-- NEVER write more than 3 sentences unless someone explicitly asks you a deep question.
-- No filler, no affirmations, no "That's so interesting!" — just respond.
-- You are texting a friend. Not writing an email. Not giving a therapy session.
-- If you feel the urge to write a paragraph, cut it in half. Then cut it in half again.
+- Match the length of what the person sent.
+- No filler, no affirmations. You are texting a friend.
 
-Your purpose:
-- Help people feel genuinely understood
-- Gradually and naturally discover what someone values, what they hope for, and what they love
-- Every 2–3 messages, weave in one organic question that deepens your understanding — what they care about, what they're building, what lights them up. Never make it feel like a survey. Let it arise naturally in the flow.
+Every 2–3 messages, weave in one organic question to understand them better.
 
-After EVERY reply, you MUST append the following JSON block on its own line at the very end of your response.
-The app automatically strips this before showing your message to the user — they will never see it.
-
+After EVERY reply, append this JSON on its own line at the very end (stripped before display):
 {"values":["..."],"goals":["..."],"interests":["..."]}
+Only include NEWLY learned things. Empty arrays if nothing new.
+NEVER mention the JSON.
 
-Rules for the JSON:
-- ONLY include things you NEWLY learned in this specific exchange — not things from prior turns
-- Be vivid and specific: not "family" → "being there for his daughter's milestones"; not "creativity" → "designing furniture by hand"
-- Use empty arrays [] for any category where nothing new was learned this turn
-- If nothing new was learned at all, output: {"values":[],"goals":[],"interests":[]}
-- NEVER mention, reference, or explain the JSON block in your reply to the user
-- Always include all three keys even if some are empty arrays
+Begin by warmly welcoming the person and asking one genuine question.`;
 
-Begin by warmly welcoming the person and asking one genuine open question to start knowing them.`;
+function buildTutorSystem(subject, course, teacher) {
+  return `You are ${teacher}, a Menlo School tutor specializing in ${course} (${subject} department).
 
-// ─── CONVERSATION STATE ───────────────────────────────────────────────────────
+Your tutoring style:
+- Warm, encouraging, and patient — you believe every student can succeed
+- Ask guiding questions rather than just giving answers
+- Break down complex concepts step by step
+- Connect new ideas to things the student already understands
+- Give specific, actionable feedback
+- Celebrate progress and effort
+
+You know the Menlo School ${course} curriculum deeply and can reference specific concepts, problem types, and learning goals for this course.
+
+Response length: Keep it SHORT — 1-3 sentences for simple questions. Go longer only when a concept genuinely needs it. No essays.
+
+After EVERY reply, append this JSON on its own line at the very end (stripped before display):
+{"values":["..."],"goals":["..."],"interests":["..."]}
+Only include NEWLY learned things about the student (academic interests, learning goals, strengths). Empty arrays if nothing new.
+NEVER mention the JSON.`;
+}
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
 const S = {
-  currentId: null,
-  messages: [],
-  values: new Set(),
-  goals: new Set(),
-  interests: new Set(),
+  currentId:     null,
+  messages:      [],
+  values:        new Set(),
+  goals:         new Set(),
+  interests:     new Set(),
   exchangeCount: 0,
-  ready: false,
-  busy: false,
+  ready:         false,
+  busy:          false,
+  tutorCtx:      null,   // { subject, course, teacher } or null
+};
+
+// Sidebar UI state
+const SB = {
+  mode:            'all',   // 'all' | 'tutor'
+  expandedSubject: null,
+  expandedCourse:  null,
+  activeTeacher:   null,    // { subjectId, course, teacher }
 };
 
 // ─── ELEMENTS ─────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
-const messagesEl    = $('messages');
-const msgInput      = $('msgInput');
-const sendBtn       = $('sendBtn');
-const tagsV         = $('tags-v');
-const tagsG         = $('tags-g');
-const tagsI         = $('tags-i');
-const secV          = $('sec-v');
-const secG          = $('sec-g');
-const secI          = $('sec-i');
-const toast         = $('toast');
-const sbChats       = $('sbChats');
-const sbSearch      = $('sbSearch');
-const themeToggle   = $('themeToggle');
-const keyInput      = $('keyInput');
+const messagesEl  = $('messages');
+const msgInput    = $('msgInput');
+const sendBtn     = $('sendBtn');
+const tagsV       = $('tags-v');
+const tagsG       = $('tags-g');
+const tagsI       = $('tags-i');
+const secV        = $('sec-v');
+const secG        = $('sec-g');
+const secI        = $('sec-i');
+const toast       = $('toast');
+const sbNav       = $('sbNav');
+const sbSearch    = $('sbSearch');
+const themeToggle = $('themeToggle');
+const keyInput    = $('keyInput');
 
 // ─── CONVERSATION STORAGE ─────────────────────────────────────────────────────
-function genId() { return 'conv_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
-
-function getConvs() {
-  try { return JSON.parse(localStorage.getItem('lumi_convs') || '{}'); } catch { return {}; }
-}
-
+function genId() { return 'conv_'+Date.now()+'_'+Math.random().toString(36).slice(2,5); }
+function getConvs() { try { return JSON.parse(localStorage.getItem('lumi_convs')||'{}'); } catch { return {}; } }
 function saveConvs(c) { localStorage.setItem('lumi_convs', JSON.stringify(c)); }
 
 function saveCurrentConv() {
-  if (!S.currentId || !S.messages.length) return;
+  if (!S.currentId) return;
   const convs = getConvs();
   const existing = convs[S.currentId] || {};
   convs[S.currentId] = {
-    id:           S.currentId,
-    ts:           existing.ts || Date.now(),
-    preview:      S.messages.find(m => m.role === 'user')?.content?.slice(0, 55) || 'New chat',
-    messages:     S.messages,
-    values:       [...S.values],
-    goals:        [...S.goals],
-    interests:    [...S.interests],
+    id: S.currentId,
+    ts: existing.ts || Date.now(),
+    preview: S.messages.find(m=>m.role==='user')?.content?.slice(0,55) || 'New chat',
+    messages: S.messages,
+    values: [...S.values],
+    goals: [...S.goals],
+    interests: [...S.interests],
     exchangeCount: S.exchangeCount,
+    tutorCtx: S.tutorCtx,
   };
   saveConvs(convs);
-  localStorage.setItem('lumi_current', S.currentId);
+  if (S.currentId) localStorage.setItem('lumi_current', S.currentId);
 }
 
-// ─── MIGRATION from old lumi_data ────────────────────────────────────────────
 function migrateOldData() {
   if (localStorage.getItem('lumi_convs')) return;
   const old = localStorage.getItem('lumi_data');
@@ -578,15 +653,7 @@ function migrateOldData() {
     if (!data.messages?.length) return;
     const id = genId();
     const convs = {};
-    convs[id] = {
-      id, ts: Date.now(),
-      preview: data.messages.find(m => m.role === 'user')?.content?.slice(0,55) || 'Chat',
-      messages: data.messages,
-      values: data.values || [],
-      goals: data.goals || [],
-      interests: data.interests || [],
-      exchangeCount: data.exchangeCount || 0,
-    };
+    convs[id] = { id, ts:Date.now(), preview: data.messages.find(m=>m.role==='user')?.content?.slice(0,55)||'Chat', messages:data.messages, values:data.values||[], goals:data.goals||[], interests:data.interests||[], exchangeCount:data.exchangeCount||0, tutorCtx:null };
     saveConvs(convs);
     localStorage.setItem('lumi_current', id);
     localStorage.removeItem('lumi_data');
@@ -594,108 +661,246 @@ function migrateOldData() {
 }
 
 // ─── LOAD A CONVERSATION ──────────────────────────────────────────────────────
-function loadConv(id, animate) {
-  const convs = getConvs();
-  const conv = convs[id];
+function loadConv(id) {
+  const conv = getConvs()[id];
   if (!conv) return;
-
-  S.currentId    = id;
-  S.messages     = conv.messages || [];
+  S.currentId     = id;
+  S.messages      = conv.messages || [];
   S.exchangeCount = conv.exchangeCount || 0;
-  S.ready        = true;
-  S.busy         = false;
+  S.tutorCtx      = conv.tutorCtx || null;
+  S.ready         = true;
+  S.busy          = false;
 
-  // Clear chat UI
   messagesEl.innerHTML = '';
-
-  // Clear profile UI
   S.values.clear(); S.goals.clear(); S.interests.clear();
-  [tagsV, tagsG, tagsI].forEach(c => { c.innerHTML = '<span class="empty-hint">Not yet discovered</span>'; });
+  [tagsV,tagsG,tagsI].forEach(c=>{ c.innerHTML='<span class="empty-hint">Not yet discovered</span>'; });
 
-  // Re-render messages
   S.messages.forEach(m => renderMsg(m.role, m.content, false));
+  (conv.values||[]).forEach(v    => { S.values.add(v);    addTag(tagsV,v,'v',false); });
+  (conv.goals||[]).forEach(g     => { S.goals.add(g);     addTag(tagsG,g,'g',false); });
+  (conv.interests||[]).forEach(i => { S.interests.add(i); addTag(tagsI,i,'i',false); });
 
-  // Re-render profile (no animation when loading)
-  (conv.values || []).forEach(v    => { S.values.add(v);    addTag(tagsV, v, 'v', false); });
-  (conv.goals  || []).forEach(g    => { S.goals.add(g);     addTag(tagsG, g, 'g', false); });
-  (conv.interests || []).forEach(i => { S.interests.add(i); addTag(tagsI, i, 'i', false); });
+  // Sync SB state with loaded tutor context
+  if (S.tutorCtx) {
+    SB.mode = 'tutor';
+    SB.activeTeacher = { subjectId: S.tutorCtx.subjectId, course: S.tutorCtx.course, teacher: S.tutorCtx.teacher };
+    SB.expandedSubject = S.tutorCtx.subjectId;
+  }
 
-  renderSidebar();
   scrollBottom();
+  renderSidebar();
 }
 
 // ─── NEW CHAT ─────────────────────────────────────────────────────────────────
 function newChat() {
   saveCurrentConv();
+  S.currentId     = genId();
+  S.messages      = [];
+  S.exchangeCount = 0;
+  S.tutorCtx      = null;
+  S.ready         = false;
+  S.values.clear(); S.goals.clear(); S.interests.clear();
+  SB.mode = 'all';
+  SB.activeTeacher = null;
+
+  messagesEl.innerHTML = '';
+  [tagsV,tagsG,tagsI].forEach(c=>{ c.innerHTML='<span class="empty-hint">Not yet discovered</span>'; });
+
+  const w = document.createElement('div');
+  w.className='welcome'; w.id='welcome';
+  w.innerHTML=`<div class="welcome-orb">✦</div>
+    <div class="welcome-title">Hi, I'm Lumi</div>
+    <div class="welcome-desc">Choose a course from the sidebar, or just start talking.</div>`;
+  messagesEl.appendChild(w);
+
+  renderSidebar();
+  if (localStorage.getItem('lumi_key')) startLumi();
+}
+
+// ─── OPEN TUTOR SESSION ───────────────────────────────────────────────────────
+function openTutor(subjectId, course, teacher) {
+  saveCurrentConv();
+
+  const subjectName = SUBJECTS.find(s=>s.id===subjectId)?.name || subjectId;
 
   S.currentId     = genId();
   S.messages      = [];
   S.exchangeCount = 0;
-  S.ready         = false;
+  S.tutorCtx      = { subjectId, subjectName, course, teacher };
+  S.ready         = true;
   S.values.clear(); S.goals.clear(); S.interests.clear();
+  SB.mode = 'tutor';
+  SB.activeTeacher = { subjectId, course, teacher };
 
   messagesEl.innerHTML = '';
-  [tagsV, tagsG, tagsI].forEach(c => { c.innerHTML = '<span class="empty-hint">Not yet discovered</span>'; });
+  [tagsV,tagsG,tagsI].forEach(c=>{ c.innerHTML='<span class="empty-hint">Not yet discovered</span>'; });
 
-  // Show welcome
-  const w = document.createElement('div');
-  w.className = 'welcome'; w.id = 'welcome';
-  w.innerHTML = `<div class="welcome-orb">✦</div>
-    <div class="welcome-title">Hi, I'm Lumi</div>
-    <div class="welcome-desc">Start typing to begin a new conversation.</div>`;
-  messagesEl.appendChild(w);
+  // Inject greeting (no API call)
+  const greeting = `You're now studying ${course} with ${teacher}. How can I help?`;
+  S.messages.push({ role:'assistant', content: greeting });
+  renderMsg('lumi', greeting, true);
+  saveCurrentConv();
 
   renderSidebar();
-
-  if (localStorage.getItem('lumi_key')) startLumi();
+  scrollBottom();
+  msgInput.focus();
 }
 
-// ─── RENDER SIDEBAR ───────────────────────────────────────────────────────────
+// ─── SIDEBAR RENDERING ───────────────────────────────────────────────────────
 function renderSidebar() {
-  const convs = getConvs();
   const query = sbSearch.value.toLowerCase().trim();
-  const sorted = Object.values(convs)
-    .filter(c => !query || c.preview.toLowerCase().includes(query))
-    .sort((a, b) => b.ts - a.ts);
+  sbNav.innerHTML = '';
 
-  sbChats.innerHTML = '';
-  if (!sorted.length) {
-    sbChats.innerHTML = '<div class="sb-empty">No chats yet</div>';
-    return;
+  // ── "All" row ──
+  const allRow = document.createElement('div');
+  allRow.className = 'sb-all' + (SB.mode==='all'&&!query ? ' active' : '');
+  allRow.innerHTML = `<svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> All`;
+  allRow.addEventListener('click', () => {
+    SB.mode = 'all';
+    SB.activeTeacher = null;
+    renderSidebar();
+    // Show welcome if no current chat loaded
+    const convs = getConvs();
+    const latest = Object.values(convs).sort((a,b)=>b.ts-a.ts)[0];
+    if (latest) loadConv(latest.id);
+    else if (!S.messages.length) showWelcome();
+  });
+  sbNav.appendChild(allRow);
+
+  // ── Recent chats (shown in All mode, no query) ──
+  if (SB.mode==='all' && !query) {
+    const recentWrap = document.createElement('div');
+    recentWrap.className = 'sb-recent open';
+    const inner = document.createElement('div');
+    inner.className = 'sb-recent-inner';
+    const convs = getConvs();
+    const sorted = Object.values(convs).sort((a,b)=>b.ts-a.ts).slice(0,20);
+    if (sorted.length === 0) {
+      inner.innerHTML = '<div class="sb-empty">No chats yet</div>';
+    } else {
+      sorted.forEach(conv => {
+        const el = document.createElement('div');
+        el.className = 'sb-chat-item' + (conv.id===S.currentId ? ' active' : '');
+        el.innerHTML = `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(conv.preview)}</div>
+          <div class="sb-chat-time">${timeAgo(conv.ts)}</div>`;
+        el.addEventListener('click', () => {
+          saveCurrentConv();
+          SB.activeTeacher = conv.tutorCtx ? { subjectId:conv.tutorCtx.subjectId, course:conv.tutorCtx.course, teacher:conv.tutorCtx.teacher } : null;
+          SB.mode = conv.tutorCtx ? 'tutor' : 'all';
+          loadConv(conv.id);
+          closeSidebar();
+        });
+        inner.appendChild(el);
+      });
+    }
+    recentWrap.appendChild(inner);
+    sbNav.appendChild(recentWrap);
   }
 
-  sorted.forEach(conv => {
-    const el = document.createElement('div');
-    el.className = 'sb-item' + (conv.id === S.currentId ? ' active' : '');
-    el.innerHTML = `<div class="sb-item-preview">${escHtml(conv.preview)}</div>
-      <div class="sb-item-time">${timeAgo(conv.ts)}</div>`;
-    el.addEventListener('click', () => {
-      saveCurrentConv();
-      loadConv(conv.id);
-      closeSidebar();
+  // ── Divider + Subjects label ──
+  const div = document.createElement('div');
+  div.className = 'sb-divider';
+  sbNav.appendChild(div);
+  const lbl = document.createElement('div');
+  lbl.className = 'sb-section-label';
+  lbl.textContent = 'Subjects';
+  sbNav.appendChild(lbl);
+
+  // ── Subject tree ──
+  SUBJECTS.forEach(subject => {
+    // Filter courses by query
+    const matchedCourses = query
+      ? subject.courses.filter(c => c.toLowerCase().includes(query) || subject.name.toLowerCase().includes(query))
+      : subject.courses;
+
+    if (query && matchedCourses.length === 0 && !subject.name.toLowerCase().includes(query)) return;
+
+    const isOpen = SB.expandedSubject === subject.id || (query && matchedCourses.length > 0);
+    const coursesToShow = query ? matchedCourses : subject.courses;
+
+    const subjectEl = document.createElement('div');
+    subjectEl.className = 'sb-subject' + (isOpen ? ' open' : '');
+
+    const hd = document.createElement('div');
+    hd.className = 'sb-subj-hd';
+    hd.innerHTML = `<span style="flex:1">${escHtml(subject.name)}</span>
+      <svg class="sb-subj-arrow" viewBox="0 0 24 24" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>`;
+    hd.addEventListener('click', () => {
+      SB.expandedSubject = SB.expandedSubject === subject.id ? null : subject.id;
+      SB.expandedCourse  = null;
+      renderSidebar();
     });
-    sbChats.appendChild(el);
+    subjectEl.appendChild(hd);
+
+    // Courses
+    const coursesEl = document.createElement('div');
+    coursesEl.className = 'sb-courses';
+
+    coursesToShow.forEach(course => {
+      const isCourseOpen = SB.expandedCourse === `${subject.id}::${course}` || (query && course.toLowerCase().includes(query));
+      const courseEl = document.createElement('div');
+      courseEl.className = 'sb-course' + (isCourseOpen ? ' open' : '');
+
+      const chd = document.createElement('div');
+      chd.className = 'sb-course-hd';
+      chd.innerHTML = `<span style="flex:1">${escHtml(course)}</span>
+        <svg class="sb-course-arrow" viewBox="0 0 24 24" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>`;
+      chd.addEventListener('click', () => {
+        const key = `${subject.id}::${course}`;
+        SB.expandedCourse = SB.expandedCourse === key ? null : key;
+        renderSidebar();
+      });
+      courseEl.appendChild(chd);
+
+      // Teachers
+      const teachersEl = document.createElement('div');
+      teachersEl.className = 'sb-teachers';
+      getTeachers().forEach(teacher => {
+        const isActive = SB.activeTeacher &&
+          SB.activeTeacher.subjectId === subject.id &&
+          SB.activeTeacher.course === course &&
+          SB.activeTeacher.teacher === teacher;
+        const btn = document.createElement('button');
+        btn.className = 'sb-teacher' + (isActive ? ' active' : '');
+        btn.innerHTML = `<span class="sb-teacher-dot"></span>${escHtml(teacher)}`;
+        btn.addEventListener('click', () => {
+          openTutor(subject.id, course, teacher);
+          closeSidebar();
+        });
+        teachersEl.appendChild(btn);
+      });
+      courseEl.appendChild(teachersEl);
+      coursesEl.appendChild(courseEl);
+    });
+
+    subjectEl.appendChild(coursesEl);
+    sbNav.appendChild(subjectEl);
   });
 }
 
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
 function timeAgo(ts) {
-  const d = Date.now() - ts;
-  const m = Math.floor(d / 60000), h = Math.floor(d / 3600000), days = Math.floor(d / 86400000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m ago`;
-  if (h < 24) return `${h}h ago`;
-  if (days < 7) return `${days}d ago`;
-  return new Date(ts).toLocaleDateString();
+  const d=Date.now()-ts, m=Math.floor(d/60000), h=Math.floor(d/3600000), days=Math.floor(d/86400000);
+  if(m<1)return'just now'; if(m<60)return`${m}m ago`; if(h<24)return`${h}h ago`;
+  if(days<7)return`${days}d ago`; return new Date(ts).toLocaleDateString();
 }
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function showWelcome() {
+  if (document.getElementById('welcome')) return;
+  messagesEl.innerHTML = '';
+  const w = document.createElement('div');
+  w.className='welcome'; w.id='welcome';
+  w.innerHTML=`<div class="welcome-orb">✦</div>
+    <div class="welcome-title">Hi, I'm Lumi</div>
+    <div class="welcome-desc">Choose a course from the sidebar, or just start talking.</div>`;
+  messagesEl.appendChild(w);
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 function init() {
   // Theme
-  if (localStorage.getItem('lumi_theme') === 'light') {
+  if (localStorage.getItem('lumi_theme')==='light') {
     document.documentElement.classList.add('light');
     themeToggle.checked = true;
   }
@@ -704,49 +909,33 @@ function init() {
   const savedKey = localStorage.getItem('lumi_key');
   if (savedKey) keyInput.value = savedKey;
 
-  // Migrate old data format
   migrateOldData();
 
-  // Load conversations
+  // Load last conversation
   const convs = getConvs();
-  const savedCurrentId = localStorage.getItem('lumi_current');
+  const lastId = localStorage.getItem('lumi_current');
+  const latest = lastId && convs[lastId] ? convs[lastId]
+    : Object.values(convs).sort((a,b)=>b.ts-a.ts)[0];
 
-  if (savedCurrentId && convs[savedCurrentId]) {
-    loadConv(savedCurrentId);
-    if (savedKey) S.ready = true;
+  if (latest) {
+    loadConv(latest.id);
   } else {
-    const latest = Object.values(convs).sort((a,b) => b.ts - a.ts)[0];
-    if (latest) {
-      loadConv(latest.id);
-      if (savedKey) S.ready = true;
-    } else {
-      // Fresh start
-      S.currentId = genId();
-      renderSidebar();
-      if (savedKey) startLumi();
-    }
+    S.currentId = genId();
+    renderSidebar();
+    if (savedKey) startLumi();
   }
 
-  // Sidebar events
+  // New Chat
   $('newChatBtn').addEventListener('click', () => {
     if (S.messages.length > 0) {
-      if (confirm('Start a new chat? Your memory will be saved.')) newChat();
-    } else {
-      newChat();
-    }
+      if (confirm('Start a new chat? Your current conversation will be saved.')) newChat();
+    } else newChat();
   });
 
+  // Search
   sbSearch.addEventListener('input', renderSidebar);
 
-  // Subject pills (visual only)
-  $('subjectPills').addEventListener('click', e => {
-    const pill = e.target.closest('.sb-pill');
-    if (!pill) return;
-    document.querySelectorAll('.sb-pill').forEach(p => p.classList.remove('active'));
-    pill.classList.add('active');
-  });
-
-  // Mobile sidebar
+  // Mobile
   $('hamburger').addEventListener('click', openSidebar);
   $('sbOverlay').addEventListener('click', closeSidebar);
 
@@ -768,15 +957,14 @@ function init() {
       showToast('API key saved.', 'ok');
       closeSettings();
       if (!S.ready) startLumi();
-    } else {
-      showToast('Please enter an API key.');
-    }
+    } else showToast('Please enter an API key.');
   });
 
   $('clearMemBtn').addEventListener('click', () => {
     if (confirm("Are you sure? This will erase all conversations and memory.")) {
       localStorage.removeItem('lumi_convs');
       localStorage.removeItem('lumi_current');
+      SB.mode='all'; SB.activeTeacher=null; SB.expandedSubject=null; SB.expandedCourse=null;
       closeSettings();
       S.currentId = genId();
       newChat();
@@ -786,29 +974,22 @@ function init() {
   // Chat input
   msgInput.addEventListener('input', () => { autoGrow(msgInput); updateSendBtn(); });
   msgInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!sendBtn.disabled) doSend(); }
+    if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); if (!sendBtn.disabled) doSend(); }
   });
   sendBtn.addEventListener('click', doSend);
 }
 
-// ─── SIDEBAR OPEN/CLOSE ───────────────────────────────────────────────────────
-function openSidebar()  { $('sidebar').classList.add('open'); $('sbOverlay').classList.add('open'); }
-function closeSidebar() { $('sidebar').classList.remove('open'); $('sbOverlay').classList.remove('open'); }
-
-// ─── SETTINGS OPEN/CLOSE ─────────────────────────────────────────────────────
+function openSidebar()   { $('sidebar').classList.add('open');    $('sbOverlay').classList.add('open'); }
+function closeSidebar()  { $('sidebar').classList.remove('open'); $('sbOverlay').classList.remove('open'); }
 function openSettings()  { $('settingsDrawer').classList.add('open'); $('settingsOverlay').classList.add('open'); }
 function closeSettings() { $('settingsDrawer').classList.remove('open'); $('settingsOverlay').classList.remove('open'); }
 
 function updateSendBtn() {
   sendBtn.disabled = !localStorage.getItem('lumi_key') || !msgInput.value.trim() || S.busy;
 }
+function autoGrow(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
 
-function autoGrow(el) {
-  el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-}
-
-// ─── START LUMI (greeting) ────────────────────────────────────────────────────
+// ─── START LUMI (companion greeting) ────────────────────────────────────────
 async function startLumi() {
   if (S.ready) return;
   S.ready = true;
@@ -817,41 +998,39 @@ async function startLumi() {
   if (S.messages.length === 0) await fetchLumi();
 }
 
-// ─── SEND ─────────────────────────────────────────────────────────────────────
+// ─── SEND ────────────────────────────────────────────────────────────────────
 async function doSend() {
   const text = msgInput.value.trim();
   if (!text || S.busy) return;
-  const key = localStorage.getItem('lumi_key');
-  if (!key) { showToast('Add your API key in Settings first.'); openSettings(); return; }
+  if (!localStorage.getItem('lumi_key')) { showToast('Add your API key in Settings.'); openSettings(); return; }
 
-  // Auto-start if needed
-  if (!S.ready) { S.ready = true; const w = document.getElementById('welcome'); if (w) w.remove(); }
+  if (!S.ready) {
+    S.ready = true;
+    const w = document.getElementById('welcome'); if (w) w.remove();
+  }
 
-  msgInput.value = '';
-  msgInput.style.height = 'auto';
-  updateSendBtn();
-
-  S.messages.push({ role: 'user', content: text });
+  msgInput.value = ''; msgInput.style.height='auto'; updateSendBtn();
+  S.messages.push({ role:'user', content:text });
   saveCurrentConv();
   renderMsg('user', text, true);
   renderSidebar();
   await fetchLumi();
 }
 
-// ─── FETCH LUMI RESPONSE ──────────────────────────────────────────────────────
+// ─── FETCH LUMI RESPONSE ─────────────────────────────────────────────────────
 async function fetchLumi() {
-  S.busy = true;
-  updateSendBtn();
-
+  S.busy = true; updateSendBtn();
   const typing = makeTyping();
   messagesEl.appendChild(typing);
   scrollBottom();
 
   try {
-    const key = localStorage.getItem('lumi_key');
-    const { clean, data } = await callAPI(key, S.messages);
+    const system = S.tutorCtx
+      ? buildTutorSystem(S.tutorCtx.subjectName, S.tutorCtx.course, S.tutorCtx.teacher)
+      : SYSTEM_COMPANION;
+    const { clean, data } = await callAPI(localStorage.getItem('lumi_key'), S.messages, system);
     typing.remove();
-    S.messages.push({ role: 'assistant', content: clean });
+    S.messages.push({ role:'assistant', content:clean });
     S.exchangeCount++;
     saveCurrentConv();
     renderMsg('lumi', clean, true);
@@ -862,179 +1041,149 @@ async function fetchLumi() {
     showToast(err.message || 'Something went wrong. Check your API key.');
     console.error(err);
   } finally {
-    S.busy = false;
-    updateSendBtn();
+    S.busy = false; updateSendBtn();
   }
 }
 
-// ─── API CALL ─────────────────────────────────────────────────────────────────
-async function callAPI(apiKey, msgs) {
+// ─── API CALL ────────────────────────────────────────────────────────────────
+async function callAPI(apiKey, msgs, system) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
       'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      stream: true,
-      system: SYSTEM,
-      messages: msgs,
+      model:'claude-sonnet-4-20250514',
+      max_tokens:1024,
+      stream:true,
+      system,
+      messages:msgs,
     }),
   });
 
   if (!res.ok) {
     let msg = `API error ${res.status}`;
-    try { const e = await res.json(); msg = e.error?.message || msg; } catch {}
+    try { const e=await res.json(); msg=e.error?.message||msg; } catch {}
     throw new Error(msg);
   }
 
-  const reader = res.body.getReader();
-  const dec = new TextDecoder();
-  let buf = '', full = '';
-
+  const reader=res.body.getReader(), dec=new TextDecoder();
+  let buf='', full='';
   while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += dec.decode(value, { stream: true });
+    const {done,value}=await reader.read();
+    if(done)break;
+    buf+=dec.decode(value,{stream:true});
     let nl;
-    while ((nl = buf.indexOf('\n')) !== -1) {
-      const line = buf.slice(0, nl).trim();
-      buf = buf.slice(nl + 1);
-      if (!line.startsWith('data: ')) continue;
-      const raw = line.slice(6);
-      if (raw === '[DONE]') continue;
-      try {
-        const ev = JSON.parse(raw);
-        if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') full += ev.delta.text;
-      } catch {}
+    while((nl=buf.indexOf('\n'))!==-1){
+      const line=buf.slice(0,nl).trim(); buf=buf.slice(nl+1);
+      if(!line.startsWith('data: '))continue;
+      const raw=line.slice(6); if(raw==='[DONE]')continue;
+      try{const ev=JSON.parse(raw); if(ev.type==='content_block_delta'&&ev.delta?.type==='text_delta')full+=ev.delta.text;}catch{}
     }
   }
-
   return parseResponse(full);
 }
 
-// ─── PARSE RESPONSE ───────────────────────────────────────────────────────────
+// ─── PARSE ───────────────────────────────────────────────────────────────────
 function parseResponse(text) {
-  const lastBrace = text.lastIndexOf('\n{');
-  if (lastBrace !== -1) {
-    const candidate = text.slice(lastBrace + 1).trim();
+  const lb = text.lastIndexOf('\n{');
+  if (lb!==-1) {
+    const cand = text.slice(lb+1).trim();
     try {
-      const parsed = JSON.parse(candidate);
-      if ('values' in parsed && 'goals' in parsed && 'interests' in parsed)
-        return { clean: text.slice(0, lastBrace).trim(), data: parsed };
+      const p=JSON.parse(cand);
+      if ('values' in p && 'goals' in p && 'interests' in p)
+        return { clean:text.slice(0,lb).trim(), data:p };
     } catch {}
   }
   const m = text.match(/\n?\{"values"\s*:[\s\S]*?\}(?:\s*)$/);
-  if (m) {
-    try {
-      const parsed = JSON.parse(m[0].trim());
-      return { clean: text.slice(0, text.length - m[0].length).trim(), data: parsed };
-    } catch {}
-  }
-  return { clean: text.trim(), data: null };
+  if (m) { try { return { clean:text.slice(0,text.length-m[0].length).trim(), data:JSON.parse(m[0].trim()) }; } catch {} }
+  return { clean:text.trim(), data:null };
 }
 
-// ─── APPLY PROFILE ────────────────────────────────────────────────────────────
-function applyProfile({ values = [], goals = [], interests = [] }) {
-  let anyNew = false;
-  const add = (arr, set, container, section, cls) => {
-    arr.forEach(raw => {
-      if (!raw) return;
-      const key = raw.toLowerCase().trim();
-      if (!set.has(key)) { set.add(key); addTag(container, raw, cls, true); flashSection(section); anyNew = true; }
+// ─── PROFILE ─────────────────────────────────────────────────────────────────
+function applyProfile({ values=[], goals=[], interests=[] }) {
+  let anyNew=false;
+  const add=(arr,set,container,section,cls)=>{
+    arr.forEach(raw=>{
+      if(!raw)return; const k=raw.toLowerCase().trim();
+      if(!set.has(k)){ set.add(k); addTag(container,raw,cls,true); flashSection(section); anyNew=true; }
     });
   };
-  add(values, S.values, tagsV, secV, 'v');
-  add(goals,  S.goals,  tagsG, secG, 'g');
-  add(interests, S.interests, tagsI, secI, 'i');
-  if (anyNew) saveCurrentConv();
+  add(values,S.values,tagsV,secV,'v');
+  add(goals,S.goals,tagsG,secG,'g');
+  add(interests,S.interests,tagsI,secI,'i');
+  if(anyNew)saveCurrentConv();
 }
 
 function addTag(container, text, cls, animate) {
-  const hint = container.querySelector('.empty-hint');
-  if (hint) hint.remove();
-  const tag = document.createElement('span');
-  tag.className = `tag ${cls}${animate ? ' new' : ''}`;
-  tag.textContent = capitalize(text);
+  const hint=container.querySelector('.empty-hint'); if(hint)hint.remove();
+  const tag=document.createElement('span');
+  tag.className=`tag ${cls}${animate?' new':''}`;
+  tag.textContent=capitalize(text);
   container.appendChild(tag);
-  if (animate) tag.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  if(animate)tag.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
-function flashSection(el) {
-  el.classList.remove('flash');
-  void el.offsetWidth;
-  el.classList.add('flash');
-}
+function flashSection(el) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+function capitalize(s) { return s.charAt(0).toUpperCase()+s.slice(1); }
 
-function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
-
-// ─── RENDER MESSAGE ───────────────────────────────────────────────────────────
+// ─── RENDER MESSAGE ──────────────────────────────────────────────────────────
 function renderMsg(role, text, animate) {
-  const el = document.createElement('div');
-  el.className = `msg ${role}`;
-  if (!animate) el.style.animation = 'none';
+  const el=document.createElement('div');
+  el.className=`msg ${role}`;
+  if(!animate) el.style.animation='none';
 
-  if (role === 'lumi') {
-    const hd = document.createElement('div');
-    hd.className = 'msg-head';
-    const av = document.createElement('div');
-    av.className = 'msg-avatar'; av.textContent = '✦';
-    const nm = document.createElement('span');
-    nm.className = 'msg-name'; nm.textContent = 'Lumi';
-    hd.append(av, nm);
-    el.appendChild(hd);
+  if(role==='lumi'){
+    const hd=document.createElement('div'); hd.className='msg-head';
+    const av=document.createElement('div'); av.className='msg-avatar'; av.textContent='✦';
+    const nm=document.createElement('span'); nm.className='msg-name';
+    nm.textContent = S.tutorCtx ? S.tutorCtx.teacher : 'Lumi';
+    hd.append(av,nm); el.appendChild(hd);
   }
 
-  const bubble = document.createElement('div');
-  bubble.className = 'msg-bubble';
-  bubble.innerHTML = fmtText(text);
+  const bubble=document.createElement('div'); bubble.className='msg-bubble';
+  bubble.innerHTML=fmtText(text);
   el.appendChild(bubble);
   messagesEl.appendChild(el);
-  if (animate) scrollBottom();
+  if(animate)scrollBottom();
 }
 
 function fmtText(text) {
-  if (!text) return '';
-  let s = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  s = s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-       .replace(/\*(.+?)\*/g,'<em>$1</em>')
-       .replace(/`(.+?)`/g,'<code>$1</code>');
-  const paras = s.split(/\n\n+/);
-  if (paras.length > 1) return paras.map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`).join('');
-  return `<p>${s.replace(/\n/g,'<br>')}</p>`;
+  if(!text)return'';
+  let s=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  s=s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code>$1</code>');
+  const ps=s.split(/\n\n+/);
+  if(ps.length>1)return ps.map(p=>`<p>${p.replace(/\n/g,'<br>')}</p>`).join('');
+  return`<p>${s.replace(/\n/g,'<br>')}</p>`;
 }
 
-// ─── TYPING INDICATOR ─────────────────────────────────────────────────────────
 function makeTyping() {
-  const wrap = document.createElement('div');
-  wrap.className = 'msg lumi';
-  const hd = document.createElement('div'); hd.className = 'msg-head';
-  const av = document.createElement('div'); av.className = 'msg-avatar'; av.textContent = '✦';
-  const nm = document.createElement('span'); nm.className = 'msg-name'; nm.textContent = 'Lumi';
-  hd.append(av, nm);
-  const ind = document.createElement('div'); ind.className = 'typing';
-  for (let i = 0; i < 3; i++) { const d = document.createElement('div'); d.className = 'typing-dot'; ind.appendChild(d); }
-  wrap.append(hd, ind);
-  return wrap;
+  const wrap=document.createElement('div'); wrap.className='msg lumi';
+  const hd=document.createElement('div'); hd.className='msg-head';
+  const av=document.createElement('div'); av.className='msg-avatar'; av.textContent='✦';
+  const nm=document.createElement('span'); nm.className='msg-name';
+  nm.textContent = S.tutorCtx ? S.tutorCtx.teacher : 'Lumi';
+  hd.append(av,nm);
+  const ind=document.createElement('div'); ind.className='typing';
+  for(let i=0;i<3;i++){const d=document.createElement('div');d.className='typing-dot';ind.appendChild(d);}
+  wrap.append(hd,ind); return wrap;
 }
 
-// ─── UTILITIES ────────────────────────────────────────────────────────────────
-function scrollBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+function scrollBottom() { messagesEl.scrollTop=messagesEl.scrollHeight; }
 
 let toastTimer;
-function showToast(msg, type) {
-  toast.textContent = msg;
-  toast.className = 'toast' + (type === 'ok' ? ' ok' : '');
+function showToast(msg,type) {
+  toast.textContent=msg;
+  toast.className='toast'+(type==='ok'?' ok':'');
   toast.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
+  toastTimer=setTimeout(()=>toast.classList.remove('show'),4000);
 }
 
-// ─── GO ───────────────────────────────────────────────────────────────────────
+// ─── GO ──────────────────────────────────────────────────────────────────────
 init();
 </script>
 </body>
