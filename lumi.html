@@ -223,7 +223,21 @@ body{display:flex;height:100vh}
 .main{flex:1;display:flex;overflow:hidden;}
 
 /* ─── CHAT PANEL ──────────────────────────────────────── */
-.chat-panel{flex:1;display:flex;flex-direction:column;min-width:0}
+.chat-panel{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+
+/* drag & drop overlay */
+.drop-overlay{
+  position:absolute;inset:0;z-index:100;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  background:rgba(11,11,18,.82);
+  border:2px dashed var(--accent);border-radius:var(--radius);
+  pointer-events:none;
+  opacity:0;transition:opacity .18s ease;
+}
+.drop-overlay.active{opacity:1;pointer-events:all}
+.drop-overlay-icon{font-size:36px;line-height:1}
+.drop-overlay-label{font-size:15px;font-weight:500;color:var(--accent)}
+.drop-overlay-sub{font-size:12px;color:var(--text-muted)}
 .messages{flex:1;overflow-y:auto;padding:28px 32px;display:flex;flex-direction:column;gap:22px;scroll-behavior:smooth;}
 .messages::-webkit-scrollbar{width:3px}
 .messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
@@ -393,7 +407,12 @@ body{display:flex;height:100vh}
   </header>
 
   <div class="main">
-    <div class="chat-panel">
+    <div class="chat-panel" id="chatPanel">
+      <div class="drop-overlay" id="dropOverlay">
+        <div class="drop-overlay-icon">📎</div>
+        <div class="drop-overlay-label">Drop to upload</div>
+        <div class="drop-overlay-sub">Images, PDFs, and text files</div>
+      </div>
       <div class="messages" id="messages">
         <div class="welcome" id="welcome">
           <div class="welcome-orb">✦</div>
@@ -942,6 +961,32 @@ function init() {
   // File attachment
   $('attachBtn').addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', () => handleFileSelect(fileInput.files[0]));
+
+  // Drag & drop
+  const chatPanel = $('chatPanel');
+  const dropOverlay = $('dropOverlay');
+  let dragCounter = 0;
+
+  chatPanel.addEventListener('dragenter', e => {
+    e.preventDefault();
+    dragCounter++;
+    dropOverlay.classList.add('active');
+  });
+  chatPanel.addEventListener('dragleave', e => {
+    dragCounter--;
+    if (dragCounter <= 0) { dragCounter = 0; dropOverlay.classList.remove('active'); }
+  });
+  chatPanel.addEventListener('dragover', e => { e.preventDefault(); });
+  chatPanel.addEventListener('drop', e => {
+    e.preventDefault();
+    dragCounter = 0;
+    dropOverlay.classList.remove('active');
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    const ok = file.type.startsWith('image/') || file.type === 'application/pdf' || file.type === 'text/plain' || file.name.endsWith('.txt');
+    if (!ok) { showToast('Only images, PDFs, and text files are supported.'); return; }
+    handleFileSelect(file);
+  });
 
   // Chat input
   msgInput.addEventListener('input', () => { autoGrow(msgInput); updateSendBtn(); });
