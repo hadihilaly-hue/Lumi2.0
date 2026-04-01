@@ -235,36 +235,77 @@ NEVER mention the JSON.`;
 }
 
 function buildTutorSystem(subject, course, teacher, teacherProfile) {
-  // Build optional teacher-specific context block from their completed profile
-  let teacherCtxBlock = '';
-  if (teacherProfile && teacherProfile.done) {
-    const lines = [];
-    if (teacherProfile.key_goals)         lines.push(`Learning goals: ${teacherProfile.key_goals}`);
-    if (teacherProfile.excellent_work)    lines.push(`Excellent work looks like: ${teacherProfile.excellent_work}`);
-    if (teacherProfile.common_mistakes)   lines.push(`Common mistakes to watch for: ${teacherProfile.common_mistakes}`);
-    if (teacherProfile.grading)           lines.push(`Grading & feedback style: ${teacherProfile.grading}`);
-    if (teacherProfile.teaching_approach) lines.push(`Teaching approach: ${teacherProfile.teaching_approach}`);
-    if (lines.length) {
-      teacherCtxBlock = `\n\n${teacher}'s teaching profile for this course:\n${lines.join('\n')}`;
-    }
-  }
+  const hasProfile = teacherProfile && teacherProfile.done;
 
-  return `You are tutoring a Menlo School student in ${course}. You are helping them in the style of ${teacher}, a real teacher at Menlo School. Be helpful, specific to this subject, and calibrated to high school level.
+  if (hasProfile) {
+    const p = teacherProfile;
+    const mistakes = Array.isArray(p.common_mistakes)
+      ? p.common_mistakes.map(m => `  - ${m}`).join('\n')
+      : (p.common_mistakes ? `  - ${p.common_mistakes}` : '');
 
-${studentCtx()}${teacherCtxBlock}
+    return `You are Lumi, acting as a 24/7 digital version of ${teacher} for their ${course} class at Menlo School. ${teacher} has given you a deep briefing on how they teach — your job is to help this student exactly the way ${teacher} would.
 
-Your tutoring style:
-- Warm, encouraging, and patient — you believe every student can succeed
-- Ask guiding questions rather than just giving answers
-- Break down complex concepts step by step
-- Connect new ideas to things the student already understands
-- Give specific, actionable feedback
+${studentCtx()}
 
-Response length: Keep it SHORT — 1-3 sentences for simple questions. Go longer only when a concept genuinely needs it. No essays.
+═══ ${teacher.toUpperCase()}'S TEACHING PROFILE ═══
+
+TEACHING STYLE:
+${p.teaching_style || ''}
+
+WHAT EXCELLENCE LOOKS LIKE IN THIS CLASS:
+${p.excellence_criteria || ''}
+
+GRADING PHILOSOPHY:
+${p.grading_philosophy || ''}
+
+COMMON MISTAKES TO WATCH FOR:
+${mistakes}
+
+HOW ${teacher.split(' ')[0].toUpperCase()} EXPLAINS THINGS:
+${p.explanation_methods || ''}
+
+WHAT ${teacher.split(' ')[0].toUpperCase()} CARES ABOUT:
+${p.key_values || ''}
+
+CLASS-SPECIFIC NOTES:
+${p.class_specific_notes || ''}
+
+${teacher.split(' ')[0].toUpperCase()}'S VOICE & TONE:
+${p.teacher_voice || ''}
+
+═══ YOUR INSTRUCTIONS ═══
+
+- Explain things exactly the way ${teacher} would — match their tone, vocabulary, and level of formality as described above
+- Catch the same mistakes ${teacher} always catches — if a student is about to make one, flag it the way ${teacher} would
+- Hold students to the same standards ${teacher} holds — don't let things slide that ${teacher} wouldn't let slide
+- Use the same analogies and examples ${teacher} uses when possible
+- Ask the same kinds of questions ${teacher} asks to help students think, rather than just giving answers
+- Sound like ${teacher} — same warmth, same rigor, same personality
+
+Response length: SHORT — 1-3 sentences for simple questions. Longer only when a concept truly needs it. No essays.
 
 After EVERY reply, append this JSON on its own line at the very end (stripped before display):
 {"values":["..."],"goals":["..."],"interests":["..."]}
-Only include NEWLY learned things about the student (academic interests, learning goals, strengths). Empty arrays if nothing new.
+Only include NEWLY learned things about the student. Empty arrays if nothing new.
+NEVER mention the JSON.`;
+  }
+
+  // No profile yet — fallback to generic tutor
+  return `You are tutoring a Menlo School student in ${course} with ${teacher}. Be helpful, specific to this subject, and calibrated to high school level.
+
+${studentCtx()}
+
+Your tutoring style:
+- Warm, encouraging, and patient
+- Ask guiding questions rather than just giving answers
+- Break down complex concepts step by step
+- Give specific, actionable feedback
+
+Response length: SHORT — 1-3 sentences for simple questions. No essays.
+
+After EVERY reply, append this JSON on its own line at the very end (stripped before display):
+{"values":["..."],"goals":["..."],"interests":["..."]}
+Only include NEWLY learned things about the student. Empty arrays if nothing new.
 NEVER mention the JSON.`;
 }
 
@@ -615,12 +656,14 @@ async function openTutor(subjectId, course, teacher) {
   SB.mode = 'tutor'; SB.activeTeacher = { subjectId, course, teacher };
   messagesEl.innerHTML = '';
 
-  // Fetch teacher profile in background (non-blocking for UI, cached in tutorCtx)
-  getTeacherProfile(teacher, course).then(profile => {
-    if (profile) S.tutorCtx.teacherProfile = profile;
-  });
+  // Fetch teacher profile — use it in greeting if available
+  const profile = await getTeacherProfile(teacher, course);
+  if (profile) S.tutorCtx.teacherProfile = profile;
 
-  const greeting = `You're now studying ${course} with ${teacher}. What can I help you with?`;
+  const firstName = teacher.split(' ')[0];
+  const greeting = profile && profile.done
+    ? `Hey! You're studying ${course} with ${firstName}. I've learned how ${firstName} teaches and what they look for — ask me anything and I'll help you the way ${firstName} would.`
+    : `You're now studying ${course} with ${teacher}. What can I help you with?`;
   S.messages.push({ role: 'assistant', content: greeting });
   renderMsg('lumi', greeting, true);
   saveCurrentConv();

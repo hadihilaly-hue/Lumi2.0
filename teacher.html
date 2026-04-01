@@ -1091,29 +1091,58 @@ async function streamReply() {
 // ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
 function buildTeacherSystem() {
   const firstName = tTeacher.name.split(' ')[0];
-  return `You are Lumi — an AI companion helping ${firstName} (${tTeacher.name}) set up their teaching profile for "${tCurrentClass.course}" (${tCurrentClass.subject}) at Menlo School.
+  return `You are Lumi, conducting a deep onboarding interview with ${firstName} (${tTeacher.name}) about their ${tCurrentClass.course} class at Menlo School. Your goal is to understand this teacher so thoroughly that you could replicate their teaching style, grading philosophy, and classroom approach for students at 11pm when the teacher isn't available.
 
-Your task: conduct a warm, focused interview to understand this teacher's approach, then generate a helpful summary that will guide AI tutoring for their students.
+You are warm, curious, and genuinely interested. This is a conversation, not a form. Ask ONE question at a time and go deep on each answer before moving on. React naturally to what they say — follow up, ask for examples, express genuine curiosity.
 
-Interview topics (collect in any natural conversational order):
-1. Key learning goals — what students should know/be able to do by end of course
-2. What excellent student work looks like — examples of mastery
-3. Common student mistakes or misconceptions — pitfalls to watch for
-4. Grading & feedback philosophy — how they evaluate and support students
-5. Overall teaching approach and style — their pedagogical identity
+Work through these areas naturally in conversation — don't rush through them:
 
-Rules:
-- Be warm, professional, and genuinely curious
-- Ask ONE question at a time; keep your responses brief (2-4 sentences max + the question)
-- Acknowledge each answer genuinely before asking the next
-- Once you have meaningful content for ALL 5 topics, write a 2-3 sentence summary paragraph in your message, then set "done": true
-- Do NOT set "done": true until you have substantive answers for all fields
+1. TEACHING PHILOSOPHY
+- How do they approach teaching this subject?
+- What do they want students to genuinely understand vs just memorize?
+- What's their teaching style — Socratic, direct instruction, discovery-based?
+- What makes a great class period for them?
+
+2. WHAT EXCELLENCE LOOKS LIKE
+- What does an A piece of work look like in specific, concrete terms?
+- What separates a good student from a great one in this class?
+- Can they give a specific example of exceptional student work or thinking?
+
+3. GRADING PHILOSOPHY
+- How do they weight different types of work?
+- What are they really looking for when they grade?
+- What mistakes immediately lower a grade?
+- What do students think matters vs what actually matters?
+
+4. COMMON STUDENT MISTAKES
+- What are the most frequent misunderstandings in this class?
+- What concepts do students consistently get wrong?
+- What bad habits do students bring into this class?
+- What do students underestimate about this class?
+
+5. HOW THEY EXPLAIN THINGS
+- How do they typically explain difficult concepts?
+- What analogies or examples do they use most?
+- What's their go-to way of helping a stuck student?
+- What questions do they ask to help students think through problems?
+
+6. WHAT THEY CARE ABOUT
+- What would they want a student to remember from this class in 10 years?
+- What excites them most about this subject?
+- What do they wish students understood about how to succeed in this class?
+- Any pet peeves or things that really matter to them?
+
+After the teacher answers each area thoroughly, briefly summarize what you've learned and confirm it's accurate before moving on. At the end of the full interview, tell the teacher their profile is complete and give a warm closing message.
 
 After EVERY reply, append this JSON on its own line at the very end — NEVER show it to the teacher, it is stripped before display:
-{"done":false,"key_goals":"","excellent_work":"","common_mistakes":"","grading":"","teaching_approach":"","summary":""}
+{"done":false,"teaching_style":"","excellence_criteria":"","grading_philosophy":"","common_mistakes":[],"explanation_methods":"","key_values":"","class_specific_notes":"","teacher_voice":""}
 
-Fill in fields as you collect information. Keep empty string "" until you have that info. Set "done":true and fill "summary" only after all fields are complete.
-NEVER mention the JSON. NEVER say you are tracking anything.`;
+Rules for the JSON:
+- Fill in fields progressively as you collect information. Keep empty string/array until you have that info.
+- "teacher_voice" should capture HOW this teacher talks — their tone, vocabulary, level of formality, whether they use humor, how direct they are.
+- "common_mistakes" is a JSON array of strings, e.g. ["mistake 1", "mistake 2"]
+- Only set "done":true when you have rich, substantive content in ALL fields.
+- NEVER mention the JSON. NEVER say you are tracking anything.`;
 }
 
 // ─── JSON PARSING ────────────────────────────────────────────────────────────
@@ -1154,18 +1183,20 @@ async function saveTeacherProfile(data) {
   const merged  = { ...profile, ...(data || {}) };
 
   const row = {
-    teacher_email: tUser.email,
-    class_name:    tCurrentClass.course,
-    subject:       tCurrentClass.subject,
-    done:          merged.done          || false,
-    key_goals:     merged.key_goals     || null,
-    excellent_work: merged.excellent_work || null,
-    common_mistakes: merged.common_mistakes || null,
-    grading:       merged.grading       || null,
-    teaching_approach: merged.teaching_approach || null,
-    summary:       merged.summary       || null,
-    messages_json: tMessages,
-    updated_at:    new Date().toISOString(),
+    teacher_email:      tUser.email,
+    class_name:         tCurrentClass.course,
+    subject:            tCurrentClass.subject,
+    done:               merged.done               || false,
+    teaching_style:     merged.teaching_style     || null,
+    excellence_criteria: merged.excellence_criteria || null,
+    grading_philosophy: merged.grading_philosophy || null,
+    common_mistakes:    Array.isArray(merged.common_mistakes) ? merged.common_mistakes : (merged.common_mistakes ? [merged.common_mistakes] : null),
+    explanation_methods: merged.explanation_methods || null,
+    key_values:         merged.key_values         || null,
+    class_specific_notes: merged.class_specific_notes || null,
+    teacher_voice:      merged.teacher_voice      || null,
+    messages_json:      tMessages,
+    updated_at:         new Date().toISOString(),
   };
 
   try {
@@ -1212,23 +1243,25 @@ function showSummaryCard(profile) {
   card.className = 't-summary-card';
 
   const fields = [
-    { key: 'summary',          label: 'Summary'           },
-    { key: 'key_goals',        label: 'Learning Goals'    },
-    { key: 'excellent_work',   label: 'Excellent Work'    },
-    { key: 'common_mistakes',  label: 'Common Mistakes'   },
-    { key: 'grading',          label: 'Grading & Feedback'},
-    { key: 'teaching_approach',label: 'Teaching Approach' },
+    { key: 'teaching_style',      label: 'Teaching Style'      },
+    { key: 'excellence_criteria', label: 'What Excellence Looks Like' },
+    { key: 'grading_philosophy',  label: 'Grading Philosophy'  },
+    { key: 'common_mistakes',     label: 'Common Mistakes'     },
+    { key: 'explanation_methods', label: 'How They Explain Things' },
+    { key: 'key_values',          label: 'What They Care About'},
+    { key: 'class_specific_notes',label: 'Class-Specific Notes'},
+    { key: 'teacher_voice',       label: 'Teacher Voice & Tone'},
   ];
 
   let html = '<h3>✓ Teaching Profile Complete</h3>';
   fields.forEach(({ key, label }) => {
     const val = profile[key];
-    if (val) {
-      html += `<div class="t-summary-field">
-        <div class="t-summary-field-label">${label}</div>
-        <div class="t-summary-field-val">${escHtml(val)}</div>
-      </div>`;
-    }
+    if (!val || (Array.isArray(val) && !val.length)) return;
+    const display = Array.isArray(val) ? val.map(v => `• ${v}`).join('\n') : val;
+    html += `<div class="t-summary-field">
+      <div class="t-summary-field-label">${label}</div>
+      <div class="t-summary-field-val">${escHtml(display)}</div>
+    </div>`;
   });
   html += `<button class="t-reinterview-btn" onclick="reinterview()">↺ Re-do interview</button>`;
   card.innerHTML = html;
