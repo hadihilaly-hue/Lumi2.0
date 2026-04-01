@@ -348,27 +348,29 @@ Only include NEWLY learned things about the student. Empty arrays if nothing new
 NEVER mention the JSON.`;
 }
 
-// ─── COMPLETED PROFILES CACHE ────────────────────────────────────────────────
-// Stores "teacher_email|class_name" for every profile with status=complete.
-async function searchTeacherProfiles(query) {
-  const { data, error } = await sb
-    .from('teacher_profiles')
-    .select('teacher_email, teacher_name, class_name, profile, status')
-    .eq('status', 'complete');
-
-  if (error) {
-    console.error('Search error:', error);
-    return [];
-  }
-
-  if (!query || query.trim() === '') return [];
-
+// ─── CURRICULUM SEARCH ───────────────────────────────────────────────────────
+// Searches hardcoded MENLO_CURRICULUM data — no Supabase needed.
+// The chat checks for a complete profile separately; search shows all teachers.
+function searchCurriculum(query) {
   const q = query.toLowerCase().trim();
+  if (!q) return [];
 
-  return data.filter(profile =>
-    profile.teacher_name?.toLowerCase().includes(q) ||
-    profile.class_name?.toLowerCase().includes(q)
-  );
+  const results = [];
+
+  Object.entries(MENLO_CURRICULUM).forEach(([subject, courses]) => {
+    Object.entries(courses).forEach(([course, teachers]) => {
+      teachers.forEach(teacher => {
+        if (teacher.toLowerCase().includes(q)) {
+          results.push({ type: 'teacher', teacher, course, subject });
+        }
+      });
+      if (course.toLowerCase().includes(q)) {
+        results.push({ type: 'class', course, teachers, subject });
+      }
+    });
+  });
+
+  return results;
 }
 
 // Maps teacher display name → real @menloschool.org email (mirrors teacher.html)
@@ -935,7 +937,7 @@ function clearSearch() {
   if (dropdown) dropdown.style.display = 'none';
 }
 
-async function renderSearchDropdown(query) {
+function renderSearchDropdown(query) {
   const dropdown = document.getElementById('searchDropdown');
   if (!dropdown) return;
 
@@ -945,8 +947,7 @@ async function renderSearchDropdown(query) {
     return;
   }
 
-  const results = await searchTeacherProfiles(query);
-  const q = query.toLowerCase().trim();
+  const results = searchCurriculum(query);
 
   dropdown.innerHTML = '';
   dropdown.style.display = 'block';
@@ -957,29 +958,27 @@ async function renderSearchDropdown(query) {
     return;
   }
 
-  // Split into teacher-name matches and class-name matches
-  const teacherMatches = {};  // email → { name, courses: [class_name] }
-  const courseMatches  = {};  // class_name → { course, teachers: [name] }
+  // Group teacher-type results: teacher → [courses]
+  const teacherMatches = {};  // teacher name → { courses: [] }
+  // Group class-type results: course → { teachers: [] }
+  const courseMatches  = {};
 
-  results.forEach(profile => {
-    const nameHit   = profile.teacher_name?.toLowerCase().includes(q);
-    const courseHit = profile.class_name?.toLowerCase().includes(q);
-
-    if (nameHit) {
-      if (!teacherMatches[profile.teacher_email])
-        teacherMatches[profile.teacher_email] = { name: profile.teacher_name, courses: [] };
-      teacherMatches[profile.teacher_email].courses.push(profile.class_name);
-    }
-    if (courseHit) {
-      if (!courseMatches[profile.class_name])
-        courseMatches[profile.class_name] = { course: profile.class_name, teachers: [] };
-      if (!courseMatches[profile.class_name].teachers.includes(profile.teacher_name))
-        courseMatches[profile.class_name].teachers.push(profile.teacher_name);
+  results.forEach(r => {
+    if (r.type === 'teacher') {
+      if (!teacherMatches[r.teacher]) teacherMatches[r.teacher] = { courses: [] };
+      if (!teacherMatches[r.teacher].courses.includes(r.course))
+        teacherMatches[r.teacher].courses.push(r.course);
+    } else {
+      if (!courseMatches[r.course]) courseMatches[r.course] = { teachers: [] };
+      r.teachers.forEach(t => {
+        if (!courseMatches[r.course].teachers.includes(t))
+          courseMatches[r.course].teachers.push(t);
+      });
     }
   });
 
-  const teacherEntries = Object.values(teacherMatches);
-  const courseEntries  = Object.values(courseMatches);
+  const teacherEntries = Object.entries(teacherMatches);
+  const courseEntries  = Object.entries(courseMatches);
 
   // ── Teachers section ──
   if (teacherEntries.length > 0) {
@@ -988,7 +987,7 @@ async function renderSearchDropdown(query) {
     lbl.textContent = 'Teachers';
     dropdown.appendChild(lbl);
 
-    teacherEntries.forEach(({ name, courses }) => {
+    teacherEntries.forEach(([name, { courses }]) => {
       const groupEl = document.createElement('div');
       const nameEl  = document.createElement('div');
       nameEl.className   = 'sr-group-name';
@@ -1022,7 +1021,7 @@ async function renderSearchDropdown(query) {
     lbl.textContent = 'Classes';
     dropdown.appendChild(lbl);
 
-    courseEntries.forEach(({ course, teachers }) => {
+    courseEntries.forEach(([course, { teachers }]) => {
       const groupEl = document.createElement('div');
       const nameEl  = document.createElement('div');
       nameEl.className   = 'sr-group-name';
@@ -1034,7 +1033,8 @@ async function renderSearchDropdown(query) {
         btn.className = 'sr-result-item';
         btn.innerHTML = `<span class="sr-arrow">└──</span>${escHtml(teacher)}`;
         btn.addEventListener('click', () => {
-          openTutor(null, course, teacher);
+          const { subjectId } = lookupSubjectForCourse(course);
+          openTutor(subjectId, course, teacher);
           closeSidebar();
         });
         groupEl.appendChild(btn);
