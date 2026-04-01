@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumi — Teacher Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth.js"></script>
+<style>
+/* ─── TEACHER PORTAL OVERRIDES ─────────────────────────────── */
+body { overflow: auto; display: block; }
+
+/* ─── AUTH LOADING ─────────────────────────────────────────── */
+#authLoading {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 999; flex-direction: column; gap: 14px;
+}
+.auth-spinner {
+  width: 36px; height: 36px; border: 3px solid var(--border);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── SIGN-IN VIEW ─────────────────────────────────────────── */
+#signinView {
+  min-height: 100vh; display: flex; align-items: center;
+  justify-content: center; padding: 24px;
+}
+.t-signin-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px; padding: 48px 40px; max-width: 400px; width: 100%;
+  box-shadow: var(--shadow); text-align: center;
+}
+.t-logo { margin-bottom: 32px; }
+.t-logo-mark {
+  width: 52px; height: 52px; background: var(--accent); border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; margin: 0 auto 12px;
+  box-shadow: 0 0 22px var(--accent-glow);
+  animation: lumiBreathe 3s ease-in-out infinite;
+}
+@keyframes lumiBreathe {
+  0%,100%{box-shadow:0 0 14px var(--accent-glow)}50%{box-shadow:0 0 28px var(--accent-glow)}
+}
+.t-logo h1 { font-size: 22px; font-weight: 600; letter-spacing: -.4px; margin-bottom: 4px; }
+.t-logo p  { font-size: 13px; color: var(--text-muted); }
+.t-signin-title { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+.t-signin-sub   { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; }
+.t-google-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 12px 20px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text);
+  font-family: inherit; font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: all .2s;
+}
+.t-google-btn:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+.t-google-btn:disabled { opacity: .55; cursor: not-allowed; }
+.t-signin-foot { margin-top: 16px; font-size: 11.5px; color: var(--text-faint); }
+.t-error {
+  display: none; background: rgba(255,80,80,.08); border: 1px solid rgba(255,80,80,.22);
+  border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #ff8585;
+  margin-bottom: 16px; text-align: left;
+}
+
+/* ─── UNKNOWN VIEW ─────────────────────────────────────────── */
+#unknownView {
+  min-height: 100vh; display: flex; align-items: center;
+  justify-content: center; padding: 24px;
+}
+.t-unknown-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px; padding: 48px 40px; max-width: 400px; width: 100%;
+  box-shadow: var(--shadow); text-align: center;
+}
+.t-unknown-icon { font-size: 40px; margin-bottom: 16px; }
+.t-unknown-box h2 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+.t-unknown-box p  { font-size: 14px; color: var(--text-muted); margin-bottom: 6px; }
+.t-unknown-email { font-size: 13px; color: var(--accent); margin-bottom: 24px; }
+.t-signout-btn {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 20px; color: var(--text-muted);
+  font-family: inherit; font-size: 13px; cursor: pointer; transition: all .2s;
+}
+.t-signout-btn:hover { border-color: #ff6b6b; color: #ff6b6b; }
+
+/* ─── HOME VIEW ────────────────────────────────────────────── */
+#homeView { min-height: 100vh; }
+.t-home-header {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 18px 32px; display: flex; align-items: center;
+  justify-content: space-between; gap: 16px; position: sticky; top: 0; z-index: 40;
+}
+.t-home-header-left { display: flex; align-items: center; gap: 12px; }
+.t-hdr-mark {
+  width: 32px; height: 32px; background: var(--accent); border-radius: 9px;
+  display: flex; align-items: center; justify-content: center; font-size: 14px;
+  box-shadow: 0 0 14px var(--accent-glow);
+}
+.t-hdr-title { font-size: 15px; font-weight: 600; }
+.t-hdr-sub   { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+.t-hdr-right { display: flex; align-items: center; gap: 12px; }
+.t-hdr-user  {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--text-muted);
+}
+.t-hdr-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--accent); display: flex; align-items: center;
+  justify-content: center; font-size: 12px; font-weight: 600;
+  overflow: hidden; flex-shrink: 0;
+}
+.t-hdr-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.t-hdr-signout {
+  background: none; border: 1px solid var(--border);
+  border-radius: 7px; padding: 6px 12px; color: var(--text-muted);
+  font-family: inherit; font-size: 12px; cursor: pointer; transition: all .15s;
+}
+.t-hdr-signout:hover { border-color: #ff6b6b; color: #ff6b6b; }
+
+.t-home-body { max-width: 900px; margin: 0 auto; padding: 36px 24px 60px; }
+.t-welcome    { margin-bottom: 32px; }
+.t-welcome h2 { font-size: 24px; font-weight: 600; letter-spacing: -.4px; margin-bottom: 6px; }
+.t-welcome p  { font-size: 14px; color: var(--text-muted); }
+
+.t-section-label {
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .8px; margin-bottom: 14px;
+}
+.t-cards-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px; margin-bottom: 40px;
+}
+.t-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 18px 20px; cursor: pointer;
+  transition: all .2s; display: flex; flex-direction: column; gap: 10px;
+}
+.t-card:hover {
+  border-color: var(--accent); background: var(--surface-2);
+  transform: translateY(-1px); box-shadow: 0 6px 20px rgba(123,105,245,.12);
+}
+.t-card-subject {
+  font-size: 10px; font-weight: 600; color: var(--accent);
+  text-transform: uppercase; letter-spacing: .6px;
+}
+.t-card-course { font-size: 14px; font-weight: 600; line-height: 1.3; }
+.t-card-meta   { display: flex; align-items: center; gap: 8px; }
+.t-card-status {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 500; padding: 3px 9px;
+  border-radius: 20px;
+}
+.t-card-status.complete {
+  background: rgba(52,211,153,.1); color: #34d399; border: 1px solid rgba(52,211,153,.2);
+}
+.t-card-status.partial {
+  background: rgba(251,191,36,.1); color: #fbbf24; border: 1px solid rgba(251,191,36,.2);
+}
+.t-card-status.empty {
+  background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border);
+}
+.t-card-preview {
+  font-size: 12px; color: var(--text-muted); line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.t-api-section {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 20px 22px;
+}
+.t-api-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.t-api-section p  { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
+.t-api-row { display: flex; gap: 8px; }
+.t-api-input {
+  flex: 1; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 12px; color: var(--text);
+  font-family: inherit; font-size: 13px; outline: none; transition: border-color .15s;
+}
+.t-api-input:focus { border-color: var(--accent); }
+.t-api-save {
+  background: var(--accent); border: none; border-radius: 8px;
+  padding: 9px 16px; color: #fff; font-family: inherit; font-size: 13px;
+  font-weight: 500; cursor: pointer; transition: opacity .15s; white-space: nowrap;
+}
+.t-api-save:hover { opacity: .85; }
+.t-api-saved {
+  font-size: 12px; color: #34d399; margin-top: 6px;
+  display: none; transition: opacity .3s;
+}
+
+/* ─── CHAT VIEW ────────────────────────────────────────────── */
+#chatView { height: 100vh; display: flex; }
+.t-chat-sidebar {
+  width: 250px; flex-shrink: 0; background: var(--sb-bg);
+  border-right: 1px solid var(--border); display: flex; flex-direction: column;
+  height: 100vh; padding: 20px 0 0;
+}
+.t-chat-sb-logo {
+  display: flex; align-items: center; gap: 9px; padding: 0 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.t-chat-sb-logo-mark {
+  width: 28px; height: 28px; background: var(--accent); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; font-size: 13px;
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+.t-chat-sb-logo-text { font-size: 14px; font-weight: 600; }
+.t-chat-sb-logo-sub  { font-size: 10px; color: var(--text-muted); font-weight: 400; }
+.t-chat-sb-body { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+.t-back-btn {
+  display: flex; align-items: center; gap: 7px; width: 100%;
+  padding: 9px 12px; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text-muted);
+  font-family: inherit; font-size: 12.5px; cursor: pointer; transition: all .15s;
+}
+.t-back-btn:hover { border-color: var(--accent); color: var(--accent); }
+.t-back-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; flex-shrink: 0; }
+.t-class-label {
+  font-size: 10px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .6px; padding: 4px 4px 2px;
+}
+.t-class-display {
+  background: var(--accent-soft); border: 1px solid rgba(123,105,245,.22);
+  border-radius: 8px; padding: 10px 12px;
+}
+.t-class-display-subject { font-size: 10px; color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+.t-class-display-name    { font-size: 13px; font-weight: 600; color: var(--text); margin-top: 3px; line-height: 1.3; }
+.t-sb-divider { height: 1px; background: var(--border); margin: 4px 0; }
+.t-sb-key-label { font-size: 11px; color: var(--text-muted); padding: 2px 4px; font-weight: 500; }
+.t-sb-key-input {
+  width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 7px; padding: 8px 10px; color: var(--text);
+  font-family: inherit; font-size: 12px; outline: none; transition: border-color .15s;
+}
+.t-sb-key-input:focus { border-color: var(--accent); }
+.t-sb-key-saved { font-size: 11px; color: #34d399; margin-top: 4px; display: none; }
+.t-chat-sb-foot { padding: 12px 16px; border-top: 1px solid var(--border); }
+.t-sb-signout {
+  display: flex; align-items: center; gap: 7px; width: 100%;
+  padding: 8px 12px; background: none; border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text-muted);
+  font-family: inherit; font-size: 12.5px; cursor: pointer; transition: all .15s;
+}
+.t-sb-signout:hover { border-color: #ff6b6b; color: #ff6b6b; }
+.t-sb-signout svg { width: 13px; height: 13px; stroke: currentColor; fill: none; }
+
+.t-chat-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.t-chat-header {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 14px 24px; display: flex; align-items: center; gap: 12px;
+  flex-shrink: 0;
+}
+.t-chat-header-icon {
+  width: 34px; height: 34px; background: var(--accent); border-radius: 9px;
+  display: flex; align-items: center; justify-content: center; font-size: 15px;
+  box-shadow: 0 0 12px var(--accent-glow); flex-shrink: 0;
+}
+.t-chat-header-name { font-size: 14px; font-weight: 600; }
+.t-chat-header-sub  { font-size: 12px; color: var(--text-muted); }
+.t-chat-header-badge {
+  margin-left: auto; font-size: 11px; font-weight: 500;
+  padding: 4px 10px; border-radius: 20px;
+}
+.t-chat-header-badge.complete { background: rgba(52,211,153,.1); color: #34d399; }
+.t-chat-header-badge.progress { background: var(--accent-soft); color: var(--accent); }
+
+.t-messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.t-messages::-webkit-scrollbar { width: 4px; }
+.t-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.t-msg { display: flex; flex-direction: column; max-width: 78%; }
+.t-msg.lumi  { align-self: flex-start; }
+.t-msg.user  { align-self: flex-end; }
+.t-msg-head  { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+.t-msg-avatar {
+  width: 24px; height: 24px; background: var(--accent); border-radius: 7px;
+  display: flex; align-items: center; justify-content: center; font-size: 11px;
+}
+.t-msg-name { font-size: 11.5px; font-weight: 600; color: var(--text-muted); }
+.t-msg-bubble {
+  padding: 12px 15px; border-radius: 14px; font-size: 14px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word;
+}
+.t-msg.lumi .t-msg-bubble {
+  background: var(--lumi-bg); border: 1px solid var(--border);
+  border-top-left-radius: 4px; color: var(--text);
+}
+.t-msg.user .t-msg-bubble {
+  background: var(--user-bg); color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.t-msg.error .t-msg-bubble {
+  background: rgba(255,80,80,.08); border: 1px solid rgba(255,80,80,.2);
+  color: #ff8585;
+}
+
+/* Typing indicator */
+.t-typing .t-msg-bubble {
+  display: flex; align-items: center; gap: 4px; padding: 12px 16px;
+}
+.t-dot {
+  width: 6px; height: 6px; background: var(--text-muted); border-radius: 50%;
+  animation: dotPulse 1.4s ease-in-out infinite;
+}
+.t-dot:nth-child(2) { animation-delay: .2s; }
+.t-dot:nth-child(3) { animation-delay: .4s; }
+@keyframes dotPulse { 0%,80%,100%{opacity:.3;transform:scale(1)} 40%{opacity:1;transform:scale(1.2)} }
+
+/* Summary card */
+.t-summary-card {
+  background: rgba(52,211,153,.06); border: 1px solid rgba(52,211,153,.18);
+  border-radius: 14px; padding: 20px 22px; margin: 8px 0;
+}
+.t-summary-card h3 { font-size: 13px; font-weight: 600; color: #34d399; margin-bottom: 12px; }
+.t-summary-field { margin-bottom: 10px; }
+.t-summary-field-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 3px; }
+.t-summary-field-val   { font-size: 13px; color: var(--text); line-height: 1.5; }
+.t-reinterview-btn {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 14px;
+  padding: 8px 14px; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text-muted); font-family: inherit;
+  font-size: 12px; cursor: pointer; transition: all .15s;
+}
+.t-reinterview-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.t-chat-input-area {
+  padding: 16px 24px; background: var(--surface);
+  border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.t-no-key-banner {
+  display: none; background: rgba(251,191,36,.07); border: 1px solid rgba(251,191,36,.2);
+  border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #fbbf24;
+  margin-bottom: 10px; text-align: center;
+}
+.t-input-row {
+  display: flex; gap: 10px; align-items: flex-end;
+}
+.t-input {
+  flex: 1; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 11px 15px; color: var(--text);
+  font-family: inherit; font-size: 14px; outline: none; resize: none;
+  max-height: 140px; line-height: 1.5; transition: border-color .15s;
+}
+.t-input:focus { border-color: var(--accent); }
+.t-input:disabled { opacity: .5; }
+.t-send-btn {
+  width: 40px; height: 40px; background: var(--accent); border: none;
+  border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: opacity .15s; flex-shrink: 0;
+}
+.t-send-btn:hover { opacity: .85; }
+.t-send-btn:disabled { opacity: .35; cursor: not-allowed; }
+.t-send-btn svg { width: 16px; height: 16px; stroke: #fff; fill: none; }
+
+/* ─── RESPONSIVE ───────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .t-chat-sidebar { width: 220px; }
+  .t-messages { padding: 16px; }
+  .t-msg { max-width: 90%; }
+  .t-home-body { padding: 24px 16px 48px; }
+  .t-home-header { padding: 14px 16px; }
+  .t-cards-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- AUTH LOADING -->
+<div id="authLoading">
+  <div class="auth-spinner"></div>
+  <div style="font-size:13px;color:var(--text-muted)">Loading…</div>
+</div>
+
+<!-- SIGN-IN VIEW -->
+<div id="signinView" style="display:none">
+  <div class="t-signin-box">
+    <div class="t-logo">
+      <div class="t-logo-mark">✦</div>
+      <h1>Lumi</h1>
+      <p>Teacher Portal · Menlo School</p>
+    </div>
+    <div class="t-signin-title">Welcome, teacher</div>
+    <div class="t-signin-sub">Sign in to set up your Lumi teaching profile</div>
+    <div class="t-error" id="tSigninError"></div>
+    <button class="t-google-btn" id="tSigninBtn">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      Sign in with Google
+    </button>
+    <div class="t-signin-foot">Menlo School staff only · @menloschool.org accounts</div>
+  </div>
+</div>
+
+<!-- UNKNOWN TEACHER VIEW -->
+<div id="unknownView" style="display:none">
+  <div class="t-unknown-box">
+    <div class="t-unknown-icon">🤔</div>
+    <h2>Account not found</h2>
+    <p>Your email isn't in the Lumi teacher database:</p>
+    <div class="t-unknown-email" id="tUnknownEmail"></div>
+    <p style="margin-bottom:20px">Only Menlo School teachers with listed courses can access this portal. If you think this is a mistake, please contact your administrator.</p>
+    <button class="t-signout-btn" onclick="doSignOut()">Sign out</button>
+  </div>
+</div>
+
+<!-- HOME VIEW -->
+<div id="homeView" style="display:none">
+  <div class="t-home-header">
+    <div class="t-home-header-left">
+      <div class="t-hdr-mark">✦</div>
+      <div>
+        <div class="t-hdr-title">Lumi <span style="color:var(--text-muted);font-weight:400">·</span> Teacher Portal</div>
+        <div class="t-hdr-sub">Menlo School</div>
+      </div>
+    </div>
+    <div class="t-hdr-right">
+      <div class="t-hdr-user">
+        <div class="t-hdr-avatar" id="hdrAvatar"></div>
+        <span id="hdrName" style="font-size:13px"></span>
+      </div>
+      <button class="t-hdr-signout" onclick="doSignOut()">Sign out</button>
+    </div>
+  </div>
+  <div class="t-home-body">
+    <div class="t-welcome">
+      <h2 id="welcomeHeading">Welcome back</h2>
+      <p>Click a class to complete Lumi's setup interview. Once done, your students will get AI tutoring calibrated to your teaching style.</p>
+    </div>
+    <div class="t-section-label">Your Classes</div>
+    <div class="t-cards-grid" id="classCards"></div>
+    <div style="margin-top:32px">
+      <div class="t-section-label" style="margin-bottom:14px">Anthropic API Key</div>
+      <div class="t-api-section">
+        <h3>Connect your API key</h3>
+        <p>Lumi uses Claude to power conversations. Your key is stored locally and never sent to any server other than Anthropic's API.</p>
+        <div class="t-api-row">
+          <input class="t-api-input" id="homeKeyInput" type="password" placeholder="sk-ant-…" autocomplete="off">
+          <button class="t-api-save" id="homeKeySave">Save</button>
+        </div>
+        <div class="t-api-saved" id="homeKeySaved">✓ Key saved</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CHAT VIEW -->
+<div id="chatView" style="display:none">
+  <div class="t-chat-sidebar">
+    <div class="t-chat-sb-logo">
+      <div class="t-chat-sb-logo-mark">✦</div>
+      <div>
+        <div class="t-chat-sb-logo-text">Lumi</div>
+        <div class="t-chat-sb-logo-sub">Teacher Portal</div>
+      </div>
+    </div>
+    <div class="t-chat-sb-body">
+      <button class="t-back-btn" onclick="goHome()">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        Back to Home
+      </button>
+      <div class="t-class-label">Current class</div>
+      <div class="t-class-display">
+        <div class="t-class-display-subject" id="sbSubject"></div>
+        <div class="t-class-display-name" id="sbClassName"></div>
+      </div>
+      <div class="t-sb-divider"></div>
+      <div class="t-sb-key-label">API Key</div>
+      <input class="t-sb-key-input" id="sbKeyInput" type="password" placeholder="sk-ant-…" autocomplete="off">
+      <div class="t-sb-key-saved" id="sbKeySaved"></div>
+    </div>
+    <div class="t-chat-sb-foot">
+      <button class="t-sb-signout" onclick="doSignOut()">
+        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign out
+      </button>
+    </div>
+  </div>
+  <div class="t-chat-main">
+    <div class="t-chat-header">
+      <div class="t-chat-header-icon">✦</div>
+      <div>
+        <div class="t-chat-header-name" id="chatHeaderName">Lumi</div>
+        <div class="t-chat-header-sub" id="chatHeaderSub">Teacher setup interview</div>
+      </div>
+      <div class="t-chat-header-badge progress" id="chatHeaderBadge">Setting up…</div>
+    </div>
+    <div class="t-messages" id="tMessages"></div>
+    <div class="t-chat-input-area">
+      <div class="t-no-key-banner" id="tNoKeyBanner">
+        ⚠️ No API key set — enter your Anthropic key in the sidebar to start chatting.
+      </div>
+      <div class="t-input-row">
+        <textarea class="t-input" id="tInput" rows="1" placeholder="Reply to Lumi…" disabled></textarea>
+        <button class="t-send-btn" id="tSendBtn" disabled>
+          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CURRICULUM (same as app.js) ─────────────────────────────────────────────
+const MENLO_CURRICULUM = {
+  "English": {
+    "English 1": ["Rachel Blumenthal","Whitney Newton","Margaret Ramsey","Andrew Warren"],
+    "English 2": ["Jay Bush","Lily Chan","Rebecca Gertmenian","Meghann Schroers-Martin"],
+    "Junior English Seminar": ["Tom Garvey","Oscar King","Maura Sincoff","Lily Chan","Cara Plamondon"],
+    "Cafe Society": ["Bridgett Longust"],
+    "Contemporary World Literature": ["Lily Chan"],
+    "Creative Nonfiction Workshop (H)": ["Whitney Newton"],
+    "Dystopian Fiction & Film": ["Cara Plamondon"],
+    "East Asian Pop Culture": ["Oscar King"],
+    "Fairy Tales": ["Oscar King"],
+    "Global Mythologies": ["Jay Bush"],
+    "Humanities I: Renaissances": ["Rebecca Gertmenian"],
+    "Humanities II: Self-Portraits": ["Rebecca Gertmenian"],
+    "Literature & Science": ["Andrew Warren"],
+    "Literature in the Age of AI": ["Rachel Blumenthal"],
+    "Literature of the American Wilderness (H)": ["Whitney Newton"],
+    "Lyric & Lifeline": ["Margaret Ramsey"],
+    "Media & Cultural Studies (H)": ["Oscar King"],
+    "Medicine & Narrative": ["Rachel Blumenthal"],
+    "Modernist Poetry Workshop (H)": ["Jay Bush"],
+    "Novella Workshop (H)": ["Oscar King"],
+    "On Being": ["Margaret Ramsey"],
+    "Science Fiction & the Classics (H)": ["Tom Garvey"],
+    "Shakespeare Now (H)": ["Andrew Warren"],
+    "5 Months, 4 Books": ["Cara Plamondon"],
+    "Argumentation & Communication (H)": ["Maura Sincoff"]
+  },
+  "History & Social Sciences": {
+    "Modern World History": ["Sabahat Adil","Franco Cruz-Ochoa","Katharine Hanson","Nicholas Merlesena"],
+    "US History": ["Miles Bennett-Smith","Glenn Davis","Trevor McNeil","Nicholas Merlesena","Joseph Mitchell"],
+    "US History (H)": ["Glenn Davis","Trevor McNeil","Nicholas Merlesena","Joseph Mitchell"],
+    "Government & Politics (H)": ["Miles Bennett-Smith","Joseph Mitchell","Matthew Nelson"],
+    "Modern Europe (H)": ["Katharine Hanson"],
+    "Philosophy I": ["Jack Bowen"],
+    "Philosophy II": ["Jack Bowen"],
+    "Psychology I": ["Dylan Citrin Cummins","Joseph Mitchell"],
+    "Psychology II": ["Dylan Citrin Cummins","Joseph Mitchell"],
+    "Economic Theory": ["Charles Hanson"],
+    "American Economic History": ["Charles Hanson"],
+    "Environmental & Development Economics": ["Charles Hanson"],
+    "History of US Foreign Relations": ["Charles Hanson"],
+    "Ethnic Studies I": ["Glenn Davis"],
+    "Ethnic Studies II": ["Glenn Davis"],
+    "Gender Studies": ["Matthew Nelson"],
+    "Global Issues for Global Citizens": ["Matthew Nelson"],
+    "In Gods We Trust": ["Matthew Nelson"],
+    "Comparative Legal Systems": ["Trevor McNeil"],
+    "Current Affairs & Civil Discourse": ["John Schafer"],
+    "Pursuit of Happiness": ["Peter Brown"],
+    "Sultans, Shahs, and Sovereigns": ["Sabahat Adil"],
+    "Humanities I: Renaissances": ["Rebecca Gertmenian"],
+    "Humanities II: Self-Portraits": ["Rebecca Gertmenian"],
+    "IP Capstone Seminar (H)": ["Peter Brown","Matthew Nelson"]
+  },
+  "Math": {
+    "Integrated Geometry & Algebra": ["Christine Walters"],
+    "Analytic Geometry & Algebra": ["Rebecca Akers","Joe Rabison"],
+    "Analytic Geometry & Algebra (H)": ["Sujata Ganpule"],
+    "Algebra 2": ["Randall Joss","Nandhini Namasivayam"],
+    "Algebra 2 with Trig": ["Rebecca Akers","Jacqueline Arreaga"],
+    "Algebra 2 with Trig (H)": ["Danielle Jensen"],
+    "Precalculus": ["Yu-Loung Chang","Christine Walters"],
+    "Introductory Calculus": ["Jacqueline Arreaga","Dave Lowell"],
+    "Introductory Calculus (H)": ["Reeve Garrett"],
+    "Calculus": ["Jude Loeffler"],
+    "Advanced Calculus I (H)": ["Sujata Ganpule","Dave Lowell"],
+    "Advanced Calculus II (H)": ["Yu-Loung Chang","Reeve Garrett"],
+    "Advanced Topics in Math (H)": ["Reeve Garrett"],
+    "Probability & Statistics (H)": ["Dennis Millstein"],
+    "Advanced Topics in Statistics (H)": ["Dennis Millstein"],
+    "Applied Statistics & Epidemiology": ["Dennis Millstein"],
+    "Intro to Applied Math & Data Science": ["Jude Loeffler"]
+  },
+  "Computer Science": {
+    "CS1: Intro to Computer Science": ["Douglas Kiang","Nandhini Namasivayam"],
+    "CS2: Data Structures & Algorithms (H)": ["Nandhini Namasivayam"],
+    "Advanced Topics in CS (H)": ["Zachary Blickensderfer"],
+    "Principles of Game Design": ["Douglas Kiang"]
+  },
+  "Science": {
+    "Living Systems: Biology in Balance": ["Chrissy Orangio"],
+    "Chemistry": ["Laura Huntley","Mary McKenna"],
+    "Chemistry (H)": ["Zachary Eagleton","Eugenia McCauley"],
+    "Conceptual Physics": ["Zachary Eagleton"],
+    "Physics 1": ["Nina Arnberg","Laura Huntley","Zane Moore","Matthew Varvir"],
+    "Physics 2 (H)": ["Matthew Varvir"],
+    "Molecular Mechanisms in Biology": ["Nina Arnberg","Todd Hardie","Cristina Weaver"],
+    "Advanced Biology (H)": ["Tatyana Buxton"],
+    "Advanced Chemistry (H)": ["Eugenia McCauley"],
+    "Advanced Physics (H)": ["James Dann"],
+    "Environmental Science": ["Chrissy Orangio"],
+    "Anatomy & Physiology": ["Todd Hardie"],
+    "Neuroscience": ["Cristina Weaver"],
+    "BioTech Research (H)": ["Tatyana Buxton"]
+  },
+  "Applied Science & Engineering": {
+    "Mechanical & Electrical Engineering": ["James Formato","Leo Jaimez"],
+    "Applied Science Research (H)": ["James Dann"],
+    "Sustainable Engineering": ["James Dann"],
+    "Design": ["James Formato"]
+  },
+  "World Language": {
+    "Spanish 1": ["Janet Tennyson"],
+    "Spanish 2": ["Janet Tennyson","Adolfo Guevara"],
+    "Heritage Spanish 3": ["Perla Amaral"],
+    "Heritage Spanish 4": ["Perla Amaral"],
+    "Advanced Spanish (H)": ["Patricia Frias"],
+    "French 1": ["Marie Sajja"],
+    "French 2": ["Corinne Chung"],
+    "French 3": ["Marie Sajja"],
+    "French 4": ["Corinne Chung"],
+    "Advanced French (H)": ["Corinne Chung"],
+    "Mandarin 1": ["Rita Yeh"],
+    "Mandarin 2": ["Rita Yeh"],
+    "Mandarin 3": ["Mingjung Chen"],
+    "Mandarin 4": ["Rita Yeh"],
+    "Mandarin 5": ["Mingjung Chen"],
+    "Advanced Mandarin (H)": ["Mingjung Chen"],
+    "Latin 1": ["Tom Garvey"],
+    "Latin 2": ["Jennifer Jordt"],
+    "Latin 3": ["Jennifer Jordt"],
+    "Latin 4": ["Jennifer Jordt"],
+    "Advanced Latin (H)": ["Tom Garvey","Jennifer Jordt"]
+  }
+};
+
+// ─── BUILD TEACHER DATABASE ──────────────────────────────────────────────────
+// Maps "firstname.lastname" → { name, classes: [{course, subject}] }
+function buildTeacherDatabase() {
+  const db = {};
+  for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
+    for (const [course, teachers] of Object.entries(courses)) {
+      for (const teacher of teachers) {
+        const parts     = teacher.toLowerCase().split(/\s+/);
+        const firstName = parts[0];
+        const lastName  = parts[parts.length - 1];
+        const key       = `${firstName}.${lastName}`;
+        if (!db[key]) db[key] = { name: teacher, classes: [] };
+        // Avoid duplicate class entries (same teacher listed under multiple subjects)
+        if (!db[key].classes.find(c => c.course === course)) {
+          db[key].classes.push({ course, subject });
+        }
+      }
+    }
+  }
+  return db;
+}
+const TEACHER_DB = buildTeacherDatabase();
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let tUser         = null;   // Supabase user
+let tTeacher      = null;   // { name, classes } from TEACHER_DB
+let tEmailKey     = null;   // email prefix e.g. "rachel.blumenthal"
+let tProfiles     = {};     // { "Course Name": { done, key_goals, … } }
+let tCurrentClass = null;   // { course, subject } currently in chat
+let tMessages     = [];     // conversation messages for current class
+let tBusy         = false;
+
+// ─── VIEWS ────────────────────────────────────────────────────────────────────
+function showView(name) {
+  ['authLoading','signinView','unknownView','homeView','chatView'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+  document.getElementById(name).style.display = name === 'chatView' ? 'flex' : (name === 'homeView' ? 'block' : 'flex');
+}
+
+// ─── AUTH INIT ────────────────────────────────────────────────────────────────
+(async () => {
+  // Show params error
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('error') === 'domain') {
+    document.getElementById('tSigninError').textContent =
+      'Access is limited to Menlo School staff. Please use your @menloschool.org account.';
+    document.getElementById('tSigninError').style.display = 'block';
+    history.replaceState({}, '', window.location.pathname);
+  }
+
+  // Try existing session first
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) {
+    handleUser(session.user);
+    return;
+  }
+
+  // Wait for OAuth redirect / auth state change
+  const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
+    subscription.unsubscribe();
+    if (session?.user) { handleUser(session.user); }
+    else               { showView('signinView'); wireSigninBtn(); }
+  });
+  setTimeout(() => {
+    subscription.unsubscribe();
+    showView('signinView');
+    wireSigninBtn();
+  }, 5000);
+})();
+
+function handleUser(user) {
+  if (!isMenloEmail(user.email)) {
+    sb.auth.signOut();
+    window.location.replace('index.html?error=domain');
+    return;
+  }
+  tUser = user;
+
+  // Derive email prefix (everything before @)
+  tEmailKey = user.email.split('@')[0].toLowerCase();
+
+  // Look up teacher
+  const found = TEACHER_DB[tEmailKey];
+  if (!found) {
+    document.getElementById('tUnknownEmail').textContent = user.email;
+    showView('unknownView');
+    return;
+  }
+
+  tTeacher = found;
+  bootHome();
+}
+
+// ─── SIGN IN ──────────────────────────────────────────────────────────────────
+function wireSigninBtn() {
+  const btn = document.getElementById('tSigninBtn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+    </svg> Redirecting to Google…`;
+    try {
+      const base       = window.location.href.replace(/\/[^/]*$/, '/');
+      const redirectTo = base + 'teacher.html';
+      const { error }  = await sb.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo, queryParams: { hd: 'menloschool.org' } },
+      });
+      if (error) throw error;
+    } catch (err) {
+      btn.disabled = false;
+      btn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg> Sign in with Google`;
+      document.getElementById('tSigninError').textContent = 'Something went wrong. Please try again.';
+      document.getElementById('tSigninError').style.display = 'block';
+    }
+  });
+}
+
+// ─── HOME VIEW ────────────────────────────────────────────────────────────────
+async function bootHome() {
+  const meta     = tUser.user_metadata || {};
+  const fullName = meta.full_name || meta.name || tTeacher.name;
+  const firstName = fullName.split(' ')[0];
+
+  document.getElementById('welcomeHeading').textContent = `Welcome, ${firstName}`;
+  document.getElementById('hdrName').textContent        = fullName;
+
+  const avatarEl = document.getElementById('hdrAvatar');
+  if (meta.avatar_url) {
+    const img = document.createElement('img'); img.src = meta.avatar_url; img.alt = '';
+    avatarEl.appendChild(img);
+  } else {
+    avatarEl.textContent = firstName[0].toUpperCase();
+  }
+
+  // Load API key
+  const savedKey = localStorage.getItem('lumi_key') || '';
+  document.getElementById('homeKeyInput').value = savedKey ? '••••••••' : '';
+
+  document.getElementById('homeKeySave').addEventListener('click', () => {
+    const val = document.getElementById('homeKeyInput').value.trim();
+    if (!val || val.startsWith('•')) return;
+    localStorage.setItem('lumi_key', val);
+    document.getElementById('homeKeyInput').value = '••••••••';
+    const saved = document.getElementById('homeKeySaved');
+    saved.style.display = 'block';
+    setTimeout(() => { saved.style.display = 'none'; }, 2000);
+  });
+
+  // Load all teacher profiles from Supabase
+  await loadAllTeacherProfiles();
+  renderClassCards();
+  showView('homeView');
+}
+
+async function loadAllTeacherProfiles() {
+  if (!tUser) return;
+  try {
+    const { data, error } = await sb
+      .from('teacher_profiles')
+      .select('*')
+      .eq('teacher_email', tUser.email);
+    if (error || !data) return;
+    tProfiles = {};
+    data.forEach(row => { tProfiles[row.class_name] = row; });
+  } catch (err) {
+    console.warn('Could not load teacher profiles:', err);
+  }
+}
+
+function renderClassCards() {
+  const grid = document.getElementById('classCards');
+  grid.innerHTML = '';
+  tTeacher.classes.forEach(({ course, subject }) => {
+    const profile = tProfiles[course];
+    const done    = profile?.done === true;
+    const hasData = profile && (profile.key_goals || profile.summary);
+
+    const card = document.createElement('div');
+    card.className = 't-card';
+
+    let statusHtml, statusClass;
+    if (done) {
+      statusClass = 'complete'; statusHtml = '✓ Complete';
+    } else if (hasData) {
+      statusClass = 'partial'; statusHtml = 'In progress';
+    } else {
+      statusClass = 'empty'; statusHtml = 'Not started';
+    }
+
+    const previewText = profile?.summary || profile?.key_goals || '';
+
+    card.innerHTML = `
+      <div class="t-card-subject">${escHtml(subject)}</div>
+      <div class="t-card-course">${escHtml(course)}</div>
+      <div class="t-card-meta">
+        <span class="t-card-status ${statusClass}">${statusHtml}</span>
+      </div>
+      ${previewText ? `<div class="t-card-preview">${escHtml(previewText)}</div>` : ''}
+    `;
+    card.addEventListener('click', () => openClassChat({ course, subject }));
+    grid.appendChild(card);
+  });
+}
+
+function goHome() {
+  showView('homeView');
+  renderClassCards();
+}
+
+// ─── CHAT VIEW ────────────────────────────────────────────────────────────────
+async function openClassChat({ course, subject }) {
+  tCurrentClass = { course, subject };
+  tMessages     = [];
+  tBusy         = false;
+
+  // Update sidebar
+  document.getElementById('sbSubject').textContent  = subject;
+  document.getElementById('sbClassName').textContent = course;
+  document.getElementById('chatHeaderName').textContent = course;
+  document.getElementById('chatHeaderSub').textContent  = `${subject} · Teacher setup`;
+
+  // Wire API key input in sidebar
+  const sbKey = document.getElementById('sbKeyInput');
+  sbKey.value = localStorage.getItem('lumi_key') ? '••••••••' : '';
+  sbKey.addEventListener('input', () => {
+    const v = sbKey.value.trim();
+    if (v && !v.startsWith('•')) {
+      localStorage.setItem('lumi_key', v);
+      sbKey.value = '••••••••';
+      document.getElementById('sbKeySaved').textContent  = '✓ Key saved';
+      document.getElementById('sbKeySaved').style.display = 'block';
+      setTimeout(() => { document.getElementById('sbKeySaved').style.display = 'none'; }, 2000);
+      updateInputState();
+    }
+  });
+
+  // Wire send
+  const input   = document.getElementById('tInput');
+  const sendBtn = document.getElementById('tSendBtn');
+  // Remove old listeners
+  input.replaceWith(input.cloneNode(true));
+  sendBtn.replaceWith(sendBtn.cloneNode(true));
+  const newInput   = document.getElementById('tInput');
+  const newSendBtn = document.getElementById('tSendBtn');
+
+  newInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  });
+  newInput.addEventListener('input', () => {
+    newInput.style.height = 'auto';
+    newInput.style.height = Math.min(newInput.scrollHeight, 140) + 'px';
+  });
+  newSendBtn.addEventListener('click', handleSend);
+
+  showView('chatView');
+  updateInputState();
+
+  // Clear messages
+  document.getElementById('tMessages').innerHTML = '';
+
+  // Load profile & decide what to show
+  const profile = tProfiles[course];
+  if (profile?.done === true) {
+    showSummaryView(profile);
+    updateBadge(true);
+  } else {
+    updateBadge(false);
+    // Restore messages from saved profile, or start fresh
+    if (profile?.messages_json?.length) {
+      tMessages = profile.messages_json;
+      tMessages.forEach(m => renderTMsg(m.role, m.content));
+    } else {
+      // Lumi opens first
+      await startInterview();
+    }
+  }
+}
+
+function updateBadge(done) {
+  const badge = document.getElementById('chatHeaderBadge');
+  badge.textContent  = done ? '✓ Complete' : 'Setting up…';
+  badge.className    = 't-chat-header-badge ' + (done ? 'complete' : 'progress');
+}
+
+function updateInputState() {
+  const hasKey  = !!localStorage.getItem('lumi_key');
+  const banner  = document.getElementById('tNoKeyBanner');
+  const input   = document.getElementById('tInput');
+  const sendBtn = document.getElementById('tSendBtn');
+  banner.style.display  = hasKey ? 'none' : 'block';
+  input.disabled        = !hasKey || tBusy;
+  sendBtn.disabled      = !hasKey || tBusy;
+}
+
+async function startInterview() {
+  const firstName = tTeacher.name.split(' ')[0];
+  // Kickoff with a user message so Lumi can reply as assistant
+  tMessages = [{ role: 'user', content: 'Hello!' }];
+  await streamReply();
+}
+
+async function handleSend() {
+  if (tBusy) return;
+  const input = document.getElementById('tInput');
+  const text  = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+
+  tMessages.push({ role: 'user', content: text });
+  renderTMsg('user', text);
+  await streamReply();
+}
+
+async function streamReply() {
+  tBusy = true;
+  updateInputState();
+
+  const apiKey = localStorage.getItem('lumi_key');
+  if (!apiKey) { tBusy = false; updateInputState(); return; }
+
+  // Add typing indicator
+  const typingEl = addTyping();
+
+  try {
+    const system = buildTeacherSystem();
+    let   full   = '';
+
+    // Create message element for streaming
+    const msgEl = createLumiMsgEl();
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        stream: true,
+        system,
+        messages: tMessages,
+      }),
+    });
+
+    typingEl.remove();
+
+    if (!res.ok) {
+      let errMsg = `API error ${res.status}`;
+      try { const e = await res.json(); errMsg = e.error?.message || errMsg; } catch {}
+      throw new Error(errMsg);
+    }
+
+    document.getElementById('tMessages').appendChild(msgEl);
+    const bubbleEl = msgEl.querySelector('.t-msg-bubble');
+
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf('\n')) !== -1) {
+        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6);
+        if (raw === '[DONE]') continue;
+        try {
+          const ev = JSON.parse(raw);
+          if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
+            full += ev.delta.text;
+            bubbleEl.textContent = stripTeacherJson(full);
+            scrollTBottom();
+          }
+        } catch {}
+      }
+    }
+
+    // Parse hidden JSON
+    const parsed = parseTeacherResponse(full);
+    bubbleEl.textContent = parsed.clean;
+    scrollTBottom();
+
+    // Push assistant message (full text including JSON, stripped on display)
+    tMessages.push({ role: 'assistant', content: full });
+
+    // Save profile state
+    await saveTeacherProfile(parsed.data);
+
+    // If done, update view
+    if (parsed.data?.done === true) {
+      updateBadge(true);
+      // Show summary card below last message
+      if (parsed.data.summary) {
+        showSummaryCard(parsed.data);
+      }
+    }
+
+  } catch (err) {
+    typingEl.remove();
+    renderTError('⚠️ ' + err.message);
+  }
+
+  tBusy = false;
+  updateInputState();
+}
+
+// ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
+function buildTeacherSystem() {
+  const firstName = tTeacher.name.split(' ')[0];
+  return `You are Lumi — an AI companion helping ${firstName} (${tTeacher.name}) set up their teaching profile for "${tCurrentClass.course}" (${tCurrentClass.subject}) at Menlo School.
+
+Your task: conduct a warm, focused interview to understand this teacher's approach, then generate a helpful summary that will guide AI tutoring for their students.
+
+Interview topics (collect in any natural conversational order):
+1. Key learning goals — what students should know/be able to do by end of course
+2. What excellent student work looks like — examples of mastery
+3. Common student mistakes or misconceptions — pitfalls to watch for
+4. Grading & feedback philosophy — how they evaluate and support students
+5. Overall teaching approach and style — their pedagogical identity
+
+Rules:
+- Be warm, professional, and genuinely curious
+- Ask ONE question at a time; keep your responses brief (2-4 sentences max + the question)
+- Acknowledge each answer genuinely before asking the next
+- Once you have meaningful content for ALL 5 topics, write a 2-3 sentence summary paragraph in your message, then set "done": true
+- Do NOT set "done": true until you have substantive answers for all fields
+
+After EVERY reply, append this JSON on its own line at the very end — NEVER show it to the teacher, it is stripped before display:
+{"done":false,"key_goals":"","excellent_work":"","common_mistakes":"","grading":"","teaching_approach":"","summary":""}
+
+Fill in fields as you collect information. Keep empty string "" until you have that info. Set "done":true and fill "summary" only after all fields are complete.
+NEVER mention the JSON. NEVER say you are tracking anything.`;
+}
+
+// ─── JSON PARSING ────────────────────────────────────────────────────────────
+function parseTeacherResponse(text) {
+  // Find the last JSON object containing "done" field
+  const idx = text.lastIndexOf('\n{');
+  if (idx !== -1) {
+    const cand = text.slice(idx + 1).trim();
+    try {
+      const p = JSON.parse(cand);
+      if ('done' in p) return { clean: text.slice(0, idx).trim(), data: p };
+    } catch {}
+  }
+  // Fallback: regex
+  const m = text.match(/\n?\{"done"[\s\S]*?\}(?:\s*)$/);
+  if (m) {
+    try {
+      const p = JSON.parse(m[0].trim());
+      if ('done' in p) return { clean: text.slice(0, text.length - m[0].length).trim(), data: p };
+    } catch {}
+  }
+  return { clean: text.trim(), data: null };
+}
+
+function stripTeacherJson(text) {
+  const idx = text.lastIndexOf('\n{');
+  if (idx !== -1) {
+    const cand = text.slice(idx + 1).trim();
+    try { const p = JSON.parse(cand); if ('done' in p) return text.slice(0, idx).trimEnd(); } catch {}
+  }
+  return text;
+}
+
+// ─── SUPABASE TEACHER PROFILES ───────────────────────────────────────────────
+async function saveTeacherProfile(data) {
+  if (!tUser || !tCurrentClass) return;
+  const profile = tProfiles[tCurrentClass.course] || {};
+  const merged  = { ...profile, ...(data || {}) };
+
+  const row = {
+    teacher_email: tUser.email,
+    class_name:    tCurrentClass.course,
+    subject:       tCurrentClass.subject,
+    done:          merged.done          || false,
+    key_goals:     merged.key_goals     || null,
+    excellent_work: merged.excellent_work || null,
+    common_mistakes: merged.common_mistakes || null,
+    grading:       merged.grading       || null,
+    teaching_approach: merged.teaching_approach || null,
+    summary:       merged.summary       || null,
+    messages_json: tMessages,
+    updated_at:    new Date().toISOString(),
+  };
+
+  try {
+    const { data: saved, error } = await sb
+      .from('teacher_profiles')
+      .upsert(row, { onConflict: 'teacher_email,class_name' })
+      .select()
+      .single();
+    if (!error && saved) {
+      tProfiles[tCurrentClass.course] = saved;
+    }
+  } catch (err) {
+    console.warn('Could not save teacher profile:', err);
+  }
+}
+
+// ─── SUMMARY VIEW ────────────────────────────────────────────────────────────
+function showSummaryView(profile) {
+  const msgsEl = document.getElementById('tMessages');
+  msgsEl.innerHTML = '';
+
+  // Greeting
+  const firstName = tTeacher.name.split(' ')[0];
+  const greet = document.createElement('div');
+  greet.className = 't-msg lumi';
+  greet.innerHTML = `
+    <div class="t-msg-head">
+      <div class="t-msg-avatar">✦</div>
+      <span class="t-msg-name">Lumi</span>
+    </div>
+    <div class="t-msg-bubble">Your ${escHtml(tCurrentClass.course)} profile is all set, ${escHtml(firstName)}! Here's what Lumi will tell your students about your class:</div>
+  `;
+  msgsEl.appendChild(greet);
+  showSummaryCard(profile);
+
+  // Disable input — interview complete
+  document.getElementById('tInput').disabled  = true;
+  document.getElementById('tSendBtn').disabled = true;
+}
+
+function showSummaryCard(profile) {
+  const msgsEl = document.getElementById('tMessages');
+  const card   = document.createElement('div');
+  card.className = 't-summary-card';
+
+  const fields = [
+    { key: 'summary',          label: 'Summary'           },
+    { key: 'key_goals',        label: 'Learning Goals'    },
+    { key: 'excellent_work',   label: 'Excellent Work'    },
+    { key: 'common_mistakes',  label: 'Common Mistakes'   },
+    { key: 'grading',          label: 'Grading & Feedback'},
+    { key: 'teaching_approach',label: 'Teaching Approach' },
+  ];
+
+  let html = '<h3>✓ Teaching Profile Complete</h3>';
+  fields.forEach(({ key, label }) => {
+    const val = profile[key];
+    if (val) {
+      html += `<div class="t-summary-field">
+        <div class="t-summary-field-label">${label}</div>
+        <div class="t-summary-field-val">${escHtml(val)}</div>
+      </div>`;
+    }
+  });
+  html += `<button class="t-reinterview-btn" onclick="reinterview()">↺ Re-do interview</button>`;
+  card.innerHTML = html;
+  msgsEl.appendChild(card);
+  scrollTBottom();
+}
+
+async function reinterview() {
+  if (!tCurrentClass) return;
+  // Clear the profile for this class
+  tProfiles[tCurrentClass.course] = null;
+  tMessages = [];
+  document.getElementById('tMessages').innerHTML = '';
+  updateBadge(false);
+
+  // Delete from Supabase
+  try {
+    await sb.from('teacher_profiles')
+      .delete()
+      .eq('teacher_email', tUser.email)
+      .eq('class_name', tCurrentClass.course);
+  } catch {}
+
+  document.getElementById('tInput').disabled   = false;
+  document.getElementById('tSendBtn').disabled  = false;
+  updateInputState();
+  await startInterview();
+}
+
+// ─── RENDER HELPERS ──────────────────────────────────────────────────────────
+function createLumiMsgEl() {
+  const el = document.createElement('div');
+  el.className = 't-msg lumi';
+  el.style.animation = 'fadeUp .25s ease';
+  el.innerHTML = `
+    <div class="t-msg-head">
+      <div class="t-msg-avatar">✦</div>
+      <span class="t-msg-name">Lumi</span>
+    </div>
+    <div class="t-msg-bubble"></div>
+  `;
+  return el;
+}
+
+function renderTMsg(role, content) {
+  const msgsEl = document.getElementById('tMessages');
+  const el     = document.createElement('div');
+
+  if (role === 'assistant') {
+    el.className = 't-msg lumi';
+    el.innerHTML = `
+      <div class="t-msg-head">
+        <div class="t-msg-avatar">✦</div>
+        <span class="t-msg-name">Lumi</span>
+      </div>
+      <div class="t-msg-bubble">${escHtml(stripTeacherJson(typeof content === 'string' ? content : ''))}</div>
+    `;
+  } else {
+    el.className = 't-msg user';
+    const text = typeof content === 'string' ? content
+      : (Array.isArray(content) ? (content.find(p => p.type === 'text')?.text || '') : '');
+    el.innerHTML = `<div class="t-msg-bubble">${escHtml(text)}</div>`;
+  }
+
+  // Don't render the kickoff "Hello!" user message
+  if (role === 'user' && typeof content === 'string' && content === 'Hello!') return;
+
+  msgsEl.appendChild(el);
+  scrollTBottom();
+}
+
+function renderTError(msg) {
+  const msgsEl = document.getElementById('tMessages');
+  const el     = document.createElement('div');
+  el.className = 't-msg error';
+  el.innerHTML = `<div class="t-msg-bubble">${escHtml(msg)}</div>`;
+  msgsEl.appendChild(el);
+  scrollTBottom();
+}
+
+function addTyping() {
+  const msgsEl = document.getElementById('tMessages');
+  const el     = document.createElement('div');
+  el.className = 't-msg lumi t-typing';
+  el.innerHTML = `
+    <div class="t-msg-head">
+      <div class="t-msg-avatar">✦</div>
+      <span class="t-msg-name">Lumi</span>
+    </div>
+    <div class="t-msg-bubble">
+      <div class="t-dot"></div><div class="t-dot"></div><div class="t-dot"></div>
+    </div>
+  `;
+  msgsEl.appendChild(el);
+  scrollTBottom();
+  return el;
+}
+
+function scrollTBottom() {
+  const msgsEl = document.getElementById('tMessages');
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── MESSAGE ANIMATIONS ─────────────────────────────────────────────────────
+const animStyle = document.createElement('style');
+animStyle.textContent = `@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`;
+document.head.appendChild(animStyle);
+</script>
+</body>
+</html>

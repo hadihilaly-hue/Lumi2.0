@@ -225,10 +225,24 @@ Only include NEWLY learned things. Empty arrays if nothing new.
 NEVER mention the JSON.`;
 }
 
-function buildTutorSystem(subject, course, teacher) {
+function buildTutorSystem(subject, course, teacher, teacherProfile) {
+  // Build optional teacher-specific context block from their completed profile
+  let teacherCtxBlock = '';
+  if (teacherProfile && teacherProfile.done) {
+    const lines = [];
+    if (teacherProfile.key_goals)         lines.push(`Learning goals: ${teacherProfile.key_goals}`);
+    if (teacherProfile.excellent_work)    lines.push(`Excellent work looks like: ${teacherProfile.excellent_work}`);
+    if (teacherProfile.common_mistakes)   lines.push(`Common mistakes to watch for: ${teacherProfile.common_mistakes}`);
+    if (teacherProfile.grading)           lines.push(`Grading & feedback style: ${teacherProfile.grading}`);
+    if (teacherProfile.teaching_approach) lines.push(`Teaching approach: ${teacherProfile.teaching_approach}`);
+    if (lines.length) {
+      teacherCtxBlock = `\n\n${teacher}'s teaching profile for this course:\n${lines.join('\n')}`;
+    }
+  }
+
   return `You are tutoring a Menlo School student in ${course}. You are helping them in the style of ${teacher}, a real teacher at Menlo School. Be helpful, specific to this subject, and calibrated to high school level.
 
-${studentCtx()}
+${studentCtx()}${teacherCtxBlock}
 
 Your tutoring style:
 - Warm, encouraging, and patient — you believe every student can succeed
@@ -243,6 +257,30 @@ After EVERY reply, append this JSON on its own line at the very end (stripped be
 {"values":["..."],"goals":["..."],"interests":["..."]}
 Only include NEWLY learned things about the student (academic interests, learning goals, strengths). Empty arrays if nothing new.
 NEVER mention the JSON.`;
+}
+
+// Fetch teacher profile from Supabase for a given teacher email (derived from name) and course
+async function getTeacherProfile(teacherName, course) {
+  if (!teacherName || !course) return null;
+  try {
+    // Derive email from teacher name (firstname.lastname@menloschool.org)
+    const parts     = teacherName.toLowerCase().split(/\s+/);
+    const firstName = parts[0];
+    const lastName  = parts[parts.length - 1];
+    const email     = `${firstName}.${lastName}@menloschool.org`;
+
+    const { data, error } = await sb
+      .from('teacher_profiles')
+      .select('*')
+      .eq('teacher_email', email)
+      .eq('class_name', course)
+      .eq('done', true)
+      .maybeSingle();
+    if (error || !data) return null;
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
@@ -556,7 +594,7 @@ function newChat() {
 }
 
 // ─── OPEN TUTOR SESSION ───────────────────────────────────────────────────────
-function openTutor(subjectId, course, teacher) {
+async function openTutor(subjectId, course, teacher) {
   saveCurrentConv();
   const subjectName = SUBJECTS.find(s => s.id === subjectId)?.name || subjectId;
   S.currentId     = genId();
@@ -567,6 +605,12 @@ function openTutor(subjectId, course, teacher) {
   S.values.clear(); S.goals.clear(); S.interests.clear();
   SB.mode = 'tutor'; SB.activeTeacher = { subjectId, course, teacher };
   messagesEl.innerHTML = '';
+
+  // Fetch teacher profile in background (non-blocking for UI, cached in tutorCtx)
+  getTeacherProfile(teacher, course).then(profile => {
+    if (profile) S.tutorCtx.teacherProfile = profile;
+  });
+
   const greeting = `You're now studying ${course} with ${teacher}. What can I help you with?`;
   S.messages.push({ role: 'assistant', content: greeting });
   renderMsg('lumi', greeting, true);
@@ -1242,7 +1286,7 @@ async function fetchLumi() {
 
   try {
     const system = S.tutorCtx
-      ? buildTutorSystem(S.tutorCtx.subjectName, S.tutorCtx.course, S.tutorCtx.teacher)
+      ? buildTutorSystem(S.tutorCtx.subjectName, S.tutorCtx.course, S.tutorCtx.teacher, S.tutorCtx.teacherProfile || null)
       : buildCompanionSystem();
     const { clean, data } = await callAPI(apiKey, S.messages, system);
     typing.remove();
