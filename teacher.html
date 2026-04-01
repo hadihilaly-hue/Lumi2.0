@@ -745,6 +745,19 @@ function handleUser(user) {
   }
 
   tTeacher = found;
+
+  // Check if a specific class was requested via ?class= (e.g. from student settings shortcut)
+  const classParam = new URLSearchParams(window.location.search).get('class');
+  if (classParam) {
+    history.replaceState({}, '', window.location.pathname); // clean URL
+    const match = tTeacher.classes.find(c => c.course === classParam);
+    if (match) {
+      await bootHome();        // sets up home state silently
+      openClassChat(match);    // jump straight into the class
+      return;
+    }
+  }
+
   bootHome();
 }
 
