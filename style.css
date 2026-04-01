@@ -89,6 +89,33 @@ body{display:flex;height:100vh}
 }
 .sb-search-ico svg{width:12px;height:12px;stroke:currentColor;fill:none}
 
+/* search dropdown */
+#searchDropdown{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;margin-bottom:10px;overflow:hidden;
+}
+.sr-section-label{
+  font-size:10px;font-weight:600;color:var(--text-muted);
+  text-transform:uppercase;letter-spacing:.6px;
+  padding:10px 12px 4px;
+}
+.sr-group-name{
+  font-size:12.5px;font-weight:600;color:var(--text);
+  padding:5px 12px 2px;
+}
+.sr-result-item{
+  display:flex;align-items:center;gap:6px;width:100%;
+  padding:6px 12px 6px 18px;background:none;border:none;
+  color:var(--text-muted);font-family:inherit;font-size:12px;
+  cursor:pointer;text-align:left;transition:background .12s,color .12s;
+}
+.sr-result-item:hover{background:var(--accent-soft);color:var(--accent);}
+.sr-arrow{color:var(--text-faint);font-size:10px;flex-shrink:0;font-style:normal;}
+.sr-empty{
+  padding:16px 12px;font-size:12px;color:var(--text-muted);text-align:center;
+}
+.sr-divider{height:1px;background:var(--border);margin:4px 0;}
+
 /* ── Conversation history ── */
 .hist-item{
   position:relative;display:flex;align-items:center;gap:4px;

@@ -41,6 +41,7 @@ let currentUser = null;
 
   await loadProfileFromSupabase();
   if (!localStorage.getItem('lumi_convs')) await loadConvsFromSupabase();
+  loadCompletedProfiles(); // non-blocking, populates cache for search dropdown
 
   // Show Teacher Mode link only for allowed teacher emails
   const ALLOWED_TEACHER_EMAILS = ['hadi.hilaly@menloschool.org'];
@@ -346,6 +347,27 @@ After EVERY reply, append this JSON on its own line at the very end (stripped be
 {"values":["..."],"goals":["..."],"interests":["..."]}
 Only include NEWLY learned things about the student. Empty arrays if nothing new.
 NEVER mention the JSON.`;
+}
+
+// ─── COMPLETED PROFILES CACHE ────────────────────────────────────────────────
+// Stores "teacher_email|class_name" for every profile with status=complete.
+// Used by the search dropdown to filter out teachers who haven't set up yet.
+let completedProfiles = new Set();
+
+async function loadCompletedProfiles() {
+  try {
+    const { data, error } = await sb
+      .from('teacher_profiles')
+      .select('teacher_email, class_name, status, done');
+    if (error || !data) return;
+    completedProfiles = new Set();
+    data.forEach(row => {
+      const s = row.status || (row.done ? 'complete' : 'not_started');
+      if (s === 'complete') completedProfiles.add(`${row.teacher_email}|${row.class_name}`);
+    });
+  } catch (err) {
+    console.warn('Could not load completed profiles:', err);
+  }
 }
 
 // Maps teacher display name → real @menloschool.org email (mirrors teacher.html)
@@ -754,6 +776,7 @@ function newChat() {
 
 // ─── OPEN TUTOR SESSION ───────────────────────────────────────────────────────
 async function openTutor(subjectId, course, teacher) {
+  clearSearch();
   saveCurrentConv();
   const subjectName = SUBJECTS.find(s => s.id === subjectId)?.name || subjectId;
   S.currentId     = genId();
@@ -789,6 +812,7 @@ async function openTutor(subjectId, course, teacher) {
 
 // ─── OPEN GENERAL CHAT ───────────────────────────────────────────────────────
 function openGeneralChat() {
+  clearSearch();
   saveCurrentConv();
   const name = getStudentName();
   S.currentId     = genId();
@@ -903,6 +927,132 @@ function deleteConv(convId) {
   renderSidebar();
 }
 
+// ─── SEARCH DROPDOWN ─────────────────────────────────────────────────────────
+function clearSearch() {
+  const input = document.getElementById('sbSearch');
+  if (input) input.value = '';
+  const dropdown = document.getElementById('searchDropdown');
+  if (dropdown) dropdown.style.display = 'none';
+}
+
+function renderSearchDropdown(query) {
+  const dropdown = document.getElementById('searchDropdown');
+  if (!dropdown) return;
+
+  if (!query) {
+    dropdown.style.display = 'none';
+    renderSidebar();
+    return;
+  }
+
+  const q = query.toLowerCase();
+
+  // Collect teacher-name matches: { email → { name, courses: [{course, subjectName}] } }
+  const teacherMatches = {};
+  // Collect course-name matches: { course → { course, subjectName, teachers: [] } }
+  const courseMatches  = {};
+
+  for (const [subjectName, courses] of Object.entries(MENLO_CURRICULUM)) {
+    for (const [course, teachers] of Object.entries(courses)) {
+      const courseHit = course.toLowerCase().includes(q);
+      for (const teacher of teachers) {
+        const email = TEACHER_EMAIL_MAP[teacher];
+        if (!email) continue;
+        // Only include teachers with a complete profile
+        if (!completedProfiles.has(`${email}|${course}`)) continue;
+
+        if (teacher.toLowerCase().includes(q)) {
+          if (!teacherMatches[email]) teacherMatches[email] = { name: teacher, courses: [] };
+          teacherMatches[email].courses.push({ course, subjectName });
+        }
+        if (courseHit) {
+          if (!courseMatches[course]) courseMatches[course] = { course, subjectName, teachers: [] };
+          if (!courseMatches[course].teachers.includes(teacher))
+            courseMatches[course].teachers.push(teacher);
+        }
+      }
+    }
+  }
+
+  const teacherEntries = Object.entries(teacherMatches);
+  const courseEntries  = Object.entries(courseMatches);
+
+  dropdown.innerHTML = '';
+  dropdown.style.display = 'block';
+
+  if (teacherEntries.length === 0 && courseEntries.length === 0) {
+    dropdown.innerHTML = '<div class="sr-empty">No teachers or classes found</div>';
+    renderSidebar();
+    return;
+  }
+
+  // ── Teachers section ──
+  if (teacherEntries.length > 0) {
+    const lbl = document.createElement('div');
+    lbl.className = 'sr-section-label';
+    lbl.textContent = 'Teachers';
+    dropdown.appendChild(lbl);
+
+    teacherEntries.forEach(([, { name, courses }]) => {
+      const groupEl = document.createElement('div');
+      const nameEl  = document.createElement('div');
+      nameEl.className   = 'sr-group-name';
+      nameEl.textContent = name;
+      groupEl.appendChild(nameEl);
+
+      courses.forEach(({ course, subjectName }) => {
+        const btn = document.createElement('button');
+        btn.className = 'sr-result-item';
+        btn.innerHTML = `<span class="sr-arrow">└──</span>${escHtml(course)}`;
+        btn.addEventListener('click', () => {
+          const subj = SUBJECTS.find(s => s.name === subjectName);
+          if (subj) openTutor(subj.id, course, name);
+          closeSidebar();
+        });
+        groupEl.appendChild(btn);
+      });
+      dropdown.appendChild(groupEl);
+    });
+  }
+
+  // ── Classes section ──
+  if (courseEntries.length > 0) {
+    if (teacherEntries.length > 0) {
+      const div = document.createElement('div');
+      div.className = 'sr-divider';
+      dropdown.appendChild(div);
+    }
+    const lbl = document.createElement('div');
+    lbl.className = 'sr-section-label';
+    lbl.textContent = 'Classes';
+    dropdown.appendChild(lbl);
+
+    courseEntries.forEach(([, { course, subjectName, teachers }]) => {
+      const groupEl = document.createElement('div');
+      const nameEl  = document.createElement('div');
+      nameEl.className   = 'sr-group-name';
+      nameEl.textContent = course;
+      groupEl.appendChild(nameEl);
+
+      teachers.forEach(teacher => {
+        const btn = document.createElement('button');
+        btn.className = 'sr-result-item';
+        btn.innerHTML = `<span class="sr-arrow">└──</span>${escHtml(teacher)}`;
+        btn.addEventListener('click', () => {
+          const subj = SUBJECTS.find(s => s.name === subjectName);
+          if (subj) openTutor(subj.id, course, teacher);
+          closeSidebar();
+        });
+        groupEl.appendChild(btn);
+      });
+      dropdown.appendChild(groupEl);
+    });
+  }
+
+  // Update sidebar nav to show conversations only (no subjects) while searching
+  renderSidebar();
+}
+
 // ─── SIDEBAR RENDERING ───────────────────────────────────────────────────────
 function renderSidebar() {
   const query = sbSearch.value.toLowerCase().trim();
@@ -971,26 +1121,22 @@ function renderSidebar() {
     sbNav.appendChild(empty);
   }
 
+  // When search is active, dropdown handles teacher/class results — skip subjects tree
+  if (query) return;
+
   // Divider + Subjects
-  if (!query) {
-    const div = document.createElement('div');
-    div.className = 'sb-divider';
-    sbNav.appendChild(div);
-  }
+  const div = document.createElement('div');
+  div.className = 'sb-divider';
+  sbNav.appendChild(div);
+
   const lbl = document.createElement('div');
   lbl.className = 'sb-section-label';
   lbl.textContent = 'Subjects';
   sbNav.appendChild(lbl);
 
   SUBJECTS.forEach(subject => {
-    const matchedCourses = query
-      ? subject.courses.filter(c => c.toLowerCase().includes(query) || subject.name.toLowerCase().includes(query))
-      : subject.courses;
-
-    if (query && matchedCourses.length === 0 && !subject.name.toLowerCase().includes(query)) return;
-
-    const isOpen = SB.expandedSubject === subject.id || (query && matchedCourses.length > 0);
-    const coursesToShow = query ? matchedCourses : subject.courses;
+    const isOpen = SB.expandedSubject === subject.id;
+    const coursesToShow = subject.courses;
 
     const subjectEl = document.createElement('div');
     subjectEl.className = 'sb-subject' + (isOpen ? ' open' : '');
@@ -1010,7 +1156,7 @@ function renderSidebar() {
     coursesEl.className = 'sb-courses';
 
     coursesToShow.forEach(course => {
-      const isCourseOpen = SB.expandedCourse === `${subject.id}::${course}` || (query && course.toLowerCase().includes(query));
+      const isCourseOpen = SB.expandedCourse === `${subject.id}::${course}`;
       const courseEl = document.createElement('div');
       courseEl.className = 'sb-course' + (isCourseOpen ? ' open' : '');
 
@@ -1169,7 +1315,7 @@ function wireListeners(savedKey) {
     if (activeDropdownEl && !activeDropdownEl.contains(e.target)) closeOpenMenu();
   });
 
-  sbSearch.addEventListener('input', renderSidebar);
+  sbSearch.addEventListener('input', () => renderSearchDropdown(sbSearch.value.trim()));
 
   $('hamburger').addEventListener('click', openSidebar);
   $('sbOverlay').addEventListener('click', closeSidebar);
