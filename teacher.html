@@ -661,6 +661,19 @@ function buildTeacherDatabase() {
 }
 const TEACHER_DB = buildTeacherDatabase();
 
+// ─── ADMIN / DEMO OVERRIDES ───────────────────────────────────────────────────
+// These emails can access the teacher portal for testing/admin purposes
+const TEACHER_OVERRIDES = {
+  'hadi.hilaly': {
+    name: 'Hadi Hilaly',
+    classes: [
+      { course: 'Literature in the Age of AI', subject: 'English' },
+      { course: 'CS1: Intro to Computer Science', subject: 'Computer Science' },
+    ],
+  },
+};
+Object.assign(TEACHER_DB, TEACHER_OVERRIDES);
+
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let tUser         = null;   // Supabase user
 let tTeacher      = null;   // { name, classes } from TEACHER_DB
