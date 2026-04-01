@@ -748,12 +748,26 @@ function showView(name) {
   } catch { /* timed out or no session — already on sign-in page, nothing to do */ }
 })();
 
+// ─── ACCESS CONTROL ───────────────────────────────────────────────────────────
+// Add teacher emails here one by one as they onboard
+const ALLOWED_TEACHER_EMAILS = [
+  "hadi.hilaly@menloschool.org"
+];
+
 function handleUser(user) {
   if (!isMenloEmail(user.email)) {
     sb.auth.signOut();
     window.location.replace('index.html?error=domain');
     return;
   }
+
+  // Check allowlist
+  if (!ALLOWED_TEACHER_EMAILS.includes(user.email.toLowerCase())) {
+    sb.auth.signOut();
+    window.location.replace('app.html?msg=no-teacher-access');
+    return;
+  }
+
   tUser = user;
 
   // Derive email prefix (everything before @)

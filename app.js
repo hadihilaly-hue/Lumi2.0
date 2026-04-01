@@ -11,6 +11,14 @@ const _loadTimeout = setTimeout(() => {
 }, 12000);
 
 (async () => {
+  // Show "no teacher access" toast if redirected back from teacher.html
+  const _urlParams = new URLSearchParams(window.location.search);
+  if (_urlParams.get('msg') === 'no-teacher-access') {
+    history.replaceState({}, '', window.location.pathname);
+    // Show toast after app loads — store flag for later
+    window._showNoTeacherAccess = true;
+  }
+
   try {
     const user = await requireAuth();
     if (!user) { clearTimeout(_loadTimeout); return; } // redirect already triggered
@@ -60,6 +68,11 @@ const _loadTimeout = setTimeout(() => {
 
   // Boot the app
   init();
+
+  // Show no-access message if redirected from teacher.html
+  if (window._showNoTeacherAccess) {
+    setTimeout(() => showToast("You don't have access to Teacher Mode.", 'warn'), 800);
+  }
 })();
 
 // ─── CURRICULUM DATA ──────────────────────────────────────────────────────────
@@ -1002,50 +1015,12 @@ function init() {
   const onboarded = localStorage.getItem('lumi_name');
   if (!onboarded) {
     $('onboarding').style.display = '';
-    initOnboarding(() => { wireListeners(savedKey); startApp(savedKey); initAdminFeatures(); });
+    initOnboarding(() => { wireListeners(savedKey); startApp(savedKey); });
     return;
   }
   $('onboarding').style.display = 'none';
   startApp(savedKey);
   wireListeners(savedKey);
-  initAdminFeatures();
-}
-
-// ─── ADMIN TEACHER SHORTCUT ───────────────────────────────────────────────────
-function initAdminFeatures() {
-  if (!currentUser) return;
-  const email = (currentUser.email || '').toLowerCase();
-  if (email !== 'hadi.hilaly@menloschool.org') return;
-
-  // Show Teacher Mode button in sidebar
-  const modeBtn = document.getElementById('teacherModeBtn');
-  if (modeBtn) modeBtn.style.display = 'flex';
-
-  const adminSection = document.getElementById('adminSection');
-  if (!adminSection) return;
-  adminSection.style.display = 'block';
-
-  const sel = document.getElementById('adminClassSelect');
-  if (sel.options.length > 0) return; // already populated
-
-  for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
-    const og = document.createElement('optgroup');
-    og.label = subject;
-    for (const course of Object.keys(courses)) {
-      const opt = document.createElement('option');
-      opt.value = course;
-      opt.textContent = course;
-      og.appendChild(opt);
-    }
-    sel.appendChild(og);
-  }
-
-  document.getElementById('adminGoBtn').addEventListener('click', () => {
-    const course = sel.value;
-    if (!course) return;
-    const base = window.location.href.replace(/\/[^/]*$/, '/');
-    window.location.href = base + 'teacher.html?class=' + encodeURIComponent(course);
-  });
 }
 
 function wireListeners(savedKey) {
