@@ -113,7 +113,7 @@ const MENLO_CURRICULUM = {
     "Analytic Geometry & Algebra": ["Rebecca Akers","Joe Rabison"],
     "Analytic Geometry & Algebra (H)": ["Sujata Ganpule"],
     "Algebra 2": ["Randall Joss","Nandhini Namasivayam"],
-    "Algebra 2 with Trig": ["Rebecca Akers","Jacqueline Arreaga"],
+    "Algebra 2 with Trig": ["Rebecca Akers","Jacqueline Arreaga","Harris"],
     "Algebra 2 with Trig (H)": ["Danielle Jensen"],
     "Precalculus": ["Yu-Loung Chang","Christine Walters"],
     "Introductory Calculus": ["Jacqueline Arreaga","Dave Lowell"],
