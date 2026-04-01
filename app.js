@@ -41,7 +41,6 @@ let currentUser = null;
 
   await loadProfileFromSupabase();
   if (!localStorage.getItem('lumi_convs')) await loadConvsFromSupabase();
-  loadCompletedProfiles(); // non-blocking, populates cache for search dropdown
 
   // Show Teacher Mode link only for allowed teacher emails
   const ALLOWED_TEACHER_EMAILS = ['hadi.hilaly@menloschool.org'];
@@ -351,23 +350,25 @@ NEVER mention the JSON.`;
 
 // ─── COMPLETED PROFILES CACHE ────────────────────────────────────────────────
 // Stores "teacher_email|class_name" for every profile with status=complete.
-// Used by the search dropdown to filter out teachers who haven't set up yet.
-let completedProfiles = new Set();
+async function searchTeacherProfiles(query) {
+  const { data, error } = await sb
+    .from('teacher_profiles')
+    .select('teacher_email, teacher_name, class_name, profile, status')
+    .eq('status', 'complete');
 
-async function loadCompletedProfiles() {
-  try {
-    const { data, error } = await sb
-      .from('teacher_profiles')
-      .select('teacher_email, teacher_name, class_name, profile')
-      .eq('status', 'complete');
-    if (error || !data) return;
-    completedProfiles = new Set();
-    data.forEach(row => {
-      completedProfiles.add(`${row.teacher_email}|${row.class_name}`);
-    });
-  } catch (err) {
-    console.warn('Could not load completed profiles:', err);
+  if (error) {
+    console.error('Search error:', error);
+    return [];
   }
+
+  if (!query || query.trim() === '') return [];
+
+  const q = query.toLowerCase().trim();
+
+  return data.filter(profile =>
+    profile.teacher_name?.toLowerCase().includes(q) ||
+    profile.class_name?.toLowerCase().includes(q)
+  );
 }
 
 // Maps teacher display name → real @menloschool.org email (mirrors teacher.html)
@@ -934,7 +935,7 @@ function clearSearch() {
   if (dropdown) dropdown.style.display = 'none';
 }
 
-function renderSearchDropdown(query) {
+async function renderSearchDropdown(query) {
   const dropdown = document.getElementById('searchDropdown');
   if (!dropdown) return;
 
@@ -944,46 +945,41 @@ function renderSearchDropdown(query) {
     return;
   }
 
-  const q = query.toLowerCase();
-
-  // Collect teacher-name matches: { email → { name, courses: [{course, subjectName}] } }
-  const teacherMatches = {};
-  // Collect course-name matches: { course → { course, subjectName, teachers: [] } }
-  const courseMatches  = {};
-
-  for (const [subjectName, courses] of Object.entries(MENLO_CURRICULUM)) {
-    for (const [course, teachers] of Object.entries(courses)) {
-      const courseHit = course.toLowerCase().includes(q);
-      for (const teacher of teachers) {
-        const email = TEACHER_EMAIL_MAP[teacher];
-        if (!email) continue;
-        // Only include teachers with a complete profile
-        if (!completedProfiles.has(`${email}|${course}`)) continue;
-
-        if (teacher.toLowerCase().includes(q)) {
-          if (!teacherMatches[email]) teacherMatches[email] = { name: teacher, courses: [] };
-          teacherMatches[email].courses.push({ course, subjectName });
-        }
-        if (courseHit) {
-          if (!courseMatches[course]) courseMatches[course] = { course, subjectName, teachers: [] };
-          if (!courseMatches[course].teachers.includes(teacher))
-            courseMatches[course].teachers.push(teacher);
-        }
-      }
-    }
-  }
-
-  const teacherEntries = Object.entries(teacherMatches);
-  const courseEntries  = Object.entries(courseMatches);
+  const results = await searchTeacherProfiles(query);
+  const q = query.toLowerCase().trim();
 
   dropdown.innerHTML = '';
   dropdown.style.display = 'block';
 
-  if (teacherEntries.length === 0 && courseEntries.length === 0) {
+  if (results.length === 0) {
     dropdown.innerHTML = '<div class="sr-empty">No teachers or classes found</div>';
     renderSidebar();
     return;
   }
+
+  // Split into teacher-name matches and class-name matches
+  const teacherMatches = {};  // email → { name, courses: [class_name] }
+  const courseMatches  = {};  // class_name → { course, teachers: [name] }
+
+  results.forEach(profile => {
+    const nameHit   = profile.teacher_name?.toLowerCase().includes(q);
+    const courseHit = profile.class_name?.toLowerCase().includes(q);
+
+    if (nameHit) {
+      if (!teacherMatches[profile.teacher_email])
+        teacherMatches[profile.teacher_email] = { name: profile.teacher_name, courses: [] };
+      teacherMatches[profile.teacher_email].courses.push(profile.class_name);
+    }
+    if (courseHit) {
+      if (!courseMatches[profile.class_name])
+        courseMatches[profile.class_name] = { course: profile.class_name, teachers: [] };
+      if (!courseMatches[profile.class_name].teachers.includes(profile.teacher_name))
+        courseMatches[profile.class_name].teachers.push(profile.teacher_name);
+    }
+  });
+
+  const teacherEntries = Object.values(teacherMatches);
+  const courseEntries  = Object.values(courseMatches);
 
   // ── Teachers section ──
   if (teacherEntries.length > 0) {
@@ -992,20 +988,20 @@ function renderSearchDropdown(query) {
     lbl.textContent = 'Teachers';
     dropdown.appendChild(lbl);
 
-    teacherEntries.forEach(([, { name, courses }]) => {
+    teacherEntries.forEach(({ name, courses }) => {
       const groupEl = document.createElement('div');
       const nameEl  = document.createElement('div');
       nameEl.className   = 'sr-group-name';
       nameEl.textContent = name;
       groupEl.appendChild(nameEl);
 
-      courses.forEach(({ course, subjectName }) => {
+      courses.forEach(course => {
         const btn = document.createElement('button');
         btn.className = 'sr-result-item';
         btn.innerHTML = `<span class="sr-arrow">└──</span>${escHtml(course)}`;
         btn.addEventListener('click', () => {
-          const subj = SUBJECTS.find(s => s.name === subjectName);
-          if (subj) openTutor(subj.id, course, name);
+          const { subjectId } = lookupSubjectForCourse(course);
+          openTutor(subjectId, course, name);
           closeSidebar();
         });
         groupEl.appendChild(btn);
@@ -1026,7 +1022,7 @@ function renderSearchDropdown(query) {
     lbl.textContent = 'Classes';
     dropdown.appendChild(lbl);
 
-    courseEntries.forEach(([, { course, subjectName, teachers }]) => {
+    courseEntries.forEach(({ course, teachers }) => {
       const groupEl = document.createElement('div');
       const nameEl  = document.createElement('div');
       nameEl.className   = 'sr-group-name';
@@ -1038,8 +1034,7 @@ function renderSearchDropdown(query) {
         btn.className = 'sr-result-item';
         btn.innerHTML = `<span class="sr-arrow">└──</span>${escHtml(teacher)}`;
         btn.addEventListener('click', () => {
-          const subj = SUBJECTS.find(s => s.name === subjectName);
-          if (subj) openTutor(subj.id, course, teacher);
+          openTutor(null, course, teacher);
           closeSidebar();
         });
         groupEl.appendChild(btn);
@@ -1048,7 +1043,6 @@ function renderSearchDropdown(query) {
     });
   }
 
-  // Update sidebar nav to show conversations only (no subjects) while searching
   renderSidebar();
 }
 
