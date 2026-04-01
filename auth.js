@@ -63,10 +63,35 @@ async function requireGuest() {
   } catch { /* timed out — just show sign-in */ }
 }
 
-// Call on app.html — redirect to index if not signed in (or wrong domain)
-// Returns the user if valid, never returns if redirect triggered
+// Call on app.html — returns user if valid, redirects if not.
+// If it's an OAuth redirect (hash token), waits for onAuthStateChange.
+// Otherwise checks session with a 4s timeout then redirects if nothing found.
 async function requireAuth() {
-  // First try: session already established
+  const hasHashToken = window.location.hash.includes('access_token');
+
+  if (hasHashToken) {
+    // Just came back from Google OAuth — wait for Supabase to exchange the token
+    return new Promise((resolve) => {
+      const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
+        subscription.unsubscribe();
+        if (!session?.user) { window.location.replace('index.html'); resolve(null); return; }
+        const user = session.user;
+        if (!isMenloEmail(user.email)) {
+          await sb.auth.signOut();
+          window.location.replace('index.html?error=domain');
+          resolve(null); return;
+        }
+        resolve(user);
+      });
+      setTimeout(() => {
+        subscription.unsubscribe();
+        window.location.replace('index.html');
+        resolve(null);
+      }, 6000);
+    });
+  }
+
+  // No OAuth redirect — check for existing session with tight timeout
   try {
     const { data: { session } } = await getSessionSafe();
     if (session?.user) {
@@ -78,35 +103,9 @@ async function requireAuth() {
       }
       return user;
     }
-  } catch {
-    // getSession timed out — fall through to onAuthStateChange
-    // (handles the case where user just completed OAuth redirect)
-  }
+  } catch { /* timeout */ }
 
-  // Second try: wait for auth state change (handles OAuth redirect with token in URL hash)
-  return new Promise((resolve) => {
-    const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
-      subscription.unsubscribe();
-      if (!session?.user) {
-        window.location.replace('index.html');
-        resolve(null);
-        return;
-      }
-      const user = session.user;
-      if (!isMenloEmail(user.email)) {
-        await sb.auth.signOut();
-        window.location.replace('index.html?error=domain');
-        resolve(null);
-        return;
-      }
-      resolve(user);
-    });
-
-    // Timeout after 6 seconds — if no auth event, redirect to sign-in
-    setTimeout(() => {
-      subscription.unsubscribe();
-      window.location.replace('index.html');
-      resolve(null);
-    }, 6000);
-  });
+  // No session found — send to sign-in
+  window.location.replace('index.html');
+  return null;
 }

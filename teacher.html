@@ -696,18 +696,14 @@ function showView(name) {
 }
 
 // ─── AUTH INIT ────────────────────────────────────────────────────────────────
-
-// Hard timeout — show reload button if nothing happens in 10s
-const _tLoadTimeout = setTimeout(() => {
-  const txt = document.getElementById('tAuthText');
-  const btn = document.getElementById('tReloadBtn');
-  if (txt) txt.textContent = 'Taking longer than expected…';
-  if (btn) btn.style.display = 'inline-block';
-}, 10000);
+// Strategy: show sign-in immediately, then quietly check for an existing session.
+// If a session exists, transition to home. If it's an OAuth redirect (hash token),
+// onAuthStateChange fires and we handle it. No hanging ever.
 
 (async () => {
-  // Show params error
   const params = new URLSearchParams(window.location.search);
+
+  // Show domain error if redirected back
   if (params.get('error') === 'domain') {
     document.getElementById('tSigninError').textContent =
       'Access is limited to Menlo School staff. Please use your @menloschool.org account.';
@@ -715,34 +711,39 @@ const _tLoadTimeout = setTimeout(() => {
     history.replaceState({}, '', window.location.pathname);
   }
 
-  // Try existing session first — use safe timeout version
-  let session = null;
-  try {
-    const result = await Promise.race([
-      sb.auth.getSession(),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
-    ]);
-    session = result.data?.session;
-  } catch { /* timed out — fall through to sign-in */ }
+  // If there's a hash in the URL it's an OAuth redirect — wait for onAuthStateChange
+  const hasHashToken = window.location.hash.includes('access_token');
 
-  clearTimeout(_tLoadTimeout);
-
-  if (session?.user) {
-    handleUser(session.user);
+  if (hasHashToken) {
+    // Coming back from Google OAuth — show loading and wait for the token
+    showView('authLoading');
+    const { data: { subscription } } = sb.auth.onAuthStateChange((event, sess) => {
+      subscription.unsubscribe();
+      if (sess?.user) { handleUser(sess.user); }
+      else            { showView('signinView'); wireSigninBtn(); }
+    });
+    // Safety fallback
+    setTimeout(() => {
+      subscription.unsubscribe();
+      showView('signinView');
+      wireSigninBtn();
+    }, 5000);
     return;
   }
 
-  // No session — check if this is an OAuth redirect (token in URL hash)
-  const { data: { subscription } } = sb.auth.onAuthStateChange((event, sess) => {
-    subscription.unsubscribe();
-    if (sess?.user) { handleUser(sess.user); }
-    else            { showView('signinView'); wireSigninBtn(); }
-  });
-  setTimeout(() => {
-    subscription.unsubscribe();
-    showView('signinView');
-    wireSigninBtn();
-  }, 4000);
+  // No OAuth redirect — show sign-in instantly, then check for existing session quietly
+  showView('signinView');
+  wireSigninBtn();
+
+  // Quietly check for existing session in background (no hang risk)
+  try {
+    const result = await Promise.race([
+      sb.auth.getSession(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 4000))
+    ]);
+    const session = result.data?.session;
+    if (session?.user) handleUser(session.user);
+  } catch { /* timed out or no session — already on sign-in page, nothing to do */ }
 })();
 
 function handleUser(user) {
