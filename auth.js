@@ -40,28 +40,47 @@ async function doSignOut() {
   window.location.replace('index.html');
 }
 
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+// getSession with a hard 5s timeout so a paused/slow Supabase never hangs the app
+async function getSessionSafe() {
+  return Promise.race([
+    sb.auth.getSession(),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('getSession timeout')), 5000)
+    ),
+  ]);
+}
+
 // ─── ROUTE GUARDS ─────────────────────────────────────────────────────────────
 // Call on index.html — redirect to app if already signed in with @menloschool.org
 async function requireGuest() {
-  const user = await getUser();
-  if (user && isMenloEmail(user.email)) {
-    window.location.replace('app.html');
-  }
+  try {
+    const { data: { session } } = await getSessionSafe();
+    const user = session?.user;
+    if (user && isMenloEmail(user.email)) {
+      window.location.replace('app.html');
+    }
+  } catch { /* timed out — just show sign-in */ }
 }
 
 // Call on app.html — redirect to index if not signed in (or wrong domain)
 // Returns the user if valid, never returns if redirect triggered
 async function requireAuth() {
   // First try: session already established
-  const { data: { session } } = await sb.auth.getSession();
-  if (session?.user) {
-    const user = session.user;
-    if (!isMenloEmail(user.email)) {
-      await sb.auth.signOut();
-      window.location.replace('index.html?error=domain');
-      return null;
+  try {
+    const { data: { session } } = await getSessionSafe();
+    if (session?.user) {
+      const user = session.user;
+      if (!isMenloEmail(user.email)) {
+        await sb.auth.signOut();
+        window.location.replace('index.html?error=domain');
+        return null;
+      }
+      return user;
     }
-    return user;
+  } catch {
+    // getSession timed out — fall through to onAuthStateChange
+    // (handles the case where user just completed OAuth redirect)
   }
 
   // Second try: wait for auth state change (handles OAuth redirect with token in URL hash)
