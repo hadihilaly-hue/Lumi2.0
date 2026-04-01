@@ -96,17 +96,26 @@ function selectRole(role) {
 }
 
 (async () => {
-  // Show domain error if redirected back after failed domain check
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('error') === 'domain') {
-    const errEl = document.getElementById('signinError');
-    errEl.textContent = 'Access is limited to Menlo School students and staff. Please sign in with your @menloschool.org account.';
-    errEl.style.display = 'block';
-    history.replaceState({}, '', window.location.pathname);
+  // If already signed in, redirect immediately
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user && isMenloEmail(session.user.email)) {
+    window.location.href = 'app.html';
+    return;
   }
 
-  // Redirect to app if already signed in
-  await requireGuest();
+  // After Google OAuth completes, onAuthStateChange fires and we redirect
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN' && session?.user) {
+      if (!isMenloEmail(session.user.email)) {
+        sb.auth.signOut();
+        const errEl = document.getElementById('signinError');
+        errEl.textContent = 'Access is limited to @menloschool.org accounts.';
+        errEl.style.display = 'block';
+        return;
+      }
+      window.location.href = selectedRole === 'teacher' ? 'teacher.html' : 'app.html';
+    }
+  });
 
   // Wire sign-in button
   const btn = document.getElementById('signinBtn');
@@ -114,21 +123,16 @@ function selectRole(role) {
     btn.disabled = true;
     btn.innerHTML = GOOGLE_SVG + ' Redirecting to Google…';
     try {
-      const base = window.location.href.replace(/\/[^/]*$/, '/');
-      const dest = selectedRole === 'teacher' ? 'teacher.html' : 'app.html';
-      const redirectTo = base + dest;
-
-      const { error } = await sb.auth.signInWithOAuth({
+      const base       = window.location.href.replace(/\/[^/]*$/, '/');
+      const redirectTo = base + (selectedRole === 'teacher' ? 'teacher.html' : 'app.html');
+      const { error }  = await sb.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo,
-          queryParams: { hd: 'menloschool.org' },
-        },
+        options: { redirectTo, queryParams: { hd: 'menloschool.org' } },
       });
       if (error) throw error;
     } catch (err) {
       btn.disabled = false;
-      selectRole(selectedRole); // restore button label
+      selectRole(selectedRole);
       const errEl = document.getElementById('signinError');
       errEl.textContent = 'Something went wrong. Please try again.';
       errEl.style.display = 'block';

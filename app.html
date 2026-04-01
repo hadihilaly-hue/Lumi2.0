@@ -11,11 +11,10 @@
 </head>
 <body>
 
-<!-- Auth loading screen (shown until session is verified) -->
+<!-- Auth loading screen — hidden as soon as session check completes -->
 <div class="auth-loading" id="authLoading">
   <div class="auth-loading-orb">✦</div>
-  <div class="auth-loading-text" id="authLoadingText">Loading Lumi…</div>
-  <button id="authReloadBtn" onclick="location.reload()" style="display:none;margin-top:18px;padding:10px 22px;background:var(--accent);border:none;border-radius:10px;color:#fff;font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;">Reload</button>
+  <div class="auth-loading-text">Loading Lumi…</div>
 </div>
 
 <!-- ─── ONBOARDING ─────────────────────────────────────── -->
@@ -153,6 +152,7 @@
         </div>
       </div>
       <button class="danger-btn" id="signOutBtn" style="margin-top:10px">Sign out</button>
+      <a href="teacher.html" id="teacherModeLink" style="display:none;margin-top:8px;text-align:center;font-size:13px;color:var(--accent);text-decoration:none;padding:8px;border:1px solid rgba(123,105,245,.3);border-radius:8px;background:var(--accent-soft);display:none">🍎 Switch to Teacher Mode</a>
     </div>
 
     <!-- Appearance -->

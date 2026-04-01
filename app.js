@@ -1,49 +1,28 @@
 // ─── AUTH GUARD ───────────────────────────────────────────────────────────────
-// Runs immediately; if not authenticated the page redirects and nothing else loads
 let currentUser = null;
 
-// Hard timeout — if loading takes > 12s show a reload button
-const _loadTimeout = setTimeout(() => {
-  const txt = document.getElementById('authLoadingText');
-  const btn = document.getElementById('authReloadBtn');
-  if (txt) txt.textContent = 'Taking longer than expected…';
-  if (btn) btn.style.display = 'inline-block';
-}, 12000);
-
 (async () => {
-  // Show "no teacher access" toast if redirected back from teacher.html
-  const _urlParams = new URLSearchParams(window.location.search);
-  if (_urlParams.get('msg') === 'no-teacher-access') {
-    history.replaceState({}, '', window.location.pathname);
-    // Show toast after app loads — store flag for later
-    window._showNoTeacherAccess = true;
-  }
+  // Simple auth check — getSession() reads from localStorage, no network needed
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
 
-  try {
-    const user = await requireAuth();
-    if (!user) { clearTimeout(_loadTimeout); return; } // redirect already triggered
-    currentUser = user;
-  } catch (err) {
-    clearTimeout(_loadTimeout);
-    const txt = document.getElementById('authLoadingText');
-    const btn = document.getElementById('authReloadBtn');
-    if (txt) txt.textContent = 'Failed to connect. Check your internet and try again.';
-    if (btn) btn.style.display = 'inline-block';
+  if (!isMenloEmail(session.user.email)) {
+    await sb.auth.signOut();
+    window.location.href = 'index.html';
     return;
   }
 
-  clearTimeout(_loadTimeout);
+  currentUser = session.user;
 
-  // Hide auth loading screen and show the app
+  // Hide loading screen and show the app
   document.getElementById('authLoading').style.display = 'none';
 
   // Populate user info (settings drawer + sidebar chip)
-  const meta      = currentUser.user_metadata || {};
-  const fullName  = meta.full_name || meta.name || 'Student';
-  const email     = currentUser.email || '';
-  const initials  = fullName[0].toUpperCase();
+  const meta     = currentUser.user_metadata || {};
+  const fullName = meta.full_name || meta.name || 'Student';
+  const email    = currentUser.email || '';
+  const initials = fullName[0].toUpperCase();
 
-  // Settings drawer
   document.getElementById('userName').textContent  = fullName;
   document.getElementById('userEmail').textContent = email;
   const avatarEl = document.getElementById('userAvatar');
@@ -52,7 +31,6 @@ const _loadTimeout = setTimeout(() => {
     avatarEl.appendChild(img);
   } else { avatarEl.textContent = initials; }
 
-  // Sidebar user chip
   document.getElementById('sbUserName').textContent  = fullName;
   document.getElementById('sbUserEmail').textContent = email;
   const sbAvatarEl = document.getElementById('sbUserAvatar');
@@ -61,18 +39,17 @@ const _loadTimeout = setTimeout(() => {
     sbAvatarEl.appendChild(img2);
   } else { sbAvatarEl.textContent = initials; }
 
-  // Load profile from Supabase if this is a new device
   await loadProfileFromSupabase();
-  // Load conversations from Supabase if localStorage is empty
   if (!localStorage.getItem('lumi_convs')) await loadConvsFromSupabase();
 
-  // Boot the app
-  init();
-
-  // Show no-access message if redirected from teacher.html
-  if (window._showNoTeacherAccess) {
-    setTimeout(() => showToast("You don't have access to Teacher Mode.", 'warn'), 800);
+  // Show Teacher Mode link only for allowed teacher emails
+  const ALLOWED_TEACHER_EMAILS = ['hadi.hilaly@menloschool.org'];
+  if (ALLOWED_TEACHER_EMAILS.includes(email.toLowerCase())) {
+    const link = document.getElementById('teacherModeLink');
+    if (link) link.style.display = 'block';
   }
+
+  init();
 })();
 
 // ─── CURRICULUM DATA ──────────────────────────────────────────────────────────

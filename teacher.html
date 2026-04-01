@@ -427,7 +427,7 @@ body { overflow: auto; display: block; }
         <div class="t-hdr-avatar" id="hdrAvatar"></div>
         <span id="hdrName" style="font-size:13px"></span>
       </div>
-      <button class="t-hdr-signout" onclick="goToStudent()" style="border-color:var(--accent);color:var(--accent)">🎒 Student Mode</button>
+      <a href="app.html" style="font-size:12px;font-weight:500;color:var(--accent);text-decoration:none;padding:6px 12px;border:1px solid rgba(123,105,245,.3);border-radius:7px;background:var(--accent-soft)">🎒 Student Mode</a>
       <button class="t-hdr-signout" onclick="doSignOut()">Sign out</button>
     </div>
   </div>
@@ -468,7 +468,7 @@ body { overflow: auto; display: block; }
         <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
         Back to Home
       </button>
-      <button class="t-back-btn" onclick="goToStudent()" style="border-color:rgba(123,105,245,.3);color:var(--accent);background:var(--accent-soft)">🎒 Student Mode</button>
+      <a href="app.html" class="t-back-btn" style="border-color:rgba(123,105,245,.3);color:var(--accent);background:var(--accent-soft);text-decoration:none">🎒 Student Mode</a>
       <div class="t-class-label">Current class</div>
       <div class="t-class-display">
         <div class="t-class-display-subject" id="sbSubject"></div>
@@ -698,54 +698,15 @@ function showView(name) {
 }
 
 // ─── AUTH INIT ────────────────────────────────────────────────────────────────
-// Strategy: show sign-in immediately, then quietly check for an existing session.
-// If a session exists, transition to home. If it's an OAuth redirect (hash token),
-// onAuthStateChange fires and we handle it. No hanging ever.
-
 (async () => {
-  const params = new URLSearchParams(window.location.search);
-
-  // Show domain error if redirected back
-  if (params.get('error') === 'domain') {
-    document.getElementById('tSigninError').textContent =
-      'Access is limited to Menlo School staff. Please use your @menloschool.org account.';
-    document.getElementById('tSigninError').style.display = 'block';
-    history.replaceState({}, '', window.location.pathname);
-  }
-
-  // If there's a hash in the URL it's an OAuth redirect — wait for onAuthStateChange
-  const hasHashToken = window.location.hash.includes('access_token');
-
-  if (hasHashToken) {
-    // Coming back from Google OAuth — show loading and wait for the token
-    showView('authLoading');
-    const { data: { subscription } } = sb.auth.onAuthStateChange((event, sess) => {
-      subscription.unsubscribe();
-      if (sess?.user) { handleUser(sess.user); }
-      else            { showView('signinView'); wireSigninBtn(); }
-    });
-    // Safety fallback
-    setTimeout(() => {
-      subscription.unsubscribe();
-      showView('signinView');
-      wireSigninBtn();
-    }, 5000);
+  // Simple auth check — reads from localStorage, instant
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    showView('signinView');
+    wireSigninBtn();
     return;
   }
-
-  // No OAuth redirect — show sign-in instantly, then check for existing session quietly
-  showView('signinView');
-  wireSigninBtn();
-
-  // Quietly check for existing session in background (no hang risk)
-  try {
-    const result = await Promise.race([
-      sb.auth.getSession(),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 4000))
-    ]);
-    const session = result.data?.session;
-    if (session?.user) handleUser(session.user);
-  } catch { /* timed out or no session — already on sign-in page, nothing to do */ }
+  handleUser(session.user);
 })();
 
 // ─── ACCESS CONTROL ───────────────────────────────────────────────────────────
