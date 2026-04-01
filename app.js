@@ -2,10 +2,29 @@
 // Runs immediately; if not authenticated the page redirects and nothing else loads
 let currentUser = null;
 
+// Hard timeout — if loading takes > 12s show a reload button
+const _loadTimeout = setTimeout(() => {
+  const txt = document.getElementById('authLoadingText');
+  const btn = document.getElementById('authReloadBtn');
+  if (txt) txt.textContent = 'Taking longer than expected…';
+  if (btn) btn.style.display = 'inline-block';
+}, 12000);
+
 (async () => {
-  const user = await requireAuth();
-  if (!user) return; // redirect already triggered
-  currentUser = user;
+  try {
+    const user = await requireAuth();
+    if (!user) { clearTimeout(_loadTimeout); return; } // redirect already triggered
+    currentUser = user;
+  } catch (err) {
+    clearTimeout(_loadTimeout);
+    const txt = document.getElementById('authLoadingText');
+    const btn = document.getElementById('authReloadBtn');
+    if (txt) txt.textContent = 'Failed to connect. Check your internet and try again.';
+    if (btn) btn.style.display = 'inline-block';
+    return;
+  }
+
+  clearTimeout(_loadTimeout);
 
   // Hide auth loading screen and show the app
   document.getElementById('authLoading').style.display = 'none';
