@@ -404,10 +404,10 @@ body { overflow: auto; display: block; }
 <div id="unknownView" style="display:none">
   <div class="t-unknown-box">
     <div class="t-unknown-icon">🤔</div>
-    <h2>Account not found</h2>
-    <p>Your email isn't in the Lumi teacher database:</p>
+    <h2>Account not set up</h2>
+    <p>Your account has not been set up yet.</p>
     <div class="t-unknown-email" id="tUnknownEmail"></div>
-    <p style="margin-bottom:20px">Only Menlo School teachers with listed courses can access this portal. If you think this is a mistake, please contact your administrator.</p>
+    <p style="margin-bottom:20px">Please contact your administrator.</p>
     <button class="t-signout-btn" onclick="doSignOut()">Sign out</button>
   </div>
 </div>
@@ -641,50 +641,107 @@ const MENLO_CURRICULUM = {
   }
 };
 
-// ─── BUILD TEACHER DATABASE ──────────────────────────────────────────────────
-// Maps "firstname.lastname" → { name, classes: [{course, subject}] }
+// ─── TEACHER EMAIL MAP ───────────────────────────────────────────────────────
+// Maps teacher full name (as it appears in MENLO_CURRICULUM) → full @menloschool.org email
+const TEACHER_EMAIL_MAP = {
+  "Rachel Blumenthal":      "rblumenthal@menloschool.org",
+  "Whitney Newton":         "wnewton@menloschool.org",
+  "Margaret Ramsey":        "mramsey@menloschool.org",
+  "Andrew Warren":          "awarren@menloschool.org",
+  "Jay Bush":               "jbush@menloschool.org",
+  "Lily Chan":              "lchan@menloschool.org",
+  "Rebecca Gertmenian":     "rgertmenian@menloschool.org",
+  "Meghann Schroers-Martin":"mschroers-martin@menloschool.org",
+  "Tom Garvey":             "tgarvey@menloschool.org",
+  "Oscar King":             "oking@menloschool.org",
+  "Maura Sincoff":          "msincoff@menloschool.org",
+  "Cara Plamondon":         "cplamondon@menloschool.org",
+  "Bridgett Longust":       "blongust@menloschool.org",
+  "Sabahat Adil":           "sadil@menloschool.org",
+  "Franco Cruz-Ochoa":      "fcruz-ochoa@menloschool.org",
+  "Katharine Hanson":       "khanson@menloschool.org",
+  "Nicholas Merlesena":     "nmerlesena@menloschool.org",
+  "Miles Bennett-Smith":    "mbennett-smith@menloschool.org",
+  "Glenn Davis":            "gdavis@menloschool.org",
+  "Trevor McNeil":          "tmcneil@menloschool.org",
+  "Joseph Mitchell":        "jmitchell@menloschool.org",
+  "Jack Bowen":             "jbowen@menloschool.org",
+  "Dylan Citrin Cummins":   "dcitrin-cummins@menloschool.org",
+  "Charles Hanson":         "chanson@menloschool.org",
+  "Matthew Nelson":         "mnelson@menloschool.org",
+  "John Schafer":           "jschafer@menloschool.org",
+  "Peter Brown":            "pbrown@menloschool.org",
+  "Christine Walters":      "cwalters@menloschool.org",
+  "Rebecca Akers":          "rakers@menloschool.org",
+  "Joe Rabison":            "jrabison@menloschool.org",
+  "Sujata Ganpule":         "sganpule@menloschool.org",
+  "Randall Joss":           "rjoss@menloschool.org",
+  "Nandhini Namasivayam":   "nnamasivayam@menloschool.org",
+  "Jacqueline Arreaga":     "jarreaga@menloschool.org",
+  "Danielle Jensen":        "djensen@menloschool.org",
+  "Yu-Loung Chang":         "ychang@menloschool.org",
+  "Dave Lowell":            "dlowell@menloschool.org",
+  "Reeve Garrett":          "rgarrett@menloschool.org",
+  "Jude Loeffler":          "jloeffler@menloschool.org",
+  "Dennis Millstein":       "dmillstein@menloschool.org",
+  "Douglas Kiang":          "dkiang@menloschool.org",
+  "Zachary Blickensderfer": "zblickensderfer@menloschool.org",
+  "Chrissy Orangio":        "corangio@menloschool.org",
+  "Laura Huntley":          "lhuntley@menloschool.org",
+  "Mary McKenna":           "mmckenna@menloschool.org",
+  "Zachary Eagleton":       "zeagleton@menloschool.org",
+  "Eugenia McCauley":       "emccauley@menloschool.org",
+  "Nina Arnberg":           "narnberg@menloschool.org",
+  "Zane Moore":             "zmoore@menloschool.org",
+  "Matthew Varvir":         "mvarvir@menloschool.org",
+  "Todd Hardie":            "thardie@menloschool.org",
+  "Cristina Weaver":        "cweaver@menloschool.org",
+  "Tatyana Buxton":         "tbuxton@menloschool.org",
+  "James Dann":             "jdann@menloschool.org",
+  "James Formato":          "jformato@menloschool.org",
+  "Leo Jaimez":             "ljaimez@menloschool.org",
+  "Janet Tennyson":         "jtennyson@menloschool.org",
+  "Adolfo Guevara":         "aguevara@menloschool.org",
+  "Perla Amaral":           "pamaral@menloschool.org",
+  "Patricia Frias":         "pfrias@menloschool.org",
+  "Marie Sajja":            "msajja@menloschool.org",
+  "Corinne Chung":          "cchung@menloschool.org",
+  "Rita Yeh":               "ryeh@menloschool.org",
+  "Mingjung Chen":          "mchen@menloschool.org",
+  "Jennifer Jordt":         "jjordt@menloschool.org",
+};
+
+// Build TEACHER_DATABASE keyed by full email → { name, classes: string[] }
 function buildTeacherDatabase() {
   const db = {};
   for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
     for (const [course, teachers] of Object.entries(courses)) {
       for (const teacher of teachers) {
-        const parts     = teacher.toLowerCase().split(/\s+/);
-        const firstName = parts[0];
-        const lastName  = parts[parts.length - 1];
-        const key       = `${firstName}.${lastName}`;
-        if (!db[key]) db[key] = { name: teacher, classes: [] };
-        // Avoid duplicate class entries (same teacher listed under multiple subjects)
-        if (!db[key].classes.find(c => c.course === course)) {
-          db[key].classes.push({ course, subject });
+        const email = TEACHER_EMAIL_MAP[teacher];
+        if (!email) continue;
+        if (!db[email]) db[email] = { name: teacher, classes: [] };
+        if (!db[email].classes.includes(course)) {
+          db[email].classes.push(course);
         }
       }
     }
   }
+  // Admin/dev account gets all classes
+  const allClasses = [];
+  for (const courses of Object.values(MENLO_CURRICULUM)) {
+    for (const course of Object.keys(courses)) {
+      if (!allClasses.includes(course)) allClasses.push(course);
+    }
+  }
+  db['hadi.hilaly@menloschool.org'] = { name: 'Hadi Hilaly', classes: allClasses };
   return db;
 }
-const TEACHER_DB = buildTeacherDatabase();
-
-// ─── ADMIN / DEMO OVERRIDES ───────────────────────────────────────────────────
-// These emails get access to ALL classes (admin / testing accounts)
-const ADMIN_EMAILS = new Set(['hadi.hilaly']);
-
-// Build the full all-classes list once
-const ALL_CLASSES = [];
-for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
-  for (const course of Object.keys(courses)) {
-    ALL_CLASSES.push({ course, subject });
-  }
-}
-
-ADMIN_EMAILS.forEach(key => {
-  TEACHER_DB[key] = { name: 'Hadi Hilaly', classes: ALL_CLASSES };
-});
+const TEACHER_DATABASE = buildTeacherDatabase();
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let tUser         = null;   // Supabase user
-let tTeacher      = null;   // { name, classes } from TEACHER_DB
-let tEmailKey     = null;   // email prefix e.g. "rachel.blumenthal"
-let tProfiles     = {};     // { "Course Name": { done, key_goals, … } }
+let tTeacher      = null;   // { name, classes: string[] } from TEACHER_DATABASE
+let tProfiles     = {};     // { "Course Name": { done, teaching_style, … } }
 let tCurrentClass = null;   // { course, subject } currently in chat
 let tMessages     = [];     // conversation messages for current class
 let tBusy         = false;
@@ -710,76 +767,9 @@ function showView(name) {
 })();
 
 // ─── ACCESS CONTROL ───────────────────────────────────────────────────────────
-// Full list of Menlo School teachers with portal access
-const ALLOWED_TEACHER_EMAILS = [
-  "hadi.hilaly@menloschool.org",
-  "rblumenthal@menloschool.org",
-  "wnewton@menloschool.org",
-  "mramsey@menloschool.org",
-  "awarren@menloschool.org",
-  "jbush@menloschool.org",
-  "lchan@menloschool.org",
-  "rgertmenian@menloschool.org",
-  "mschroers-martin@menloschool.org",
-  "tgarvey@menloschool.org",
-  "oking@menloschool.org",
-  "msincoff@menloschool.org",
-  "cplamondon@menloschool.org",
-  "blongust@menloschool.org",
-  "sadil@menloschool.org",
-  "fcruz-ochoa@menloschool.org",
-  "khanson@menloschool.org",
-  "nmerlesena@menloschool.org",
-  "mbennett-smith@menloschool.org",
-  "gdavis@menloschool.org",
-  "tmcneil@menloschool.org",
-  "jmitchell@menloschool.org",
-  "jbowen@menloschool.org",
-  "dcitrin-cummins@menloschool.org",
-  "chanson@menloschool.org",
-  "mnelson@menloschool.org",
-  "jschafer@menloschool.org",
-  "pbrown@menloschool.org",
-  "rakers@menloschool.org",
-  "jrabison@menloschool.org",
-  "sganpule@menloschool.org",
-  "rjoss@menloschool.org",
-  "nnamasivayam@menloschool.org",
-  "jarreaga@menloschool.org",
-  "djensen@menloschool.org",
-  "ychang@menloschool.org",
-  "cwalters@menloschool.org",
-  "dlowell@menloschool.org",
-  "rgarrett@menloschool.org",
-  "jloeffler@menloschool.org",
-  "dmillstein@menloschool.org",
-  "dkiang@menloschool.org",
-  "zblickensderfer@menloschool.org",
-  "corangio@menloschool.org",
-  "lhuntley@menloschool.org",
-  "mmckenna@menloschool.org",
-  "zeagleton@menloschool.org",
-  "emccauley@menloschool.org",
-  "narnberg@menloschool.org",
-  "zmoore@menloschool.org",
-  "mvarvir@menloschool.org",
-  "thardie@menloschool.org",
-  "cweaver@menloschool.org",
-  "tbuxton@menloschool.org",
-  "jdann@menloschool.org",
-  "jformato@menloschool.org",
-  "ljaimez@menloschool.org",
-  "jtennyson@menloschool.org",
-  "aguevara@menloschool.org",
-  "pamaral@menloschool.org",
-  "pfrias@menloschool.org",
-  "msajja@menloschool.org",
-  "cchung@menloschool.org",
-  "ryeh@menloschool.org",
-  "mchen@menloschool.org",
-  "jjordt@menloschool.org",
-  "mwolf@menloschool.org"
-];
+// Derived directly from TEACHER_DATABASE — no separate list to maintain
+const ALLOWED_TEACHER_EMAILS = Object.keys(TEACHER_DATABASE);
+
 
 async function handleUser(user) {
   if (!isMenloEmail(user.email)) {
@@ -788,20 +778,10 @@ async function handleUser(user) {
     return;
   }
 
-  // Check allowlist
-  if (!ALLOWED_TEACHER_EMAILS.includes(user.email.toLowerCase())) {
-    sb.auth.signOut();
-    window.location.replace('app.html?msg=no-teacher-access');
-    return;
-  }
-
   tUser = user;
 
-  // Derive email prefix (everything before @)
-  tEmailKey = user.email.split('@')[0].toLowerCase();
-
-  // Look up teacher
-  const found = TEACHER_DB[tEmailKey];
+  // Look up teacher by full email address
+  const found = TEACHER_DATABASE[user.email.toLowerCase()];
   if (!found) {
     document.getElementById('tUnknownEmail').textContent = user.email;
     showView('unknownView');
@@ -814,10 +794,10 @@ async function handleUser(user) {
   const classParam = new URLSearchParams(window.location.search).get('class');
   if (classParam) {
     history.replaceState({}, '', window.location.pathname); // clean URL
-    const match = tTeacher.classes.find(c => c.course === classParam);
-    if (match) {
-      await bootHome();        // sets up home state silently
-      openClassChat(match);    // jump straight into the class
+    if (tTeacher.classes.includes(classParam)) {
+      const classSubject = lookupSubjectForCourse(classParam);
+      await bootHome();
+      openClassChat({ course: classParam, subject: classSubject });
       return;
     }
   }
@@ -911,13 +891,22 @@ async function loadAllTeacherProfiles() {
   }
 }
 
+// Returns the subject (department) for a given course name by scanning MENLO_CURRICULUM
+function lookupSubjectForCourse(courseName) {
+  for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
+    if (courses[courseName]) return subject;
+  }
+  return 'General';
+}
+
 function renderClassCards() {
   const grid = document.getElementById('classCards');
   grid.innerHTML = '';
-  tTeacher.classes.forEach(({ course, subject }) => {
+  tTeacher.classes.forEach(course => {
+    const subject = lookupSubjectForCourse(course);
     const profile = tProfiles[course];
     const done    = profile?.done === true;
-    const hasData = profile && (profile.key_goals || profile.summary);
+    const hasData = profile && (profile.teaching_style || profile.key_values);
 
     const card = document.createElement('div');
     card.className = 't-card';
@@ -931,7 +920,7 @@ function renderClassCards() {
       statusClass = 'empty'; statusHtml = 'Not started';
     }
 
-    const previewText = profile?.summary || profile?.key_goals || '';
+    const previewText = profile?.teaching_style || profile?.key_values || '';
 
     card.innerHTML = `
       <div class="t-card-subject">${escHtml(subject)}</div>
