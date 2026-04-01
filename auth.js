@@ -36,8 +36,20 @@ async function signInWithGoogle() {
 
 // ─── SIGN OUT ─────────────────────────────────────────────────────────────────
 async function doSignOut() {
+  localStorage.removeItem('lumi_authed');
   await sb.auth.signOut();
   window.location.replace('index.html');
+}
+
+// ─── MODE SWITCHING ───────────────────────────────────────────────────────────
+// Mark session as active in localStorage so the destination page skips re-auth
+function goToTeacher() {
+  const base = window.location.href.replace(/\/[^/]*$/, '/');
+  window.location.href = base + 'teacher.html';
+}
+function goToStudent() {
+  const base = window.location.href.replace(/\/[^/]*$/, '/');
+  window.location.href = base + 'app.html';
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -64,13 +76,11 @@ async function requireGuest() {
 }
 
 // Call on app.html — returns user if valid, redirects if not.
-// If it's an OAuth redirect (hash token), waits for onAuthStateChange.
-// Otherwise checks session with a 4s timeout then redirects if nothing found.
 async function requireAuth() {
   const hasHashToken = window.location.hash.includes('access_token');
 
   if (hasHashToken) {
-    // Just came back from Google OAuth — wait for Supabase to exchange the token
+    // Just came back from Google OAuth — wait for token exchange
     return new Promise((resolve) => {
       const { data: { subscription } } = sb.auth.onAuthStateChange(async (event, session) => {
         subscription.unsubscribe();
@@ -81,6 +91,7 @@ async function requireAuth() {
           window.location.replace('index.html?error=domain');
           resolve(null); return;
         }
+        localStorage.setItem('lumi_authed', '1');
         resolve(user);
       });
       setTimeout(() => {
@@ -91,7 +102,27 @@ async function requireAuth() {
     });
   }
 
-  // No OAuth redirect — check for existing session with tight timeout
+  // Check Supabase's own localStorage cache first — no network call needed
+  // Supabase stores the session under sb-<project>-auth-token
+  const cachedKey = Object.keys(localStorage).find(k => k.includes('auth-token') && k.includes('supabase'));
+  if (cachedKey) {
+    try {
+      const cached = JSON.parse(localStorage.getItem(cachedKey));
+      const user = cached?.user || cached?.session?.user;
+      if (user && isMenloEmail(user.email)) {
+        // Still verify with a quick network call (but don't block UI on it)
+        getSessionSafe().then(({ data: { session } }) => {
+          if (!session?.user) {
+            localStorage.removeItem('lumi_authed');
+            window.location.replace('index.html');
+          }
+        }).catch(() => {});
+        return user;
+      }
+    } catch {}
+  }
+
+  // No cache — check session with tight timeout
   try {
     const { data: { session } } = await getSessionSafe();
     if (session?.user) {
@@ -101,11 +132,12 @@ async function requireAuth() {
         window.location.replace('index.html?error=domain');
         return null;
       }
+      localStorage.setItem('lumi_authed', '1');
       return user;
     }
   } catch { /* timeout */ }
 
-  // No session found — send to sign-in
+  // No session — send to sign-in
   window.location.replace('index.html');
   return null;
 }

@@ -427,6 +427,7 @@ body { overflow: auto; display: block; }
         <div class="t-hdr-avatar" id="hdrAvatar"></div>
         <span id="hdrName" style="font-size:13px"></span>
       </div>
+      <button class="t-hdr-signout" onclick="goToStudent()" style="border-color:var(--accent);color:var(--accent)">🎒 Student Mode</button>
       <button class="t-hdr-signout" onclick="doSignOut()">Sign out</button>
     </div>
   </div>
@@ -467,6 +468,7 @@ body { overflow: auto; display: block; }
         <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
         Back to Home
       </button>
+      <button class="t-back-btn" onclick="goToStudent()" style="border-color:rgba(123,105,245,.3);color:var(--accent);background:var(--accent-soft)">🎒 Student Mode</button>
       <div class="t-class-label">Current class</div>
       <div class="t-class-display">
         <div class="t-class-display-subject" id="sbSubject"></div>

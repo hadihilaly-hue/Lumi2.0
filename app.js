@@ -1017,6 +1017,10 @@ function initAdminFeatures() {
   const email = (currentUser.email || '').toLowerCase();
   if (email !== 'hadi.hilaly@menloschool.org') return;
 
+  // Show Teacher Mode button in sidebar
+  const modeBtn = document.getElementById('teacherModeBtn');
+  if (modeBtn) modeBtn.style.display = 'flex';
+
   const adminSection = document.getElementById('adminSection');
   if (!adminSection) return;
   adminSection.style.display = 'block';
