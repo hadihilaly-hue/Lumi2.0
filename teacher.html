@@ -715,7 +715,7 @@ const ALLOWED_TEACHER_EMAILS = [
   "hadi.hilaly@menloschool.org"
 ];
 
-function handleUser(user) {
+async function handleUser(user) {
   if (!isMenloEmail(user.email)) {
     sb.auth.signOut();
     window.location.replace('index.html?error=domain');
