@@ -358,11 +358,12 @@ async function loadCompletedProfiles() {
   try {
     const { data, error } = await sb
       .from('teacher_profiles')
-      .select('teacher_email, class_name, status');
+      .select('teacher_email, teacher_name, class_name, profile')
+      .eq('status', 'complete');
     if (error || !data) return;
     completedProfiles = new Set();
     data.forEach(row => {
-      if (row.status === 'complete') completedProfiles.add(`${row.teacher_email}|${row.class_name}`);
+      completedProfiles.add(`${row.teacher_email}|${row.class_name}`);
     });
   } catch (err) {
     console.warn('Could not load completed profiles:', err);
