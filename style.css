@@ -646,7 +646,35 @@ body.signin-page{
   text-transform:uppercase;letter-spacing:.6px;
   padding:8px 2px 0;border-top:1px solid var(--border);margin-top:4px;
 }
-.sched-subj-divider:first-child{border-top:none;margin-top:0;padding-top:0}
+.sched-subj-divider:first-child,.sched-subj-divider.first{border-top:none;margin-top:0;padding-top:0}
+
+/* electives section */
+.sched-electives-hd{
+  grid-column:1/-1;margin-top:16px;padding-top:14px;
+  border-top:2px solid var(--border);
+  font-size:11px;font-weight:700;color:var(--text-muted);
+  text-transform:uppercase;letter-spacing:.6px;
+}
+.sched-electives-toggle{
+  grid-column:1/-1;
+  padding:9px 13px;background:var(--surface-2);
+  border:1.5px solid var(--border);border-radius:10px;
+  font-size:13px;font-weight:500;color:var(--accent);
+  cursor:pointer;text-align:center;transition:all .15s;
+}
+.sched-electives-toggle:hover{background:var(--accent-soft);border-color:var(--accent)}
+.sched-electives-search-hint{
+  grid-column:1/-1;
+  font-size:11.5px;color:var(--text-muted);text-align:center;
+  padding:4px 0 2px;
+}
+.sched-electives-body{
+  grid-column:1/-1;
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+}
+@media(max-width:520px){
+  .sched-electives-body{grid-template-columns:repeat(2,1fr)}
+}
 
 /* teacher cards */
 .sched-teacher-prog{font-size:12px;color:var(--text-muted);font-weight:500}

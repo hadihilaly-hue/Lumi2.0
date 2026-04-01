@@ -1423,42 +1423,111 @@ function initScheduleSetup(onDone, prefill = []) {
   });
 
   // ── Step 2: Classes ───────────────────────────────────────────────────────
+  function makePill(course) {
+    const pill = document.createElement('div');
+    pill.className = 'sched-class-pill' + (selectedClasses.has(course) ? ' selected' : '');
+    pill.textContent = course;
+    pill.addEventListener('click', () => {
+      if (selectedClasses.has(course)) {
+        selectedClasses.delete(course);
+        delete teacherChoices[course];
+        pill.classList.remove('selected');
+      } else {
+        selectedClasses.add(course);
+        pill.classList.add('selected');
+      }
+      updateClassHint();
+    });
+    return pill;
+  }
+
+  function addSubjectSection(grid, subject, courses, isFirst) {
+    const div = document.createElement('div');
+    div.className = 'sched-subj-divider' + (isFirst ? ' first' : '');
+    div.textContent = subject;
+    grid.appendChild(div);
+    courses.forEach(course => grid.appendChild(makePill(course)));
+  }
+
   function buildClassGrid(filter) {
     const grid = $('ssClassGrid');
     grid.innerHTML = '';
     const q = (filter || '').toLowerCase().trim();
-    const curriculum = chosenGrade ? getCoursesForGrade(chosenGrade) : MENLO_CURRICULUM;
 
-    let first = true;
-    Object.entries(curriculum).forEach(([subject, courses]) => {
-      const matching = Object.keys(courses).filter(c =>
-        !q || c.toLowerCase().includes(q) || subject.toLowerCase().includes(q));
-      if (!matching.length) return;
-
-      const div = document.createElement('div');
-      div.className = 'sched-subj-divider' + (first ? ' first' : '');
-      div.textContent = subject;
-      grid.appendChild(div);
-      first = false;
-
-      matching.forEach(course => {
-        const pill = document.createElement('div');
-        pill.className = 'sched-class-pill' + (selectedClasses.has(course) ? ' selected' : '');
-        pill.textContent = course;
-        pill.addEventListener('click', () => {
-          if (selectedClasses.has(course)) {
-            selectedClasses.delete(course);
-            delete teacherChoices[course];
-            pill.classList.remove('selected');
-          } else {
-            selectedClasses.add(course);
-            pill.classList.add('selected');
-          }
-          updateClassHint();
-        });
-        grid.appendChild(pill);
+    // When searching, show everything across the full catalog
+    if (q) {
+      let first = true;
+      Object.entries(MENLO_CURRICULUM).forEach(([subject, courses]) => {
+        const matching = Object.keys(courses).filter(c =>
+          c.toLowerCase().includes(q) || subject.toLowerCase().includes(q));
+        if (!matching.length) return;
+        addSubjectSection(grid, subject, matching, first);
+        first = false;
       });
+      if (!grid.children.length) {
+        const empty = document.createElement('div');
+        empty.className = 'sched-subj-divider first';
+        empty.textContent = 'No classes found';
+        grid.appendChild(empty);
+      }
+      return;
+    }
+
+    // No search — show grade-filtered classes, then "All Electives" section
+    const gradeCurriculum = chosenGrade ? getCoursesForGrade(chosenGrade) : MENLO_CURRICULUM;
+    const gradeCoursesSet = new Set(
+      Object.values(gradeCurriculum).flatMap(c => Object.keys(c))
+    );
+
+    // Grade section
+    let first = true;
+    Object.entries(gradeCurriculum).forEach(([subject, courses]) => {
+      const list = Object.keys(courses);
+      if (!list.length) return;
+      addSubjectSection(grid, subject, list, first);
+      first = false;
     });
+
+    // Electives divider + all remaining courses not already shown
+    const electiveDivider = document.createElement('div');
+    electiveDivider.className = 'sched-subj-divider sched-electives-hd';
+    electiveDivider.textContent = 'All Electives';
+    grid.appendChild(electiveDivider);
+
+    const electivesToggle = document.createElement('div');
+    electivesToggle.className = 'sched-electives-toggle';
+    electivesToggle.textContent = 'Show all Menlo classes ▸';
+    let expanded = false;
+
+    const electivesBody = document.createElement('div');
+    electivesBody.className = 'sched-electives-body';
+    electivesBody.style.display = 'none';
+
+    // Build full catalog minus grade-filtered ones
+    Object.entries(MENLO_CURRICULUM).forEach(([subject, courses]) => {
+      const electives = Object.keys(courses).filter(c => !gradeCoursesSet.has(c));
+      if (!electives.length) return;
+      const hdr = document.createElement('div');
+      hdr.className = 'sched-subj-divider first';
+      hdr.textContent = subject;
+      electivesBody.appendChild(hdr);
+      electives.forEach(course => electivesBody.appendChild(makePill(course)));
+    });
+
+    // Also add a search hint inside electives
+    const searchHint = document.createElement('div');
+    searchHint.className = 'sched-electives-search-hint';
+    searchHint.textContent = '💡 Use the search bar above to find any class instantly';
+
+    electivesToggle.addEventListener('click', () => {
+      expanded = !expanded;
+      electivesBody.style.display = expanded ? '' : 'none';
+      electivesToggle.textContent = expanded ? 'Hide ▾' : 'Show all Menlo classes ▸';
+    });
+
+    grid.appendChild(electivesToggle);
+    grid.appendChild(searchHint);
+    grid.appendChild(electivesBody);
   }
 
   function updateClassHint() {
