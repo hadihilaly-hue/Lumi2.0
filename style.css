@@ -535,63 +535,167 @@ body.signin-page{
 .auth-loading-text{font-size:13px;color:var(--text-muted)}
 
 /* ─── SCHEDULE SETUP ─────────────────────────────────────── */
-.sched-setup{position:fixed;inset:0;z-index:2000;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:28px 16px 24px;overflow-y:auto;transition:opacity .4s ease;}
+.sched-setup{
+  position:fixed;inset:0;z-index:2000;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;
+  overflow-y:auto;transition:opacity .35s ease;
+}
 .sched-setup.hidden{opacity:0;pointer-events:none}
-.sched-logo{display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:20px;flex-shrink:0}
-.sched-logo-mark{width:44px;height:44px;background:var(--accent);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 0 22px var(--accent-glow);animation:lumiBreathe 3s ease-in-out infinite;}
-.sched-logo-name{font-size:18px;font-weight:600;letter-spacing:-.3px}
-.sched-logo-school{font-size:11px;color:var(--text-muted)}
-.sched-progress-wrap{width:100%;max-width:440px;margin-bottom:16px;flex-shrink:0}
-.sched-prog-track{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:6px}
-.sched-prog-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s ease}
-.sched-prog-label{font-size:11px;color:var(--text-muted);text-align:right}
-.sched-card{width:100%;max-width:440px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:24px;flex-shrink:0}
-.sched-step{display:none;flex-direction:column;gap:14px}
-.sched-step.active{display:flex}
-.sched-welcome{font-size:13px;color:var(--text-muted);line-height:1.65;background:var(--accent-soft);border:1px solid rgba(123,105,245,.15);border-radius:10px;padding:12px 14px;}
-.sched-prog-sub{font-size:11px;color:var(--text-muted)}
-.sched-q{font-size:15px;font-weight:600;color:var(--text);line-height:1.45}
-.sched-search-input{width:100%;background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:14px;padding:10px 13px;outline:none;transition:border-color .2s;}
+
+/* header bar */
+.sched-header{
+  width:100%;max-width:560px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 24px 0;flex-shrink:0;
+}
+.sched-logo-wrap{display:flex;align-items:center;gap:8px}
+.sched-logo-mark{
+  width:32px;height:32px;background:var(--accent);border-radius:10px;
+  display:flex;align-items:center;justify-content:center;font-size:15px;
+  box-shadow:0 0 16px var(--accent-glow);animation:lumiBreathe 3s ease-in-out infinite;
+}
+.sched-logo-name{font-size:16px;font-weight:600;letter-spacing:-.3px;color:var(--text)}
+
+/* step dots */
+.sched-dots{display:flex;gap:7px;align-items:center}
+.sched-dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--border);transition:all .3s ease;
+}
+.sched-dot.active{background:var(--accent);box-shadow:0 0 8px var(--accent-glow)}
+.sched-dot.done{background:var(--accent);opacity:.45}
+
+/* step containers */
+.sched-step{display:none;width:100%;max-width:560px;padding:0 24px 40px;animation:schedIn .25s ease}
+.sched-step.active{display:block}
+@keyframes schedIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.sched-step-inner{display:flex;flex-direction:column;gap:20px;padding-top:32px}
+
+/* headings */
+.sched-heading{font-size:22px;font-weight:600;color:var(--text);letter-spacing:-.3px;line-height:1.3}
+.sched-subheading{font-size:14px;color:var(--text-muted);margin-top:-12px}
+.sched-hint{font-size:12px;color:var(--text-muted);text-align:center}
+
+/* back button */
+.sched-back-btn{
+  align-self:flex-start;padding:6px 12px;background:transparent;
+  border:1px solid var(--border);border-radius:8px;
+  color:var(--text-muted);font-family:inherit;font-size:13px;
+  cursor:pointer;transition:all .15s;
+}
+.sched-back-btn:hover{border-color:var(--text-muted);color:var(--text)}
+
+/* grade 2x2 grid */
+.sched-grade-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;
+}
+.sched-grade-card{
+  background:var(--surface);border:1.5px solid var(--border);
+  border-radius:16px;padding:28px 16px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;transition:all .2s ease;user-select:none;
+}
+.sched-grade-card:hover{border-color:var(--accent);background:var(--accent-soft);transform:translateY(-2px)}
+.sched-grade-card.selected{
+  background:var(--accent);border-color:var(--accent);
+  box-shadow:0 4px 20px var(--accent-glow);transform:translateY(-2px);
+}
+.sched-grade-num{font-size:28px;font-weight:700;color:var(--text);line-height:1}
+.sched-grade-card.selected .sched-grade-num{color:#fff}
+.sched-grade-label{font-size:12px;color:var(--text-muted);font-weight:500}
+.sched-grade-card.selected .sched-grade-label{color:rgba(255,255,255,.75)}
+
+/* class search */
+.sched-search-input{
+  width:100%;background:var(--surface);border:1.5px solid var(--border);
+  border-radius:12px;color:var(--text);font-family:inherit;
+  font-size:14px;padding:11px 14px;outline:none;transition:border-color .2s;
+}
 .sched-search-input:focus{border-color:var(--accent)}
 .sched-search-input::placeholder{color:var(--text-faint)}
-.sched-class-list{max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);}
-.sched-class-list::-webkit-scrollbar{width:3px}
-.sched-class-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-.sched-subj-header{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;padding:8px 12px 4px;position:sticky;top:0;background:var(--surface-2);}
-.sched-class-item{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;cursor:pointer;transition:background .15s;border-bottom:1px solid var(--border);font-size:13px;color:var(--text);}
-.sched-class-item:last-child{border-bottom:none}
-.sched-class-item:hover{background:var(--accent-soft)}
-.sched-class-item.selected{background:var(--accent-soft);color:var(--accent)}
-.sched-class-check{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;transition:all .15s;}
-.sched-class-item.selected .sched-class-check{background:var(--accent);border-color:var(--accent);color:#fff}
-.sched-selection-hint{font-size:12px;color:var(--text-muted);text-align:center}
-.sched-teacher-list{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;}
-.sched-teacher-btn{display:flex;align-items:center;padding:11px 14px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;text-align:left;gap:8px;}
-.sched-teacher-btn:hover{border-color:var(--accent);color:var(--accent)}
-.sched-teacher-btn.selected{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
-.sched-grades{display:flex;gap:8px}
-.sched-grade-btn{flex:1;padding:12px 8px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:all .18s;min-height:44px;}
-.sched-grade-btn:hover{border-color:var(--accent);color:var(--accent)}
-.sched-grade-btn.selected{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
-.sched-confirm-list{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;}
-.sched-confirm-item{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;}
-.sched-confirm-course{font-weight:500;color:var(--text)}
-.sched-confirm-teacher{color:var(--text-muted);font-size:12px}
-.sched-step-nav{display:flex;gap:8px;align-items:center}
-.sched-back-btn{padding:11px 16px;background:transparent;border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-family:inherit;font-size:13px;cursor:pointer;transition:all .15s;white-space:nowrap;}
-.sched-back-btn:hover{border-color:var(--text-muted);color:var(--text)}
-.sched-cta{width:100%;padding:13px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;opacity:.4;min-height:44px;}
-.sched-cta:not([disabled]){opacity:1;box-shadow:0 2px 14px var(--accent-glow)}
-.sched-cta:not([disabled]):hover{opacity:.88}
-.sched-cta-sm{flex:1;padding:11px 16px;font-size:13px;min-height:44px;opacity:1;box-shadow:none;}
-.sched-cta-sm[disabled]{opacity:.4;box-shadow:none;cursor:default}
-.sched-cta-sm:not([disabled]):hover{opacity:.88;box-shadow:0 2px 10px var(--accent-glow)}
-@media(max-width:480px){
-  .sched-setup{padding:20px 12px 16px}
-  .sched-card{padding:18px 14px;border-radius:16px}
-  .sched-class-list{max-height:200px}
-  .sched-teacher-list{max-height:200px}
-  .sched-confirm-list{max-height:200px}
+
+/* class pill grid */
+.sched-class-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+  max-height:380px;overflow-y:auto;
+  padding-right:4px;
+}
+.sched-class-grid::-webkit-scrollbar{width:3px}
+.sched-class-grid::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.sched-class-pill{
+  background:var(--surface);border:1.5px solid var(--border);
+  border-radius:12px;padding:12px 10px;cursor:pointer;
+  font-size:12.5px;font-weight:500;color:var(--text);
+  text-align:center;line-height:1.35;
+  transition:all .18s ease;user-select:none;
+  display:flex;align-items:center;justify-content:center;min-height:52px;
+  position:relative;
+}
+.sched-class-pill:hover{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.sched-class-pill.selected{
+  background:var(--accent);border-color:var(--accent);
+  color:#fff;box-shadow:0 2px 12px var(--accent-glow);
+}
+.sched-class-pill.selected::after{
+  content:'✓';position:absolute;top:4px;right:6px;
+  font-size:10px;opacity:.75;
+}
+.sched-subj-divider{
+  grid-column:1/-1;
+  font-size:10px;font-weight:600;color:var(--text-muted);
+  text-transform:uppercase;letter-spacing:.6px;
+  padding:8px 2px 0;border-top:1px solid var(--border);margin-top:4px;
+}
+.sched-subj-divider:first-child{border-top:none;margin-top:0;padding-top:0}
+
+/* teacher cards */
+.sched-teacher-prog{font-size:12px;color:var(--text-muted);font-weight:500}
+.sched-teacher-grid{display:flex;flex-wrap:wrap;gap:10px}
+.sched-teacher-card{
+  flex:1;min-width:120px;max-width:180px;
+  background:var(--surface);border:1.5px solid var(--border);
+  border-radius:14px;padding:18px 14px;cursor:pointer;
+  font-size:13.5px;font-weight:500;color:var(--text);
+  text-align:center;line-height:1.4;
+  transition:all .2s ease;user-select:none;
+}
+.sched-teacher-card:hover{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);transform:translateY(-2px)}
+.sched-teacher-card.selected{
+  background:var(--accent);border-color:var(--accent);
+  color:#fff;box-shadow:0 4px 16px var(--accent-glow);transform:translateY(-2px);
+}
+
+/* confirm list */
+.sched-confirm-list{display:flex;flex-direction:column;gap:8px}
+.sched-confirm-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:13px 16px;background:var(--surface);
+  border:1px solid var(--border);border-radius:12px;
+  gap:12px;
+}
+.sched-confirm-course{font-size:14px;font-weight:500;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sched-confirm-teacher{font-size:13px;color:var(--text-muted);flex-shrink:0}
+
+/* CTA */
+.sched-cta{
+  width:100%;padding:14px;background:var(--accent);color:#fff;
+  border:none;border-radius:12px;font-family:inherit;
+  font-size:15px;font-weight:600;cursor:pointer;
+  transition:all .2s;min-height:48px;
+  box-shadow:0 2px 16px var(--accent-glow);
+}
+.sched-cta:hover{opacity:.9;transform:translateY(-1px)}
+.sched-cta[disabled]{opacity:.35;box-shadow:none;cursor:default;transform:none}
+
+@media(max-width:520px){
+  .sched-header{padding:16px 16px 0}
+  .sched-step{padding:0 16px 32px}
+  .sched-step-inner{padding-top:24px;gap:16px}
+  .sched-heading{font-size:19px}
+  .sched-grade-card{padding:22px 12px}
+  .sched-grade-num{font-size:24px}
+  .sched-class-grid{grid-template-columns:repeat(2,1fr);max-height:320px}
+  .sched-teacher-card{min-width:100px}
 }
 
 /* ─── SEMESTER BANNER ────────────────────────────────────── */

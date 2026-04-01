@@ -1303,160 +1303,241 @@ function showWelcome() {
 }
 
 // ─── SCHEDULE SETUP ──────────────────────────────────────────────────────────
+// Grade-filtered course lists. Courses not listed show to all grades.
+const GRADE_COURSES = {
+  '9': [
+    'English 1','Modern World History','Living Systems: Biology in Balance',
+    'Integrated Geometry & Algebra','Analytic Geometry & Algebra','Analytic Geometry & Algebra (H)',
+    'Algebra 2','Algebra 2 with Trig','Algebra 2 with Trig (H)',
+    'CS1: Intro to Computer Science','Principles of Game Design',
+    'Spanish 1','Spanish 2','French 1','French 2','Mandarin 1','Mandarin 2','Latin 1','Latin 2',
+    'Mechanical & Electrical Engineering','Design',
+  ],
+  '10': [
+    'English 2','US History','US History (H)','Chemistry','Chemistry (H)','Conceptual Physics','Physics 1',
+    'Algebra 2','Algebra 2 with Trig','Algebra 2 with Trig (H)',
+    'Precalculus','Introductory Calculus','Introductory Calculus (H)',
+    'CS1: Intro to Computer Science','CS2: Data Structures & Algorithms (H)','Principles of Game Design',
+    'Spanish 1','Spanish 2','Heritage Spanish 3','French 1','French 2','French 3',
+    'Mandarin 1','Mandarin 2','Mandarin 3','Latin 1','Latin 2','Latin 3',
+    'Mechanical & Electrical Engineering','Design',
+  ],
+  '11': [
+    'Junior English Seminar','US History','US History (H)',
+    'Chemistry (H)','Physics 1','Physics 2 (H)','Molecular Mechanisms in Biology',
+    'Precalculus','Introductory Calculus','Introductory Calculus (H)',
+    'Calculus','Advanced Calculus I (H)','Probability & Statistics (H)',
+    'CS1: Intro to Computer Science','CS2: Data Structures & Algorithms (H)','Advanced Topics in CS (H)','Principles of Game Design',
+    'Government & Politics (H)','Modern Europe (H)','Philosophy I','Psychology I','Economic Theory',
+    'Spanish 2','Heritage Spanish 3','Heritage Spanish 4','Advanced Spanish (H)',
+    'French 2','French 3','French 4','Advanced French (H)',
+    'Mandarin 2','Mandarin 3','Mandarin 4','Advanced Mandarin (H)',
+    'Latin 2','Latin 3','Latin 4','Advanced Latin (H)',
+    'Mechanical & Electrical Engineering','Applied Science Research (H)','Sustainable Engineering',
+  ],
+  '12': [
+    'Cafe Society','Contemporary World Literature','Creative Nonfiction Workshop (H)',
+    'Dystopian Fiction & Film','East Asian Pop Culture','Fairy Tales','Global Mythologies',
+    'Humanities I: Renaissances','Humanities II: Self-Portraits','Literature & Science',
+    'Literature in the Age of AI','Literature of the American Wilderness (H)','Lyric & Lifeline',
+    'Media & Cultural Studies (H)','Medicine & Narrative','Modernist Poetry Workshop (H)',
+    'Novella Workshop (H)','On Being','Science Fiction & the Classics (H)',
+    'Shakespeare Now (H)','5 Months, 4 Books','Argumentation & Communication (H)',
+    'Government & Politics (H)','Modern Europe (H)','Philosophy I','Philosophy II',
+    'Psychology I','Psychology II','Economic Theory','American Economic History',
+    'Environmental & Development Economics','History of US Foreign Relations',
+    'Ethnic Studies I','Ethnic Studies II','Gender Studies','Global Issues for Global Citizens',
+    'In Gods We Trust','Comparative Legal Systems','Current Affairs & Civil Discourse',
+    'Pursuit of Happiness','Sultans, Shahs, and Sovereigns','IP Capstone Seminar (H)',
+    'Advanced Calculus I (H)','Advanced Calculus II (H)','Advanced Topics in Math (H)',
+    'Probability & Statistics (H)','Advanced Topics in Statistics (H)',
+    'Applied Statistics & Epidemiology','Intro to Applied Math & Data Science',
+    'CS2: Data Structures & Algorithms (H)','Advanced Topics in CS (H)','Principles of Game Design',
+    'Advanced Biology (H)','Advanced Chemistry (H)','Advanced Physics (H)',
+    'Environmental Science','Anatomy & Physiology','Neuroscience','BioTech Research (H)',
+    'Molecular Mechanisms in Biology','Physics 2 (H)',
+    'Heritage Spanish 3','Heritage Spanish 4','Advanced Spanish (H)',
+    'French 3','French 4','Advanced French (H)',
+    'Mandarin 3','Mandarin 4','Mandarin 5','Advanced Mandarin (H)',
+    'Latin 3','Latin 4','Advanced Latin (H)',
+    'Applied Science Research (H)','Sustainable Engineering',
+  ],
+};
+
+function getCoursesForGrade(grade) {
+  const allowed = GRADE_COURSES[grade];
+  if (!allowed) return MENLO_CURRICULUM; // show all if grade unknown
+  const filtered = {};
+  Object.entries(MENLO_CURRICULUM).forEach(([subject, courses]) => {
+    const matching = {};
+    Object.entries(courses).forEach(([course, teachers]) => {
+      if (allowed.includes(course)) matching[course] = teachers;
+    });
+    if (Object.keys(matching).length) filtered[subject] = matching;
+  });
+  return filtered;
+}
+
 function initScheduleSetup(onDone, prefill = []) {
   const el = $('schedSetup');
   el.classList.remove('hidden');
   el.style.display = '';
 
   // State
+  let chosenGrade       = localStorage.getItem('lumi_grade') || null;
   const selectedClasses = new Set(prefill.map(p => p.course));
   const teacherChoices  = {};
   prefill.forEach(p => { teacherChoices[p.course] = p.teacher; });
-  let teacherStepIdx = 0;
-  let chosenGrade    = localStorage.getItem('lumi_grade') || null;
+  let teacherIdx = 0;
 
-  const steps = [$('ssStep1'), $('ssStep2'), $('ssStep3'), $('ssStep4')];
+  // Steps: 0=grade, 1=classes, 2=teachers, 3=confirm
+  const stepEls = [$('ssStep1'), $('ssStep2'), $('ssStep3'), $('ssStep4')];
 
   function setStep(n) {
-    steps.forEach((s, i) => s.classList.toggle('active', i === n));
-    $('schedProgFill').style.width = Math.round((n / 4) * 100) + '%';
-    $('schedProgLabel').textContent = `Step ${n + 1} of 4`;
+    stepEls.forEach((s, i) => s.classList.toggle('active', i === n));
+    document.querySelectorAll('.sched-dot').forEach((d, i) => {
+      d.classList.toggle('active', i === n);
+      d.classList.toggle('done', i < n);
+    });
     el.scrollTop = 0;
   }
 
-  // ── Step 1: class picker ──────────────────────────────────────────────────
-  function buildClassList(filter) {
-    const list = $('ssClassList');
-    list.innerHTML = '';
+  // ── Step 1: Grade ─────────────────────────────────────────────────────────
+  if (chosenGrade) {
+    const card = el.querySelector(`.sched-grade-card[data-grade="${chosenGrade}"]`);
+    if (card) card.classList.add('selected');
+  }
+
+  el.querySelectorAll('.sched-grade-card').forEach(card => {
+    card.addEventListener('click', () => {
+      el.querySelectorAll('.sched-grade-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      chosenGrade = card.dataset.grade;
+      // Remove any previously selected classes that aren't in new grade
+      const allowed = getCoursesForGrade(chosenGrade);
+      const allAllowed = Object.values(allowed).flatMap(c => Object.keys(c));
+      [...selectedClasses].forEach(c => { if (!allAllowed.includes(c)) { selectedClasses.delete(c); delete teacherChoices[c]; } });
+      // Auto-advance after brief highlight
+      setTimeout(() => { buildClassGrid(''); setStep(1); }, 180);
+    });
+  });
+
+  // ── Step 2: Classes ───────────────────────────────────────────────────────
+  function buildClassGrid(filter) {
+    const grid = $('ssClassGrid');
+    grid.innerHTML = '';
     const q = (filter || '').toLowerCase().trim();
-    Object.entries(MENLO_CURRICULUM).forEach(([subject, courses]) => {
+    const curriculum = chosenGrade ? getCoursesForGrade(chosenGrade) : MENLO_CURRICULUM;
+
+    let first = true;
+    Object.entries(curriculum).forEach(([subject, courses]) => {
       const matching = Object.keys(courses).filter(c =>
         !q || c.toLowerCase().includes(q) || subject.toLowerCase().includes(q));
       if (!matching.length) return;
-      const hdr = document.createElement('div');
-      hdr.className = 'sched-subj-header';
-      hdr.textContent = subject;
-      list.appendChild(hdr);
+
+      const div = document.createElement('div');
+      div.className = 'sched-subj-divider' + (first ? ' first' : '');
+      div.textContent = subject;
+      grid.appendChild(div);
+      first = false;
+
       matching.forEach(course => {
-        const sel = selectedClasses.has(course);
-        const item = document.createElement('div');
-        item.className = 'sched-class-item' + (sel ? ' selected' : '');
-        const check = document.createElement('div');
-        check.className = 'sched-class-check';
-        check.textContent = sel ? '✓' : '';
-        const label = document.createElement('span');
-        label.textContent = course;
-        item.appendChild(label);
-        item.appendChild(check);
-        item.addEventListener('click', () => {
+        const pill = document.createElement('div');
+        pill.className = 'sched-class-pill' + (selectedClasses.has(course) ? ' selected' : '');
+        pill.textContent = course;
+        pill.addEventListener('click', () => {
           if (selectedClasses.has(course)) {
             selectedClasses.delete(course);
             delete teacherChoices[course];
+            pill.classList.remove('selected');
           } else {
             selectedClasses.add(course);
+            pill.classList.add('selected');
           }
-          buildClassList($('ssClassSearch').value);
-          updateStep1Btn();
+          updateClassHint();
         });
-        list.appendChild(item);
+        grid.appendChild(pill);
       });
     });
   }
 
-  function updateStep1Btn() {
+  function updateClassHint() {
     const n = selectedClasses.size;
-    $('ssStep1Next').disabled = n === 0;
     $('ssSelectionHint').textContent = n === 0
-      ? 'Select all your classes to continue'
-      : `${n} class${n !== 1 ? 'es' : ''} selected — tap Continue when done`;
+      ? 'Tap your classes to select them'
+      : `${n} class${n !== 1 ? 'es' : ''} selected`;
+    $('ssStep2Next').disabled = n === 0;
   }
 
-  buildClassList('');
-  updateStep1Btn();
+  buildClassGrid('');
+  updateClassHint();
 
-  $('ssClassSearch').addEventListener('input', function() { buildClassList(this.value); });
+  $('ssClassSearch').addEventListener('input', function() { buildClassGrid(this.value); });
 
-  $('ssStep1Next').addEventListener('click', () => {
-    teacherStepIdx = 0;
+  $('ssStep2Back').addEventListener('click', () => setStep(0));
+
+  $('ssStep2Next').addEventListener('click', () => {
+    teacherIdx = 0;
     showTeacherStep();
-    setStep(1);
+    setStep(2);
   });
 
-  // ── Step 2: teacher picker ────────────────────────────────────────────────
+  // ── Step 3: Teachers ──────────────────────────────────────────────────────
   function getSelectedArray() { return [...selectedClasses]; }
 
   function showTeacherStep() {
     const arr = getSelectedArray();
-    if (teacherStepIdx >= arr.length) {
-      // All teachers chosen — go to grade
-      setStep(2);
-      if (chosenGrade) {
-        document.querySelectorAll('.sched-grade-btn').forEach(b =>
-          b.classList.toggle('selected', b.dataset.grade === chosenGrade));
-        $('ssStep3Next').disabled = false;
-      }
+    if (teacherIdx >= arr.length) {
+      buildConfirmList();
+      setStep(3);
       return;
     }
-    const course = arr[teacherStepIdx];
-    $('ssTeacherClassName').textContent = course;
-    $('ssTeacherProgress').textContent  = `Class ${teacherStepIdx + 1} of ${arr.length}`;
-    const teacherList = $('ssTeacherList');
-    teacherList.innerHTML = '';
+    const course = arr[teacherIdx];
+    $('ssTeacherProg').textContent   = `${course} — ${teacherIdx + 1} of ${arr.length} classes`;
+    $('ssTeacherCourseName').textContent = '';
+
     let teachers = [];
     for (const [, courses] of Object.entries(MENLO_CURRICULUM)) {
       if (courses[course]) { teachers = courses[course]; break; }
     }
+
+    // If only one teacher, skip and auto-advance
+    if (teachers.length === 1) {
+      teacherChoices[course] = teachers[0];
+      teacherIdx++;
+      showTeacherStep();
+      return;
+    }
+
+    const grid = $('ssTeacherGrid');
+    grid.innerHTML = '';
     teachers.forEach(t => {
-      const btn = document.createElement('button');
-      btn.className = 'sched-teacher-btn' + (teacherChoices[course] === t ? ' selected' : '');
-      btn.textContent = t;
-      btn.addEventListener('click', () => {
-        teacherList.querySelectorAll('.sched-teacher-btn').forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
+      const card = document.createElement('div');
+      card.className = 'sched-teacher-card' + (teacherChoices[course] === t ? ' selected' : '');
+      card.textContent = t.split(' ').slice(-1)[0]; // last name only for compact display
+      card.title = t;
+      card.addEventListener('click', () => {
+        grid.querySelectorAll('.sched-teacher-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
         teacherChoices[course] = t;
-        $('ssStep2Next').disabled = false;
+        setTimeout(() => { teacherIdx++; showTeacherStep(); }, 200);
       });
-      teacherList.appendChild(btn);
+      grid.appendChild(card);
     });
-    $('ssStep2Next').disabled = !teacherChoices[course];
   }
 
-  $('ssStep2Next').addEventListener('click', () => {
-    teacherStepIdx++;
-    showTeacherStep();
-  });
-
-  $('ssStep2Back').addEventListener('click', () => {
-    if (teacherStepIdx === 0) {
-      setStep(0);
+  $('ssStep3Back').addEventListener('click', () => {
+    if (teacherIdx === 0) {
+      buildClassGrid($('ssClassSearch').value);
+      updateClassHint();
+      setStep(1);
     } else {
-      teacherStepIdx--;
+      teacherIdx--;
       showTeacherStep();
     }
   });
 
-  // ── Step 3: grade ─────────────────────────────────────────────────────────
-  document.querySelectorAll('.sched-grade-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.sched-grade-btn').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      chosenGrade = btn.dataset.grade;
-      $('ssStep3Next').disabled = false;
-    });
-  });
-
-  $('ssStep3Next').addEventListener('click', () => {
-    buildConfirmList();
-    setStep(3);
-  });
-
-  $('ssStep3Back').addEventListener('click', () => {
-    teacherStepIdx = Math.max(0, getSelectedArray().length - 1);
-    showTeacherStep();
-    setStep(1);
-  });
-
-  // ── Step 4: confirmation ──────────────────────────────────────────────────
+  // ── Step 4: Confirm ───────────────────────────────────────────────────────
   function buildConfirmList() {
     const list = $('ssConfirmList');
     list.innerHTML = '';
@@ -1464,22 +1545,22 @@ function initScheduleSetup(onDone, prefill = []) {
       const teacher = teacherChoices[course] || '—';
       const item = document.createElement('div');
       item.className = 'sched-confirm-item';
-      const courseEl = document.createElement('span');
-      courseEl.className = 'sched-confirm-course';
-      courseEl.textContent = course;
-      const teacherEl = document.createElement('span');
-      teacherEl.className = 'sched-confirm-teacher';
-      teacherEl.textContent = teacher;
-      item.appendChild(courseEl);
-      item.appendChild(teacherEl);
+      const c = document.createElement('span');
+      c.className = 'sched-confirm-course';
+      c.textContent = course;
+      const t = document.createElement('span');
+      t.className = 'sched-confirm-teacher';
+      t.textContent = teacher.split(' ').slice(-1)[0]; // last name
+      item.appendChild(c);
+      item.appendChild(t);
       list.appendChild(item);
     });
   }
 
-  $('ssStep4Edit').addEventListener('click', () => {
-    buildClassList($('ssClassSearch').value);
-    updateStep1Btn();
-    setStep(0);
+  $('ssStep4Back').addEventListener('click', () => {
+    teacherIdx = Math.max(0, getSelectedArray().length - 1);
+    showTeacherStep();
+    setStep(2);
   });
 
   $('ssStep4Done').addEventListener('click', () => {
@@ -1492,7 +1573,7 @@ function initScheduleSetup(onDone, prefill = []) {
     if (chosenGrade) localStorage.setItem('lumi_grade', chosenGrade);
     syncScheduleToSupabase(schedule);
     el.classList.add('hidden');
-    setTimeout(() => { el.style.display = 'none'; onDone(); }, 400);
+    setTimeout(() => { el.style.display = 'none'; onDone(); }, 350);
   });
 
   setStep(0);
