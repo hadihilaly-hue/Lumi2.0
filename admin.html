@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumi — Admin Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+body { overflow: auto; display: block; }
+
+#authLoading {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 999; flex-direction: column; gap: 14px;
+}
+.auth-spinner {
+  width: 36px; height: 36px; border: 3px solid var(--border);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── HEADER ───────────────────────────────────────────────────────────────── */
+#adminHeader {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 16px 32px; display: flex; align-items: center;
+  justify-content: space-between; position: sticky; top: 0; z-index: 40;
+}
+.a-hdr-left { display: flex; align-items: center; gap: 12px; }
+.a-hdr-mark {
+  width: 32px; height: 32px; background: var(--accent); border-radius: 9px;
+  display: flex; align-items: center; justify-content: center; font-size: 14px;
+  box-shadow: 0 0 14px var(--accent-glow);
+}
+.a-hdr-title { font-size: 15px; font-weight: 600; }
+.a-hdr-sub   { font-size: 11px; color: var(--text-muted); }
+.a-hdr-right { display: flex; align-items: center; gap: 12px; }
+.a-signout {
+  background: none; border: 1px solid var(--border); border-radius: 7px;
+  padding: 6px 12px; color: var(--text-muted); font-family: inherit;
+  font-size: 12px; cursor: pointer; transition: all .15s;
+}
+.a-signout:hover { border-color: #ff6b6b; color: #ff6b6b; }
+.a-refresh-info { font-size: 11px; color: var(--text-faint); }
+
+/* ─── BODY ─────────────────────────────────────────────────────────────────── */
+#adminBody { max-width: 960px; margin: 0 auto; padding: 32px 24px 80px; }
+
+/* ─── STATS BAR ────────────────────────────────────────────────────────────── */
+.a-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px;
+}
+.a-stat {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px 18px;
+}
+.a-stat-num  { font-size: 26px; font-weight: 700; letter-spacing: -.5px; line-height: 1; margin-bottom: 4px; }
+.a-stat-label{ font-size: 11px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
+.a-stat-num.green  { color: #34d399; }
+.a-stat-num.yellow { color: #fbbf24; }
+.a-stat-num.red    { color: #ef4444; }
+
+/* ─── SEARCH ───────────────────────────────────────────────────────────────── */
+.a-search-row { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+.a-search {
+  flex: 1; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 14px; color: var(--text);
+  font-family: inherit; font-size: 14px; outline: none; transition: border-color .15s;
+}
+.a-search:focus { border-color: var(--accent); }
+.a-section-label {
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .8px; margin-bottom: 12px;
+}
+
+/* ─── TEACHER ROWS ─────────────────────────────────────────────────────────── */
+.a-teacher-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; margin-bottom: 10px; overflow: hidden; transition: border-color .15s;
+}
+.a-teacher-card:hover { border-color: rgba(123,105,245,.3); }
+.a-teacher-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; cursor: pointer; user-select: none; gap: 12px;
+}
+.a-teacher-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.a-teacher-avatar {
+  width: 34px; height: 34px; border-radius: 50%; background: var(--accent-soft);
+  border: 1px solid rgba(123,105,245,.25); display: flex; align-items: center;
+  justify-content: center; font-size: 13px; font-weight: 600; color: var(--accent);
+  flex-shrink: 0;
+}
+.a-teacher-name  { font-size: 14px; font-weight: 600; }
+.a-teacher-email { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.a-teacher-header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.a-mini-dots { display: flex; gap: 5px; align-items: center; }
+.a-chevron { font-size: 12px; color: var(--text-faint); transition: transform .2s; }
+.a-chevron.open { transform: rotate(180deg); }
+
+.a-teacher-classes {
+  display: none; border-top: 1px solid var(--border);
+  padding: 6px 0 10px;
+}
+.a-teacher-classes.open { display: block; }
+.a-class-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 18px; gap: 12px;
+}
+.a-class-row:hover { background: var(--surface-2); }
+.a-class-name { font-size: 13px; color: var(--text); min-width: 0; flex: 1; }
+.a-class-subject { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+.a-class-status { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.a-status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+}
+.a-status-dot.not_started { background: #ef4444; box-shadow: 0 0 4px rgba(239,68,68,.5); }
+.a-status-dot.in_progress { background: #fbbf24; box-shadow: 0 0 4px rgba(251,191,36,.5); }
+.a-status-dot.complete    { background: #34d399; box-shadow: 0 0 4px rgba(52,211,153,.5); }
+.a-status-label { font-size: 11.5px; font-weight: 500; }
+.a-status-label.not_started { color: #ef4444; }
+.a-status-label.in_progress { color: #fbbf24; }
+.a-status-label.complete    { color: #34d399; }
+.a-class-updated { font-size: 10.5px; color: var(--text-faint); flex-shrink: 0; }
+
+/* ─── EMPTY ────────────────────────────────────────────────────────────────── */
+.a-empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 14px; }
+
+@media (max-width: 600px) {
+  .a-stats { grid-template-columns: repeat(2, 1fr); }
+  #adminHeader { padding: 14px 16px; }
+  #adminBody { padding: 20px 14px 60px; }
+}
+</style>
+</head>
+<body>
+
+<div id="authLoading">
+  <div class="auth-spinner"></div>
+  <div style="font-size:13px;color:var(--text-muted);margin-top:8px">Loading…</div>
+</div>
+
+<div id="adminApp" style="display:none">
+  <!-- HEADER -->
+  <div id="adminHeader">
+    <div class="a-hdr-left">
+      <div class="a-hdr-mark">✦</div>
+      <div>
+        <div class="a-hdr-title">Lumi <span style="color:var(--text-muted);font-weight:400">·</span> Admin Dashboard</div>
+        <div class="a-hdr-sub">Menlo School · Teacher Profile Status</div>
+      </div>
+    </div>
+    <div class="a-hdr-right">
+      <span class="a-refresh-info" id="refreshInfo">Auto-refreshes every 60s</span>
+      <a href="teacher.html" style="font-size:12px;font-weight:500;color:var(--accent);text-decoration:none;padding:6px 12px;border:1px solid rgba(123,105,245,.3);border-radius:7px;background:var(--accent-soft)">🍎 Teacher Portal</a>
+      <button class="a-signout" onclick="doSignOut()">Sign out</button>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div id="adminBody">
+    <!-- STATS -->
+    <div class="a-stats">
+      <div class="a-stat">
+        <div class="a-stat-num" id="statTotal">—</div>
+        <div class="a-stat-label">Total Classes</div>
+      </div>
+      <div class="a-stat">
+        <div class="a-stat-num green" id="statComplete">—</div>
+        <div class="a-stat-label">Complete</div>
+      </div>
+      <div class="a-stat">
+        <div class="a-stat-num yellow" id="statInProgress">—</div>
+        <div class="a-stat-label">In Progress</div>
+      </div>
+      <div class="a-stat">
+        <div class="a-stat-num red" id="statNotStarted">—</div>
+        <div class="a-stat-label">Not Started</div>
+      </div>
+    </div>
+
+    <!-- SEARCH -->
+    <div class="a-search-row">
+      <input class="a-search" id="teacherSearch" type="text" placeholder="Search teachers…" oninput="renderDashboard()">
+    </div>
+    <div class="a-section-label" id="teacherCount">All teachers</div>
+
+    <!-- TEACHER LIST -->
+    <div id="teacherList"></div>
+  </div>
+</div>
+
+<script src="supabase.js"></script>
+<script src="auth.js"></script>
+<script>
+const ADMIN_EMAIL = 'hadi.hilaly@menloschool.org';
+
+// ─── CURRICULUM (same as teacher.html) ───────────────────────────────────────
+const MENLO_CURRICULUM = {
+  "English": {
+    "English 1": ["Rachel Blumenthal","Whitney Newton","Margaret Ramsey","Andrew Warren"],
+    "English 2": ["Jay Bush","Lily Chan","Rebecca Gertmenian","Meghann Schroers-Martin"],
+    "Junior English Seminar": ["Tom Garvey","Oscar King","Maura Sincoff","Lily Chan","Cara Plamondon"],
+    "Cafe Society": ["Bridgett Longust"],
+    "Contemporary World Literature": ["Lily Chan"],
+    "Creative Nonfiction Workshop (H)": ["Whitney Newton"],
+    "Dystopian Fiction & Film": ["Cara Plamondon"],
+    "East Asian Pop Culture": ["Oscar King"],
+    "Fairy Tales": ["Oscar King"],
+    "Global Mythologies": ["Jay Bush"],
+    "Humanities I: Renaissances": ["Rebecca Gertmenian"],
+    "Humanities II: Self-Portraits": ["Rebecca Gertmenian"],
+    "Literature & Science": ["Andrew Warren"],
+    "Literature in the Age of AI": ["Rachel Blumenthal"],
+    "Literature of the American Wilderness (H)": ["Whitney Newton"],
+    "Lyric & Lifeline": ["Margaret Ramsey"],
+    "Media & Cultural Studies (H)": ["Oscar King"],
+    "Medicine & Narrative": ["Rachel Blumenthal"],
+    "Modernist Poetry Workshop (H)": ["Jay Bush"],
+    "Novella Workshop (H)": ["Oscar King"],
+    "On Being": ["Margaret Ramsey"],
+    "Science Fiction & the Classics (H)": ["Tom Garvey"],
+    "Shakespeare Now (H)": ["Andrew Warren"],
+    "5 Months, 4 Books": ["Cara Plamondon"],
+    "Argumentation & Communication (H)": ["Maura Sincoff"]
+  },
+  "History & Social Sciences": {
+    "Modern World History": ["Sabahat Adil","Franco Cruz-Ochoa","Katharine Hanson","Nicholas Merlesena"],
+    "US History": ["Miles Bennett-Smith","Glenn Davis","Trevor McNeil","Nicholas Merlesena","Joseph Mitchell"],
+    "US History (H)": ["Glenn Davis","Trevor McNeil","Nicholas Merlesena","Joseph Mitchell"],
+    "Government & Politics (H)": ["Miles Bennett-Smith","Joseph Mitchell","Matthew Nelson"],
+    "Modern Europe (H)": ["Katharine Hanson"],
+    "Philosophy I": ["Jack Bowen"],
+    "Philosophy II": ["Jack Bowen"],
+    "Psychology I": ["Dylan Citrin Cummins","Joseph Mitchell"],
+    "Psychology II": ["Dylan Citrin Cummins","Joseph Mitchell"],
+    "Economic Theory": ["Charles Hanson"],
+    "American Economic History": ["Charles Hanson"],
+    "Environmental & Development Economics": ["Charles Hanson"],
+    "History of US Foreign Relations": ["Charles Hanson"],
+    "Ethnic Studies I": ["Glenn Davis"],
+    "Ethnic Studies II": ["Glenn Davis"],
+    "Gender Studies": ["Matthew Nelson"],
+    "Global Issues for Global Citizens": ["Matthew Nelson"],
+    "In Gods We Trust": ["Matthew Nelson"],
+    "Comparative Legal Systems": ["Trevor McNeil"],
+    "Current Affairs & Civil Discourse": ["John Schafer"],
+    "Pursuit of Happiness": ["Peter Brown"],
+    "Sultans, Shahs, and Sovereigns": ["Sabahat Adil"],
+    "Humanities I: Renaissances": ["Rebecca Gertmenian"],
+    "Humanities II: Self-Portraits": ["Rebecca Gertmenian"],
+    "IP Capstone Seminar (H)": ["Peter Brown","Matthew Nelson"]
+  },
+  "Math": {
+    "Integrated Geometry & Algebra": ["Christine Walters"],
+    "Analytic Geometry & Algebra": ["Rebecca Akers","Joe Rabison"],
+    "Analytic Geometry & Algebra (H)": ["Sujata Ganpule"],
+    "Algebra 2": ["Randall Joss","Nandhini Namasivayam"],
+    "Algebra 2 with Trig": ["Rebecca Akers","Jacqueline Arreaga","Richard Harris"],
+    "Algebra 2 with Trig (H)": ["Danielle Jensen"],
+    "Precalculus": ["Yu-Loung Chang","Christine Walters"],
+    "Introductory Calculus": ["Jacqueline Arreaga","Dave Lowell"],
+    "Introductory Calculus (H)": ["Reeve Garrett"],
+    "Calculus": ["Jude Loeffler"],
+    "Advanced Calculus I (H)": ["Sujata Ganpule","Dave Lowell"],
+    "Advanced Calculus II (H)": ["Yu-Loung Chang","Reeve Garrett"],
+    "Advanced Topics in Math (H)": ["Reeve Garrett"],
+    "Probability & Statistics (H)": ["Dennis Millstein"],
+    "Advanced Topics in Statistics (H)": ["Dennis Millstein"],
+    "Applied Statistics & Epidemiology": ["Dennis Millstein"],
+    "Intro to Applied Math & Data Science": ["Jude Loeffler"]
+  },
+  "Computer Science": {
+    "CS1: Intro to Computer Science": ["Douglas Kiang","Nandhini Namasivayam"],
+    "CS2: Data Structures & Algorithms (H)": ["Nandhini Namasivayam"],
+    "Advanced Topics in CS (H)": ["Zachary Blickensderfer"],
+    "Principles of Game Design": ["Douglas Kiang"]
+  },
+  "Science": {
+    "Living Systems: Biology in Balance": ["Chrissy Orangio"],
+    "Chemistry": ["Laura Huntley","Mary McKenna"],
+    "Chemistry (H)": ["Zachary Eagleton","Eugenia McCauley"],
+    "Conceptual Physics": ["Zachary Eagleton"],
+    "Physics 1": ["Nina Arnberg","Laura Huntley","Zane Moore","Matthew Varvir"],
+    "Physics 2 (H)": ["Matthew Varvir"],
+    "Molecular Mechanisms in Biology": ["Nina Arnberg","Todd Hardie","Cristina Weaver"],
+    "Advanced Biology (H)": ["Tatyana Buxton"],
+    "Advanced Chemistry (H)": ["Eugenia McCauley"],
+    "Advanced Physics (H)": ["James Dann"],
+    "Environmental Science": ["Chrissy Orangio"],
+    "Anatomy & Physiology": ["Todd Hardie"],
+    "Neuroscience": ["Cristina Weaver"],
+    "BioTech Research (H)": ["Tatyana Buxton"]
+  },
+  "Applied Science & Engineering": {
+    "Mechanical & Electrical Engineering": ["James Formato","Leo Jaimez"],
+    "Applied Science Research (H)": ["James Dann"],
+    "Sustainable Engineering": ["James Dann"],
+    "Design": ["James Formato"]
+  },
+  "World Language": {
+    "Spanish 1": ["Janet Tennyson"],
+    "Spanish 2": ["Janet Tennyson","Adolfo Guevara"],
+    "Heritage Spanish 3": ["Perla Amaral"],
+    "Heritage Spanish 4": ["Perla Amaral"],
+    "Advanced Spanish (H)": ["Patricia Frias"],
+    "French 1": ["Marie Sajja"],
+    "French 2": ["Corinne Chung"],
+    "French 3": ["Marie Sajja"],
+    "French 4": ["Corinne Chung"],
+    "Advanced French (H)": ["Corinne Chung"],
+    "Mandarin 1": ["Rita Yeh"],
+    "Mandarin 2": ["Rita Yeh"],
+    "Mandarin 3": ["Mingjung Chen"],
+    "Mandarin 4": ["Rita Yeh"],
+    "Mandarin 5": ["Mingjung Chen"],
+    "Advanced Mandarin (H)": ["Mingjung Chen"],
+    "Latin 1": ["Tom Garvey"],
+    "Latin 2": ["Jennifer Jordt"],
+    "Latin 3": ["Jennifer Jordt"],
+    "Latin 4": ["Jennifer Jordt"],
+    "Advanced Latin (H)": ["Tom Garvey","Jennifer Jordt"]
+  }
+};
+
+const TEACHER_EMAIL_MAP = {
+  "Rachel Blumenthal":      "rblumenthal@menloschool.org",
+  "Whitney Newton":         "wnewton@menloschool.org",
+  "Margaret Ramsey":        "mramsey@menloschool.org",
+  "Andrew Warren":          "awarren@menloschool.org",
+  "Jay Bush":               "jbush@menloschool.org",
+  "Lily Chan":              "lchan@menloschool.org",
+  "Rebecca Gertmenian":     "rgertmenian@menloschool.org",
+  "Meghann Schroers-Martin":"mschroers-martin@menloschool.org",
+  "Tom Garvey":             "tgarvey@menloschool.org",
+  "Oscar King":             "oking@menloschool.org",
+  "Maura Sincoff":          "msincoff@menloschool.org",
+  "Cara Plamondon":         "cplamondon@menloschool.org",
+  "Bridgett Longust":       "blongust@menloschool.org",
+  "Sabahat Adil":           "sadil@menloschool.org",
+  "Franco Cruz-Ochoa":      "fcruz-ochoa@menloschool.org",
+  "Katharine Hanson":       "khanson@menloschool.org",
+  "Nicholas Merlesena":     "nmerlesena@menloschool.org",
+  "Miles Bennett-Smith":    "mbennett-smith@menloschool.org",
+  "Glenn Davis":            "gdavis@menloschool.org",
+  "Trevor McNeil":          "tmcneil@menloschool.org",
+  "Joseph Mitchell":        "jmitchell@menloschool.org",
+  "Jack Bowen":             "jbowen@menloschool.org",
+  "Dylan Citrin Cummins":   "dcitrin-cummins@menloschool.org",
+  "Charles Hanson":         "chanson@menloschool.org",
+  "Matthew Nelson":         "mnelson@menloschool.org",
+  "John Schafer":           "jschafer@menloschool.org",
+  "Peter Brown":            "pbrown@menloschool.org",
+  "Christine Walters":      "cwalters@menloschool.org",
+  "Rebecca Akers":          "rakers@menloschool.org",
+  "Joe Rabison":            "jrabison@menloschool.org",
+  "Sujata Ganpule":         "sganpule@menloschool.org",
+  "Randall Joss":           "rjoss@menloschool.org",
+  "Nandhini Namasivayam":   "nnamasivayam@menloschool.org",
+  "Jacqueline Arreaga":     "jarreaga@menloschool.org",
+  "Danielle Jensen":        "djensen@menloschool.org",
+  "Yu-Loung Chang":         "ychang@menloschool.org",
+  "Dave Lowell":            "dlowell@menloschool.org",
+  "Reeve Garrett":          "rgarrett@menloschool.org",
+  "Jude Loeffler":          "jloeffler@menloschool.org",
+  "Dennis Millstein":       "dmillstein@menloschool.org",
+  "Douglas Kiang":          "dkiang@menloschool.org",
+  "Zachary Blickensderfer": "zblickensderfer@menloschool.org",
+  "Chrissy Orangio":        "corangio@menloschool.org",
+  "Laura Huntley":          "lhuntley@menloschool.org",
+  "Mary McKenna":           "mmckenna@menloschool.org",
+  "Zachary Eagleton":       "zeagleton@menloschool.org",
+  "Eugenia McCauley":       "emccauley@menloschool.org",
+  "Nina Arnberg":           "narnberg@menloschool.org",
+  "Zane Moore":             "zmoore@menloschool.org",
+  "Matthew Varvir":         "mvarvir@menloschool.org",
+  "Todd Hardie":            "thardie@menloschool.org",
+  "Cristina Weaver":        "cweaver@menloschool.org",
+  "Tatyana Buxton":         "tbuxton@menloschool.org",
+  "James Dann":             "jdann@menloschool.org",
+  "James Formato":          "jformato@menloschool.org",
+  "Leo Jaimez":             "ljaimez@menloschool.org",
+  "Janet Tennyson":         "jtennyson@menloschool.org",
+  "Adolfo Guevara":         "aguevara@menloschool.org",
+  "Perla Amaral":           "pamaral@menloschool.org",
+  "Patricia Frias":         "pfrias@menloschool.org",
+  "Marie Sajja":            "msajja@menloschool.org",
+  "Corinne Chung":          "cchung@menloschool.org",
+  "Rita Yeh":               "ryeh@menloschool.org",
+  "Mingjung Chen":          "mchen@menloschool.org",
+  "Jennifer Jordt":         "jjordt@menloschool.org",
+  "Richard Harris":         "rharris@menloschool.org",
+};
+
+// Build teacher list: email → { name, classes: string[] }
+function buildTeacherDatabase() {
+  const db = {};
+  for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
+    for (const [course, teachers] of Object.entries(courses)) {
+      for (const teacher of teachers) {
+        const email = TEACHER_EMAIL_MAP[teacher];
+        if (!email) continue;
+        if (!db[email]) db[email] = { name: teacher, classes: [] };
+        if (!db[email].classes.includes(course)) db[email].classes.push(course);
+      }
+    }
+  }
+  return db;
+}
+const TEACHER_DATABASE = buildTeacherDatabase();
+
+function lookupSubjectForCourse(courseName) {
+  for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
+    if (courses[courseName]) return subject;
+  }
+  return 'General';
+}
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let aUser      = null;
+let aProfiles  = {};   // "email|course" → profile row
+let aExpanded  = new Set();
+let aRefreshTimer = null;
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.replace('index.html'); return; }
+  if (session.user.email.toLowerCase() !== ADMIN_EMAIL) {
+    await sb.auth.signOut();
+    window.location.replace('index.html');
+    return;
+  }
+  aUser = session.user;
+  document.getElementById('authLoading').style.display = 'none';
+  document.getElementById('adminApp').style.display = 'block';
+  await loadAndRender();
+  startAutoRefresh();
+})();
+
+// ─── DATA ─────────────────────────────────────────────────────────────────────
+async function loadAndRender() {
+  try {
+    const { data, error } = await sb
+      .from('teacher_profiles')
+      .select('teacher_email, class_name, status, done, updated_at, teaching_style, key_values');
+    if (!error && data) {
+      aProfiles = {};
+      data.forEach(row => {
+        aProfiles[`${row.teacher_email}|${row.class_name}`] = row;
+      });
+    }
+  } catch (err) {
+    console.warn('Could not load profiles:', err);
+  }
+  renderDashboard();
+  updateRefreshTime();
+}
+
+function startAutoRefresh() {
+  if (aRefreshTimer) clearInterval(aRefreshTimer);
+  aRefreshTimer = setInterval(loadAndRender, 60000);
+}
+
+function updateRefreshTime() {
+  const now = new Date();
+  const t   = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('refreshInfo').textContent = `Last refreshed ${t} · auto-refreshes every 60s`;
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function getStatus(email, course) {
+  const row = aProfiles[`${email}|${course}`];
+  if (!row) return 'not_started';
+  return row.status || (row.done ? 'complete' : (row.teaching_style ? 'in_progress' : 'not_started'));
+}
+
+function renderDashboard() {
+  const query   = (document.getElementById('teacherSearch')?.value || '').toLowerCase().trim();
+  const entries = Object.entries(TEACHER_DATABASE)
+    .filter(([, t]) => !query || t.name.toLowerCase().includes(query))
+    .sort(([, a], [, b]) => a.name.localeCompare(b.name));
+
+  // Compute stats across ALL teachers (not filtered)
+  let total = 0, complete = 0, inProgress = 0, notStarted = 0;
+  for (const [email, teacher] of Object.entries(TEACHER_DATABASE)) {
+    for (const course of teacher.classes) {
+      total++;
+      const s = getStatus(email, course);
+      if (s === 'complete')    complete++;
+      else if (s === 'in_progress') inProgress++;
+      else notStarted++;
+    }
+  }
+  document.getElementById('statTotal').textContent      = total;
+  document.getElementById('statComplete').textContent   = complete;
+  document.getElementById('statInProgress').textContent = inProgress;
+  document.getElementById('statNotStarted').textContent = notStarted;
+  document.getElementById('teacherCount').textContent   =
+    query ? `${entries.length} teacher${entries.length !== 1 ? 's' : ''} matching "${query}"` : `All teachers (${entries.length})`;
+
+  const list = document.getElementById('teacherList');
+  list.innerHTML = '';
+
+  if (entries.length === 0) {
+    list.innerHTML = '<div class="a-empty">No teachers found.</div>';
+    return;
+  }
+
+  entries.forEach(([email, teacher]) => {
+    const isOpen    = aExpanded.has(email);
+    const classes   = teacher.classes;
+    const statuses  = classes.map(c => getStatus(email, c));
+    const nComplete = statuses.filter(s => s === 'complete').length;
+    const nProgress = statuses.filter(s => s === 'in_progress').length;
+    const nNot      = statuses.filter(s => s === 'not_started').length;
+
+    // Mini dot row (up to 8 dots)
+    const dotsHtml = classes.slice(0, 8).map((c, i) => {
+      const s = statuses[i];
+      return `<span class="a-status-dot ${s}" title="${escHtml(c)}"></span>`;
+    }).join('') + (classes.length > 8 ? `<span style="font-size:10px;color:var(--text-faint)">+${classes.length - 8}</span>` : '');
+
+    const classesHtml = classes.map(course => {
+      const s      = getStatus(email, course);
+      const label  = s === 'complete' ? 'Complete' : s === 'in_progress' ? 'In Progress' : 'Not Started';
+      const subject = lookupSubjectForCourse(course);
+      const row    = aProfiles[`${email}|${course}`];
+      const updated = row?.updated_at
+        ? new Date(row.updated_at).toLocaleDateString([], { month: 'short', day: 'numeric' })
+        : '';
+      return `
+        <div class="a-class-row">
+          <div>
+            <div class="a-class-name">${escHtml(course)}</div>
+            <div class="a-class-subject">${escHtml(subject)}</div>
+          </div>
+          <div class="a-class-status">
+            <span class="a-status-dot ${s}"></span>
+            <span class="a-status-label ${s}">${label}</span>
+          </div>
+          ${updated ? `<div class="a-class-updated">${updated}</div>` : '<div class="a-class-updated"></div>'}
+        </div>`;
+    }).join('');
+
+    const initials = teacher.name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
+    const summaryParts = [];
+    if (nComplete > 0)  summaryParts.push(`<span style="color:#34d399">${nComplete} complete</span>`);
+    if (nProgress > 0)  summaryParts.push(`<span style="color:#fbbf24">${nProgress} in progress</span>`);
+    if (nNot > 0)       summaryParts.push(`<span style="color:#ef4444">${nNot} not started</span>`);
+
+    const card = document.createElement('div');
+    card.className = 'a-teacher-card';
+    card.innerHTML = `
+      <div class="a-teacher-header" onclick="toggleTeacher('${escHtml(email)}')">
+        <div class="a-teacher-header-left">
+          <div class="a-teacher-avatar">${initials}</div>
+          <div>
+            <div class="a-teacher-name">${escHtml(teacher.name)}</div>
+            <div class="a-teacher-email">${escHtml(email)} · ${summaryParts.join(', ')}</div>
+          </div>
+        </div>
+        <div class="a-teacher-header-right">
+          <div class="a-mini-dots">${dotsHtml}</div>
+          <span class="a-chevron ${isOpen ? 'open' : ''}">▼</span>
+        </div>
+      </div>
+      <div class="a-teacher-classes ${isOpen ? 'open' : ''}">
+        ${classesHtml}
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+function toggleTeacher(email) {
+  if (aExpanded.has(email)) aExpanded.delete(email);
+  else aExpanded.add(email);
+  renderDashboard();
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

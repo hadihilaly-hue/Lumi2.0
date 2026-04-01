@@ -327,6 +327,43 @@ body { overflow: auto; display: block; }
 }
 .t-reinterview-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+/* ─── STATUS DOTS ──────────────────────────────────────────────────────────── */
+.t-status-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; display: inline-block;
+}
+.t-status-dot.not_started { background: #ef4444; box-shadow: 0 0 5px rgba(239,68,68,.45); }
+.t-status-dot.in_progress { background: #fbbf24; box-shadow: 0 0 5px rgba(251,191,36,.45); }
+.t-status-dot.complete    { background: #34d399; box-shadow: 0 0 5px rgba(52,211,153,.45); }
+
+/* ─── STATUS POPUP ─────────────────────────────────────────────────────────── */
+#statusPopupOverlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
+  z-index: 300; display: flex; align-items: center; justify-content: center; padding: 24px;
+  animation: fadeIn .18s ease;
+}
+.t-status-popup {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px; padding: 32px 28px; max-width: 380px; width: 100%;
+  box-shadow: 0 24px 60px rgba(0,0,0,.45);
+  animation: slideUp .22s ease;
+}
+@keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+.t-status-popup h3 { font-size: 16px; font-weight: 600; margin-bottom: 20px; line-height: 1.4; }
+.t-popup-option {
+  display: flex; align-items: flex-start; gap: 14px; width: 100%;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px; cursor: pointer; text-align: left;
+  font-family: inherit; color: var(--text); transition: all .18s; margin-bottom: 10px;
+}
+.t-popup-option:hover { border-color: var(--accent); background: var(--accent-soft); }
+.t-popup-option-icon  { font-size: 20px; flex-shrink: 0; line-height: 1.2; }
+.t-popup-option-title { font-size: 13.5px; font-weight: 600; margin-bottom: 3px; }
+.t-popup-option-desc  { font-size: 12px; color: var(--text-muted); line-height: 1.45; }
+.t-popup-note {
+  font-size: 11.5px; color: var(--text-faint); text-align: center;
+  margin-top: 16px; line-height: 1.5; padding: 0 4px;
+}
+
 .t-chat-input-area {
   padding: 16px 24px; background: var(--surface);
   border-top: 1px solid var(--border); flex-shrink: 0;
@@ -507,6 +544,28 @@ body { overflow: auto; display: block; }
         </button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- STATUS POPUP -->
+<div id="statusPopupOverlay" style="display:none">
+  <div class="t-status-popup">
+    <h3 id="statusPopupTitle">How's your profile going?</h3>
+    <button class="t-popup-option" onclick="markStatus('complete')">
+      <div class="t-popup-option-icon">✅</div>
+      <div>
+        <div class="t-popup-option-title">Mark as Complete</div>
+        <div class="t-popup-option-desc">I'm happy with my profile — students can use it now</div>
+      </div>
+    </button>
+    <button class="t-popup-option" onclick="markStatus('in_progress')">
+      <div class="t-popup-option-icon">⏸️</div>
+      <div>
+        <div class="t-popup-option-title">Still Working On It</div>
+        <div class="t-popup-option-desc">I want to come back and add more later</div>
+      </div>
+    </button>
+    <div class="t-popup-note">You can always edit your profile even after marking it complete</div>
   </div>
 </div>
 
@@ -741,12 +800,13 @@ function buildTeacherDatabase() {
 const TEACHER_DATABASE = buildTeacherDatabase();
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
-let tUser         = null;   // Supabase user
-let tTeacher      = null;   // { name, classes: string[] } from TEACHER_DATABASE
-let tProfiles     = {};     // { "Course Name": { done, teaching_style, … } }
-let tCurrentClass = null;   // { course, subject } currently in chat
-let tMessages     = [];     // conversation messages for current class
-let tBusy         = false;
+let tUser              = null;   // Supabase user
+let tTeacher           = null;   // { name, classes: string[] } from TEACHER_DATABASE
+let tProfiles          = {};     // { "Course Name": { done, status, teaching_style, … } }
+let tCurrentClass      = null;   // { course, subject } currently in chat
+let tMessages          = [];     // conversation messages for current class
+let tBusy              = false;
+let tPendingNavigation = null;   // callback waiting behind status popup
 
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
 function showView(name) {
@@ -905,32 +965,33 @@ function renderClassCards() {
   const grid = document.getElementById('classCards');
   grid.innerHTML = '';
   tTeacher.classes.forEach(course => {
-    const subject = lookupSubjectForCourse(course);
-    const profile = tProfiles[course];
-    const done    = profile?.done === true;
-    const hasData = profile && (profile.teaching_style || profile.key_values);
+    const subject     = lookupSubjectForCourse(course);
+    const profile     = tProfiles[course];
+    // Use explicit status field; fall back to inferring from done/data for old rows
+    const rawStatus   = profile?.status
+      || (profile?.done ? 'complete' : (profile?.teaching_style ? 'in_progress' : 'not_started'));
+    const status      = rawStatus;
 
-    const card = document.createElement('div');
-    card.className = 't-card';
-
-    let statusHtml, statusClass;
-    if (done) {
-      statusClass = 'complete'; statusHtml = '✓ Complete';
-    } else if (hasData) {
-      statusClass = 'partial'; statusHtml = 'In progress';
-    } else {
-      statusClass = 'empty'; statusHtml = 'Not started';
-    }
+    const dotClass    = status === 'complete' ? 'complete'
+                      : status === 'in_progress' ? 'in_progress' : 'not_started';
+    const statusLabel = status === 'complete' ? 'Complete'
+                      : status === 'in_progress' ? 'In Progress' : 'Not Started';
+    const btnLabel    = status === 'complete' ? 'View & Edit'
+                      : status === 'in_progress' ? 'Continue' : 'Get Started';
 
     const previewText = profile?.teaching_style || profile?.key_values || '';
 
+    const card = document.createElement('div');
+    card.className = 't-card';
     card.innerHTML = `
       <div class="t-card-subject">${escHtml(subject)}</div>
       <div class="t-card-course">${escHtml(course)}</div>
-      <div class="t-card-meta">
-        <span class="t-card-status ${statusClass}">${statusHtml}</span>
+      <div class="t-card-meta" style="display:flex;align-items:center;gap:8px;margin-top:2px">
+        <span class="t-status-dot ${dotClass}"></span>
+        <span style="font-size:11.5px;color:var(--text-muted);font-weight:500">${statusLabel}</span>
       </div>
       ${previewText ? `<div class="t-card-preview">${escHtml(previewText)}</div>` : ''}
+      <div style="margin-top:8px;font-size:12px;font-weight:600;color:var(--accent)">${escHtml(btnLabel)} →</div>
     `;
     card.addEventListener('click', () => openClassChat({ course, subject }));
     grid.appendChild(card);
@@ -938,8 +999,59 @@ function renderClassCards() {
 }
 
 function goHome() {
-  showView('homeView');
-  renderClassCards();
+  promptStatusThenDo(() => {
+    showView('homeView');
+    renderClassCards();
+  });
+}
+
+// ─── STATUS POPUP ─────────────────────────────────────────────────────────────
+function promptStatusThenDo(callback) {
+  if (!tCurrentClass) { callback(); return; }
+  const profile = tProfiles[tCurrentClass.course];
+  const status  = profile?.status
+    || (profile?.done ? 'complete' : (profile?.teaching_style ? 'in_progress' : 'not_started'));
+  // Only interrupt if actively in progress
+  if (status !== 'in_progress') { callback(); return; }
+  tPendingNavigation = callback;
+  document.getElementById('statusPopupTitle').textContent =
+    `How's your ${tCurrentClass.course} profile going?`;
+  document.getElementById('statusPopupOverlay').style.display = 'flex';
+}
+
+function closeStatusPopup() {
+  document.getElementById('statusPopupOverlay').style.display = 'none';
+}
+
+async function markStatus(status) {
+  closeStatusPopup();
+  await setProfileStatus(status);
+  if (tPendingNavigation) {
+    tPendingNavigation();
+    tPendingNavigation = null;
+  }
+}
+
+async function setProfileStatus(status) {
+  if (!tUser || !tCurrentClass) return;
+  try {
+    const { data, error } = await sb
+      .from('teacher_profiles')
+      .upsert({
+        teacher_email: tUser.email,
+        class_name:    tCurrentClass.course,
+        subject:       tCurrentClass.subject,
+        status,
+        updated_at:    new Date().toISOString(),
+      }, { onConflict: 'teacher_email,class_name' })
+      .select()
+      .single();
+    if (!error && data) {
+      tProfiles[tCurrentClass.course] = { ...(tProfiles[tCurrentClass.course] || {}), ...data };
+    }
+  } catch (err) {
+    console.warn('Could not update status:', err);
+  }
 }
 
 // ─── CHAT VIEW ────────────────────────────────────────────────────────────────
@@ -989,6 +1101,14 @@ async function openClassChat({ course, subject }) {
 
   showView('chatView');
   updateInputState();
+
+  // Auto-set status to in_progress when first opened
+  const existingProfile = tProfiles[course];
+  const existingStatus  = existingProfile?.status
+    || (existingProfile?.done ? 'complete' : (existingProfile?.teaching_style ? 'in_progress' : 'not_started'));
+  if (existingStatus === 'not_started') {
+    await setProfileStatus('in_progress');
+  }
 
   // Clear messages
   document.getElementById('tMessages').innerHTML = '';
@@ -1285,11 +1405,16 @@ async function saveTeacherProfile(data) {
 
   const toArr = v => Array.isArray(v) ? v : (v ? [v] : null);
 
+  // When the interview marks done=true, also promote status to complete
+  const newStatus = merged.done ? 'complete'
+    : (merged.status || (merged.teaching_style ? 'in_progress' : 'not_started'));
+
   const row = {
     teacher_email:           tUser.email,
     class_name:              tCurrentClass.course,
     subject:                 tCurrentClass.subject,
     done:                    merged.done                    || false,
+    status:                  newStatus,
     teaching_style:          merged.teaching_style          || null,
     excellence_criteria:     merged.excellence_criteria     || null,
     grading_philosophy:      merged.grading_philosophy      || null,

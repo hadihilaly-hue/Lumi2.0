@@ -348,24 +348,94 @@ Only include NEWLY learned things about the student. Empty arrays if nothing new
 NEVER mention the JSON.`;
 }
 
-// Fetch teacher profile from Supabase for a given teacher email (derived from name) and course
+// Maps teacher display name → real @menloschool.org email (mirrors teacher.html)
+const TEACHER_EMAIL_MAP = {
+  "Rachel Blumenthal":      "rblumenthal@menloschool.org",
+  "Whitney Newton":         "wnewton@menloschool.org",
+  "Margaret Ramsey":        "mramsey@menloschool.org",
+  "Andrew Warren":          "awarren@menloschool.org",
+  "Jay Bush":               "jbush@menloschool.org",
+  "Lily Chan":              "lchan@menloschool.org",
+  "Rebecca Gertmenian":     "rgertmenian@menloschool.org",
+  "Meghann Schroers-Martin":"mschroers-martin@menloschool.org",
+  "Tom Garvey":             "tgarvey@menloschool.org",
+  "Oscar King":             "oking@menloschool.org",
+  "Maura Sincoff":          "msincoff@menloschool.org",
+  "Cara Plamondon":         "cplamondon@menloschool.org",
+  "Bridgett Longust":       "blongust@menloschool.org",
+  "Sabahat Adil":           "sadil@menloschool.org",
+  "Franco Cruz-Ochoa":      "fcruz-ochoa@menloschool.org",
+  "Katharine Hanson":       "khanson@menloschool.org",
+  "Nicholas Merlesena":     "nmerlesena@menloschool.org",
+  "Miles Bennett-Smith":    "mbennett-smith@menloschool.org",
+  "Glenn Davis":            "gdavis@menloschool.org",
+  "Trevor McNeil":          "tmcneil@menloschool.org",
+  "Joseph Mitchell":        "jmitchell@menloschool.org",
+  "Jack Bowen":             "jbowen@menloschool.org",
+  "Dylan Citrin Cummins":   "dcitrin-cummins@menloschool.org",
+  "Charles Hanson":         "chanson@menloschool.org",
+  "Matthew Nelson":         "mnelson@menloschool.org",
+  "John Schafer":           "jschafer@menloschool.org",
+  "Peter Brown":            "pbrown@menloschool.org",
+  "Christine Walters":      "cwalters@menloschool.org",
+  "Rebecca Akers":          "rakers@menloschool.org",
+  "Joe Rabison":            "jrabison@menloschool.org",
+  "Sujata Ganpule":         "sganpule@menloschool.org",
+  "Randall Joss":           "rjoss@menloschool.org",
+  "Nandhini Namasivayam":   "nnamasivayam@menloschool.org",
+  "Jacqueline Arreaga":     "jarreaga@menloschool.org",
+  "Danielle Jensen":        "djensen@menloschool.org",
+  "Yu-Loung Chang":         "ychang@menloschool.org",
+  "Dave Lowell":            "dlowell@menloschool.org",
+  "Reeve Garrett":          "rgarrett@menloschool.org",
+  "Jude Loeffler":          "jloeffler@menloschool.org",
+  "Dennis Millstein":       "dmillstein@menloschool.org",
+  "Douglas Kiang":          "dkiang@menloschool.org",
+  "Zachary Blickensderfer": "zblickensderfer@menloschool.org",
+  "Chrissy Orangio":        "corangio@menloschool.org",
+  "Laura Huntley":          "lhuntley@menloschool.org",
+  "Mary McKenna":           "mmckenna@menloschool.org",
+  "Zachary Eagleton":       "zeagleton@menloschool.org",
+  "Eugenia McCauley":       "emccauley@menloschool.org",
+  "Nina Arnberg":           "narnberg@menloschool.org",
+  "Zane Moore":             "zmoore@menloschool.org",
+  "Matthew Varvir":         "mvarvir@menloschool.org",
+  "Todd Hardie":            "thardie@menloschool.org",
+  "Cristina Weaver":        "cweaver@menloschool.org",
+  "Tatyana Buxton":         "tbuxton@menloschool.org",
+  "James Dann":             "jdann@menloschool.org",
+  "James Formato":          "jformato@menloschool.org",
+  "Leo Jaimez":             "ljaimez@menloschool.org",
+  "Janet Tennyson":         "jtennyson@menloschool.org",
+  "Adolfo Guevara":         "aguevara@menloschool.org",
+  "Perla Amaral":           "pamaral@menloschool.org",
+  "Patricia Frias":         "pfrias@menloschool.org",
+  "Marie Sajja":            "msajja@menloschool.org",
+  "Corinne Chung":          "cchung@menloschool.org",
+  "Rita Yeh":               "ryeh@menloschool.org",
+  "Mingjung Chen":          "mchen@menloschool.org",
+  "Jennifer Jordt":         "jjordt@menloschool.org",
+  "Richard Harris":         "rharris@menloschool.org",
+};
+
+// Fetch teacher profile from Supabase for a given teacher name and course.
+// Returns the profile if status=complete, { __notReady: true } if in_progress/not_started, null if not found.
 async function getTeacherProfile(teacherName, course) {
   if (!teacherName || !course) return null;
   try {
-    // Derive email from teacher name (firstname.lastname@menloschool.org)
-    const parts     = teacherName.toLowerCase().split(/\s+/);
-    const firstName = parts[0];
-    const lastName  = parts[parts.length - 1];
-    const email     = `${firstName}.${lastName}@menloschool.org`;
+    const email = TEACHER_EMAIL_MAP[teacherName];
+    if (!email) return null;
 
     const { data, error } = await sb
       .from('teacher_profiles')
       .select('*')
       .eq('teacher_email', email)
       .eq('class_name', course)
-      .eq('done', true)
       .maybeSingle();
     if (error || !data) return null;
+
+    const status = data.status || (data.done ? 'complete' : (data.teaching_style ? 'in_progress' : 'not_started'));
+    if (status !== 'complete') return { __notReady: true };
     return data;
   } catch {
     return null;
@@ -695,14 +765,20 @@ async function openTutor(subjectId, course, teacher) {
   SB.mode = 'tutor'; SB.activeTeacher = { subjectId, course, teacher };
   messagesEl.innerHTML = '';
 
-  // Fetch teacher profile — use it in greeting if available
+  // Fetch teacher profile — check status before using
   const profile = await getTeacherProfile(teacher, course);
-  if (profile) S.tutorCtx.teacherProfile = profile;
-
+  let greeting;
   const firstName = teacher.split(' ')[0];
-  const greeting = profile && profile.done
-    ? `Hey! You're studying ${course} with ${firstName}. I've learned how ${firstName} teaches and what they look for — ask me anything and I'll help you the way ${firstName} would.`
-    : `You're now studying ${course} with ${teacher}. What can I help you with?`;
+
+  if (profile?.__notReady) {
+    greeting = `${firstName} hasn't finished setting up their Lumi profile yet. Check back soon — or chat with General Lumi in the meantime!`;
+    S.tutorCtx.teacherProfile = null;
+  } else if (profile) {
+    S.tutorCtx.teacherProfile = profile;
+    greeting = `Hey! You're studying ${course} with ${firstName}. I've learned how ${firstName} teaches and what they look for — ask me anything and I'll help you the way ${firstName} would.`;
+  } else {
+    greeting = `You're now studying ${course} with ${teacher}. What can I help you with?`;
+  }
   S.messages.push({ role: 'assistant', content: greeting });
   renderMsg('lumi', greeting, true);
   saveCurrentConv();
