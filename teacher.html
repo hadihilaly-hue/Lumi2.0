@@ -574,7 +574,7 @@ const MENLO_CURRICULUM = {
     "Analytic Geometry & Algebra": ["Rebecca Akers","Joe Rabison"],
     "Analytic Geometry & Algebra (H)": ["Sujata Ganpule"],
     "Algebra 2": ["Randall Joss","Nandhini Namasivayam"],
-    "Algebra 2 with Trig": ["Rebecca Akers","Jacqueline Arreaga","Harris"],
+    "Algebra 2 with Trig": ["Rebecca Akers","Jacqueline Arreaga","Richard Harris"],
     "Algebra 2 with Trig (H)": ["Danielle Jensen"],
     "Precalculus": ["Yu-Loung Chang","Christine Walters"],
     "Introductory Calculus": ["Jacqueline Arreaga","Dave Lowell"],
@@ -709,7 +709,7 @@ const TEACHER_EMAIL_MAP = {
   "Rita Yeh":               "ryeh@menloschool.org",
   "Mingjung Chen":          "mchen@menloschool.org",
   "Jennifer Jordt":         "jjordt@menloschool.org",
-  "Harris":                 "rharris@menloschool.org",
+  "Richard Harris":         "rharris@menloschool.org",
 };
 
 // Build TEACHER_DATABASE keyed by full email → { name, classes: string[] }
@@ -735,7 +735,7 @@ function buildTeacherDatabase() {
     }
   }
   db['hadi.hilaly@menloschool.org'] = { name: 'Hadi Hilaly', classes: allClasses };
-  db['rharris@menloschool.org']     = { name: 'Harris', classes: ['Algebra 2 with Trig'] };
+  db['rharris@menloschool.org']     = { name: 'Richard Harris', classes: ['Algebra 2 with Trig'] };
   return db;
 }
 const TEACHER_DATABASE = buildTeacherDatabase();
