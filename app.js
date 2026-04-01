@@ -273,7 +273,7 @@ NEVER mention the JSON.`;
 }
 
 function buildTutorSystem(subject, course, teacher, teacherProfile) {
-  const hasProfile = teacherProfile && teacherProfile.done;
+  const hasProfile = !!teacherProfile;
 
   if (hasProfile) {
     const p = teacherProfile;
@@ -358,12 +358,11 @@ async function loadCompletedProfiles() {
   try {
     const { data, error } = await sb
       .from('teacher_profiles')
-      .select('teacher_email, class_name, status, done');
+      .select('teacher_email, class_name, status');
     if (error || !data) return;
     completedProfiles = new Set();
     data.forEach(row => {
-      const s = row.status || (row.done ? 'complete' : 'not_started');
-      if (s === 'complete') completedProfiles.add(`${row.teacher_email}|${row.class_name}`);
+      if (row.status === 'complete') completedProfiles.add(`${row.teacher_email}|${row.class_name}`);
     });
   } catch (err) {
     console.warn('Could not load completed profiles:', err);
@@ -456,8 +455,7 @@ async function getTeacherProfile(teacherName, course) {
       .maybeSingle();
     if (error || !data) return null;
 
-    const status = data.status || (data.done ? 'complete' : (data.teaching_style ? 'in_progress' : 'not_started'));
-    if (status !== 'complete') return { __notReady: true };
+    if (data.status !== 'complete') return { __notReady: true };
     return data;
   } catch {
     return null;
