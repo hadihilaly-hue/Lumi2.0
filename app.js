@@ -39,31 +39,6 @@ let currentUser = null;
   // Load conversations from Supabase if localStorage is empty
   if (!localStorage.getItem('lumi_convs')) await loadConvsFromSupabase();
 
-  // Admin teacher portal shortcut (hadi.hilaly only)
-  if (email === 'hadi.hilaly@menloschool.org') {
-    const adminSection = document.getElementById('adminSection');
-    adminSection.style.display = 'block';
-    const sel = document.getElementById('adminClassSelect');
-    // Populate with all courses grouped by subject
-    for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
-      const og = document.createElement('optgroup');
-      og.label = subject;
-      for (const course of Object.keys(courses)) {
-        const opt = document.createElement('option');
-        opt.value = course;
-        opt.textContent = course;
-        og.appendChild(opt);
-      }
-      sel.appendChild(og);
-    }
-    document.getElementById('adminGoBtn').addEventListener('click', () => {
-      const course = sel.value;
-      if (!course) return;
-      const base = window.location.href.replace(/\/[^/]*$/, '/');
-      window.location.href = base + 'teacher.html?class=' + encodeURIComponent(course);
-    });
-  }
-
   // Boot the app
   init();
 })();
@@ -1008,12 +983,46 @@ function init() {
   const onboarded = localStorage.getItem('lumi_name');
   if (!onboarded) {
     $('onboarding').style.display = '';
-    initOnboarding(() => { wireListeners(savedKey); startApp(savedKey); });
+    initOnboarding(() => { wireListeners(savedKey); startApp(savedKey); initAdminFeatures(); });
     return;
   }
   $('onboarding').style.display = 'none';
   startApp(savedKey);
   wireListeners(savedKey);
+  initAdminFeatures();
+}
+
+// ─── ADMIN TEACHER SHORTCUT ───────────────────────────────────────────────────
+function initAdminFeatures() {
+  if (!currentUser) return;
+  const email = (currentUser.email || '').toLowerCase();
+  if (email !== 'hadi.hilaly@menloschool.org') return;
+
+  const adminSection = document.getElementById('adminSection');
+  if (!adminSection) return;
+  adminSection.style.display = 'block';
+
+  const sel = document.getElementById('adminClassSelect');
+  if (sel.options.length > 0) return; // already populated
+
+  for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
+    const og = document.createElement('optgroup');
+    og.label = subject;
+    for (const course of Object.keys(courses)) {
+      const opt = document.createElement('option');
+      opt.value = course;
+      opt.textContent = course;
+      og.appendChild(opt);
+    }
+    sel.appendChild(og);
+  }
+
+  document.getElementById('adminGoBtn').addEventListener('click', () => {
+    const course = sel.value;
+    if (!course) return;
+    const base = window.location.href.replace(/\/[^/]*$/, '/');
+    window.location.href = base + 'teacher.html?class=' + encodeURIComponent(course);
+  });
 }
 
 function wireListeners(savedKey) {
