@@ -45,6 +45,63 @@
   </div>
 </div>
 
+<!-- ─── SCHEDULE SETUP ──────────────────────────────────── -->
+<div class="sched-setup" id="schedSetup" style="display:none">
+  <div class="sched-logo">
+    <div class="sched-logo-mark">✦</div>
+    <div class="sched-logo-name">Lumi</div>
+    <div class="sched-logo-school">Menlo School</div>
+  </div>
+  <div class="sched-progress-wrap">
+    <div class="sched-prog-track"><div class="sched-prog-fill" id="schedProgFill"></div></div>
+    <div class="sched-prog-label" id="schedProgLabel">Step 1 of 4</div>
+  </div>
+  <div class="sched-card" id="schedCard">
+    <!-- Step 1: class picker -->
+    <div class="sched-step active" id="ssStep1">
+      <div class="sched-welcome">Welcome to Lumi! Before we get started, let's set up your schedule so I can make everything personal to you.</div>
+      <div class="sched-q">What classes are you taking this semester?</div>
+      <input class="sched-search-input" id="ssClassSearch" placeholder="Search classes…" autocomplete="off">
+      <div class="sched-class-list" id="ssClassList"></div>
+      <div class="sched-selection-hint" id="ssSelectionHint">Select all your classes to continue</div>
+      <button class="sched-cta" id="ssStep1Next" disabled>Continue →</button>
+    </div>
+    <!-- Step 2: teacher picker (dynamic content) -->
+    <div class="sched-step" id="ssStep2">
+      <div class="sched-prog-sub" id="ssTeacherProgress"></div>
+      <div class="sched-q">Who's your teacher for <strong id="ssTeacherClassName"></strong>?</div>
+      <div class="sched-teacher-list" id="ssTeacherList"></div>
+      <div class="sched-step-nav">
+        <button class="sched-back-btn" id="ssStep2Back">← Back</button>
+        <button class="sched-cta sched-cta-sm" id="ssStep2Next" disabled>Next →</button>
+      </div>
+    </div>
+    <!-- Step 3: grade -->
+    <div class="sched-step" id="ssStep3">
+      <div class="sched-q">What grade are you in?</div>
+      <div class="sched-grades">
+        <button class="sched-grade-btn" data-grade="9">9th</button>
+        <button class="sched-grade-btn" data-grade="10">10th</button>
+        <button class="sched-grade-btn" data-grade="11">11th</button>
+        <button class="sched-grade-btn" data-grade="12">12th</button>
+      </div>
+      <div class="sched-step-nav">
+        <button class="sched-back-btn" id="ssStep3Back">← Back</button>
+        <button class="sched-cta sched-cta-sm" id="ssStep3Next" disabled>Continue →</button>
+      </div>
+    </div>
+    <!-- Step 4: confirmation -->
+    <div class="sched-step" id="ssStep4">
+      <div class="sched-q">Here's your schedule — looks good?</div>
+      <div class="sched-confirm-list" id="ssConfirmList"></div>
+      <div class="sched-step-nav">
+        <button class="sched-back-btn" id="ssStep4Edit">← Edit</button>
+        <button class="sched-cta sched-cta-sm" id="ssStep4Done">Looks good!</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ─── SIDEBAR ───────────────────────────────────────── -->
 <nav class="sidebar" id="sidebar">
   <div class="sb-scroll">
@@ -155,6 +212,7 @@
         </div>
       </div>
       <button class="danger-btn" id="signOutBtn" style="margin-top:10px">Sign out</button>
+      <button class="settings-save-btn" id="updateScheduleBtn" style="margin-top:8px">Update My Schedule</button>
       <a href="teacher.html" id="teacherModeLink" style="display:none;margin-top:8px;text-align:center;font-size:13px;color:var(--accent);text-decoration:none;padding:8px;border:1px solid rgba(123,105,245,.3);border-radius:8px;background:var(--accent-soft);display:none">🍎 Switch to Teacher Mode</a>
     </div>
 
@@ -193,6 +251,6 @@
 <!-- Scripts at bottom so the loading screen renders immediately -->
 <script src="supabase.js"></script>
 <script src="auth.js"></script>
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

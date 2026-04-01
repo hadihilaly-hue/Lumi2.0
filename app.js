@@ -348,6 +348,23 @@ Only include NEWLY learned things about the student. Empty arrays if nothing new
 NEVER mention the JSON.`;
 }
 
+// ─── SCHEDULE STORAGE ────────────────────────────────────────────────────────
+// Schedule: [{ course, teacher, subject }]
+function getSchedule() {
+  try { return JSON.parse(localStorage.getItem('lumi_schedule') || '[]'); } catch { return []; }
+}
+function saveScheduleLocal(s) { localStorage.setItem('lumi_schedule', JSON.stringify(s)); }
+
+function syncScheduleToSupabase(schedule) {
+  if (!currentUser) return;
+  sb.from('profiles').upsert({
+    id: currentUser.id,
+    schedule,
+    schedule_updated_at: new Date().toISOString(),
+  }, { onConflict: 'id' })
+    .then(({ error }) => { if (error) console.warn('Schedule sync error:', error); });
+}
+
 // ─── CURRICULUM SEARCH ───────────────────────────────────────────────────────
 // Searches hardcoded MENLO_CURRICULUM data — no Supabase needed.
 // The chat checks for a complete profile separately; search shows all teachers.
@@ -484,6 +501,7 @@ const SB = {
   expandedSubject: null,
   expandedCourse:  null,
   activeTeacher:   null,
+  showAllClasses:  false,
 };
 
 // ─── ELEMENTS ─────────────────────────────────────────────────────────────────
@@ -650,13 +668,15 @@ async function loadProfileFromSupabase() {
   try {
     const { data, error } = await sb
       .from('profiles')
-      .select('name, grade, values_profile')
+      .select('name, grade, values_profile, schedule')
       .eq('id', currentUser.id)
       .single();
     if (error || !data) return;
     // Always restore name/grade (overwrite if Supabase is newer)
     if (!hasName && data.name)  localStorage.setItem('lumi_name',  data.name);
     if (!hasName && data.grade) localStorage.setItem('lumi_grade', data.grade);
+    if (data.schedule?.length && !localStorage.getItem('lumi_schedule'))
+      localStorage.setItem('lumi_schedule', JSON.stringify(data.schedule));
     // Seed global values/goals/interests from profile (loaded conv will override for current session)
     if (data.values_profile) {
       const vp = data.values_profile;
@@ -1051,6 +1071,54 @@ function renderSidebar() {
   const query = sbSearch.value.toLowerCase().trim();
   sbNav.innerHTML = '';
 
+  // My Classes section (when schedule is set and not searching)
+  const schedule = getSchedule();
+  if (schedule.length > 0 && !query) {
+    const myHd = document.createElement('div');
+    myHd.className = 'sb-my-classes-hd';
+    myHd.textContent = 'My Classes';
+    sbNav.appendChild(myHd);
+
+    schedule.forEach(({ course, teacher }) => {
+      const lastName = teacher ? teacher.split(' ').slice(-1)[0] : '';
+      const isActive = SB.activeTeacher &&
+        SB.activeTeacher.course === course &&
+        SB.activeTeacher.teacher === teacher;
+      const item = document.createElement('div');
+      item.className = 'sb-my-class-item' + (isActive ? ' active' : '');
+      const icon = document.createElement('span');
+      icon.className = 'sb-my-class-icon';
+      icon.textContent = '📚';
+      const name = document.createElement('span');
+      name.className = 'sb-my-class-name';
+      name.textContent = course;
+      const tch = document.createElement('span');
+      tch.className = 'sb-my-class-teacher';
+      tch.textContent = lastName;
+      item.appendChild(icon);
+      item.appendChild(name);
+      item.appendChild(tch);
+      item.addEventListener('click', () => {
+        const { subjectId } = lookupSubjectForCourse(course);
+        openTutor(subjectId, course, teacher);
+        closeSidebar();
+      });
+      sbNav.appendChild(item);
+    });
+
+    const addBtn = document.createElement('div');
+    addBtn.className = 'sb-add-class';
+    addBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add a class`;
+    addBtn.addEventListener('click', () => {
+      initScheduleSetup(() => { renderSidebar(); }, getSchedule());
+    });
+    sbNav.appendChild(addBtn);
+
+    const divMid = document.createElement('div');
+    divMid.className = 'sb-divider';
+    sbNav.appendChild(divMid);
+  }
+
   // General Chat button
   const genRow = document.createElement('div');
   genRow.className = 'sb-general' + (SB.mode === 'general' && !S.tutorCtx ? ' active' : '');
@@ -1117,10 +1185,24 @@ function renderSidebar() {
   // When search is active, dropdown handles teacher/class results — skip subjects tree
   if (query) return;
 
-  // Divider + Subjects
-  const div = document.createElement('div');
-  div.className = 'sb-divider';
-  sbNav.appendChild(div);
+  // Subjects — wrapped in "All Classes" toggle when a schedule exists
+  const hasSchedule = schedule.length > 0;
+
+  if (hasSchedule) {
+    const allToggle = document.createElement('div');
+    allToggle.className = 'sb-all-classes-toggle' + (SB.showAllClasses ? ' open' : '');
+    allToggle.innerHTML = `<svg viewBox="0 0 24 24" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg> All Classes`;
+    allToggle.addEventListener('click', () => { SB.showAllClasses = !SB.showAllClasses; renderSidebar(); });
+    sbNav.appendChild(allToggle);
+    if (!SB.showAllClasses) return;
+    const divSub = document.createElement('div');
+    divSub.className = 'sb-divider';
+    sbNav.appendChild(divSub);
+  } else {
+    const div = document.createElement('div');
+    div.className = 'sb-divider';
+    sbNav.appendChild(div);
+  }
 
   const lbl = document.createElement('div');
   lbl.className = 'sb-section-label';
@@ -1220,6 +1302,202 @@ function showWelcome() {
   });
 }
 
+// ─── SCHEDULE SETUP ──────────────────────────────────────────────────────────
+function initScheduleSetup(onDone, prefill = []) {
+  const el = $('schedSetup');
+  el.classList.remove('hidden');
+  el.style.display = '';
+
+  // State
+  const selectedClasses = new Set(prefill.map(p => p.course));
+  const teacherChoices  = {};
+  prefill.forEach(p => { teacherChoices[p.course] = p.teacher; });
+  let teacherStepIdx = 0;
+  let chosenGrade    = localStorage.getItem('lumi_grade') || null;
+
+  const steps = [$('ssStep1'), $('ssStep2'), $('ssStep3'), $('ssStep4')];
+
+  function setStep(n) {
+    steps.forEach((s, i) => s.classList.toggle('active', i === n));
+    $('schedProgFill').style.width = Math.round((n / 4) * 100) + '%';
+    $('schedProgLabel').textContent = `Step ${n + 1} of 4`;
+    el.scrollTop = 0;
+  }
+
+  // ── Step 1: class picker ──────────────────────────────────────────────────
+  function buildClassList(filter) {
+    const list = $('ssClassList');
+    list.innerHTML = '';
+    const q = (filter || '').toLowerCase().trim();
+    Object.entries(MENLO_CURRICULUM).forEach(([subject, courses]) => {
+      const matching = Object.keys(courses).filter(c =>
+        !q || c.toLowerCase().includes(q) || subject.toLowerCase().includes(q));
+      if (!matching.length) return;
+      const hdr = document.createElement('div');
+      hdr.className = 'sched-subj-header';
+      hdr.textContent = subject;
+      list.appendChild(hdr);
+      matching.forEach(course => {
+        const sel = selectedClasses.has(course);
+        const item = document.createElement('div');
+        item.className = 'sched-class-item' + (sel ? ' selected' : '');
+        const check = document.createElement('div');
+        check.className = 'sched-class-check';
+        check.textContent = sel ? '✓' : '';
+        const label = document.createElement('span');
+        label.textContent = course;
+        item.appendChild(label);
+        item.appendChild(check);
+        item.addEventListener('click', () => {
+          if (selectedClasses.has(course)) {
+            selectedClasses.delete(course);
+            delete teacherChoices[course];
+          } else {
+            selectedClasses.add(course);
+          }
+          buildClassList($('ssClassSearch').value);
+          updateStep1Btn();
+        });
+        list.appendChild(item);
+      });
+    });
+  }
+
+  function updateStep1Btn() {
+    const n = selectedClasses.size;
+    $('ssStep1Next').disabled = n === 0;
+    $('ssSelectionHint').textContent = n === 0
+      ? 'Select all your classes to continue'
+      : `${n} class${n !== 1 ? 'es' : ''} selected — tap Continue when done`;
+  }
+
+  buildClassList('');
+  updateStep1Btn();
+
+  $('ssClassSearch').addEventListener('input', function() { buildClassList(this.value); });
+
+  $('ssStep1Next').addEventListener('click', () => {
+    teacherStepIdx = 0;
+    showTeacherStep();
+    setStep(1);
+  });
+
+  // ── Step 2: teacher picker ────────────────────────────────────────────────
+  function getSelectedArray() { return [...selectedClasses]; }
+
+  function showTeacherStep() {
+    const arr = getSelectedArray();
+    if (teacherStepIdx >= arr.length) {
+      // All teachers chosen — go to grade
+      setStep(2);
+      if (chosenGrade) {
+        document.querySelectorAll('.sched-grade-btn').forEach(b =>
+          b.classList.toggle('selected', b.dataset.grade === chosenGrade));
+        $('ssStep3Next').disabled = false;
+      }
+      return;
+    }
+    const course = arr[teacherStepIdx];
+    $('ssTeacherClassName').textContent = course;
+    $('ssTeacherProgress').textContent  = `Class ${teacherStepIdx + 1} of ${arr.length}`;
+    const teacherList = $('ssTeacherList');
+    teacherList.innerHTML = '';
+    let teachers = [];
+    for (const [, courses] of Object.entries(MENLO_CURRICULUM)) {
+      if (courses[course]) { teachers = courses[course]; break; }
+    }
+    teachers.forEach(t => {
+      const btn = document.createElement('button');
+      btn.className = 'sched-teacher-btn' + (teacherChoices[course] === t ? ' selected' : '');
+      btn.textContent = t;
+      btn.addEventListener('click', () => {
+        teacherList.querySelectorAll('.sched-teacher-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        teacherChoices[course] = t;
+        $('ssStep2Next').disabled = false;
+      });
+      teacherList.appendChild(btn);
+    });
+    $('ssStep2Next').disabled = !teacherChoices[course];
+  }
+
+  $('ssStep2Next').addEventListener('click', () => {
+    teacherStepIdx++;
+    showTeacherStep();
+  });
+
+  $('ssStep2Back').addEventListener('click', () => {
+    if (teacherStepIdx === 0) {
+      setStep(0);
+    } else {
+      teacherStepIdx--;
+      showTeacherStep();
+    }
+  });
+
+  // ── Step 3: grade ─────────────────────────────────────────────────────────
+  document.querySelectorAll('.sched-grade-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.sched-grade-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      chosenGrade = btn.dataset.grade;
+      $('ssStep3Next').disabled = false;
+    });
+  });
+
+  $('ssStep3Next').addEventListener('click', () => {
+    buildConfirmList();
+    setStep(3);
+  });
+
+  $('ssStep3Back').addEventListener('click', () => {
+    teacherStepIdx = Math.max(0, getSelectedArray().length - 1);
+    showTeacherStep();
+    setStep(1);
+  });
+
+  // ── Step 4: confirmation ──────────────────────────────────────────────────
+  function buildConfirmList() {
+    const list = $('ssConfirmList');
+    list.innerHTML = '';
+    getSelectedArray().forEach(course => {
+      const teacher = teacherChoices[course] || '—';
+      const item = document.createElement('div');
+      item.className = 'sched-confirm-item';
+      const courseEl = document.createElement('span');
+      courseEl.className = 'sched-confirm-course';
+      courseEl.textContent = course;
+      const teacherEl = document.createElement('span');
+      teacherEl.className = 'sched-confirm-teacher';
+      teacherEl.textContent = teacher;
+      item.appendChild(courseEl);
+      item.appendChild(teacherEl);
+      list.appendChild(item);
+    });
+  }
+
+  $('ssStep4Edit').addEventListener('click', () => {
+    buildClassList($('ssClassSearch').value);
+    updateStep1Btn();
+    setStep(0);
+  });
+
+  $('ssStep4Done').addEventListener('click', () => {
+    const schedule = getSelectedArray().map(course => {
+      const subject = Object.entries(MENLO_CURRICULUM)
+        .find(([, courses]) => courses[course])?.[0] || '';
+      return { course, teacher: teacherChoices[course] || '', subject };
+    });
+    saveScheduleLocal(schedule);
+    if (chosenGrade) localStorage.setItem('lumi_grade', chosenGrade);
+    syncScheduleToSupabase(schedule);
+    el.classList.add('hidden');
+    setTimeout(() => { el.style.display = 'none'; onDone(); }, 400);
+  });
+
+  setStep(0);
+}
+
 // ─── ONBOARDING ───────────────────────────────────────────────────────────────
 function initOnboarding(onDone) {
   const ob      = $('onboarding');
@@ -1273,6 +1551,59 @@ function initOnboarding(onDone) {
   });
 }
 
+// ─── SEMESTER BANNER ─────────────────────────────────────────────────────────
+function checkSemesterBanner() {
+  const existing = document.getElementById('semesterBanner');
+  if (existing) existing.remove();
+
+  // Don't show if no schedule set yet
+  if (!getSchedule().length) return;
+
+  const now = new Date();
+  const m = now.getMonth() + 1; // 1-12
+  const d = now.getDate();
+
+  // Check dismiss (within 30 days)
+  const dismissed = localStorage.getItem('lumi_banner_dismissed');
+  if (dismissed && (Date.now() - parseInt(dismissed, 10)) < 30 * 24 * 60 * 60 * 1000) return;
+
+  let type = null, icon = '', text = '', dismissLabel = 'Dismiss';
+
+  // Add/drop window (more specific) takes priority
+  if ((m === 9 && d >= 1 && d <= 14) || (m === 2 && d >= 1 && d <= 14)) {
+    type = 'add-drop'; icon = '📋';
+    text = 'Add/drop period is open — did your schedule change?';
+    dismissLabel = 'No changes';
+  } else if ((m === 8 && d >= 1) || m === 9 || m === 1 || (m === 2 && d <= 15)) {
+    type = 'new-sem'; icon = '🎒';
+    text = 'New semester starting — is your schedule still accurate?';
+  }
+
+  if (!type) return;
+
+  const banner = document.createElement('div');
+  banner.id = 'semesterBanner';
+  banner.className = `semester-banner ${type}`;
+  banner.innerHTML = `
+    <div class="semester-banner-text">${icon} ${text}</div>
+    <div class="semester-banner-btns">
+      <button class="semester-banner-btn primary" id="bannerUpdate">Update Schedule</button>
+      <button class="semester-banner-btn ghost" id="bannerDismiss">${dismissLabel}</button>
+    </div>`;
+
+  const main = document.querySelector('.main');
+  if (main) main.insertBefore(banner, main.firstChild);
+
+  document.getElementById('bannerUpdate').addEventListener('click', () => {
+    banner.remove();
+    initScheduleSetup(() => { renderSidebar(); }, getSchedule());
+  });
+  document.getElementById('bannerDismiss').addEventListener('click', () => {
+    localStorage.setItem('lumi_banner_dismissed', Date.now().toString());
+    banner.remove();
+  });
+}
+
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 function init() {
   // Theme
@@ -1285,16 +1616,32 @@ function init() {
   const savedKey = localStorage.getItem('lumi_key');
   if (savedKey) keyInput.value = savedKey;
 
-  // Onboarding
-  const onboarded = localStorage.getItem('lumi_name');
-  if (!onboarded) {
+  // Onboarding + schedule setup
+  const hasName     = !!localStorage.getItem('lumi_name');
+  const hasSchedule = getSchedule().length > 0;
+
+  wireListeners(savedKey);
+
+  if (!hasName) {
     $('onboarding').style.display = '';
-    initOnboarding(() => { wireListeners(savedKey); startApp(savedKey); });
+    initOnboarding(() => {
+      if (!getSchedule().length) {
+        initScheduleSetup(() => startApp(savedKey));
+      } else {
+        startApp(savedKey);
+      }
+    });
     return;
   }
+
   $('onboarding').style.display = 'none';
+
+  if (!hasSchedule) {
+    initScheduleSetup(() => startApp(savedKey));
+    return;
+  }
+
   startApp(savedKey);
-  wireListeners(savedKey);
 }
 
 function wireListeners(savedKey) {
@@ -1334,6 +1681,11 @@ function wireListeners(savedKey) {
     } else {
       showToast('Please enter a valid API key (starts with sk-ant-).');
     }
+  });
+
+  $('updateScheduleBtn').addEventListener('click', () => {
+    closeSettings();
+    initScheduleSetup(() => { renderSidebar(); }, getSchedule());
   });
 
   $('signOutBtn').addEventListener('click', async () => {
@@ -1406,6 +1758,7 @@ function startApp(savedKey) {
   S.currentId = genId();
   renderSidebar();
   showWelcome();
+  checkSemesterBanner();
   if (!savedKey) showNoKeyBanner();
 }
 

@@ -533,3 +533,91 @@ body.signin-page{
   box-shadow:0 0 28px var(--accent-glow);animation:lumiBreathe 3s ease-in-out infinite;
 }
 .auth-loading-text{font-size:13px;color:var(--text-muted)}
+
+/* ─── SCHEDULE SETUP ─────────────────────────────────────── */
+.sched-setup{position:fixed;inset:0;z-index:2000;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:28px 16px 24px;overflow-y:auto;transition:opacity .4s ease;}
+.sched-setup.hidden{opacity:0;pointer-events:none}
+.sched-logo{display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:20px;flex-shrink:0}
+.sched-logo-mark{width:44px;height:44px;background:var(--accent);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 0 22px var(--accent-glow);animation:lumiBreathe 3s ease-in-out infinite;}
+.sched-logo-name{font-size:18px;font-weight:600;letter-spacing:-.3px}
+.sched-logo-school{font-size:11px;color:var(--text-muted)}
+.sched-progress-wrap{width:100%;max-width:440px;margin-bottom:16px;flex-shrink:0}
+.sched-prog-track{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:6px}
+.sched-prog-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s ease}
+.sched-prog-label{font-size:11px;color:var(--text-muted);text-align:right}
+.sched-card{width:100%;max-width:440px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:24px;flex-shrink:0}
+.sched-step{display:none;flex-direction:column;gap:14px}
+.sched-step.active{display:flex}
+.sched-welcome{font-size:13px;color:var(--text-muted);line-height:1.65;background:var(--accent-soft);border:1px solid rgba(123,105,245,.15);border-radius:10px;padding:12px 14px;}
+.sched-prog-sub{font-size:11px;color:var(--text-muted)}
+.sched-q{font-size:15px;font-weight:600;color:var(--text);line-height:1.45}
+.sched-search-input{width:100%;background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:14px;padding:10px 13px;outline:none;transition:border-color .2s;}
+.sched-search-input:focus{border-color:var(--accent)}
+.sched-search-input::placeholder{color:var(--text-faint)}
+.sched-class-list{max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);}
+.sched-class-list::-webkit-scrollbar{width:3px}
+.sched-class-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.sched-subj-header{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;padding:8px 12px 4px;position:sticky;top:0;background:var(--surface-2);}
+.sched-class-item{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;cursor:pointer;transition:background .15s;border-bottom:1px solid var(--border);font-size:13px;color:var(--text);}
+.sched-class-item:last-child{border-bottom:none}
+.sched-class-item:hover{background:var(--accent-soft)}
+.sched-class-item.selected{background:var(--accent-soft);color:var(--accent)}
+.sched-class-check{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;transition:all .15s;}
+.sched-class-item.selected .sched-class-check{background:var(--accent);border-color:var(--accent);color:#fff}
+.sched-selection-hint{font-size:12px;color:var(--text-muted);text-align:center}
+.sched-teacher-list{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;}
+.sched-teacher-btn{display:flex;align-items:center;padding:11px 14px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;text-align:left;gap:8px;}
+.sched-teacher-btn:hover{border-color:var(--accent);color:var(--accent)}
+.sched-teacher-btn.selected{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.sched-grades{display:flex;gap:8px}
+.sched-grade-btn{flex:1;padding:12px 8px;background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:all .18s;min-height:44px;}
+.sched-grade-btn:hover{border-color:var(--accent);color:var(--accent)}
+.sched-grade-btn.selected{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.sched-confirm-list{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;}
+.sched-confirm-item{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;}
+.sched-confirm-course{font-weight:500;color:var(--text)}
+.sched-confirm-teacher{color:var(--text-muted);font-size:12px}
+.sched-step-nav{display:flex;gap:8px;align-items:center}
+.sched-back-btn{padding:11px 16px;background:transparent;border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-family:inherit;font-size:13px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.sched-back-btn:hover{border-color:var(--text-muted);color:var(--text)}
+.sched-cta{width:100%;padding:13px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;opacity:.4;min-height:44px;}
+.sched-cta:not([disabled]){opacity:1;box-shadow:0 2px 14px var(--accent-glow)}
+.sched-cta:not([disabled]):hover{opacity:.88}
+.sched-cta-sm{flex:1;padding:11px 16px;font-size:13px;min-height:44px;opacity:1;box-shadow:none;}
+.sched-cta-sm[disabled]{opacity:.4;box-shadow:none;cursor:default}
+.sched-cta-sm:not([disabled]):hover{opacity:.88;box-shadow:0 2px 10px var(--accent-glow)}
+@media(max-width:480px){
+  .sched-setup{padding:20px 12px 16px}
+  .sched-card{padding:18px 14px;border-radius:16px}
+  .sched-class-list{max-height:200px}
+  .sched-teacher-list{max-height:200px}
+  .sched-confirm-list{max-height:200px}
+}
+
+/* ─── SEMESTER BANNER ────────────────────────────────────── */
+.semester-banner{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:10px;margin:12px 12px 0;border:1px solid;font-size:13px;line-height:1.4;flex-wrap:wrap;}
+.semester-banner.new-sem{background:rgba(123,105,245,.08);border-color:rgba(123,105,245,.25);color:var(--text)}
+.semester-banner.add-drop{background:rgba(80,160,255,.07);border-color:rgba(80,160,255,.2);color:var(--text)}
+.semester-banner-text{flex:1;min-width:200px}
+.semester-banner-btns{display:flex;gap:6px;flex-shrink:0}
+.semester-banner-btn{padding:5px 11px;border-radius:6px;font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;border:1px solid transparent;}
+.semester-banner-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.semester-banner-btn.primary:hover{opacity:.88}
+.semester-banner-btn.ghost{background:transparent;color:var(--text-muted);border-color:var(--border)}
+.semester-banner-btn.ghost:hover{color:var(--text);border-color:var(--text-muted)}
+
+/* ─── MY CLASSES SIDEBAR ─────────────────────────────────── */
+.sb-my-classes-hd{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;padding:8px 8px 4px;}
+.sb-my-class-item{display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--text);transition:all .15s;min-height:34px;}
+.sb-my-class-item:hover{background:var(--surface-2);color:var(--text)}
+.sb-my-class-item.active{background:var(--accent-soft);color:var(--accent)}
+.sb-my-class-icon{font-size:13px;flex-shrink:0}
+.sb-my-class-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.sb-my-class-teacher{font-size:11px;color:var(--text-muted);flex-shrink:0}
+.sb-my-class-item.active .sb-my-class-teacher{color:var(--accent);opacity:.7}
+.sb-add-class{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:12px;color:var(--text-muted);transition:all .15s;margin-top:2px;}
+.sb-add-class:hover{background:var(--surface-2);color:var(--accent)}
+.sb-all-classes-toggle{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;color:var(--text-muted);transition:all .15s;margin-top:2px;}
+.sb-all-classes-toggle:hover{background:var(--surface-2);color:var(--text)}
+.sb-all-classes-toggle svg{width:12px;height:12px;stroke:currentColor;fill:none;transition:transform .2s;flex-shrink:0}
+.sb-all-classes-toggle.open svg{transform:rotate(90deg)}
