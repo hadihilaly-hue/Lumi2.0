@@ -372,7 +372,8 @@ body { overflow: auto; display: block; }
 <!-- AUTH LOADING -->
 <div id="authLoading">
   <div class="auth-spinner"></div>
-  <div style="font-size:13px;color:var(--text-muted)">Loading…</div>
+  <div id="tAuthText" style="font-size:13px;color:var(--text-muted);margin-top:10px">Loading…</div>
+  <button id="tReloadBtn" onclick="location.reload()" style="display:none;margin-top:16px;padding:10px 22px;background:var(--accent);border:none;border-radius:10px;color:#fff;font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;">Reload</button>
 </div>
 
 <!-- SIGN-IN VIEW -->
@@ -695,6 +696,15 @@ function showView(name) {
 }
 
 // ─── AUTH INIT ────────────────────────────────────────────────────────────────
+
+// Hard timeout — show reload button if nothing happens in 10s
+const _tLoadTimeout = setTimeout(() => {
+  const txt = document.getElementById('tAuthText');
+  const btn = document.getElementById('tReloadBtn');
+  if (txt) txt.textContent = 'Taking longer than expected…';
+  if (btn) btn.style.display = 'inline-block';
+}, 10000);
+
 (async () => {
   // Show params error
   const params = new URLSearchParams(window.location.search);
@@ -705,24 +715,34 @@ function showView(name) {
     history.replaceState({}, '', window.location.pathname);
   }
 
-  // Try existing session first
-  const { data: { session } } = await sb.auth.getSession();
+  // Try existing session first — use safe timeout version
+  let session = null;
+  try {
+    const result = await Promise.race([
+      sb.auth.getSession(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
+    ]);
+    session = result.data?.session;
+  } catch { /* timed out — fall through to sign-in */ }
+
+  clearTimeout(_tLoadTimeout);
+
   if (session?.user) {
     handleUser(session.user);
     return;
   }
 
-  // Wait for OAuth redirect / auth state change
-  const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
+  // No session — check if this is an OAuth redirect (token in URL hash)
+  const { data: { subscription } } = sb.auth.onAuthStateChange((event, sess) => {
     subscription.unsubscribe();
-    if (session?.user) { handleUser(session.user); }
-    else               { showView('signinView'); wireSigninBtn(); }
+    if (sess?.user) { handleUser(sess.user); }
+    else            { showView('signinView'); wireSigninBtn(); }
   });
   setTimeout(() => {
     subscription.unsubscribe();
     showView('signinView');
     wireSigninBtn();
-  }, 5000);
+  }, 4000);
 })();
 
 function handleUser(user) {
