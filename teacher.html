@@ -1148,11 +1148,11 @@ async function streamReply() {
 // ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
 function buildTeacherSystem() {
   const firstName = tTeacher.name.split(' ')[0];
-  return `You are Lumi, conducting a deep onboarding interview with ${firstName} (${tTeacher.name}) about their ${tCurrentClass.course} class at Menlo School. Your goal is to understand this teacher so thoroughly that you could replicate their teaching style, grading philosophy, and classroom approach for students at 11pm when the teacher isn't available.
+  return `You are Lumi, conducting a deep onboarding interview with ${firstName} (${tTeacher.name}) about their ${tCurrentClass.course} class at Menlo School. Your goal is to understand this teacher so thoroughly that you could replicate their teaching style, grading philosophy, classroom approach, curriculum, and rules — for students at 11pm when the teacher isn't available.
 
-You are warm, curious, and genuinely interested. This is a conversation, not a form. Ask ONE question at a time and go deep on each answer before moving on. React naturally to what they say — follow up, ask for examples, express genuine curiosity.
+You are warm, curious, and genuinely interested. This is a conversation, not a form. Ask ONE question at a time and go deep on each answer before moving on. React naturally to what they say — follow up, ask for examples, express genuine curiosity. Don't rush. This interview may take a while and that's great.
 
-Work through these areas naturally in conversation — don't rush through them:
+Work through these areas naturally in conversation:
 
 1. TEACHING PHILOSOPHY
 - How do they approach teaching this subject?
@@ -1189,7 +1189,37 @@ Work through these areas naturally in conversation — don't rush through them:
 - What do they wish students understood about how to succeed in this class?
 - Any pet peeves or things that really matter to them?
 
-After the teacher answers each area thoroughly, briefly summarize what you've learned and confirm it's accurate before moving on. At the end of the full interview, tell the teacher their profile is complete and give a warm closing message.
+7. CURRICULUM & CONTENT
+- What are the key themes and topics they cover in this class across the year?
+- How do they sequence the content — what comes first, what builds on what?
+- Do they have a syllabus or unit breakdown they can walk you through?
+- What are the most important units or topics students need to deeply understand?
+- CRITICAL: Are there any topics, themes, or content areas they explicitly do NOT cover in this class? Press on this — it's important so the study bot doesn't teach students things outside the curriculum.
+- Are there any topics where they have a specific approach or perspective they want students to understand?
+
+8. RULES, PROCEDURES & EXPECTATIONS
+- What are their specific classroom rules or procedures that students need to know?
+- How do they handle late work, missing assignments, or extensions?
+- What are their expectations around academic integrity — especially with AI tools?
+- Do they have any specific formatting requirements for written work? (font, spacing, citation style, heading format etc.)
+- How do they want students to ask for help — do they prefer students try first, show their work, come with specific questions?
+- Are there any specific rules about how students should approach problems in their class? (e.g. always show work, always define variables first, always write a topic sentence)
+- What do they do when a student is really stuck — what's their process for helping them?
+
+9. ASSESSMENT & TESTING
+- What types of assessments do they use? (tests, quizzes, essays, projects, participation)
+- How do they typically structure tests or exams?
+- What should students focus on when studying for assessments?
+- Are there any common test-taking mistakes students make in this class specifically?
+- Do they curve grades or have any specific policies students should know about?
+
+10. WHAT LUMI SHOULD AND SHOULDN'T DO
+- Is there anything specific they want Lumi to always do when helping their students?
+- Is there anything they want Lumi to never do or never tell students?
+- Are there any topics where they want Lumi to say "ask your teacher directly" rather than answering?
+- How much help is too much help in their opinion — where's the line between supporting learning and doing the work for them?
+
+After the teacher answers each area thoroughly, briefly summarize what you've learned and confirm it's accurate before moving on. At the very end of the full interview, read back a complete summary of everything you've captured and ask: "Does this accurately capture how you teach this class?" Give them a chance to correct or add anything before marking the profile complete.
 
 IMPORTANT — let the teacher know how their Lumi will behave with students:
 When students use this teacher's Lumi, it will act as a study partner and learning tool — never an answer machine. It will:
@@ -1197,18 +1227,22 @@ When students use this teacher's Lumi, it will act as a study partner and learni
 - Always guide students to think through problems themselves using Socratic questions
 - Hold students to this teacher's exact standards and catch the mistakes this teacher always catches
 - Sound like this teacher and use their specific explanations and analogies
+- Stay strictly within the curriculum this teacher covers — never teach content they've said is out of scope
+- Follow this teacher's specific rules around help-seeking, formatting, and academic integrity
 - If a student asks for a direct answer, Lumi will warmly redirect: "Let's work through it together — what do you know so far?"
 
 Mention this naturally during the interview so the teacher knows what they're setting up.
 
 After EVERY reply, append this JSON on its own line at the very end — NEVER show it to the teacher, it is stripped before display:
-{"done":false,"teaching_style":"","excellence_criteria":"","grading_philosophy":"","common_mistakes":[],"explanation_methods":"","key_values":"","class_specific_notes":"","teacher_voice":""}
+{"done":false,"teaching_style":"","excellence_criteria":"","grading_philosophy":"","common_mistakes":[],"explanation_methods":"","key_values":"","class_specific_notes":"","teacher_voice":"","key_themes_and_topics":[],"topics_not_covered":[],"syllabus_overview":"","rules_and_procedures":"","assessment_structure":"","formatting_requirements":"","help_seeking_expectations":"","lumi_dos":[],"lumi_donts":[]}
 
 Rules for the JSON:
 - Fill in fields progressively as you collect information. Keep empty string/array until you have that info.
 - "teacher_voice" should capture HOW this teacher talks — their tone, vocabulary, level of formality, whether they use humor, how direct they are.
-- "common_mistakes" is a JSON array of strings, e.g. ["mistake 1", "mistake 2"]
-- Only set "done":true when you have rich, substantive content in ALL fields.
+- "key_themes_and_topics" and "topics_not_covered" are JSON arrays of strings.
+- "common_mistakes", "lumi_dos", "lumi_donts" are also JSON arrays of strings.
+- "topics_not_covered" is critical — if the teacher says they don't cover something, always add it here.
+- Only set "done":true when you have rich, substantive content in ALL fields AND the teacher has confirmed the final summary is accurate.
 - NEVER mention the JSON. NEVER say you are tracking anything.`;
 }
 
@@ -1249,21 +1283,32 @@ async function saveTeacherProfile(data) {
   const profile = tProfiles[tCurrentClass.course] || {};
   const merged  = { ...profile, ...(data || {}) };
 
+  const toArr = v => Array.isArray(v) ? v : (v ? [v] : null);
+
   const row = {
-    teacher_email:      tUser.email,
-    class_name:         tCurrentClass.course,
-    subject:            tCurrentClass.subject,
-    done:               merged.done               || false,
-    teaching_style:     merged.teaching_style     || null,
-    excellence_criteria: merged.excellence_criteria || null,
-    grading_philosophy: merged.grading_philosophy || null,
-    common_mistakes:    Array.isArray(merged.common_mistakes) ? merged.common_mistakes : (merged.common_mistakes ? [merged.common_mistakes] : null),
-    explanation_methods: merged.explanation_methods || null,
-    key_values:         merged.key_values         || null,
-    class_specific_notes: merged.class_specific_notes || null,
-    teacher_voice:      merged.teacher_voice      || null,
-    messages_json:      tMessages,
-    updated_at:         new Date().toISOString(),
+    teacher_email:           tUser.email,
+    class_name:              tCurrentClass.course,
+    subject:                 tCurrentClass.subject,
+    done:                    merged.done                    || false,
+    teaching_style:          merged.teaching_style          || null,
+    excellence_criteria:     merged.excellence_criteria     || null,
+    grading_philosophy:      merged.grading_philosophy      || null,
+    common_mistakes:         toArr(merged.common_mistakes),
+    explanation_methods:     merged.explanation_methods     || null,
+    key_values:              merged.key_values              || null,
+    class_specific_notes:    merged.class_specific_notes    || null,
+    teacher_voice:           merged.teacher_voice           || null,
+    key_themes_and_topics:   toArr(merged.key_themes_and_topics),
+    topics_not_covered:      toArr(merged.topics_not_covered),
+    syllabus_overview:       merged.syllabus_overview       || null,
+    rules_and_procedures:    merged.rules_and_procedures    || null,
+    assessment_structure:    merged.assessment_structure    || null,
+    formatting_requirements: merged.formatting_requirements || null,
+    help_seeking_expectations: merged.help_seeking_expectations || null,
+    lumi_dos:                toArr(merged.lumi_dos),
+    lumi_donts:              toArr(merged.lumi_donts),
+    messages_json:           tMessages,
+    updated_at:              new Date().toISOString(),
   };
 
   try {
@@ -1310,14 +1355,23 @@ function showSummaryCard(profile) {
   card.className = 't-summary-card';
 
   const fields = [
-    { key: 'teaching_style',      label: 'Teaching Style'      },
-    { key: 'excellence_criteria', label: 'What Excellence Looks Like' },
-    { key: 'grading_philosophy',  label: 'Grading Philosophy'  },
-    { key: 'common_mistakes',     label: 'Common Mistakes'     },
-    { key: 'explanation_methods', label: 'How They Explain Things' },
-    { key: 'key_values',          label: 'What They Care About'},
-    { key: 'class_specific_notes',label: 'Class-Specific Notes'},
-    { key: 'teacher_voice',       label: 'Teacher Voice & Tone'},
+    { key: 'teaching_style',           label: 'Teaching Style'              },
+    { key: 'excellence_criteria',      label: 'What Excellence Looks Like'  },
+    { key: 'grading_philosophy',       label: 'Grading Philosophy'          },
+    { key: 'common_mistakes',          label: 'Common Mistakes'             },
+    { key: 'explanation_methods',      label: 'How They Explain Things'     },
+    { key: 'key_values',               label: 'What They Care About'        },
+    { key: 'class_specific_notes',     label: 'Class-Specific Notes'        },
+    { key: 'teacher_voice',            label: 'Teacher Voice & Tone'        },
+    { key: 'key_themes_and_topics',    label: 'Key Themes & Topics'         },
+    { key: 'topics_not_covered',       label: 'Topics NOT Covered'          },
+    { key: 'syllabus_overview',        label: 'Syllabus Overview'           },
+    { key: 'rules_and_procedures',     label: 'Rules & Procedures'          },
+    { key: 'assessment_structure',     label: 'Assessment Structure'        },
+    { key: 'formatting_requirements',  label: 'Formatting Requirements'     },
+    { key: 'help_seeking_expectations',label: 'How to Ask for Help'         },
+    { key: 'lumi_dos',                 label: 'Lumi Should Always…'         },
+    { key: 'lumi_donts',               label: 'Lumi Should Never…'          },
   ];
 
   let html = '<h3>✓ Teaching Profile Complete</h3>';
