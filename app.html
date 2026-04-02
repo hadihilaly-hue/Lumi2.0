@@ -19,30 +19,39 @@
 
 <!-- ─── ONBOARDING ─────────────────────────────────────── -->
 <div class="onboarding" id="onboarding" style="display:none">
-  <div class="ob-logo">
-    <div class="ob-logo-mark">✦</div>
-    <div class="ob-logo-name">Lumi</div>
-    <div class="ob-logo-school">Menlo School</div>
-  </div>
-  <div class="ob-card">
-    <!-- Step 1: name -->
-    <div class="ob-step active" id="obStep1">
-      <div class="ob-q">Hey! I'm Lumi, your Menlo study companion.<span class="ob-q-sub">What should I call you?</span></div>
-      <input class="ob-name-input" id="obNameInput" placeholder="Your first name…" autocomplete="given-name" maxlength="40">
-      <button class="ob-cta" id="obNameNext" disabled>Continue →</button>
+
+  <!-- API-key gate (only shown when no key is saved) -->
+  <div class="ob-key-step" id="obKeyStep" style="display:none">
+    <div class="ob-logo">
+      <div class="ob-logo-mark">✦</div>
+      <div class="ob-logo-name">Lumi</div>
+      <div class="ob-logo-school">Menlo School</div>
     </div>
-    <!-- Step 2: grade -->
-    <div class="ob-step" id="obStep2">
-      <div class="ob-q" id="obGradeQ">Nice to meet you!<span class="ob-q-sub">What grade are you in?</span></div>
-      <div class="ob-grades">
-        <button class="ob-grade-btn" data-grade="9">9th</button>
-        <button class="ob-grade-btn" data-grade="10">10th</button>
-        <button class="ob-grade-btn" data-grade="11">11th</button>
-        <button class="ob-grade-btn" data-grade="12">12th</button>
-      </div>
-      <button class="ob-cta" id="obGradeNext" disabled>Let's go →</button>
+    <div class="ob-card">
+      <div class="ob-q">One quick thing first<span class="ob-q-sub">Lumi runs on the Claude API. Paste your Anthropic key to get started — it stays on your device.</span></div>
+      <input class="ob-name-input" id="obKeyInput" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+      <button class="ob-cta" id="obKeyNext" disabled>Start talking to Lumi →</button>
     </div>
   </div>
+
+  <!-- Conversational chat onboarding -->
+  <div class="ob-chat-wrap" id="obChatWrap" style="display:none">
+    <div class="ob-chat-header">
+      <div class="ob-logo-mark ob-chat-orb">✦</div>
+      <span class="ob-chat-title">Lumi</span>
+      <span class="ob-chat-subtitle">Menlo School</span>
+    </div>
+    <div class="ob-chat-messages" id="obMessages"></div>
+    <div class="ob-chat-foot">
+      <textarea class="ob-chat-input" id="obInput" placeholder="Type your answer…" rows="1" autocomplete="off"></textarea>
+      <button class="ob-chat-send" id="obSend" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
 </div>
 
 <!-- ─── SCHEDULE SETUP ──────────────────────────────────── -->
@@ -404,6 +413,6 @@
 <!-- Scripts at bottom so the loading screen renders immediately -->
 <script src="supabase.js"></script>
 <script src="auth.js"></script>
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>

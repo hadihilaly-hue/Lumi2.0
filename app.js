@@ -203,11 +203,35 @@ function getTeachers(subjectName, course) {
 function getStudentName() { return localStorage.getItem('lumi_name') || 'there'; }
 function getStudentGrade() { return localStorage.getItem('lumi_grade') || null; }
 function studentCtx() {
-  const name  = localStorage.getItem('lumi_name');
-  const grade = localStorage.getItem('lumi_grade');
-  if (name && grade) return `The student's name is ${name} and they are in grade ${grade} at Menlo School.`;
-  if (name) return `The student's name is ${name} and they attend Menlo School.`;
-  return 'The student attends Menlo School.';
+  const name       = localStorage.getItem('lumi_name');
+  const grade      = localStorage.getItem('lumi_grade');
+  const schedule   = getSchedule();
+  const style      = getStudyStyle();
+  const learning   = localStorage.getItem('lumi_learning_style') || '';
+  const hwStart    = localStorage.getItem('lumi_hw_start') || '';
+  const activities = localStorage.getItem('lumi_activities') || '';
+  const painPts    = (() => { try { return JSON.parse(localStorage.getItem('lumi_pain_points') || '[]'); } catch { return []; } })();
+
+  const learnMap = {
+    step_by_step:  'prefers step-by-step walkthroughs',
+    socratic:      'learns best through guiding questions',
+    example_first: 'learns best by seeing an example first then doing it themselves',
+    mixed:         'flexible learning style',
+  };
+
+  let ctx = name && grade
+    ? `The student's name is ${name} and they are in grade ${grade} at Menlo School.`
+    : name ? `The student's name is ${name} and they attend Menlo School.`
+    : 'The student attends Menlo School.';
+
+  if (schedule.length) ctx += `\nSchedule: ${schedule.map(s => `${s.course} (${s.teacher})`).join(', ')}.`;
+  if (learning && learnMap[learning]) ctx += `\nLearning style: ${learnMap[learning]}.`;
+  if (hwStart)    ctx += `\nUsually starts homework around ${hwStart}.`;
+  if (activities) ctx += `\nTypical activities: ${activities}.`;
+  if (painPts.length) ctx += `\nAreas that need extra support (never make them feel bad about these): ${painPts.join(', ')}.`;
+  ctx += `\nStudy style: ${style.work_minutes} min work / ${style.break_minutes} min break (${style.label}).`;
+  ctx += `\nBedtime: 10:30 PM — never schedule or encourage work past this time.`;
+  return ctx;
 }
 
 // ─── SHARED TEACHING PHILOSOPHY ──────────────────────────────────────────────
@@ -652,11 +676,27 @@ function syncProfileToSupabase() {
     goals:     [...S.goals],
     interests: [...S.interests],
   };
+  // New onboarding fields
+  const learning_style      = localStorage.getItem('lumi_learning_style') || null;
+  const typical_activities  = localStorage.getItem('lumi_activities') || null;
+  const homework_start_time = localStorage.getItem('lumi_hw_start') || null;
+  const onboarding_complete = localStorage.getItem('lumi_onboarding_complete') === 'true';
+  let pain_points = [];
+  try { pain_points = JSON.parse(localStorage.getItem('lumi_pain_points') || '[]'); } catch {}
+  let study_style = null;
+  try { study_style = JSON.parse(localStorage.getItem('lumi_study_style') || 'null'); } catch {}
+
   sb.from('profiles').upsert({
     id:             currentUser.id,
     name:           name  || null,
     grade:          grade || null,
     values_profile,
+    learning_style,
+    pain_points,
+    typical_activities,
+    homework_start_time,
+    study_style,
+    onboarding_complete,
   }, { onConflict: 'id' })
     .then(({ error }) => { if (error) console.warn('Supabase profile sync error:', error); });
 }
@@ -668,7 +708,7 @@ async function loadProfileFromSupabase() {
   try {
     const { data, error } = await sb
       .from('profiles')
-      .select('name, grade, values_profile, schedule')
+      .select('name, grade, values_profile, schedule, learning_style, pain_points, typical_activities, homework_start_time, study_style, onboarding_complete')
       .eq('id', currentUser.id)
       .single();
     if (error || !data) return;
@@ -684,6 +724,19 @@ async function loadProfileFromSupabase() {
       (vp.goals     || []).forEach(g => S.goals.add(g));
       (vp.interests || []).forEach(i => S.interests.add(i));
     }
+    // Restore new onboarding fields if not already set
+    if (data.learning_style && !localStorage.getItem('lumi_learning_style'))
+      localStorage.setItem('lumi_learning_style', data.learning_style);
+    if (data.pain_points?.length && !localStorage.getItem('lumi_pain_points'))
+      localStorage.setItem('lumi_pain_points', JSON.stringify(data.pain_points));
+    if (data.typical_activities && !localStorage.getItem('lumi_activities'))
+      localStorage.setItem('lumi_activities', data.typical_activities);
+    if (data.homework_start_time && !localStorage.getItem('lumi_hw_start'))
+      localStorage.setItem('lumi_hw_start', data.homework_start_time);
+    if (data.study_style && !localStorage.getItem('lumi_study_style'))
+      localStorage.setItem('lumi_study_style', JSON.stringify(data.study_style));
+    if (data.onboarding_complete && !localStorage.getItem('lumi_onboarding_complete'))
+      localStorage.setItem('lumi_onboarding_complete', 'true');
   } catch (err) {
     console.warn('Supabase profile load failed:', err);
   }
@@ -1717,57 +1770,376 @@ function initScheduleSetup(onDone, prefill = []) {
   setStep(0);
 }
 
-// ─── ONBOARDING ───────────────────────────────────────────────────────────────
+// ─── ONBOARDING (Conversational AI) ──────────────────────────────────────────
+
+// Onboarding conversation state
+const OB = {
+  messages: [],
+  profile: {
+    name: '', grade: '', schedule_raw: [],
+    study_style: { work_minutes: 25, break_minutes: 5, label: 'Short Bursts' },
+    learning_style: 'mixed', homework_start_time: '18:00',
+    typical_activities: '', pain_points: [],
+    calendar_connected: false, onboarding_complete: false,
+  },
+  busy:   false,
+  onDone: null,
+};
+
+function buildOnboardingSystem() {
+  // Include a condensed course list so the AI can match classes
+  const courseList = Object.entries(MENLO_CURRICULUM)
+    .flatMap(([subj, courses]) => Object.keys(courses).map(c => c))
+    .slice(0, 100).join(', ');
+
+  return `You are Lumi, a warm and genuinely curious AI study buddy at Menlo School. This is your first conversation with this student. Your job: get to know them in exactly 7 questions so you can be genuinely useful.
+
+OPEN WITH THIS EXACT MESSAGE (then wait for a "yes" or "ready" before asking Q1):
+"Hey! I'm Lumi — your Menlo study buddy. I'm not like a typical AI assistant. My whole job is to actually help you learn and stay on top of your work. To do that well I need to get to know you a little first. I've got 7 quick questions — should take about 3 minutes. Ready?"
+
+QUESTIONS — ask one at a time, react warmly to each answer before moving on. Use their name from Q1 onward.
+
+Q1: "First — what's your name and what grade are you in?"
+Q2: "What classes are you taking this semester? Just list them out — no need to be formal." For each class, ask in the same message: "And who's your teacher for [class]?" Try to match class names to this Menlo course list: ${courseList}
+Q3: "How do you like to study? Shorter bursts — 25 on, 5 off? Longer sessions to really get into flow? Something else?"
+Q4: "What does a typical school night look like? When do you get home, any practices or activities, when do you usually start homework?"
+Q5: "When you're really stuck on something — what actually helps? Step-by-step walkthrough, guiding questions until you get it yourself, or see an example and run with it?"
+Q6: "What's the hardest part of school for you right now? Could be a subject, keeping up with deadlines, test anxiety — anything."
+Q7: "Last thing — do you use Google Calendar? If you connect it I can plan your homework around your actual evening instead of guessing." If they say yes, include ###SHOW_CAL_BUTTON on its own line.
+
+WRAP UP: After Q7 is answered, say:
+"Perfect [Name]! Here's what I've got:
+📚 Your classes: [list class → teacher for each]
+⏱ Study style: [work_minutes] on, [break_minutes] off
+🌙 Bedtime: 10:30pm — non-negotiable
+[📅 Calendar: Connected ✓] or [📅 Calendar: Not connected yet]
+
+I'll use all of this every time we work together. Whenever you're ready to study just tell me what homework you have and I'll help you plan your night. Let's go! 🎉"
+
+RULES:
+- One question at a time — never ask two things at once
+- React genuinely before moving on ("Oh nice, calc BC is intense!" etc.)
+- If they give a vague answer, gently probe for more
+- Keep the whole thing warm and under 5 minutes
+- Never show raw data to the student
+- The 10:30pm bedtime is non-negotiable — confirm it warmly, don't ask about it
+
+After EVERY response (including the opening), append on the very last line:
+###PROFILE_UPDATE:{"name":"","grade":"","schedule_raw":[],"study_style":{"work_minutes":25,"break_minutes":5,"label":"Short Bursts"},"learning_style":"mixed","homework_start_time":"18:00","typical_activities":"","pain_points":[],"calendar_connected":false,"onboarding_complete":false}
+
+Only fill in fields you've actually learned from the student. Empty strings/arrays for unknown fields.
+schedule_raw format: [{"course":"Calculus BC","teacher":"Garrett"}]
+learning_style options: "step_by_step" | "socratic" | "example_first" | "mixed"
+Set onboarding_complete to true ONLY in the wrap-up message after all 7 questions.
+NEVER mention the JSON to the student. NEVER display it.`;
+}
+
 function initOnboarding(onDone) {
-  const ob      = $('onboarding');
-  const step1   = $('obStep1');
-  const step2   = $('obStep2');
-  const nameIn  = $('obNameInput');
-  const nameBtn = $('obNameNext');
-  const gradeQ  = $('obGradeQ');
-  const gradeBtn = $('obGradeNext');
-  let chosenGrade = null;
+  OB.onDone    = onDone;
+  OB.messages  = [];
+  OB.busy      = false;
+  const ob = $('onboarding');
+  ob.style.display = '';
 
-  // Pre-fill name from Google profile — if we have it, skip straight to grade step
+  // Pre-fill name from Google account
   const googleName = currentUser?.user_metadata?.full_name || currentUser?.user_metadata?.name || '';
-  const firstName  = googleName.split(' ')[0] || '';
-  if (firstName) {
-    nameIn.value     = firstName;
-    nameBtn.disabled = false;
-    // Auto-advance to grade step so user only has to pick a grade
-    goToStep2();
+  if (googleName) OB.profile.name = googleName.split(' ')[0];
+
+  const savedKey = localStorage.getItem('lumi_key');
+  if (!savedKey) {
+    showObKeyGate();
+  } else {
+    showObChatUI();
+    startObConversation();
+  }
+}
+
+function showObKeyGate() {
+  $('obKeyStep').style.display  = '';
+  $('obChatWrap').style.display = 'none';
+  const input = $('obKeyInput');
+  const btn   = $('obKeyNext');
+  input.addEventListener('input', () => { btn.disabled = !input.value.trim().startsWith('sk-'); });
+  btn.addEventListener('click', () => {
+    const key = input.value.trim();
+    if (!key) return;
+    localStorage.setItem('lumi_key', key);
+    showObChatUI();
+    startObConversation();
+  });
+}
+
+function showObChatUI() {
+  $('obKeyStep').style.display  = 'none';
+  $('obChatWrap').style.display = '';
+  const input = $('obInput');
+  const btn   = $('obSend');
+  input.addEventListener('input', () => {
+    obAutoGrow(input);
+    btn.disabled = !input.value.trim() || OB.busy;
+  });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey && !OB.busy) { e.preventDefault(); obSend(); }
+  });
+  btn.addEventListener('click', obSend);
+}
+
+function obAutoGrow(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 110) + 'px'; }
+
+function obRenderMsg(role, rawText, animate = false) {
+  const msgs = $('obMessages');
+  const wrap  = document.createElement('div');
+  wrap.className = 'ob-msg ' + role;
+
+  if (role === 'lumi') {
+    const av  = document.createElement('div');
+    av.className = 'ob-msg-avatar';
+    av.textContent = '✦';
+    wrap.appendChild(av);
   }
 
-  nameIn.addEventListener('input', () => { nameBtn.disabled = !nameIn.value.trim(); });
-  nameIn.addEventListener('keydown', e => { if (e.key === 'Enter' && nameIn.value.trim()) goToStep2(); });
-  nameBtn.addEventListener('click', goToStep2);
+  const bubble = document.createElement('div');
+  bubble.className = 'ob-msg-bubble';
 
-  function goToStep2() {
-    const name = nameIn.value.trim();
-    if (!name) return;
-    gradeQ.innerHTML = `Nice to meet you, ${escHtml(name)}!<span class="ob-q-sub">What grade are you in?</span>`;
-    step1.classList.remove('active');
-    step2.classList.add('active');
-  }
+  const hasCalBtn = rawText.includes('###SHOW_CAL_BUTTON');
+  const text = rawText.replace(/###SHOW_CAL_BUTTON\s*/g, '').trim();
 
-  step2.querySelectorAll('.ob-grade-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      step2.querySelectorAll('.ob-grade-btn').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      chosenGrade = btn.dataset.grade;
-      gradeBtn.disabled = false;
+  // Basic markdown rendering
+  bubble.innerHTML = text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g,'<em>$1</em>')
+    .replace(/\n\n+/g,'</p><p>')
+    .replace(/\n/g,'<br>')
+    .replace(/^/,'<p>').replace(/$/,'</p>');
+
+  if (hasCalBtn) {
+    const calBtn = document.createElement('button');
+    calBtn.className = 'ob-cal-btn';
+    calBtn.textContent = '📅 Connect Google Calendar';
+    calBtn.addEventListener('click', async () => {
+      calBtn.disabled = true;
+      calBtn.textContent = 'Connecting…';
+      await connectGoogleCalendar();
     });
-  });
+    bubble.appendChild(calBtn);
+  }
 
-  gradeBtn.addEventListener('click', () => {
-    if (!chosenGrade) return;
-    const name = nameIn.value.trim();
-    localStorage.setItem('lumi_name',  name);
-    localStorage.setItem('lumi_grade', chosenGrade);
-    syncProfileToSupabase();
-    ob.classList.add('hidden');
-    setTimeout(() => { ob.style.display = 'none'; onDone(); }, 500);
-  });
+  wrap.appendChild(bubble);
+  if (animate) { wrap.classList.add('ob-msg-enter'); }
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+  if (animate) requestAnimationFrame(() => wrap.classList.add('ob-msg-visible'));
+}
+
+function obShowTyping() {
+  const msgs = $('obMessages');
+  const wrap  = document.createElement('div');
+  wrap.className = 'ob-msg lumi';
+  wrap.id = 'obTyping';
+  const av = document.createElement('div'); av.className = 'ob-msg-avatar'; av.textContent = '✦';
+  const bubble = document.createElement('div'); bubble.className = 'ob-msg-bubble';
+  bubble.innerHTML = '<div class="typing"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>';
+  wrap.appendChild(av); wrap.appendChild(bubble);
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+function obHideTyping() { const t = $('obTyping'); if (t) t.remove(); }
+
+function obParseProfile(text) {
+  const m = text.match(/###PROFILE_UPDATE:\s*(\{[\s\S]*?\})\s*$/m);
+  if (!m) return null;
+  try { return JSON.parse(m[1]); } catch { return null; }
+}
+
+function obStripProfile(text) {
+  return text.replace(/###PROFILE_UPDATE:\s*\{[\s\S]*?\}\s*$/m, '').trim();
+}
+
+function obApplyProfile(data) {
+  if (!data) return;
+  if (data.name)                          OB.profile.name               = data.name;
+  if (data.grade)                         OB.profile.grade              = data.grade;
+  if (data.schedule_raw?.length)          OB.profile.schedule_raw       = data.schedule_raw;
+  if (data.study_style?.work_minutes)     OB.profile.study_style        = data.study_style;
+  if (data.learning_style && data.learning_style !== 'mixed') OB.profile.learning_style = data.learning_style;
+  if (data.homework_start_time && data.homework_start_time !== '18:00') OB.profile.homework_start_time = data.homework_start_time;
+  if (data.typical_activities)            OB.profile.typical_activities = data.typical_activities;
+  if (data.pain_points?.length)           OB.profile.pain_points        = data.pain_points;
+  if (data.calendar_connected)            OB.profile.calendar_connected = data.calendar_connected;
+  if (data.onboarding_complete)           OB.profile.onboarding_complete = data.onboarding_complete;
+
+  // Persist to localStorage immediately
+  if (OB.profile.name)               localStorage.setItem('lumi_name',           OB.profile.name);
+  if (OB.profile.grade)              localStorage.setItem('lumi_grade',          OB.profile.grade);
+  if (OB.profile.learning_style)     localStorage.setItem('lumi_learning_style', OB.profile.learning_style);
+  if (OB.profile.homework_start_time !== '18:00') localStorage.setItem('lumi_hw_start', OB.profile.homework_start_time);
+  if (OB.profile.typical_activities) localStorage.setItem('lumi_activities',     OB.profile.typical_activities);
+  if (OB.profile.pain_points?.length) localStorage.setItem('lumi_pain_points',  JSON.stringify(OB.profile.pain_points));
+  if (OB.profile.study_style?.work_minutes) saveStudyStyle(OB.profile.study_style);
+  if (OB.profile.calendar_connected) setCalendarConnected(true);
+
+  // Process schedule
+  if (OB.profile.schedule_raw?.length) {
+    const sched = obMatchSchedule(OB.profile.schedule_raw);
+    if (sched.length) { saveScheduleLocal(sched); syncScheduleToSupabase(sched); }
+  }
+
+  // On completion, save full profile to Supabase
+  if (OB.profile.onboarding_complete) {
+    localStorage.setItem('lumi_onboarding_complete', 'true');
+    obSaveFullProfile();
+  }
+}
+
+function obMatchSchedule(rawList) {
+  return rawList.map(({ course, teacher }) => {
+    const cNorm = (course || '').toLowerCase();
+    for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
+      for (const [cName, teachers] of Object.entries(courses)) {
+        const cnNorm = cName.toLowerCase();
+        const words  = cNorm.split(/\s+/);
+        if (cnNorm.includes(cNorm) || words.some(w => w.length > 3 && cnNorm.includes(w))) {
+          const tNorm   = (teacher || '').toLowerCase();
+          const matched = teachers.find(t =>
+            t.toLowerCase().includes(tNorm) ||
+            tNorm.includes(t.split(' ').slice(-1)[0].toLowerCase())
+          ) || teachers[0] || teacher || '';
+          return { course: cName, teacher: matched, subject };
+        }
+      }
+    }
+    return { course: course || '', teacher: teacher || '', subject: 'Other' };
+  }).filter(s => s.course);
+}
+
+async function obSaveFullProfile() {
+  if (!currentUser) return;
+  const schedule = getSchedule();
+  try {
+    await sb.from('profiles').upsert({
+      id:                  currentUser.id,
+      name:                OB.profile.name  || null,
+      grade:               OB.profile.grade || null,
+      schedule,
+      study_style:         OB.profile.study_style,
+      learning_style:      OB.profile.learning_style  || 'mixed',
+      homework_start_time: OB.profile.homework_start_time || '18:00',
+      typical_activities:  OB.profile.typical_activities || '',
+      pain_points:         OB.profile.pain_points || [],
+      calendar_connected:  OB.profile.calendar_connected || false,
+      onboarding_complete: true,
+    }, { onConflict: 'id' });
+  } catch (e) { console.warn('Profile save error:', e); }
+}
+
+async function startObConversation() {
+  OB.busy = true;
+  obShowTyping();
+  const key = localStorage.getItem('lumi_key');
+
+  // Seed with Google name if available so AI uses it immediately
+  const seedMsg = OB.profile.name
+    ? `Hi! My name is ${OB.profile.name}.`
+    : 'Hi!';
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        system: buildOnboardingSystem(),
+        messages: [{ role: 'user', content: seedMsg }],
+      }),
+    });
+    obHideTyping();
+    if (!res.ok) throw new Error('API error ' + res.status);
+    const resp = await res.json();
+    const full = resp.content?.[0]?.text || '';
+    const profileData = obParseProfile(full);
+    const clean = obStripProfile(full);
+    OB.messages = [
+      { role: 'user', content: seedMsg },
+      { role: 'assistant', content: clean },
+    ];
+    obRenderMsg('lumi', clean, true);
+    if (profileData) obApplyProfile(profileData);
+  } catch (e) {
+    obHideTyping();
+    obRenderMsg('lumi', "Hey! I'm Lumi — your Menlo study buddy. I'm having a bit of trouble connecting. Please check your API key in settings and refresh the page.", true);
+  }
+  OB.busy = false;
+  const btn = $('obSend');
+  if (btn) btn.disabled = false;
+}
+
+async function obSend() {
+  const input = $('obInput');
+  const text  = input.value.trim();
+  if (!text || OB.busy) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  $('obSend').disabled = true;
+
+  obRenderMsg('student', text);
+  OB.messages.push({ role: 'user', content: text });
+
+  OB.busy = true;
+  obShowTyping();
+  const key = localStorage.getItem('lumi_key');
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        system: buildOnboardingSystem(),
+        messages: OB.messages,
+      }),
+    });
+    obHideTyping();
+    if (!res.ok) throw new Error('API error ' + res.status);
+    const resp = await res.json();
+    const full  = resp.content?.[0]?.text || '';
+    const profileData = obParseProfile(full);
+    const clean = obStripProfile(full);
+    OB.messages.push({ role: 'assistant', content: clean });
+    obRenderMsg('lumi', clean, true);
+    if (profileData) obApplyProfile(profileData);
+    if (profileData?.onboarding_complete) {
+      setTimeout(() => obFinish(), 2000);
+    }
+  } catch (e) {
+    obHideTyping();
+    obRenderMsg('lumi', 'Something went wrong — ' + (e.message || 'please try again.'), true);
+  }
+
+  OB.busy = false;
+  $('obSend').disabled = !($('obInput').value.trim());
+}
+
+function obFinish() {
+  const ob = $('onboarding');
+  ob.classList.add('hidden');
+  setTimeout(() => {
+    ob.style.display = 'none';
+    if (OB.onDone) OB.onDone();
+  }, 400);
 }
 
 // ─── SEMESTER BANNER ─────────────────────────────────────────────────────────
@@ -1843,13 +2215,7 @@ function init() {
 
   if (!hasName) {
     $('onboarding').style.display = '';
-    initOnboarding(() => {
-      if (!getSchedule().length) {
-        initScheduleSetup(() => startApp(savedKey));
-      } else {
-        startApp(savedKey);
-      }
-    });
+    initOnboarding(() => { startApp(savedKey); });
     return;
   }
 
