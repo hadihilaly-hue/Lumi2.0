@@ -2208,17 +2208,28 @@ function init() {
   if (savedKey) keyInput.value = savedKey;
 
   // Onboarding + schedule setup
-  const hasName     = !!localStorage.getItem('lumi_name');
-  const hasSchedule = getSchedule().length > 0;
+  // Gate on onboarding_complete so a Supabase-restored name doesn't skip the interview
+  const hasOnboarded = localStorage.getItem('lumi_onboarding_complete') === 'true';
+  const hasName      = !!localStorage.getItem('lumi_name');
+  const hasSchedule  = getSchedule().length > 0;
 
   wireListeners(savedKey);
 
+  // Show conversational onboarding for brand-new users (no name at all)
   if (!hasName) {
     $('onboarding').style.display = '';
     initOnboarding(() => { startApp(savedKey); });
     return;
   }
 
+  // Has name from the new onboarding flow — already completed
+  if (hasOnboarded) {
+    $('onboarding').style.display = 'none';
+    startApp(savedKey);
+    return;
+  }
+
+  // Returning old user: has name but never did the new interview — go straight to app
   $('onboarding').style.display = 'none';
 
   if (!hasSchedule) {
