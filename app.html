@@ -59,6 +59,7 @@
       <div class="sched-dot" data-step="1"></div>
       <div class="sched-dot" data-step="2"></div>
       <div class="sched-dot" data-step="3"></div>
+      <div class="sched-dot" data-step="4"></div>
     </div>
   </div>
 
@@ -111,13 +112,55 @@
     </div>
   </div>
 
-  <!-- Step 4: Confirmation -->
+  <!-- Step 4: Study Style -->
   <div class="sched-step" id="ssStep4">
     <div class="sched-step-inner">
-      <button class="sched-back-btn" id="ssStep4Back">← Edit</button>
+      <button class="sched-back-btn" id="ssStep4Back">← Back</button>
+      <div class="sched-heading">How do you like to study?</div>
+      <div class="sched-subheading">We'll build your schedule around this</div>
+      <div class="sched-style-grid" id="ssStyleGrid">
+        <div class="sched-style-card" data-work="25" data-break="5" data-label="Short Bursts">
+          <div class="sched-style-icon">🎯</div>
+          <div class="sched-style-name">Short Bursts</div>
+          <div class="sched-style-desc">25 min work · 5 min break</div>
+        </div>
+        <div class="sched-style-card" data-work="45" data-break="10" data-label="Longer Sessions">
+          <div class="sched-style-icon">📚</div>
+          <div class="sched-style-name">Longer Sessions</div>
+          <div class="sched-style-desc">45 min work · 10 min break</div>
+        </div>
+        <div class="sched-style-card" data-work="50" data-break="10" data-label="Power Sessions">
+          <div class="sched-style-icon">⚡</div>
+          <div class="sched-style-name">Power Sessions</div>
+          <div class="sched-style-desc">50 min work · 10 min break</div>
+        </div>
+        <div class="sched-style-card" data-work="custom" data-break="custom" data-label="Custom">
+          <div class="sched-style-icon">🎨</div>
+          <div class="sched-style-name">Custom</div>
+          <div class="sched-style-desc">Set my own times</div>
+        </div>
+      </div>
+      <div class="sched-style-custom" id="ssStyleCustom" style="display:none">
+        <div class="sched-style-slider-row">
+          <label class="sched-style-slider-label">Work time: <span id="ssWorkVal">25</span> min</label>
+          <input type="range" class="sched-style-slider" id="ssWorkSlider" min="10" max="90" value="25" step="5">
+        </div>
+        <div class="sched-style-slider-row">
+          <label class="sched-style-slider-label">Break time: <span id="ssBreakVal">5</span> min</label>
+          <input type="range" class="sched-style-slider" id="ssBreakSlider" min="5" max="30" value="5" step="5">
+        </div>
+      </div>
+      <button class="sched-cta" id="ssStep4Next" disabled>Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 5: Confirmation -->
+  <div class="sched-step" id="ssStep5">
+    <div class="sched-step-inner">
+      <button class="sched-back-btn" id="ssStep5Back">← Edit</button>
       <div class="sched-heading">Here's your schedule</div>
       <div class="sched-confirm-list" id="ssConfirmList"></div>
-      <button class="sched-cta" id="ssStep4Done">Confirm Schedule</button>
+      <button class="sched-cta" id="ssStep5Done">Confirm Schedule</button>
     </div>
   </div>
 
@@ -334,6 +377,6 @@
 <!-- Scripts at bottom so the loading screen renders immediately -->
 <script src="supabase.js"></script>
 <script src="auth.js"></script>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

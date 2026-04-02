@@ -1396,8 +1396,8 @@ function initScheduleSetup(onDone, prefill = []) {
   prefill.forEach(p => { teacherChoices[p.course] = p.teacher; });
   let teacherIdx = 0;
 
-  // Steps: 0=grade, 1=classes, 2=teachers, 3=confirm
-  const stepEls = [$('ssStep1'), $('ssStep2'), $('ssStep3'), $('ssStep4')];
+  // Steps: 0=grade, 1=classes, 2=teachers, 3=study-style, 4=confirm
+  const stepEls = [$('ssStep1'), $('ssStep2'), $('ssStep3'), $('ssStep4'), $('ssStep5')];
 
   function setStep(n) {
     stepEls.forEach((s, i) => s.classList.toggle('active', i === n));
@@ -1563,7 +1563,7 @@ function initScheduleSetup(onDone, prefill = []) {
   function showTeacherStep() {
     const arr = getSelectedArray();
     if (teacherIdx >= arr.length) {
-      buildConfirmList();
+      showStyleStep();
       setStep(3);
       return;
     }
@@ -1638,7 +1638,68 @@ function initScheduleSetup(onDone, prefill = []) {
     setStep(2);
   });
 
-  $('ssStep4Done').addEventListener('click', () => {
+  // ── Step 4: Study Style ──────────────────────────────────
+  let chosenStyle = getStudyStyle();
+
+  function showStyleStep() {
+    // Pre-select saved style
+    $('ssStyleGrid').querySelectorAll('.sched-style-card').forEach(card => {
+      card.classList.toggle('selected', card.dataset.label === chosenStyle.label);
+    });
+    const isCustom = chosenStyle.label === 'Custom';
+    $('ssStyleCustom').style.display = isCustom ? '' : 'none';
+    if (isCustom) {
+      $('ssWorkSlider').value = chosenStyle.work_minutes;
+      $('ssBreakSlider').value = chosenStyle.break_minutes;
+      $('ssWorkVal').textContent = chosenStyle.work_minutes;
+      $('ssBreakVal').textContent = chosenStyle.break_minutes;
+    }
+    $('ssStep4Next').disabled = false; // always pre-enabled (default style exists)
+  }
+
+  $('ssStyleGrid').querySelectorAll('.sched-style-card').forEach(card => {
+    card.addEventListener('click', () => {
+      $('ssStyleGrid').querySelectorAll('.sched-style-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      const isCustom = card.dataset.work === 'custom';
+      $('ssStyleCustom').style.display = isCustom ? '' : 'none';
+      if (!isCustom) {
+        chosenStyle = {
+          work_minutes: parseInt(card.dataset.work, 10),
+          break_minutes: parseInt(card.dataset.break, 10),
+          label: card.dataset.label
+        };
+      } else {
+        chosenStyle = {
+          work_minutes: parseInt($('ssWorkSlider').value, 10),
+          break_minutes: parseInt($('ssBreakSlider').value, 10),
+          label: 'Custom'
+        };
+      }
+      $('ssStep4Next').disabled = false;
+    });
+  });
+
+  $('ssWorkSlider').addEventListener('input', function() {
+    $('ssWorkVal').textContent = this.value;
+    chosenStyle = { work_minutes: parseInt(this.value, 10), break_minutes: parseInt($('ssBreakSlider').value, 10), label: 'Custom' };
+  });
+
+  $('ssBreakSlider').addEventListener('input', function() {
+    $('ssBreakVal').textContent = this.value;
+    chosenStyle = { work_minutes: parseInt($('ssWorkSlider').value, 10), break_minutes: parseInt(this.value, 10), label: 'Custom' };
+  });
+
+  $('ssStep4Next').addEventListener('click', () => {
+    buildConfirmList();
+    setStep(4);
+  });
+
+  $('ssStep5Back').addEventListener('click', () => {
+    setStep(3);
+  });
+
+  $('ssStep5Done').addEventListener('click', () => {
     const schedule = getSelectedArray().map(course => {
       const subject = Object.entries(MENLO_CURRICULUM)
         .find(([, courses]) => courses[course])?.[0] || '';
@@ -1646,7 +1707,9 @@ function initScheduleSetup(onDone, prefill = []) {
     });
     saveScheduleLocal(schedule);
     if (chosenGrade) localStorage.setItem('lumi_grade', chosenGrade);
+    saveStudyStyle(chosenStyle);
     syncScheduleToSupabase(schedule);
+    syncStudyStyleToSupabase(chosenStyle);
     el.classList.add('hidden');
     setTimeout(() => { el.style.display = 'none'; onDone(); }, 350);
   });
@@ -2308,6 +2371,78 @@ function showToast(msg, type) {
 
 // ─── HOMEWORK PLANNER ────────────────────────────────────────────────────────
 
+const HOMEWORK_PRIORITY = {
+  TIER_1_CRITICAL: {
+    types: ['essay', 'research paper', 'project', 'presentation', 'lab report', 'final', 'portfolio'],
+    label: 'Major Work',
+    color: 'red',
+    reason: 'High stakes, time consuming, needs multiple sessions'
+  },
+  TIER_2_IMPORTANT: {
+    types: ['test', 'exam', 'quiz study', 'midterm'],
+    label: 'Assessment Prep',
+    color: 'orange',
+    reason: 'Needs focused preparation, spaced over multiple days'
+  },
+  TIER_3_STANDARD: {
+    types: ['homework', 'problem set', 'worksheet', 'reading', 'assignment'],
+    label: 'Regular Work',
+    color: 'yellow',
+    reason: 'Complete in one session'
+  },
+  TIER_4_LIGHT: {
+    types: ['review', 'notes', 'vocab', 'flashcards'],
+    label: 'Light Work',
+    color: 'green',
+    reason: 'Can be done in short bursts'
+  }
+};
+
+const TIER_DOT = {
+  TIER_1_CRITICAL: '🔴',
+  TIER_2_IMPORTANT: '🟠',
+  TIER_3_STANDARD: '🟡',
+  TIER_4_LIGHT: '🟢'
+};
+
+const TIER_ORDER = { TIER_1_CRITICAL: 0, TIER_2_IMPORTANT: 1, TIER_3_STANDARD: 2, TIER_4_LIGHT: 3 };
+
+function classifyTask(title) {
+  const t = (title || '').toLowerCase();
+  for (const [tierKey, tier] of Object.entries(HOMEWORK_PRIORITY)) {
+    if (tier.types.some(kw => t.includes(kw))) return tierKey;
+  }
+  return 'TIER_3_STANDARD';
+}
+
+function getStudyStyle() {
+  try {
+    return JSON.parse(localStorage.getItem('lumi_study_style') || 'null')
+      || { work_minutes: 25, break_minutes: 5, label: 'Short Bursts' };
+  } catch { return { work_minutes: 25, break_minutes: 5, label: 'Short Bursts' }; }
+}
+function saveStudyStyle(style) { localStorage.setItem('lumi_study_style', JSON.stringify(style)); }
+async function syncStudyStyleToSupabase(style) {
+  if (!currentUser) return;
+  try {
+    await sb.from('profiles').upsert({ id: currentUser.id, study_style: style }, { onConflict: 'id' });
+  } catch {}
+}
+
+function getPlanStartMinutes() {
+  const now = new Date();
+  const total = now.getHours() * 60 + now.getMinutes();
+  return Math.ceil(total / 5) * 5; // round up to nearest 5 min
+}
+
+function fmtPlanAbsTime(totalMinutes) {
+  const h = Math.floor(totalMinutes / 60) % 24;
+  const m = totalMinutes % 60;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
 function getHwTasks() {
   try { return JSON.parse(localStorage.getItem('lumi_hw_tasks') || '[]'); } catch { return []; }
 }
@@ -2446,6 +2581,7 @@ function closeHwPlanModal() {
 function renderHwPopupTasks() {
   const list  = $('hwPopupTaskList');
   const tasks = getHwTasks();
+  const today = todayStr();
   list.innerHTML = '';
   if (!tasks.length) {
     const empty = document.createElement('div');
@@ -2455,6 +2591,10 @@ function renderHwPopupTasks() {
     return;
   }
   tasks.forEach(task => {
+    const tier      = classifyTask(task.title);
+    const dot       = TIER_DOT[tier] || '⚪';
+    const isTonight = task.dueDate === today || !task.dueDate;
+
     const card = document.createElement('div');
     card.className = 'hw-task-card' + (task.isComplete ? ' done' : '');
 
@@ -2468,13 +2608,13 @@ function renderHwPopupTasks() {
     info.className = 'hw-task-info';
     const title = document.createElement('div');
     title.className = 'hw-task-title';
-    title.textContent = task.title;
+    title.textContent = `${dot} ${task.title}`;
     const meta = document.createElement('div');
     meta.className = 'hw-task-meta';
     const parts = [];
     if (task.className)        parts.push(task.className.split(' ').slice(0,2).join(' '));
     if (task.estimatedMinutes) parts.push(`~${task.estimatedMinutes} min`);
-    if (task.dueDate)          parts.push('Due ' + task.dueDate);
+    if (task.dueDate)          parts.push(isTonight ? '⚡ tonight' : '📅 ' + task.dueDate);
     meta.textContent = parts.join(' · ');
     info.appendChild(title);
     info.appendChild(meta);
@@ -2516,96 +2656,146 @@ function addHwTask(task) {
 
 // ── Study plan generator ───────────────────────────────────
 function buildStudyPlan(tasks) {
-  // Sort: due soonest first, then shortest
-  const sorted = [...tasks].sort((a, b) => {
+  if (!tasks.length) return { blocks: [], totalMinutes: 0, startMinutes: getPlanStartMinutes(), warnings: [] };
+
+  const style = getStudyStyle();
+  const WORK = style.work_minutes;
+  const BREAK = style.break_minutes;
+  const today = todayStr();
+  const startMinutes = getPlanStartMinutes();
+  const isLateNight = new Date().getHours() >= 22;
+  const warnings = [];
+
+  if (isLateNight) {
+    warnings.push({ type: 'late', text: "It's getting late — focusing on just what's due tonight." });
+  }
+
+  // Classify and annotate tasks
+  const classified = tasks.map(t => ({
+    ...t,
+    tier: classifyTask(t.title),
+    isTonight: t.dueDate === today || !t.dueDate,
+  }));
+
+  // If late night, only schedule tonight's tasks
+  const toSchedule = isLateNight ? classified.filter(t => t.isTonight) : classified;
+
+  // Sort: tonight first, then hardest tier first, then by due date
+  const sorted = [...toSchedule].sort((a, b) => {
+    if (a.isTonight !== b.isTonight) return a.isTonight ? -1 : 1;
+    if (TIER_ORDER[a.tier] !== TIER_ORDER[b.tier]) return TIER_ORDER[a.tier] - TIER_ORDER[b.tier];
     if (a.dueDate && b.dueDate && a.dueDate !== b.dueDate)
       return a.dueDate < b.dueDate ? -1 : 1;
-    return (a.estimatedMinutes || 30) - (b.estimatedMinutes || 30);
+    return 0;
   });
 
-  const plan = [];
-  let elapsed = 0; // minutes since start
-  const BREAK_INTERVAL = 90;
-  let nextBreak = BREAK_INTERVAL;
+  // Overload warnings
+  const totalEstimated = sorted.reduce((s, t) => s + (t.estimatedMinutes || 30), 0);
+  const tier1Count = sorted.filter(t => t.tier === 'TIER_1_CRITICAL').length;
+
+  if (totalEstimated > 180) {
+    warnings.push({
+      type: 'heavy',
+      text: `This is a heavy night (~${Math.round(totalEstimated / 60)}hrs) — let's talk about what to prioritize.`
+    });
+  }
+  if (tier1Count > 2) {
+    warnings.push({
+      type: 'overload',
+      text: `You have ${tier1Count} major assignments tonight — consider spreading some across tomorrow.`
+    });
+  }
+
+  // Build blocks by chunking each task into WORK-minute pieces
+  const blocks = [];
+  let elapsed = 0;
   let workedSinceBreak = 0;
 
-  sorted.forEach(task => {
+  sorted.forEach((task, taskIdx) => {
     const dur = task.estimatedMinutes || 30;
+    const numChunks = Math.ceil(dur / WORK);
 
-    // Insert break if needed
-    if (workedSinceBreak >= nextBreak && sorted.length > 1) {
-      plan.push({ type: 'break', duration: 15, startMinute: elapsed });
-      elapsed += 15;
-      workedSinceBreak = 0;
+    for (let chunk = 0; chunk < numChunks; chunk++) {
+      // Insert break before this chunk if we've hit the work limit
+      if (workedSinceBreak >= WORK && (taskIdx > 0 || chunk > 0)) {
+        blocks.push({ type: 'break', duration: BREAK, startMinute: elapsed });
+        elapsed += BREAK;
+        workedSinceBreak = 0;
+      }
+
+      const chunkDur = Math.min(WORK, dur - chunk * WORK);
+      blocks.push({
+        type: 'task',
+        task,
+        duration: chunkDur,
+        startMinute: elapsed,
+        chunkNum:    numChunks > 1 ? chunk + 1 : null,
+        totalChunks: numChunks > 1 ? numChunks : null,
+      });
+      elapsed += chunkDur;
+      workedSinceBreak += chunkDur;
     }
-
-    plan.push({
-      type: 'task',
-      task,
-      duration: dur,
-      startMinute: elapsed
-    });
-    elapsed += dur;
-    workedSinceBreak += dur;
   });
 
-  return { blocks: plan, totalMinutes: elapsed };
-}
-
-function fmtPlanTime(minutesOffset) {
-  // Start from 6:00 PM by default
-  const start = 18 * 60 + minutesOffset;
-  const h = Math.floor(start / 60) % 24;
-  const m = start % 60;
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const h12  = h % 12 || 12;
-  return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
+  return { blocks, totalMinutes: elapsed, startMinutes, warnings };
 }
 
 function renderStudyPlan(plan) {
   const body = $('hwPlanBody');
   body.innerHTML = '';
+  const { blocks, totalMinutes, startMinutes, warnings } = plan;
 
-  const totalH = Math.floor(plan.totalMinutes / 60);
-  const totalM = plan.totalMinutes % 60;
-  const timeStr = totalH > 0
-    ? `${totalH}h ${totalM > 0 ? totalM + 'm' : ''}`.trim()
-    : `${totalM}m`;
+  // Warnings banner
+  warnings.forEach(w => {
+    const el = document.createElement('div');
+    el.className = `hw-plan-warning ${w.type}`;
+    el.textContent = (w.type === 'late' ? '🌙 ' : w.type === 'heavy' ? '⚠️ ' : '🔴 ') + w.text;
+    body.appendChild(el);
+  });
 
+  // Summary line
+  const uniqueTasks = new Set(blocks.filter(b => b.type === 'task').map(b => b.task.id)).size;
+  const totalH = Math.floor(totalMinutes / 60);
+  const totalM = totalMinutes % 60;
+  const timeStr = totalH > 0 ? `${totalH}h ${totalM > 0 ? totalM + 'm' : ''}`.trim() : `${totalM}m`;
+  const style = getStudyStyle();
   const summary = document.createElement('div');
   summary.className = 'hw-plan-summary';
-  summary.textContent = `Here's your study session — ${plan.blocks.filter(b => b.type === 'task').length} assignments, about ${timeStr} total. Starting at 6:00 PM:`;
+  summary.textContent = `${uniqueTasks} assignment${uniqueTasks !== 1 ? 's' : ''} · ~${timeStr} total · ${style.work_minutes}min on / ${style.break_minutes}min off. Starting now:`;
   body.appendChild(summary);
 
-  plan.blocks.forEach(block => {
+  // Plan blocks
+  blocks.forEach(block => {
     const el = document.createElement('div');
     el.className = 'hw-plan-block' + (block.type === 'break' ? ' break' : '');
 
+    const absMin = startMinutes + block.startMinute;
     const timeEl = document.createElement('div');
     timeEl.className = 'hw-plan-block-time';
-    timeEl.textContent = fmtPlanTime(block.startMinute) + ' · ' + block.duration + ' min';
+    timeEl.textContent = fmtPlanAbsTime(absMin) + ' · ' + block.duration + ' min';
 
     const titleEl = document.createElement('div');
     titleEl.className = 'hw-plan-block-title';
 
     if (block.type === 'break') {
-      titleEl.textContent = '☕ Take a break';
+      titleEl.textContent = '🔋 Break';
       const metaEl = document.createElement('div');
       metaEl.className = 'hw-plan-block-meta';
       metaEl.textContent = 'Step away, stretch, hydrate.';
-      el.appendChild(timeEl);
-      el.appendChild(titleEl);
-      el.appendChild(metaEl);
+      el.appendChild(timeEl); el.appendChild(titleEl); el.appendChild(metaEl);
     } else {
-      titleEl.textContent = block.task.title;
+      const dot = TIER_DOT[block.task.tier] || '⚪';
+      const chunkLabel = block.chunkNum ? ` (part ${block.chunkNum} of ${block.totalChunks})` : '';
+      titleEl.textContent = `${dot} ${block.task.title}${chunkLabel}`;
       const metaEl = document.createElement('div');
       metaEl.className = 'hw-plan-block-meta';
       const parts = [];
       if (block.task.className) parts.push(block.task.className.split(' ').slice(0, 2).join(' '));
-      if (block.task.dueDate)   parts.push('Due ' + block.task.dueDate);
+      const tierInfo = HOMEWORK_PRIORITY[block.task.tier];
+      if (tierInfo) parts.push(tierInfo.label);
+      if (block.task.dueDate) parts.push(block.task.isTonight ? '⚡ tonight' : '📅 ' + block.task.dueDate);
       metaEl.textContent = parts.join(' · ');
-      el.appendChild(timeEl);
-      el.appendChild(titleEl);
+      el.appendChild(timeEl); el.appendChild(titleEl);
       if (parts.length) el.appendChild(metaEl);
     }
     body.appendChild(el);
@@ -2636,12 +2826,21 @@ function renderHwSidebar(container) {
     empty.textContent = 'No homework — enjoy the break!';
     container.appendChild(empty);
   } else {
-    // Show incomplete first, then completed (max 5 each)
-    const incomplete = tasks.filter(t => !t.isComplete);
-    const complete   = tasks.filter(t => t.isComplete).slice(0, 3);
-    const toShow     = [...incomplete, ...complete].slice(0, 8);
+    const incomplete = tasks
+      .filter(t => !t.isComplete)
+      .map(t => ({ ...t, tier: classifyTask(t.title), isTonight: t.dueDate === today || !t.dueDate }))
+      .sort((a, b) => {
+        if (a.isTonight !== b.isTonight) return a.isTonight ? -1 : 1;
+        return (TIER_ORDER[a.tier] || 3) - (TIER_ORDER[b.tier] || 3);
+      });
+    const complete = tasks.filter(t => t.isComplete).slice(0, 2);
+    const toShow = [...incomplete, ...complete].slice(0, 7);
 
     toShow.forEach(task => {
+      const tier      = task.tier || classifyTask(task.title);
+      const dot       = TIER_DOT[tier] || '⚪';
+      const isTonight = task.isTonight !== undefined ? task.isTonight : (task.dueDate === today || !task.dueDate);
+
       const item = document.createElement('div');
       item.className = 'sb-hw-item' + (task.isComplete ? ' done' : '');
 
@@ -2650,19 +2849,23 @@ function renderHwSidebar(container) {
       check.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
       check.addEventListener('click', e => { e.stopPropagation(); toggleHwTask(task.id); });
 
-      const title = document.createElement('div');
-      title.className = 'sb-hw-item-title';
-      title.textContent = task.title;
+      const dotEl = document.createElement('span');
+      dotEl.className = 'sb-hw-tier-dot';
+      dotEl.textContent = dot;
 
-      const cls = document.createElement('div');
-      cls.className = 'sb-hw-item-class';
-      cls.textContent = task.className
-        ? task.className.split(' ').slice(0, 2).join(' ')
-        : '';
+      const titleEl = document.createElement('div');
+      titleEl.className = 'sb-hw-item-title';
+      titleEl.textContent = task.title;
+
+      const urgencyEl = document.createElement('div');
+      urgencyEl.className = 'sb-hw-item-urgency';
+      urgencyEl.textContent = isTonight ? '⚡' : '📅';
+      urgencyEl.title = isTonight ? 'Due tonight' : ('Due ' + (task.dueDate || ''));
 
       item.appendChild(check);
-      item.appendChild(title);
-      item.appendChild(cls);
+      item.appendChild(dotEl);
+      item.appendChild(titleEl);
+      item.appendChild(urgencyEl);
       container.appendChild(item);
     });
   }
@@ -2682,15 +2885,45 @@ function renderHwSidebar(container) {
 // ── System prompt homework context ─────────────────────────
 function hwContext() {
   const tasks = getHwTasks().filter(t => !t.isComplete);
+  const today = todayStr();
   if (!tasks.length) return '';
+  const style = getStudyStyle();
   const lines = tasks.map(t => {
-    const parts = [`• ${t.title}`];
+    const tier     = classifyTask(t.title);
+    const tierInfo = HOMEWORK_PRIORITY[tier];
+    const dot      = TIER_DOT[tier] || '⚪';
+    const isTonight = t.dueDate === today || !t.dueDate;
+    const parts = [`${dot} ${t.title}`];
     if (t.className)        parts.push(`(${t.className})`);
     if (t.estimatedMinutes) parts.push(`~${t.estimatedMinutes} min`);
-    if (t.dueDate)          parts.push(`due ${t.dueDate}`);
+    if (t.dueDate)          parts.push(isTonight ? '[DUE TONIGHT]' : `due ${t.dueDate}`);
+    if (tierInfo)           parts.push(`[${tierInfo.label}]`);
     return parts.join(' ');
   });
-  return `\n\nSTUDENT'S CURRENT HOMEWORK:\n${lines.join('\n')}\n(Reference this naturally when relevant — e.g. if they mention being stressed or if a class comes up.)`;
+  const totalTonight = tasks
+    .filter(t => t.dueDate === today || !t.dueDate)
+    .reduce((s, t) => s + (t.estimatedMinutes || 30), 0);
+  const overload = totalTonight > 180 ? `\n⚠️ Tonight's workload is ~${Math.round(totalTonight/60)}hrs — help them prioritize.` : '';
+  return `
+
+HOMEWORK PRIORITY SYSTEM:
+You have access to the student's full homework list with priority tiers and due dates. Use this intelligently:
+
+Current homework:
+${lines.join('\n')}
+
+Student study style: ${style.work_minutes} min work / ${style.break_minutes} min break (${style.label})${overload}
+
+Rules you must always follow:
+- Essays and projects should NEVER be left entirely to the night before — proactively suggest spreading them out
+- If a student has a test in 3+ days, suggest starting review tonight even if nothing else is due
+- If tonight's workload exceeds 3 hours, warn them and help prioritize what matters most
+- Always schedule hardest, most important work first while energy is high
+- Light review and vocab can be done during break times between bigger tasks
+- If a student asks to work on low-priority tasks when they have urgent Tier 1 work, gently redirect: "You have your [assignment] due [when] — want to tackle that first?"
+- Celebrate when students work ahead on big projects
+- Be realistic and encouraging — never make the student feel overwhelmed
+- If nothing is due tonight but Tier 1 work is due soon, proactively suggest working on it now`;
 }
 
 // ── Supabase sync ──────────────────────────────────────────

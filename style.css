@@ -836,3 +836,26 @@ body.signin-page{
 .sb-hw-empty{font-size:12px;color:var(--text-muted);padding:4px 8px 8px;line-height:1.4}
 .sb-hw-open-btn{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:12px;color:var(--text-muted);transition:all .15s;margin-top:2px}
 .sb-hw-open-btn:hover{background:var(--surface-2);color:var(--accent)}
+
+/* ─── STUDY STYLE STEP ───────────────────────────────────── */
+.sched-style-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.sched-style-card{background:var(--surface-2);border:2px solid var(--border);border-radius:14px;padding:16px 10px;cursor:pointer;transition:all .15s;text-align:center}
+.sched-style-card:hover{border-color:var(--accent);background:var(--accent-soft)}
+.sched-style-card.selected{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 3px var(--accent-glow)}
+.sched-style-icon{font-size:22px;margin-bottom:5px}
+.sched-style-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px}
+.sched-style-desc{font-size:11px;color:var(--text-muted);line-height:1.4}
+.sched-style-custom{background:var(--surface-2);border-radius:12px;padding:14px 16px;margin-bottom:14px;display:flex;flex-direction:column;gap:14px}
+.sched-style-slider-row{display:flex;flex-direction:column;gap:6px}
+.sched-style-slider-label{font-size:13px;color:var(--text);font-weight:500}
+.sched-style-slider{width:100%;accent-color:var(--accent);cursor:pointer}
+
+/* ─── PLAN WARNINGS ──────────────────────────────────────── */
+.hw-plan-warning{border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px;line-height:1.4}
+.hw-plan-warning.late{background:rgba(99,102,241,.1);color:#a5b4fc;border:1px solid rgba(99,102,241,.2)}
+.hw-plan-warning.heavy{background:rgba(239,68,68,.1);color:#fca5a5;border:1px solid rgba(239,68,68,.2)}
+.hw-plan-warning.overload{background:rgba(234,179,8,.1);color:#fde68a;border:1px solid rgba(234,179,8,.2)}
+
+/* ─── PRIORITY SIDEBAR ───────────────────────────────────── */
+.sb-hw-tier-dot{font-size:10px;flex-shrink:0;line-height:1}
+.sb-hw-item-urgency{font-size:11px;flex-shrink:0;opacity:.7}
