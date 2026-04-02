@@ -248,6 +248,10 @@
         <div class="drop-overlay-sub">Images, PDFs, and text files</div>
       </div>
       <div class="messages" id="messages"></div>
+      <div class="voice-listening-bar" id="voiceListeningBar">
+        <div class="voice-dot"></div>
+        <span>Listening…</span>
+      </div>
       <div class="input-area">
         <div class="attach-preview" id="attachPreview"></div>
         <div class="input-wrap">
@@ -256,6 +260,14 @@
           </button>
           <input type="file" id="fileInput" accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,.txt" style="display:none">
           <textarea class="msg-input" id="msgInput" placeholder="Say something…" rows="1"></textarea>
+          <button class="mic-btn" id="micBtn" title="Voice input">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+          </button>
           <button class="send-btn" id="sendBtn" disabled>
             <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
           </button>
@@ -324,6 +336,29 @@
         <div class="settings-hint" style="margin-bottom:8px">Connect your Google Calendar so Lumi can plan homework around your real evening.</div>
         <button class="settings-save-btn" id="calConnectBtn">Connect Google Calendar</button>
       </div>
+    </div>
+
+    <!-- Voice -->
+    <div class="settings-section">
+      <div class="settings-section-title">Voice</div>
+      <div class="toggle-row">
+        <span class="toggle-label">Voice Mode</span>
+        <label class="toggle">
+          <input type="checkbox" id="voiceModeToggle">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+      <div class="settings-hint" style="margin-bottom:10px">Mic stays active and Lumi speaks back automatically.</div>
+      <div class="toggle-row">
+        <span class="toggle-label">Mute Lumi's voice</span>
+        <label class="toggle">
+          <input type="checkbox" id="muteTtsToggle">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+      <div class="settings-hint">Lumi won't speak aloud. Click 🔊 on any message to hear it.</div>
     </div>
 
     <!-- Memory -->
@@ -413,6 +448,6 @@
 <!-- Scripts at bottom so the loading screen renders immediately -->
 <script src="supabase.js"></script>
 <script src="auth.js"></script>
-<script src="app.js?v=15"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>

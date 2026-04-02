@@ -2195,6 +2195,199 @@ function checkSemesterBanner() {
   });
 }
 
+// ─── VOICE / SPEECH ───────────────────────────────────────────────────────────
+let _recognition    = null;
+let _voiceMode      = localStorage.getItem('lumi_voice_mode') === 'true';
+let _muteTts        = localStorage.getItem('lumi_mute_tts')   === 'true';
+let _isRecording    = false;
+let _lastWasVoice   = false;   // did the last user message come from mic?
+let _voiceSendTimer = null;
+let _isSpeaking     = false;
+
+function initVoice() {
+  const MicBtn = $('micBtn');
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) {
+    if (MicBtn) { MicBtn.disabled = true; MicBtn.title = 'Voice input not supported — try Chrome'; }
+    return;
+  }
+
+  _recognition = new SpeechRec();
+  _recognition.lang = 'en-US';
+  _recognition.interimResults = true;
+  _recognition.continuous = false;
+
+  _recognition.onstart = () => {
+    _isRecording = true;
+    _updateMicBtn();
+    if (_voiceMode) _showListeningBar(true);
+  };
+
+  _recognition.onresult = (e) => {
+    clearTimeout(_voiceSendTimer);
+    const transcript = Array.from(e.results).map(r => r[0].transcript).join('');
+    msgInput.value = transcript;
+    autoGrow(msgInput);
+    updateSendBtn();
+    if (!_voiceMode) {
+      // Auto-send 1 s after speech settles (non-voice-mode)
+      _voiceSendTimer = setTimeout(() => {
+        if (msgInput.value.trim()) { _lastWasVoice = true; doSend(); }
+      }, 1000);
+    }
+  };
+
+  _recognition.onend = () => {
+    _isRecording = false;
+    _updateMicBtn();
+    if (!_voiceMode) _showListeningBar(false);
+    // In voice mode the mic restarts automatically after Lumi finishes speaking
+  };
+
+  _recognition.onerror = (e) => {
+    _isRecording = false;
+    _updateMicBtn();
+    if (e.error === 'not-allowed') {
+      showToast('Please allow microphone access in your browser settings to use voice input.');
+    }
+    // Keep whatever was transcribed so far on other errors
+  };
+
+  // Restore voice-mode state from last session
+  if (_voiceMode) {
+    document.body.classList.add('voice-mode-on');
+    _startRecording();
+  }
+}
+
+function _startRecording() {
+  if (!_recognition) return;
+  if (_isRecording) { _stopRecording(); return; }
+  _recognition.continuous = _voiceMode;
+  try { _recognition.start(); } catch(e) {}
+}
+
+function _stopRecording() {
+  if (_recognition && _isRecording) { try { _recognition.stop(); } catch(e) {} }
+  _isRecording = false;
+  _updateMicBtn();
+  _showListeningBar(false);
+}
+
+function _updateMicBtn() {
+  const btn = $('micBtn');
+  if (!btn) return;
+  btn.classList.toggle('recording',     _isRecording && !_voiceMode);
+  btn.classList.toggle('voice-active',  _isRecording &&  _voiceMode);
+}
+
+function _showListeningBar(show) {
+  const bar = $('voiceListeningBar');
+  if (bar) bar.classList.toggle('active', show);
+}
+
+// Speak a Lumi response aloud
+function speakResponse(text) {
+  if (_muteTts || !text || !window.speechSynthesis) return;
+  speechSynthesis.cancel();
+
+  // Strip markdown/HTML so it reads cleanly
+  const clean = text
+    .replace(/#{1,6}\s/g, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/`{1,3}[\s\S]*?`{1,3}/g, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\n\n+/g, '. ')
+    .replace(/\n/g, ' ')
+    .slice(0, 800)   // cap at ~800 chars so it doesn't drone on
+    .trim();
+
+  const utterance = new SpeechSynthesisUtterance(clean);
+  utterance.rate   = 1.0;
+  utterance.pitch  = 1.0;
+  utterance.volume = 1.0;
+
+  const pickVoice = () => {
+    const voices = speechSynthesis.getVoices();
+    const preferred = voices.find(v =>
+      v.name.includes('Samantha') ||
+      v.name.includes('Karen') ||
+      v.name.includes('Google US English') ||
+      (v.lang === 'en-US' && v.localService)
+    );
+    if (preferred) utterance.voice = preferred;
+  };
+  pickVoice();
+  if (!speechSynthesis.getVoices().length) speechSynthesis.onvoiceschanged = pickVoice;
+
+  _isSpeaking = true;
+  utterance.onend = () => {
+    _isSpeaking = false;
+    // In voice mode, restart mic after Lumi finishes speaking
+    if (_voiceMode && !_isRecording) setTimeout(_startRecording, 350);
+  };
+  utterance.onerror = () => { _isSpeaking = false; };
+
+  try { speechSynthesis.speak(utterance); } catch(e) {}
+}
+
+// Attach a speaker button to a Lumi message element
+function _addSpeakerBtn(msgEl, text) {
+  const btn = document.createElement('button');
+  btn.className  = 'msg-speak-btn';
+  btn.title      = 'Read aloud';
+  btn.innerHTML  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`;
+  btn.addEventListener('click', () => {
+    speechSynthesis.cancel();
+    btn.classList.add('speaking');
+    speakResponse(text);
+    setTimeout(() => btn.classList.remove('speaking'), 300);
+  });
+  const head = msgEl.querySelector('.msg-head');
+  if (head) head.appendChild(btn);
+}
+
+function wireVoiceListeners() {
+  // Mic button
+  const micBtn = $('micBtn');
+  if (micBtn) {
+    micBtn.addEventListener('click', () => {
+      if (!_recognition) { showToast('Voice input not supported in this browser — try Chrome'); return; }
+      if (_isRecording) { _stopRecording(); }
+      else { _lastWasVoice = true; _startRecording(); }
+    });
+  }
+
+  // Voice Mode toggle
+  const vmToggle = $('voiceModeToggle');
+  if (vmToggle) {
+    vmToggle.checked = _voiceMode;
+    vmToggle.addEventListener('change', () => {
+      _voiceMode = vmToggle.checked;
+      localStorage.setItem('lumi_voice_mode', _voiceMode);
+      document.body.classList.toggle('voice-mode-on', _voiceMode);
+      if (_voiceMode) {
+        _startRecording();
+      } else {
+        _stopRecording();
+        speechSynthesis.cancel();
+      }
+    });
+  }
+
+  // Mute TTS toggle
+  const muteToggle = $('muteTtsToggle');
+  if (muteToggle) {
+    muteToggle.checked = _muteTts;
+    muteToggle.addEventListener('change', () => {
+      _muteTts = muteToggle.checked;
+      localStorage.setItem('lumi_mute_tts', _muteTts);
+      if (_muteTts) speechSynthesis.cancel();
+    });
+  }
+}
+
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 function init() {
   // Theme
@@ -2367,6 +2560,9 @@ function startApp(savedKey) {
       updateCalUi();
     }
   });
+
+  initVoice();
+  wireVoiceListeners();
 
   loadHwFromSupabase().then(async () => {
     await loadCalendarEvents();
@@ -2576,6 +2772,8 @@ async function fetchLumi() {
     S.exchangeCount++;
     saveCurrentConv();
     renderMsg('lumi', clean, true);
+    // Speak aloud if voice was used OR voice mode is on
+    if (_lastWasVoice || _voiceMode) { speakResponse(clean); _lastWasVoice = false; }
     renderSidebar();
     if (data) applyProfile(data);
     if (S.exchangeCount === 1) {
@@ -2688,6 +2886,7 @@ function renderMsg(role, content, animate, att) {
     const nm = document.createElement('span'); nm.className = 'msg-name';
     nm.textContent = S.tutorCtx ? S.tutorCtx.teacher : 'Lumi';
     hd.append(av, nm); el.appendChild(hd);
+    // Speaker button added after bubble is built (needs text) — deferred below
   }
 
   const bubble = document.createElement('div'); bubble.className = 'msg-bubble';
@@ -2734,6 +2933,13 @@ function renderMsg(role, content, animate, att) {
   el.appendChild(bubble);
   messagesEl.appendChild(el);
   if (animate) scrollBottom();
+
+  // Add speaker button to Lumi messages after bubble is in the DOM
+  if (role === 'lumi') {
+    const plainText = typeof content === 'string' ? content
+      : (Array.isArray(content) ? content.filter(p => p.type === 'text').map(p => p.text).join(' ') : '');
+    if (plainText) _addSpeakerBtn(el, plainText);
+  }
 }
 
 function fmtText(text) {

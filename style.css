@@ -738,6 +738,27 @@ body.signin-page{
 .semester-banner-btn.ghost{background:transparent;color:var(--text-muted);border-color:var(--border)}
 .semester-banner-btn.ghost:hover{color:var(--text);border-color:var(--text-muted)}
 
+/* ─── VOICE ──────────────────────────────────────────────── */
+.mic-btn{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border:none;background:none;border-radius:50%;cursor:pointer;color:var(--text-muted);transition:color .15s,background .15s;flex-shrink:0;position:relative;padding:0}
+.mic-btn:hover{color:var(--text);background:var(--surface-2)}
+.mic-btn svg{width:17px;height:17px;pointer-events:none}
+.mic-btn.recording{color:#ef4444}
+.mic-btn.recording::before{content:'';position:absolute;inset:-5px;border-radius:50%;border:2px solid #ef4444;animation:mic-pulse 1s ease-in-out infinite}
+.mic-btn.voice-active{color:#22c55e}
+.mic-btn.voice-active::before{content:'';position:absolute;inset:-5px;border-radius:50%;border:2px solid #22c55e;animation:mic-pulse 2s ease-in-out infinite}
+@keyframes mic-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(1.18)}}
+.mic-btn:disabled{opacity:.3;cursor:not-allowed}
+/* Speaker button on Lumi messages */
+.msg-speak-btn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:none;background:none;border-radius:4px;cursor:pointer;color:var(--text-muted);opacity:0;transition:opacity .15s,color .15s,background .15s;margin-left:6px;flex-shrink:0;padding:0}
+.msg.lumi:hover .msg-speak-btn{opacity:.5}
+.msg-speak-btn.speaking,.body.voice-mode-on .msg-speak-btn{opacity:.6}
+.msg-speak-btn:hover{color:var(--accent);background:var(--accent-soft);opacity:1 !important}
+.msg-speak-btn svg{width:13px;height:13px;pointer-events:none}
+/* Listening bar above input */
+.voice-listening-bar{display:none;align-items:center;gap:8px;padding:5px 16px;background:rgba(34,197,94,.07);border-top:1px solid rgba(34,197,94,.18);font-size:12px;color:#4ade80;font-weight:500;flex-shrink:0}
+.voice-listening-bar.active{display:flex}
+.voice-dot{width:7px;height:7px;border-radius:50%;background:#22c55e;flex-shrink:0;animation:mic-pulse 1.4s ease-in-out infinite}
+
 /* ─── MY CLASSES SIDEBAR ─────────────────────────────────── */
 .sb-my-classes-hd{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;padding:8px 8px 4px;}
 .sb-star-hd{color:#f59e0b;font-size:11px;line-height:1}
