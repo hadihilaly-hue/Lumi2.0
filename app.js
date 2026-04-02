@@ -1976,7 +1976,19 @@ function startApp(savedKey) {
   migrateOldData();
   S.currentId = genId();
   wireHwListeners();
-  loadHwFromSupabase().then(() => {
+  wireCalListeners();
+  updateCalUi();
+
+  // If we just returned from Google OAuth, mark calendar as connected
+  sb.auth.getSession().then(({ data: { session } }) => {
+    if (session?.provider_token && session?.user?.app_metadata?.provider === 'google') {
+      setCalendarConnected(true);
+      updateCalUi();
+    }
+  });
+
+  loadHwFromSupabase().then(async () => {
+    await loadCalendarEvents();
     renderSidebar();
     checkDailyHwPrompt();
   });
@@ -1984,6 +1996,12 @@ function startApp(savedKey) {
   showWelcome();
   checkSemesterBanner();
   if (!savedKey) showNoKeyBanner();
+
+  // Wire timeline modal close buttons
+  const tlClose   = $('timelineClose');
+  const tlBackdrop = $('timelineBackdrop');
+  if (tlClose)    tlClose.addEventListener('click', closeTimelineModal);
+  if (tlBackdrop) tlBackdrop.addEventListener('click', closeTimelineModal);
 }
 
 function showNoKeyBanner() {
@@ -2371,6 +2389,11 @@ function showToast(msg, type) {
 
 // ─── HOMEWORK PLANNER ────────────────────────────────────────────────────────
 
+// ── Calendar state (session-only, never persisted) ─────────
+let _calEvents  = [];    // [{title, start, end, id}]
+let _calFetched = false; // fetched once per session
+let _calToken   = null;  // Google provider_token from Supabase session
+
 const HOMEWORK_PRIORITY = {
   TIER_1_CRITICAL: {
     types: ['essay', 'research paper', 'project', 'presentation', 'lab report', 'final', 'portfolio'],
@@ -2441,6 +2464,371 @@ function fmtPlanAbsTime(totalMinutes) {
   const ampm = h >= 12 ? 'PM' : 'AM';
   const h12 = h % 12 || 12;
   return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
+// ── Google Calendar helpers ────────────────────────────────
+function isCalendarConnected() {
+  return !!localStorage.getItem('lumi_cal_connected');
+}
+function setCalendarConnected(val) {
+  if (val) localStorage.setItem('lumi_cal_connected', '1');
+  else     localStorage.removeItem('lumi_cal_connected');
+}
+
+async function fetchCalendarToken() {
+  if (!currentUser) return null;
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const token = session?.provider_token || null;
+    if (token) _calToken = token;
+    return token;
+  } catch { return null; }
+}
+
+async function getTodaysCalEvents(accessToken) {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const endOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
+  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(startOfDay)}&timeMax=${encodeURIComponent(endOfDay)}&singleEvents=true&orderBy=startTime`;
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!resp.ok) throw new Error('cal_fetch_' + resp.status);
+  const data = await resp.json();
+  return (data.items || []).map(ev => ({
+    id:    ev.id,
+    title: ev.summary || 'Event',
+    start: new Date(ev.start?.dateTime || ev.start?.date),
+    end:   new Date(ev.end?.dateTime   || ev.end?.date),
+  }));
+}
+
+async function loadCalendarEvents() {
+  if (_calFetched) return;
+  if (!isCalendarConnected()) return;
+  _calFetched = true;
+  try {
+    const token = await fetchCalendarToken();
+    if (!token) { setCalendarConnected(false); updateCalUi(); return; }
+    _calToken  = token;
+    _calEvents = await getTodaysCalEvents(token);
+  } catch (e) {
+    console.warn('Calendar fetch failed, falling back to homework-only plan:', e.message);
+    _calEvents = [];
+    if (e.message.includes('cal_fetch_401')) { setCalendarConnected(false); updateCalUi(); showToast('Calendar session expired — please reconnect.'); }
+  }
+}
+
+// Return free blocks between now and 10:30 PM, excluding calendar events
+// All times in absolute minutes since midnight
+function getFreeTimeBlocks() {
+  const now = new Date();
+  const nowMin   = now.getHours() * 60 + now.getMinutes();
+  const startMin = Math.ceil(nowMin / 5) * 5;
+  const endMin   = BEDTIME_MINUTES;
+
+  if (!_calEvents.length) {
+    return startMin < endMin ? [{ startMin, endMin, durationMin: endMin - startMin }] : [];
+  }
+
+  const busy = _calEvents
+    .map(ev => ({
+      start: ev.start.getHours() * 60 + ev.start.getMinutes(),
+      end:   ev.end.getHours()   * 60 + ev.end.getMinutes(),
+    }))
+    .filter(b => b.end > startMin && b.start < endMin)
+    .sort((a, b) => a.start - b.start);
+
+  const free = [];
+  let cursor = startMin;
+  busy.forEach(b => {
+    if (b.start > cursor && b.start - cursor >= 20) {
+      free.push({ startMin: cursor, endMin: b.start, durationMin: b.start - cursor });
+    }
+    cursor = Math.max(cursor, b.end);
+  });
+  if (cursor < endMin && endMin - cursor >= 20) {
+    free.push({ startMin: cursor, endMin, durationMin: endMin - cursor });
+  }
+  return free;
+}
+
+function getTotalFreeMinutes() {
+  return getFreeTimeBlocks().reduce((s, b) => s + b.durationMin, 0);
+}
+
+function updateCalUi() {
+  const connected = isCalendarConnected();
+  const cs = $('calConnectedState');
+  const ds = $('calDisconnectedState');
+  if (cs) cs.style.display = connected ? '' : 'none';
+  if (ds) ds.style.display = connected ? 'none' : '';
+}
+
+async function connectGoogleCalendar() {
+  try {
+    const { error } = await sb.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        scopes: 'https://www.googleapis.com/auth/calendar.readonly',
+        redirectTo: window.location.href,
+        queryParams: { access_type: 'offline', prompt: 'consent' },
+      },
+    });
+    if (error) showToast('Calendar connection failed: ' + error.message);
+  } catch { showToast('Calendar connection failed.'); }
+}
+
+function wireCalListeners() {
+  const connectBtn    = $('calConnectBtn');
+  const disconnectBtn = $('calDisconnectBtn');
+  if (connectBtn)    connectBtn.addEventListener('click', connectGoogleCalendar);
+  if (disconnectBtn) disconnectBtn.addEventListener('click', () => {
+    setCalendarConnected(false);
+    _calEvents  = [];
+    _calFetched = false;
+    _calToken   = null;
+    updateCalUi();
+    showToast('Calendar disconnected.', 'ok');
+  });
+}
+
+// ── Timeline modal ─────────────────────────────────────────
+function showTimelineModal() {
+  const bd = $('timelineBackdrop');
+  const m  = $('timelineModal');
+  bd.style.display = 'block';
+  requestAnimationFrame(() => bd.classList.add('open'));
+  m.style.display = 'flex';
+  m.style.flexDirection = 'column';
+  requestAnimationFrame(() => m.classList.add('open'));
+  renderTimeline();
+}
+
+function closeTimelineModal() {
+  const bd = $('timelineBackdrop');
+  const m  = $('timelineModal');
+  bd.classList.remove('open');
+  m.classList.remove('open');
+  setTimeout(() => { bd.style.display = 'none'; m.style.display = 'none'; }, 200);
+}
+
+function renderTimeline() {
+  const body  = $('timelineBody');
+  const meta  = $('timelineMeta');
+  const title = $('timelineTitle');
+  body.innerHTML = '';
+
+  const now    = new Date();
+  const today  = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  title.textContent = `Tonight — ${today}`;
+
+  const nowMin   = now.getHours() * 60 + now.getMinutes();
+  const startMin = Math.ceil(nowMin / 5) * 5;
+  const totalFree = getTotalFreeMinutes();
+  const fH = Math.floor(totalFree / 60), fM = totalFree % 60;
+  const freeStr = fH > 0 ? `${fH}h ${fM > 0 ? fM + 'm' : ''}`.trim() : `${fM}m`;
+  const calTonight = _calEvents.filter(ev => ev.end.getHours() * 60 + ev.end.getMinutes() > startMin);
+  meta.textContent = `${fmtPlanAbsTime(startMin)} → 10:30 PM · ${freeStr} free${calTonight.length ? ` · ${calTonight.length} calendar event${calTonight.length !== 1 ? 's' : ''} tonight` : ''}`;
+
+  const tasks = getHwTasks().filter(t => !t.isComplete);
+  const plan  = buildStudyPlanWithCalendar(tasks);
+
+  // Now-line
+  const nowLine = document.createElement('div');
+  nowLine.className = 'tl-now-line';
+  const nowLabel = document.createElement('span');
+  nowLabel.className = 'tl-now-label';
+  nowLabel.textContent = 'NOW';
+  nowLine.appendChild(nowLabel);
+  body.appendChild(nowLine);
+
+  plan.timeline.forEach(block => {
+    if (block.type === 'bedtime') {
+      const el = document.createElement('div');
+      el.className = 'tl-block bedtime';
+      const timeEl = document.createElement('div'); timeEl.className = 'tl-time'; timeEl.textContent = '10:30';
+      const bar    = document.createElement('div'); bar.className = 'tl-bar';
+      const ct     = document.createElement('div'); ct.className = 'tl-content';
+      const t      = document.createElement('div'); t.className = 'tl-title'; t.textContent = '🌙 Bedtime — lights out!';
+      const m2     = document.createElement('div'); m2.className = 'tl-meta'; m2.textContent = '8 hours of sleep is non-negotiable.';
+      ct.appendChild(t); ct.appendChild(m2);
+      el.appendChild(timeEl); el.appendChild(bar); el.appendChild(ct);
+      body.appendChild(el);
+      return;
+    }
+
+    const el = document.createElement('div');
+    el.className = 'tl-block ' + block.type;
+
+    const taskDone = block.taskId && getHwTasks().find(t2 => t2.id === block.taskId && t2.isComplete);
+    if (taskDone) el.classList.add('done');
+
+    const timeEl = document.createElement('div');
+    timeEl.className = 'tl-time';
+    timeEl.textContent = fmtPlanAbsTime(block.startMin);
+
+    const bar = document.createElement('div');
+    bar.className = 'tl-bar';
+
+    const ct    = document.createElement('div'); ct.className = 'tl-content';
+    const titleEl = document.createElement('div'); titleEl.className = 'tl-title';
+    const metaEl  = document.createElement('div'); metaEl.className = 'tl-meta';
+
+    if (block.type === 'hw') {
+      const dot = TIER_DOT[block.tier] || '⚪';
+      const chunk = block.chunkNum ? ` pt ${block.chunkNum}/${block.totalChunks}` : '';
+      titleEl.textContent = `${dot} ${block.title}${chunk}`;
+      metaEl.textContent  = `${block.duration} min${block.className ? ' · ' + block.className.split(' ').slice(0,2).join(' ') : ''}`;
+      el.addEventListener('click', () => {
+        const entry = getSchedule().find(s => s.course === block.className);
+        if (entry) { openTutor(lookupSubjectForCourse(entry.course).subjectId, entry.course, entry.teacher); closeTimelineModal(); }
+      });
+    } else if (block.type === 'break') {
+      titleEl.textContent = '🔋 Break';
+      metaEl.textContent  = block.duration + ' min';
+    } else if (block.type === 'cal') {
+      titleEl.textContent = '📅 ' + block.title;
+      metaEl.textContent  = block.duration + ' min · Calendar';
+    } else if (block.type === 'gap') {
+      titleEl.textContent = 'Free gap';
+      metaEl.textContent  = block.duration + ' min — too short to schedule';
+    }
+
+    ct.appendChild(titleEl);
+    if (metaEl.textContent) ct.appendChild(metaEl);
+    el.appendChild(timeEl); el.appendChild(bar); el.appendChild(ct);
+    body.appendChild(el);
+  });
+}
+
+// Build a calendar-aware study plan, scheduling tasks only in free time gaps
+function buildStudyPlanWithCalendar(tasks) {
+  const style    = getStudyStyle();
+  const WORK     = style.work_minutes;
+  const BREAK    = style.break_minutes;
+  const today    = todayStr();
+  const startMin = getPlanStartMinutes();
+  const warnings = [];
+
+  if (startMin >= BEDTIME_MINUTES) {
+    return {
+      blocks: [], timeline: [{ type: 'bedtime', startMin: BEDTIME_MINUTES, duration: 0 }],
+      warnings: [{ type: 'bedtime', text: "It's 10:30 — time to wrap up and get to sleep." }],
+      totalMinutes: 0, startMinutes: startMin, isPastBedtime: true,
+    };
+  }
+
+  const freeBlocks = getFreeTimeBlocks();
+  const totalFree  = freeBlocks.reduce((s, b) => s + b.durationMin, 0);
+
+  if (_calEvents.length > 0 && totalFree < 120) {
+    const fH = Math.floor(totalFree / 60), fM = totalFree % 60;
+    const fs = fH > 0 ? `${fH}h ${fM > 0 ? fM + 'm' : ''}`.trim() : `${fM}m`;
+    warnings.push({ type: 'heavy', text: `You only have ${fs} free tonight between your activities. Let's figure out what's most important.` });
+  }
+
+  // Classify and sort tasks: tonight+hardest first
+  const classified = tasks.map(t => ({
+    ...t, tier: classifyTask(t.title), isTonight: t.dueDate === today || !t.dueDate,
+    _rem: t.estimatedMinutes || 30, _chunk: 0,
+  })).sort((a, b) => {
+    if (a.isTonight !== b.isTonight) return a.isTonight ? -1 : 1;
+    if (TIER_ORDER[a.tier] !== TIER_ORDER[b.tier]) return TIER_ORDER[a.tier] - TIER_ORDER[b.tier];
+    if (a.dueDate && b.dueDate && a.dueDate !== b.dueDate) return a.dueDate < b.dueDate ? -1 : 1;
+    return 0;
+  });
+
+  const totalEst = classified.reduce((s, t) => s + (t.estimatedMinutes || 30), 0);
+  if (totalEst > totalFree && totalEst > 0 && !warnings.length) {
+    const hW = Math.round(totalEst / 60 * 10) / 10, hF = Math.round(totalFree / 60 * 10) / 10;
+    warnings.push({ type: 'bedtime-overload', text: `You have ~${hW}hrs of homework but only ~${hF}hrs free tonight. Let's figure out what's most important.` });
+  }
+
+  const hwBlocks = [];
+  const timeline = [];
+  let taskQueue  = classified.map(t => ({ ...t }));
+
+  // Build sorted list of calendar events tonight
+  const calTonight = _calEvents
+    .map(ev => ({
+      title:    ev.title,
+      startMin: ev.start.getHours() * 60 + ev.start.getMinutes(),
+      endMin:   ev.end.getHours()   * 60 + ev.end.getMinutes(),
+    }))
+    .filter(ev => ev.endMin > startMin && ev.startMin < BEDTIME_MINUTES)
+    .sort((a, b) => a.startMin - b.startMin);
+
+  let timelineCursor = startMin;
+
+  function scheduleIntoFreeBlock(fStart, fEnd) {
+    let pos = fStart, workedSince = 0;
+    while (pos < fEnd && taskQueue.length > 0) {
+      const task = taskQueue[0];
+      if (task._rem <= 0) { taskQueue.shift(); continue; }
+      const numChunks = Math.ceil((task.estimatedMinutes || 30) / WORK);
+
+      if (workedSince >= WORK) {
+        const bd = Math.min(BREAK, fEnd - pos);
+        if (bd >= 5) {
+          timeline.push({ type: 'break', startMin: pos, duration: bd });
+          hwBlocks.push({ type: 'break', duration: bd, startMinute: pos - startMin });
+          pos += bd; workedSince = 0;
+        } else break;
+        continue;
+      }
+
+      const available = fEnd - pos;
+      if (available <= 0) break;
+      const chunkDur  = Math.min(WORK, task._rem);
+      const actualDur = Math.min(chunkDur, available);
+
+      timeline.push({
+        type: 'hw', taskId: task.id, title: task.title, className: task.className || '',
+        tier: task.tier, startMin: pos, duration: actualDur,
+        chunkNum:    numChunks > 1 ? task._chunk + 1 : null,
+        totalChunks: numChunks > 1 ? numChunks : null,
+      });
+      hwBlocks.push({
+        type: 'task', task: { ...task }, duration: actualDur, startMinute: pos - startMin,
+        chunkNum:    numChunks > 1 ? task._chunk + 1 : null,
+        totalChunks: numChunks > 1 ? numChunks : null,
+        truncated: actualDur < chunkDur,
+      });
+
+      task._rem   -= actualDur;
+      task._chunk += 1;
+      pos         += actualDur;
+      workedSince += actualDur;
+      if (task._rem <= 0) taskQueue.shift();
+    }
+    return pos;
+  }
+
+  freeBlocks.forEach(fb => {
+    // Add any calendar events that fall before this free block
+    calTonight
+      .filter(ev => ev.startMin >= timelineCursor && ev.startMin < fb.startMin)
+      .forEach(ev => timeline.push({
+        type: 'cal', title: ev.title,
+        startMin: Math.max(ev.startMin, timelineCursor),
+        duration: ev.endMin - Math.max(ev.startMin, timelineCursor),
+      }));
+    timelineCursor = fb.startMin;
+    timelineCursor = scheduleIntoFreeBlock(fb.startMin, Math.min(fb.endMin, BEDTIME_MINUTES));
+  });
+
+  // Remaining calendar events after all free blocks
+  calTonight
+    .filter(ev => ev.startMin >= timelineCursor && ev.startMin < BEDTIME_MINUTES)
+    .forEach(ev => timeline.push({
+      type: 'cal', title: ev.title, startMin: ev.startMin,
+      duration: Math.min(ev.endMin, BEDTIME_MINUTES) - ev.startMin,
+    }));
+
+  timeline.sort((a, b) => a.startMin - b.startMin);
+  timeline.push({ type: 'bedtime', startMin: BEDTIME_MINUTES, duration: 0 });
+
+  const totalMinutes = hwBlocks.filter(b => b.type === 'task').reduce((s, b) => s + b.duration, 0);
+  return { blocks: hwBlocks, timeline, warnings, totalMinutes, startMinutes: startMin, isPastBedtime: false };
 }
 
 function getHwTasks() {
@@ -2563,7 +2951,7 @@ function closeHwAddModal() {
 
 function showHwPlanModal() {
   const tasks = getHwTasks().filter(t => !t.isComplete);
-  const plan  = buildStudyPlan(tasks);
+  const plan  = _calEvents.length > 0 ? buildStudyPlanWithCalendar(tasks) : buildStudyPlan(tasks);
   renderStudyPlan(plan);
   const modal = $('hwPlanModal');
   modal.style.display = 'flex';
@@ -2931,6 +3319,15 @@ function renderHwSidebar(container) {
   openBtn.addEventListener('click', () => { showHwPopup(); closeSidebar(); });
   container.appendChild(openBtn);
 
+  if (isCalendarConnected() || _calEvents.length > 0) {
+    const tlBtn = document.createElement('div');
+    tlBtn.className = 'sb-hw-open-btn';
+    tlBtn.style.marginTop = '4px';
+    tlBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> View tonight's timeline`;
+    tlBtn.addEventListener('click', () => { showTimelineModal(); closeSidebar(); });
+    container.appendChild(tlBtn);
+  }
+
   const div = document.createElement('div');
   div.className = 'sb-divider';
   container.appendChild(div);
@@ -2967,6 +3364,39 @@ function hwContext() {
     : minutesUntilBed < 60
     ? `\n⏰ Less than ${minutesUntilBed} minutes until the 10:30 PM bedtime cutoff — flag this and help them focus on only the most critical work.`
     : '';
+
+  // Calendar context
+  let calContext = '';
+  if (_calEvents.length > 0) {
+    const evLines = _calEvents.map(ev => {
+      const st = ev.start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const et = ev.end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      return `  • ${ev.title} (${st} – ${et})`;
+    });
+    const fb   = getFreeTimeBlocks();
+    const fbLines = fb.map(b => {
+      const dH = Math.floor(b.durationMin / 60), dM = b.durationMin % 60;
+      const ds = dH > 0 ? `${dH}h ${dM > 0 ? dM + 'm' : ''}`.trim() : `${dM}m`;
+      return `  • ${fmtPlanAbsTime(b.startMin)} – ${fmtPlanAbsTime(b.endMin)} (${ds})`;
+    });
+    const tf = getTotalFreeMinutes();
+    const tfH = Math.floor(tf / 60), tfM = tf % 60;
+    const tfStr = tfH > 0 ? `${tfH}h ${tfM > 0 ? tfM + 'm' : ''}`.trim() : `${tfM}m`;
+    calContext = `
+
+STUDENT'S CALENDAR FOR TODAY:
+${evLines.join('\n')}
+
+FREE TIME AVAILABLE TONIGHT:
+${fbLines.length ? fbLines.join('\n') : '  • No free blocks of 20+ min before 10:30 PM'}
+
+Total free time tonight: ${tfStr}
+Homework cutoff: 10:30 PM
+
+Plan homework only within free time blocks. Never schedule during calendar events.
+If free time is tight, be honest with the student about what is realistic tonight.`;
+  }
+
   return `
 
 HOMEWORK PRIORITY SYSTEM:
@@ -2975,7 +3405,7 @@ You have access to the student's full homework list with priority tiers and due 
 Current homework:
 ${lines.join('\n')}
 
-Student study style: ${style.work_minutes} min work / ${style.break_minutes} min break (${style.label})${overload}${bedtimeNote}
+Student study style: ${style.work_minutes} min work / ${style.break_minutes} min break (${style.label})${overload}${bedtimeNote}${calContext}
 
 Rules you must always follow:
 - The student's bedtime is 10:30 PM. Never schedule or encourage work past this time.

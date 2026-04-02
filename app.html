@@ -301,6 +301,22 @@
       <div class="settings-hint">Your key is stored locally and never shared.</div>
     </div>
 
+    <!-- Calendar Integration -->
+    <div class="settings-section">
+      <div class="settings-section-title">Calendar Integration</div>
+      <div id="calConnectedState" style="display:none">
+        <div class="cal-connected-chip">
+          <span class="cal-connected-icon">✅</span>
+          <span class="cal-connected-label">Google Calendar connected</span>
+        </div>
+        <button class="danger-btn" id="calDisconnectBtn" style="margin-top:8px">Disconnect Calendar</button>
+      </div>
+      <div id="calDisconnectedState">
+        <div class="settings-hint" style="margin-bottom:8px">Connect your Google Calendar so Lumi can plan homework around your real evening.</div>
+        <button class="settings-save-btn" id="calConnectBtn">Connect Google Calendar</button>
+      </div>
+    </div>
+
     <!-- Memory -->
     <div class="settings-section">
       <div class="settings-section-title">Memory</div>
@@ -372,11 +388,22 @@
   </div>
 </div>
 
+<!-- ─── TIMELINE MODAL ────────────────────────────────────── -->
+<div class="hw-backdrop" id="timelineBackdrop" style="display:none"></div>
+<div class="timeline-modal" id="timelineModal" style="display:none">
+  <div class="timeline-modal-head">
+    <div class="timeline-modal-title" id="timelineTitle">Tonight's Plan</div>
+    <button class="hw-popup-close" id="timelineClose">×</button>
+  </div>
+  <div class="timeline-modal-meta" id="timelineMeta"></div>
+  <div class="timeline-body" id="timelineBody"></div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- Scripts at bottom so the loading screen renders immediately -->
 <script src="supabase.js"></script>
 <script src="auth.js"></script>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>
