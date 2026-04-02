@@ -1126,13 +1126,13 @@ function renderSidebar() {
 
   const schedule = getSchedule();
 
-  // Homework section (when schedule is set and not searching)
-  if (schedule.length > 0 && !query) {
+  // Homework section — always visible when schedule is set
+  if (schedule.length > 0) {
     renderHwSidebar(sbNav);
   }
 
-  // My Classes section (when schedule is set and not searching)
-  if (schedule.length > 0 && !query) {
+  // My Classes section — always pinned, visible even during search
+  if (schedule.length > 0) {
     const myHd = document.createElement('div');
     myHd.className = 'sb-my-classes-hd';
     myHd.innerHTML = `<span class="sb-star-hd">★</span> My Classes`;
