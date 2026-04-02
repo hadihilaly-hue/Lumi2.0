@@ -267,11 +267,73 @@
   </div>
 </div>
 
+<!-- ─── HOMEWORK DAILY POPUP ──────────────────────────────── -->
+<div class="hw-backdrop" id="hwBackdrop"></div>
+<div class="hw-popup" id="hwPopup" style="display:none">
+  <div class="hw-popup-head">
+    <div class="hw-popup-title">📚 Homework Check-in</div>
+    <button class="hw-popup-close" id="hwPopupClose">×</button>
+  </div>
+  <div class="hw-popup-body">
+    <div class="hw-popup-greeting" id="hwPopupGreeting">What homework do you have today?</div>
+    <div class="hw-task-list" id="hwPopupTaskList"></div>
+    <button class="hw-add-task-btn" id="hwPopupAddBtn">+ Add homework</button>
+  </div>
+  <div class="hw-popup-footer">
+    <button class="hw-plan-btn" id="hwPopupPlanBtn">Generate tonight's study plan →</button>
+    <button class="hw-skip-btn" id="hwPopupSkipBtn">No homework today</button>
+  </div>
+</div>
+
+<!-- ─── HOMEWORK ADD MODAL ────────────────────────────────── -->
+<div class="hw-modal" id="hwAddModal" style="display:none">
+  <div class="hw-modal-head">
+    <button class="hw-modal-back" id="hwAddBack">←</button>
+    <div class="hw-modal-title">Add Homework</div>
+  </div>
+  <div class="hw-modal-body">
+    <div class="hw-field">
+      <label class="hw-label">Class</label>
+      <select class="hw-select" id="hwClassSelect"></select>
+    </div>
+    <div class="hw-field">
+      <label class="hw-label">Assignment</label>
+      <input class="hw-input" id="hwTitleInput" placeholder="e.g. Read Ch. 5, Problem Set 3…" autocomplete="off" maxlength="120">
+    </div>
+    <div class="hw-field hw-field-row">
+      <div class="hw-field-half">
+        <label class="hw-label">Due date</label>
+        <input class="hw-input" id="hwDueInput" type="date">
+      </div>
+      <div class="hw-field-half">
+        <label class="hw-label">Est. time (min)</label>
+        <input class="hw-input" id="hwTimeInput" type="number" min="5" max="480" placeholder="30">
+      </div>
+    </div>
+    <div class="hw-time-hint" id="hwTimeHint"></div>
+  </div>
+  <div class="hw-modal-footer">
+    <button class="hw-plan-btn" id="hwAddSaveBtn">Save →</button>
+  </div>
+</div>
+
+<!-- ─── HOMEWORK PLAN MODAL ───────────────────────────────── -->
+<div class="hw-modal" id="hwPlanModal" style="display:none">
+  <div class="hw-modal-head">
+    <button class="hw-modal-back" id="hwPlanBack">←</button>
+    <div class="hw-modal-title">Tonight's Study Plan</div>
+  </div>
+  <div class="hw-modal-body" id="hwPlanBody"></div>
+  <div class="hw-modal-footer">
+    <button class="hw-plan-btn" id="hwPlanDoneBtn">Let's do it!</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- Scripts at bottom so the loading screen renders immediately -->
 <script src="supabase.js"></script>
 <script src="auth.js"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

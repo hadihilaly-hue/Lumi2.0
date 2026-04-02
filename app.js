@@ -264,7 +264,7 @@ Response length:
 
 Every 2–3 messages, weave in one organic question to understand them better.
 ${TEACHING_PHILOSOPHY}
-
+${hwContext()}
 After EVERY reply, append this JSON on its own line at the very end (stripped before display):
 {"values":["..."],"goals":["..."],"interests":["..."]}
 Only include NEWLY learned things. Empty arrays if nothing new.
@@ -319,7 +319,7 @@ ${p.teacher_voice || ''}
 - Ask the same kinds of questions ${teacher} asks to help students think, rather than just giving answers
 - Sound like ${teacher} — same warmth, same rigor, same personality
 ${TEACHING_PHILOSOPHY}
-
+${hwContext()}
 Response length: SHORT — 1-3 sentences for simple questions. Longer only when a concept truly needs it. No essays.
 
 After EVERY reply, append this JSON on its own line at the very end (stripped before display):
@@ -1071,8 +1071,14 @@ function renderSidebar() {
   const query = sbSearch.value.toLowerCase().trim();
   sbNav.innerHTML = '';
 
-  // My Classes section (when schedule is set and not searching)
   const schedule = getSchedule();
+
+  // Homework section (when schedule is set and not searching)
+  if (schedule.length > 0 && !query) {
+    renderHwSidebar(sbNav);
+  }
+
+  // My Classes section (when schedule is set and not searching)
   if (schedule.length > 0 && !query) {
     const myHd = document.createElement('div');
     myHd.className = 'sb-my-classes-hd';
@@ -1906,6 +1912,11 @@ function wireListeners(savedKey) {
 function startApp(savedKey) {
   migrateOldData();
   S.currentId = genId();
+  wireHwListeners();
+  loadHwFromSupabase().then(() => {
+    renderSidebar();
+    checkDailyHwPrompt();
+  });
   renderSidebar();
   showWelcome();
   checkSemesterBanner();
@@ -2293,4 +2304,474 @@ function showToast(msg, type) {
   toast.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
+}
+
+// ─── HOMEWORK PLANNER ────────────────────────────────────────────────────────
+
+function getHwTasks() {
+  try { return JSON.parse(localStorage.getItem('lumi_hw_tasks') || '[]'); } catch { return []; }
+}
+function saveHwTasks(tasks) { localStorage.setItem('lumi_hw_tasks', JSON.stringify(tasks)); }
+function genHwId() { return 'hw_' + Math.random().toString(36).slice(2, 10); }
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+
+// Load teacher profiles for all schedule classes (used for time hints)
+const _hwProfileCache = {};
+async function getTeacherProfileCached(teacherId) {
+  if (!teacherId) return null;
+  if (_hwProfileCache[teacherId] !== undefined) return _hwProfileCache[teacherId];
+  try {
+    const { data } = await sb.from('teacher_profiles').select('*').eq('id', teacherId).single();
+    _hwProfileCache[teacherId] = data || null;
+  } catch { _hwProfileCache[teacherId] = null; }
+  return _hwProfileCache[teacherId];
+}
+
+function buildTeacherId(course, teacher) {
+  // Mirror the ID format used in teacher.html: slugify course + teacher
+  return (course + '_' + teacher).toLowerCase().replace(/[^a-z0-9]+/g, '_');
+}
+
+// ── Daily popup check ──────────────────────────────────────
+function checkDailyHwPrompt() {
+  const lastDate = localStorage.getItem('lumi_hw_date');
+  if (lastDate === todayStr()) return;           // already shown today
+  const schedule = getSchedule();
+  if (!schedule.length) return;                  // no schedule yet
+  // Remove stale (past & complete) tasks older than 3 days
+  pruneOldTasks();
+  showHwPopup();
+}
+
+function pruneOldTasks() {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 3);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const tasks = getHwTasks().filter(t => !t.isComplete || (t.dueDate && t.dueDate >= cutoffStr));
+  saveHwTasks(tasks);
+}
+
+// ── Show/hide helpers ──────────────────────────────────────
+function openHwBackdrop()  { $('hwBackdrop').classList.add('open'); }
+function closeHwBackdrop() { $('hwBackdrop').classList.remove('open'); }
+
+function showHwPopup() {
+  localStorage.setItem('lumi_hw_date', todayStr());
+  openHwBackdrop();
+  const popup = $('hwPopup');
+  popup.style.display = 'flex';
+  popup.style.flexDirection = 'column';
+  requestAnimationFrame(() => popup.classList.add('open'));
+  renderHwPopupTasks();
+}
+
+function closeHwPopup() {
+  const popup = $('hwPopup');
+  popup.classList.remove('open');
+  closeHwBackdrop();
+  setTimeout(() => { popup.style.display = 'none'; }, 200);
+  renderSidebar(); // refresh sidebar checklist
+  syncHwToSupabase();
+}
+
+function showHwAddModal(prefillClass) {
+  const modal = $('hwAddModal');
+  modal.style.display = 'flex';
+  modal.style.flexDirection = 'column';
+  requestAnimationFrame(() => modal.classList.add('open'));
+
+  // Populate class selector
+  const sel = $('hwClassSelect');
+  sel.innerHTML = '';
+  const schedule = getSchedule();
+  schedule.forEach(({ course }) => {
+    const opt = document.createElement('option');
+    opt.value = course;
+    opt.textContent = course;
+    sel.appendChild(opt);
+  });
+  if (prefillClass) sel.value = prefillClass;
+
+  // Default due date = today
+  $('hwDueInput').value = todayStr();
+  $('hwTitleInput').value = '';
+  $('hwTimeInput').value = '';
+  $('hwTimeHint').textContent = '';
+
+  // Show teacher time hint when class changes
+  sel.addEventListener('change', updateTimeHint);
+  updateTimeHint();
+}
+
+async function updateTimeHint() {
+  const sel    = $('hwClassSelect');
+  const course = sel.value;
+  const schedule = getSchedule();
+  const entry  = schedule.find(s => s.course === course);
+  if (!entry) { $('hwTimeHint').textContent = ''; return; }
+  const tid = buildTeacherId(entry.course, entry.teacher);
+  const profile = await getTeacherProfileCached(tid);
+  if (profile && profile.typical_hw_duration_minutes) {
+    $('hwTimeHint').textContent = `${entry.teacher.split(' ')[0]} typically assigns ~${profile.typical_hw_duration_minutes} min of homework`;
+    $('hwTimeInput').placeholder = profile.typical_hw_duration_minutes;
+  } else {
+    $('hwTimeHint').textContent = '';
+    $('hwTimeInput').placeholder = '30';
+  }
+}
+
+function closeHwAddModal() {
+  const modal = $('hwAddModal');
+  modal.classList.remove('open');
+  setTimeout(() => { modal.style.display = 'none'; }, 200);
+}
+
+function showHwPlanModal() {
+  const tasks = getHwTasks().filter(t => !t.isComplete);
+  const plan  = buildStudyPlan(tasks);
+  renderStudyPlan(plan);
+  const modal = $('hwPlanModal');
+  modal.style.display = 'flex';
+  modal.style.flexDirection = 'column';
+  requestAnimationFrame(() => modal.classList.add('open'));
+}
+
+function closeHwPlanModal() {
+  const modal = $('hwPlanModal');
+  modal.classList.remove('open');
+  setTimeout(() => { modal.style.display = 'none'; }, 200);
+}
+
+// ── Render popup task list ─────────────────────────────────
+function renderHwPopupTasks() {
+  const list  = $('hwPopupTaskList');
+  const tasks = getHwTasks();
+  list.innerHTML = '';
+  if (!tasks.length) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'font-size:13px;color:var(--text-muted);padding:4px 0 12px';
+    empty.textContent = 'Nothing yet — add your assignments below.';
+    list.appendChild(empty);
+    return;
+  }
+  tasks.forEach(task => {
+    const card = document.createElement('div');
+    card.className = 'hw-task-card' + (task.isComplete ? ' done' : '');
+
+    const check = document.createElement('button');
+    check.className = 'hw-task-check';
+    check.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
+    check.title = task.isComplete ? 'Mark incomplete' : 'Mark done';
+    check.addEventListener('click', () => toggleHwTask(task.id));
+
+    const info = document.createElement('div');
+    info.className = 'hw-task-info';
+    const title = document.createElement('div');
+    title.className = 'hw-task-title';
+    title.textContent = task.title;
+    const meta = document.createElement('div');
+    meta.className = 'hw-task-meta';
+    const parts = [];
+    if (task.className)        parts.push(task.className.split(' ').slice(0,2).join(' '));
+    if (task.estimatedMinutes) parts.push(`~${task.estimatedMinutes} min`);
+    if (task.dueDate)          parts.push('Due ' + task.dueDate);
+    meta.textContent = parts.join(' · ');
+    info.appendChild(title);
+    info.appendChild(meta);
+
+    const del = document.createElement('button');
+    del.className = 'hw-task-del';
+    del.textContent = '×';
+    del.title = 'Remove';
+    del.addEventListener('click', () => deleteHwTask(task.id));
+
+    card.appendChild(check);
+    card.appendChild(info);
+    card.appendChild(del);
+    list.appendChild(card);
+  });
+}
+
+function toggleHwTask(id) {
+  const tasks = getHwTasks().map(t => t.id === id ? { ...t, isComplete: !t.isComplete } : t);
+  saveHwTasks(tasks);
+  renderHwPopupTasks();
+  renderSidebar();
+  syncHwToSupabase();
+}
+
+function deleteHwTask(id) {
+  const tasks = getHwTasks().filter(t => t.id !== id);
+  saveHwTasks(tasks);
+  renderHwPopupTasks();
+  renderSidebar();
+  syncHwToSupabase();
+}
+
+function addHwTask(task) {
+  const tasks = getHwTasks();
+  tasks.push(task);
+  saveHwTasks(tasks);
+}
+
+// ── Study plan generator ───────────────────────────────────
+function buildStudyPlan(tasks) {
+  // Sort: due soonest first, then shortest
+  const sorted = [...tasks].sort((a, b) => {
+    if (a.dueDate && b.dueDate && a.dueDate !== b.dueDate)
+      return a.dueDate < b.dueDate ? -1 : 1;
+    return (a.estimatedMinutes || 30) - (b.estimatedMinutes || 30);
+  });
+
+  const plan = [];
+  let elapsed = 0; // minutes since start
+  const BREAK_INTERVAL = 90;
+  let nextBreak = BREAK_INTERVAL;
+  let workedSinceBreak = 0;
+
+  sorted.forEach(task => {
+    const dur = task.estimatedMinutes || 30;
+
+    // Insert break if needed
+    if (workedSinceBreak >= nextBreak && sorted.length > 1) {
+      plan.push({ type: 'break', duration: 15, startMinute: elapsed });
+      elapsed += 15;
+      workedSinceBreak = 0;
+    }
+
+    plan.push({
+      type: 'task',
+      task,
+      duration: dur,
+      startMinute: elapsed
+    });
+    elapsed += dur;
+    workedSinceBreak += dur;
+  });
+
+  return { blocks: plan, totalMinutes: elapsed };
+}
+
+function fmtPlanTime(minutesOffset) {
+  // Start from 6:00 PM by default
+  const start = 18 * 60 + minutesOffset;
+  const h = Math.floor(start / 60) % 24;
+  const m = start % 60;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12  = h % 12 || 12;
+  return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
+function renderStudyPlan(plan) {
+  const body = $('hwPlanBody');
+  body.innerHTML = '';
+
+  const totalH = Math.floor(plan.totalMinutes / 60);
+  const totalM = plan.totalMinutes % 60;
+  const timeStr = totalH > 0
+    ? `${totalH}h ${totalM > 0 ? totalM + 'm' : ''}`.trim()
+    : `${totalM}m`;
+
+  const summary = document.createElement('div');
+  summary.className = 'hw-plan-summary';
+  summary.textContent = `Here's your study session — ${plan.blocks.filter(b => b.type === 'task').length} assignments, about ${timeStr} total. Starting at 6:00 PM:`;
+  body.appendChild(summary);
+
+  plan.blocks.forEach(block => {
+    const el = document.createElement('div');
+    el.className = 'hw-plan-block' + (block.type === 'break' ? ' break' : '');
+
+    const timeEl = document.createElement('div');
+    timeEl.className = 'hw-plan-block-time';
+    timeEl.textContent = fmtPlanTime(block.startMinute) + ' · ' + block.duration + ' min';
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'hw-plan-block-title';
+
+    if (block.type === 'break') {
+      titleEl.textContent = '☕ Take a break';
+      const metaEl = document.createElement('div');
+      metaEl.className = 'hw-plan-block-meta';
+      metaEl.textContent = 'Step away, stretch, hydrate.';
+      el.appendChild(timeEl);
+      el.appendChild(titleEl);
+      el.appendChild(metaEl);
+    } else {
+      titleEl.textContent = block.task.title;
+      const metaEl = document.createElement('div');
+      metaEl.className = 'hw-plan-block-meta';
+      const parts = [];
+      if (block.task.className) parts.push(block.task.className.split(' ').slice(0, 2).join(' '));
+      if (block.task.dueDate)   parts.push('Due ' + block.task.dueDate);
+      metaEl.textContent = parts.join(' · ');
+      el.appendChild(timeEl);
+      el.appendChild(titleEl);
+      if (parts.length) el.appendChild(metaEl);
+    }
+    body.appendChild(el);
+  });
+}
+
+// ── Sidebar homework checklist ─────────────────────────────
+function renderHwSidebar(container) {
+  const tasks = getHwTasks();
+  const today = todayStr();
+
+  // Header
+  const hd = document.createElement('div');
+  hd.className = 'sb-hw-hd';
+  const hdLabel = document.createElement('span');
+  hdLabel.textContent = 'My Homework';
+  const hdBtn = document.createElement('button');
+  hdBtn.className = 'sb-hw-hd-btn';
+  hdBtn.textContent = '+ Add';
+  hdBtn.addEventListener('click', () => { showHwAddModal(); closeSidebar(); });
+  hd.appendChild(hdLabel);
+  hd.appendChild(hdBtn);
+  container.appendChild(hd);
+
+  if (!tasks.length) {
+    const empty = document.createElement('div');
+    empty.className = 'sb-hw-empty';
+    empty.textContent = 'No homework — enjoy the break!';
+    container.appendChild(empty);
+  } else {
+    // Show incomplete first, then completed (max 5 each)
+    const incomplete = tasks.filter(t => !t.isComplete);
+    const complete   = tasks.filter(t => t.isComplete).slice(0, 3);
+    const toShow     = [...incomplete, ...complete].slice(0, 8);
+
+    toShow.forEach(task => {
+      const item = document.createElement('div');
+      item.className = 'sb-hw-item' + (task.isComplete ? ' done' : '');
+
+      const check = document.createElement('div');
+      check.className = 'sb-hw-check' + (task.isComplete ? ' done' : '');
+      check.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
+      check.addEventListener('click', e => { e.stopPropagation(); toggleHwTask(task.id); });
+
+      const title = document.createElement('div');
+      title.className = 'sb-hw-item-title';
+      title.textContent = task.title;
+
+      const cls = document.createElement('div');
+      cls.className = 'sb-hw-item-class';
+      cls.textContent = task.className
+        ? task.className.split(' ').slice(0, 2).join(' ')
+        : '';
+
+      item.appendChild(check);
+      item.appendChild(title);
+      item.appendChild(cls);
+      container.appendChild(item);
+    });
+  }
+
+  // "Open planner" button
+  const openBtn = document.createElement('div');
+  openBtn.className = 'sb-hw-open-btn';
+  openBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Open planner`;
+  openBtn.addEventListener('click', () => { showHwPopup(); closeSidebar(); });
+  container.appendChild(openBtn);
+
+  const div = document.createElement('div');
+  div.className = 'sb-divider';
+  container.appendChild(div);
+}
+
+// ── System prompt homework context ─────────────────────────
+function hwContext() {
+  const tasks = getHwTasks().filter(t => !t.isComplete);
+  if (!tasks.length) return '';
+  const lines = tasks.map(t => {
+    const parts = [`• ${t.title}`];
+    if (t.className)        parts.push(`(${t.className})`);
+    if (t.estimatedMinutes) parts.push(`~${t.estimatedMinutes} min`);
+    if (t.dueDate)          parts.push(`due ${t.dueDate}`);
+    return parts.join(' ');
+  });
+  return `\n\nSTUDENT'S CURRENT HOMEWORK:\n${lines.join('\n')}\n(Reference this naturally when relevant — e.g. if they mention being stressed or if a class comes up.)`;
+}
+
+// ── Supabase sync ──────────────────────────────────────────
+async function syncHwToSupabase() {
+  if (!currentUser) return;
+  const tasks = getHwTasks();
+  try {
+    await sb.from('profiles').upsert({
+      id: currentUser.id,
+      hw_tasks: tasks,
+      hw_updated_at: new Date().toISOString()
+    }, { onConflict: 'id' });
+  } catch (e) { /* non-critical */ }
+}
+
+async function loadHwFromSupabase() {
+  if (!currentUser) return;
+  // Only load from remote if local is empty (local is source of truth during session)
+  if (getHwTasks().length > 0) return;
+  try {
+    const { data } = await sb.from('profiles').select('hw_tasks').eq('id', currentUser.id).single();
+    if (data && Array.isArray(data.hw_tasks) && data.hw_tasks.length > 0) {
+      saveHwTasks(data.hw_tasks);
+    }
+  } catch (e) { /* ignore */ }
+}
+
+// ── Wire all homework event listeners ─────────────────────
+function wireHwListeners() {
+  $('hwPopupClose').addEventListener('click', closeHwPopup);
+  $('hwBackdrop').addEventListener('click', closeHwPopup);
+
+  $('hwPopupAddBtn').addEventListener('click', () => {
+    showHwAddModal();
+  });
+
+  $('hwPopupSkipBtn').addEventListener('click', closeHwPopup);
+
+  $('hwPopupPlanBtn').addEventListener('click', () => {
+    const tasks = getHwTasks().filter(t => !t.isComplete);
+    if (!tasks.length) { showToast('Add some homework first!'); return; }
+    showHwPlanModal();
+  });
+
+  $('hwAddBack').addEventListener('click', () => {
+    closeHwAddModal();
+    // Re-open popup if it was showing
+    if ($('hwPopup').classList.contains('open')) { /* already open */ }
+    else { showHwPopup(); }
+  });
+
+  $('hwAddSaveBtn').addEventListener('click', () => {
+    const title = $('hwTitleInput').value.trim();
+    if (!title) { showToast('Please enter an assignment name.'); return; }
+    const course = $('hwClassSelect').value;
+    const schedule = getSchedule();
+    const entry = schedule.find(s => s.course === course) || {};
+    const mins = parseInt($('hwTimeInput').value, 10) || null;
+    addHwTask({
+      id:               genHwId(),
+      title,
+      className:        course,
+      teacherName:      entry.teacher || '',
+      dueDate:          $('hwDueInput').value || todayStr(),
+      estimatedMinutes: mins,
+      isComplete:       false,
+      createdAt:        new Date().toISOString()
+    });
+    closeHwAddModal();
+    // Return to popup
+    renderHwPopupTasks();
+    if (!$('hwPopup').classList.contains('open')) showHwPopup();
+    showToast('Added!', 'ok');
+  });
+
+  $('hwPlanBack').addEventListener('click', () => {
+    closeHwPlanModal();
+  });
+
+  $('hwPlanDoneBtn').addEventListener('click', () => {
+    closeHwPlanModal();
+    closeHwPopup();
+  });
 }
