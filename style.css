@@ -739,20 +739,26 @@ body.signin-page{
 .semester-banner-btn.ghost:hover{color:var(--text);border-color:var(--text-muted)}
 
 /* ─── MY CLASSES SIDEBAR ─────────────────────────────────── */
-.sb-my-classes-hd{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;padding:8px 8px 4px;}
+.sb-my-classes-hd{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;padding:8px 8px 4px;}
+.sb-star-hd{color:#f59e0b;font-size:11px;line-height:1}
 .sb-my-class-item{display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--text);transition:all .15s;min-height:34px;}
 .sb-my-class-item:hover{background:var(--surface-2);color:var(--text)}
 .sb-my-class-item.active{background:var(--accent-soft);color:var(--accent)}
-.sb-my-class-icon{font-size:13px;flex-shrink:0}
+.sb-my-class-star{font-size:12px;flex-shrink:0;color:#f59e0b;line-height:1}
+.sb-my-class-item.active .sb-my-class-star{color:var(--accent)}
 .sb-my-class-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
 .sb-my-class-teacher{font-size:11px;color:var(--text-muted);flex-shrink:0}
 .sb-my-class-item.active .sb-my-class-teacher{color:var(--accent);opacity:.7}
 .sb-add-class{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:12px;color:var(--text-muted);transition:all .15s;margin-top:2px;}
 .sb-add-class:hover{background:var(--surface-2);color:var(--accent)}
-.sb-all-classes-toggle{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;color:var(--text-muted);transition:all .15s;margin-top:2px;}
-.sb-all-classes-toggle:hover{background:var(--surface-2);color:var(--text)}
-.sb-all-classes-toggle svg{width:12px;height:12px;stroke:currentColor;fill:none;transition:transform .2s;flex-shrink:0}
-.sb-all-classes-toggle.open svg{transform:rotate(90deg)}
+/* All Classes — styled as a real button */
+.sb-all-classes-toggle{display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-muted);background:var(--surface-2);border:1px solid var(--border);transition:all .15s;margin-top:4px;}
+.sb-all-classes-toggle:hover{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.sb-all-classes-toggle.open{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.sb-all-classes-icon{display:flex;align-items:center;flex-shrink:0}
+.sb-all-classes-label{flex:1}
+.sb-all-classes-arrow{display:flex;align-items:center;flex-shrink:0;transition:transform .2s}
+.sb-all-classes-toggle.open .sb-all-classes-arrow{transform:rotate(90deg)}
 
 /* ─── HOMEWORK PLANNER ───────────────────────────────────── */
 .hw-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);z-index:700;display:none}

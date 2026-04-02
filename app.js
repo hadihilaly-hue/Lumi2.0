@@ -1135,7 +1135,7 @@ function renderSidebar() {
   if (schedule.length > 0 && !query) {
     const myHd = document.createElement('div');
     myHd.className = 'sb-my-classes-hd';
-    myHd.textContent = 'My Classes';
+    myHd.innerHTML = `<span class="sb-star-hd">★</span> My Classes`;
     sbNav.appendChild(myHd);
 
     schedule.forEach(({ course, teacher }) => {
@@ -1145,16 +1145,16 @@ function renderSidebar() {
         SB.activeTeacher.teacher === teacher;
       const item = document.createElement('div');
       item.className = 'sb-my-class-item' + (isActive ? ' active' : '');
-      const icon = document.createElement('span');
-      icon.className = 'sb-my-class-icon';
-      icon.textContent = '📚';
+      const star = document.createElement('span');
+      star.className = 'sb-my-class-star';
+      star.textContent = '★';
       const name = document.createElement('span');
       name.className = 'sb-my-class-name';
       name.textContent = course;
       const tch = document.createElement('span');
       tch.className = 'sb-my-class-teacher';
       tch.textContent = lastName;
-      item.appendChild(icon);
+      item.appendChild(star);
       item.appendChild(name);
       item.appendChild(tch);
       item.addEventListener('click', () => {
@@ -1250,7 +1250,14 @@ function renderSidebar() {
   if (hasSchedule) {
     const allToggle = document.createElement('div');
     allToggle.className = 'sb-all-classes-toggle' + (SB.showAllClasses ? ' open' : '');
-    allToggle.innerHTML = `<svg viewBox="0 0 24 24" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg> All Classes`;
+    allToggle.innerHTML = `
+      <span class="sb-all-classes-icon">
+        <svg viewBox="0 0 24 24" stroke-width="2" fill="none" stroke="currentColor" width="13" height="13"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </span>
+      <span class="sb-all-classes-label">All Menlo Classes</span>
+      <span class="sb-all-classes-arrow">
+        <svg viewBox="0 0 24 24" stroke-width="2.5" fill="none" stroke="currentColor" width="11" height="11"><polyline points="9 18 15 12 9 6"/></svg>
+      </span>`;
     allToggle.addEventListener('click', () => { SB.showAllClasses = !SB.showAllClasses; renderSidebar(); });
     sbNav.appendChild(allToggle);
     if (!SB.showAllClasses) return;
@@ -1947,13 +1954,24 @@ function obShowTyping() {
 function obHideTyping() { const t = $('obTyping'); if (t) t.remove(); }
 
 function obParseProfile(text) {
-  const m = text.match(/###PROFILE_UPDATE:\s*(\{[\s\S]*?\})\s*$/m);
-  if (!m) return null;
-  try { return JSON.parse(m[1]); } catch { return null; }
+  // Use brace-counting instead of regex to handle nested JSON (e.g. study_style:{...})
+  const idx = text.lastIndexOf('###PROFILE_UPDATE:');
+  if (idx === -1) return null;
+  const jsonStart = text.indexOf('{', idx);
+  if (jsonStart === -1) return null;
+  let depth = 0, i = jsonStart;
+  while (i < text.length) {
+    if (text[i] === '{') depth++;
+    else if (text[i] === '}') { depth--; if (depth === 0) break; }
+    i++;
+  }
+  try { return JSON.parse(text.slice(jsonStart, i + 1)); } catch { return null; }
 }
 
 function obStripProfile(text) {
-  return text.replace(/###PROFILE_UPDATE:\s*\{[\s\S]*?\}\s*$/m, '').trim();
+  const idx = text.lastIndexOf('###PROFILE_UPDATE:');
+  if (idx === -1) return text.trim();
+  return text.slice(0, idx).trim();
 }
 
 function obApplyProfile(data) {
