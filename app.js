@@ -1783,7 +1783,7 @@ function initScheduleSetup(onDone, prefill = []) {
 const OB = {
   messages: [],
   profile: {
-    name: '', grade: '', schedule_raw: [],
+    name: '',
     study_style: { work_minutes: 25, break_minutes: 5, label: 'Short Bursts' },
     learning_style: 'mixed', homework_start_time: '18:00',
     typical_activities: '', pain_points: [],
@@ -1794,50 +1794,41 @@ const OB = {
 };
 
 function buildOnboardingSystem() {
-  // Include a condensed course list so the AI can match classes
-  const courseList = Object.entries(MENLO_CURRICULUM)
-    .flatMap(([subj, courses]) => Object.keys(courses).map(c => c))
-    .slice(0, 100).join(', ');
-
-  return `You are Lumi, a warm and genuinely curious AI study buddy at Menlo School. This is your first conversation with this student. Your job: get to know them in exactly 7 questions so you can be genuinely useful.
+  return `You are Lumi, a warm and genuinely curious AI study buddy at Menlo School. This is your first conversation with a new student. Your job: get to know them in 5 quick questions. Do NOT ask about their grade or classes — those are collected separately via a form after this chat.
 
 OPEN WITH THIS EXACT MESSAGE (then wait for a "yes" or "ready" before asking Q1):
-"Hey! I'm Lumi — your Menlo study buddy. I'm not like a typical AI assistant. My whole job is to actually help you learn and stay on top of your work. To do that well I need to get to know you a little first. I've got 7 quick questions — should take about 3 minutes. Ready?"
+"Hey! I'm Lumi — your Menlo study buddy. I'm not like a typical AI assistant. My whole job is to actually help you learn and stay on top of your work. To do that well I need to get to know you a little first. I've got 5 quick questions — takes about 2 minutes. Ready?"
 
 QUESTIONS — ask one at a time, react warmly to each answer before moving on. Use their name from Q1 onward.
 
-Q1: "First — what's your name and what grade are you in?"
-Q2: "What classes are you taking this semester? Just list them out — no need to be formal." For each class, ask in the same message: "And who's your teacher for [class]?" Try to match class names to this Menlo course list: ${courseList}
-Q3: "How do you like to study? Shorter bursts — 25 on, 5 off? Longer sessions to really get into flow? Something else?"
-Q4: "What does a typical school night look like? When do you get home, any practices or activities, when do you usually start homework?"
-Q5: "When you're really stuck on something — what actually helps? Step-by-step walkthrough, guiding questions until you get it yourself, or see an example and run with it?"
-Q6: "What's the hardest part of school for you right now? Could be a subject, keeping up with deadlines, test anxiety — anything."
-Q7: "Last thing — do you use Google Calendar? If you connect it I can plan your homework around your actual evening instead of guessing." If they say yes, include ###SHOW_CAL_BUTTON on its own line.
+Q1: "First — what's your name?"
+Q2: "How do you like to study? Shorter bursts with breaks — like 25 on, 5 off? Longer sessions to really get into flow? Or something else?"
+Q3: "What does a typical school night look like for you? Any sports, activities, or jobs — and when do you usually start homework?"
+Q4: "When you're really stuck on something — what actually helps? Step-by-step walkthrough, guiding questions until you get it yourself, or seeing a worked example and running with it?"
+Q5: "Last thing — what's the hardest part of school for you right now? Could be a subject, keeping up with deadlines, test anxiety — anything." If they bring up wanting to connect Google Calendar, include ###SHOW_CAL_BUTTON on its own line.
 
-WRAP UP: After Q7 is answered, say:
-"Perfect [Name]! Here's what I've got:
-📚 Your classes: [list class → teacher for each]
+WRAP UP: After Q5 is answered, say:
+"Perfect, [Name]! I've got what I need. Next up I'll have you pick your grade and classes — that'll just take a second.
 ⏱ Study style: [work_minutes] on, [break_minutes] off
-🌙 Bedtime: 10:30pm — non-negotiable
-[📅 Calendar: Connected ✓] or [📅 Calendar: Not connected yet]
+🌙 Bedtime: 10:30pm — I'll never schedule work past that
+[📅 Calendar: Connected ✓] (only show this line if they connected it)
 
-I'll use all of this every time we work together. Whenever you're ready to study just tell me what homework you have and I'll help you plan your night. Let's go! 🎉"
+Once your classes are set we're good to go. Let's do it! 🎉"
 
 RULES:
 - One question at a time — never ask two things at once
-- React genuinely before moving on ("Oh nice, calc BC is intense!" etc.)
-- If they give a vague answer, gently probe for more
-- Keep the whole thing warm and under 5 minutes
-- Never show raw data to the student
-- The 10:30pm bedtime is non-negotiable — confirm it warmly, don't ask about it
+- React genuinely before moving on ("Nice, I love that approach!" etc.)
+- Do NOT ask about grade or classes — the form handles that
+- If they give a vague answer, gently probe once for more detail
+- Keep the whole thing warm and under 3 minutes
+- The 10:30pm bedtime is non-negotiable — mention it warmly in the wrap-up, don't ask about it
 
 After EVERY response (including the opening), append on the very last line:
-###PROFILE_UPDATE:{"name":"","grade":"","schedule_raw":[],"study_style":{"work_minutes":25,"break_minutes":5,"label":"Short Bursts"},"learning_style":"mixed","homework_start_time":"18:00","typical_activities":"","pain_points":[],"calendar_connected":false,"onboarding_complete":false}
+###PROFILE_UPDATE:{"name":"","study_style":{"work_minutes":25,"break_minutes":5,"label":"Short Bursts"},"learning_style":"mixed","homework_start_time":"18:00","typical_activities":"","pain_points":[],"calendar_connected":false,"onboarding_complete":false}
 
-Only fill in fields you've actually learned from the student. Empty strings/arrays for unknown fields.
-schedule_raw format: [{"course":"Calculus BC","teacher":"Garrett"}]
+Only fill in fields you've actually learned. Empty strings/arrays for unknown fields.
 learning_style options: "step_by_step" | "socratic" | "example_first" | "mixed"
-Set onboarding_complete to true ONLY in the wrap-up message after all 7 questions.
+Set onboarding_complete to true ONLY in the wrap-up message after Q5.
 NEVER mention the JSON to the student. NEVER display it.`;
 }
 
@@ -1977,8 +1968,6 @@ function obStripProfile(text) {
 function obApplyProfile(data) {
   if (!data) return;
   if (data.name)                          OB.profile.name               = data.name;
-  if (data.grade)                         OB.profile.grade              = data.grade;
-  if (data.schedule_raw?.length)          OB.profile.schedule_raw       = data.schedule_raw;
   if (data.study_style?.work_minutes)     OB.profile.study_style        = data.study_style;
   if (data.learning_style && data.learning_style !== 'mixed') OB.profile.learning_style = data.learning_style;
   if (data.homework_start_time && data.homework_start_time !== '18:00') OB.profile.homework_start_time = data.homework_start_time;
@@ -1989,7 +1978,6 @@ function obApplyProfile(data) {
 
   // Persist to localStorage immediately
   if (OB.profile.name)               localStorage.setItem('lumi_name',           OB.profile.name);
-  if (OB.profile.grade)              localStorage.setItem('lumi_grade',          OB.profile.grade);
   if (OB.profile.learning_style)     localStorage.setItem('lumi_learning_style', OB.profile.learning_style);
   if (OB.profile.homework_start_time !== '18:00') localStorage.setItem('lumi_hw_start', OB.profile.homework_start_time);
   if (OB.profile.typical_activities) localStorage.setItem('lumi_activities',     OB.profile.typical_activities);
@@ -1997,13 +1985,7 @@ function obApplyProfile(data) {
   if (OB.profile.study_style?.work_minutes) saveStudyStyle(OB.profile.study_style);
   if (OB.profile.calendar_connected) setCalendarConnected(true);
 
-  // Process schedule
-  if (OB.profile.schedule_raw?.length) {
-    const sched = obMatchSchedule(OB.profile.schedule_raw);
-    if (sched.length) { saveScheduleLocal(sched); syncScheduleToSupabase(sched); }
-  }
-
-  // On completion, save full profile to Supabase
+  // On completion, save personality profile to Supabase (grade/schedule saved later by initScheduleSetup)
   if (OB.profile.onboarding_complete) {
     localStorage.setItem('lumi_onboarding_complete', 'true');
     obSaveFullProfile();
@@ -2034,13 +2016,12 @@ function obMatchSchedule(rawList) {
 
 async function obSaveFullProfile() {
   if (!currentUser) return;
-  const schedule = getSchedule();
+  // Save only the personality fields collected during the chat.
+  // Grade and schedule are saved separately by initScheduleSetup.
   try {
     await sb.from('profiles').upsert({
       id:                  currentUser.id,
       name:                OB.profile.name  || null,
-      grade:               OB.profile.grade || null,
-      schedule,
       study_style:         OB.profile.study_style,
       learning_style:      OB.profile.learning_style  || 'mixed',
       homework_start_time: OB.profile.homework_start_time || '18:00',
@@ -2234,10 +2215,14 @@ function init() {
 
   wireListeners(savedKey);
 
-  // Show conversational onboarding for brand-new users (no name at all)
+  // Show conversational onboarding for brand-new users (no name at all),
+  // then hand off to the class/grade picker box
   if (!hasName) {
     $('onboarding').style.display = '';
-    initOnboarding(() => { startApp(savedKey); });
+    initOnboarding(() => {
+      // After the chat, always show the class+grade picker
+      initScheduleSetup(() => startApp(savedKey));
+    });
     return;
   }
 
