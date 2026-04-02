@@ -2019,10 +2019,11 @@ function obMatchSchedule(rawList) {
         const words  = cNorm.split(/\s+/);
         if (cnNorm.includes(cNorm) || words.some(w => w.length > 3 && cnNorm.includes(w))) {
           const tNorm   = (teacher || '').toLowerCase();
+          // Try to find a match in the curriculum — if no match, keep what the student said
           const matched = teachers.find(t =>
             t.toLowerCase().includes(tNorm) ||
             tNorm.includes(t.split(' ').slice(-1)[0].toLowerCase())
-          ) || teachers[0] || teacher || '';
+          ) || teacher || '';
           return { course: cName, teacher: matched, subject };
         }
       }
