@@ -2655,19 +2655,23 @@ function addHwTask(task) {
 }
 
 // ── Study plan generator ───────────────────────────────────
+const BEDTIME_MINUTES = 22 * 60 + 30; // 10:30 PM
+
 function buildStudyPlan(tasks) {
-  if (!tasks.length) return { blocks: [], totalMinutes: 0, startMinutes: getPlanStartMinutes(), warnings: [] };
+  if (!tasks.length) return { blocks: [], totalMinutes: 0, startMinutes: getPlanStartMinutes(), warnings: [], isPastBedtime: false };
 
   const style = getStudyStyle();
   const WORK = style.work_minutes;
   const BREAK = style.break_minutes;
   const today = todayStr();
   const startMinutes = getPlanStartMinutes();
-  const isLateNight = new Date().getHours() >= 22;
+  const isPastBedtime = startMinutes >= BEDTIME_MINUTES;
+  const minutesUntilBedtime = Math.max(0, BEDTIME_MINUTES - startMinutes);
   const warnings = [];
 
-  if (isLateNight) {
-    warnings.push({ type: 'late', text: "It's getting late — focusing on just what's due tonight." });
+  if (isPastBedtime) {
+    warnings.push({ type: 'bedtime', text: "It's 10:30 — time to wrap up and get to sleep. Getting 8 hours of sleep is just as important as finishing your homework. Whatever isn't done can be handled tomorrow morning or during a free period." });
+    return { blocks: [], totalMinutes: 0, startMinutes, warnings, isPastBedtime: true };
   }
 
   // Classify and annotate tasks
@@ -2677,11 +2681,8 @@ function buildStudyPlan(tasks) {
     isTonight: t.dueDate === today || !t.dueDate,
   }));
 
-  // If late night, only schedule tonight's tasks
-  const toSchedule = isLateNight ? classified.filter(t => t.isTonight) : classified;
-
   // Sort: tonight first, then hardest tier first, then by due date
-  const sorted = [...toSchedule].sort((a, b) => {
+  const sorted = [...classified].sort((a, b) => {
     if (a.isTonight !== b.isTonight) return a.isTonight ? -1 : 1;
     if (TIER_ORDER[a.tier] !== TIER_ORDER[b.tier]) return TIER_ORDER[a.tier] - TIER_ORDER[b.tier];
     if (a.dueDate && b.dueDate && a.dueDate !== b.dueDate)
@@ -2693,7 +2694,14 @@ function buildStudyPlan(tasks) {
   const totalEstimated = sorted.reduce((s, t) => s + (t.estimatedMinutes || 30), 0);
   const tier1Count = sorted.filter(t => t.tier === 'TIER_1_CRITICAL').length;
 
-  if (totalEstimated > 180) {
+  if (totalEstimated > minutesUntilBedtime) {
+    const hrsWork = Math.round(totalEstimated / 60 * 10) / 10;
+    const hrsBed  = Math.round(minutesUntilBedtime / 60 * 10) / 10;
+    warnings.push({
+      type: 'bedtime-overload',
+      text: `You have ~${hrsWork}hrs of work but only ~${hrsBed}hrs before your 10:30 cutoff tonight. Let's figure out what's most important to finish tonight and what can wait.`
+    });
+  } else if (totalEstimated > 180) {
     warnings.push({
       type: 'heavy',
       text: `This is a heavy night (~${Math.round(totalEstimated / 60)}hrs) — let's talk about what to prioritize.`
@@ -2706,50 +2714,79 @@ function buildStudyPlan(tasks) {
     });
   }
 
-  // Build blocks by chunking each task into WORK-minute pieces
+  // Build blocks by chunking each task into WORK-minute pieces, stopping at bedtime
   const blocks = [];
   let elapsed = 0;
   let workedSinceBreak = 0;
+  let hitBedtime = false;
 
   sorted.forEach((task, taskIdx) => {
+    if (hitBedtime) return;
     const dur = task.estimatedMinutes || 30;
     const numChunks = Math.ceil(dur / WORK);
 
     for (let chunk = 0; chunk < numChunks; chunk++) {
+      if (hitBedtime) break;
+
       // Insert break before this chunk if we've hit the work limit
       if (workedSinceBreak >= WORK && (taskIdx > 0 || chunk > 0)) {
+        const breakEnd = elapsed + BREAK;
+        if (startMinutes + breakEnd > BEDTIME_MINUTES) { hitBedtime = true; break; }
         blocks.push({ type: 'break', duration: BREAK, startMinute: elapsed });
         elapsed += BREAK;
         workedSinceBreak = 0;
       }
 
       const chunkDur = Math.min(WORK, dur - chunk * WORK);
+      // Cap chunk at bedtime
+      const availableMinutes = BEDTIME_MINUTES - startMinutes - elapsed;
+      if (availableMinutes <= 0) { hitBedtime = true; break; }
+      const actualDur = Math.min(chunkDur, availableMinutes);
+
       blocks.push({
         type: 'task',
         task,
-        duration: chunkDur,
+        duration: actualDur,
         startMinute: elapsed,
         chunkNum:    numChunks > 1 ? chunk + 1 : null,
         totalChunks: numChunks > 1 ? numChunks : null,
+        truncated:   actualDur < chunkDur,
       });
-      elapsed += chunkDur;
-      workedSinceBreak += chunkDur;
+      elapsed += actualDur;
+      workedSinceBreak += actualDur;
+      if (startMinutes + elapsed >= BEDTIME_MINUTES) { hitBedtime = true; break; }
     }
   });
 
-  return { blocks, totalMinutes: elapsed, startMinutes, warnings };
+  // Add bedtime block at the end if we hit the limit mid-plan
+  if (hitBedtime || startMinutes + elapsed >= BEDTIME_MINUTES) {
+    blocks.push({ type: 'bedtime', startMinute: elapsed });
+  }
+
+  return { blocks, totalMinutes: elapsed, startMinutes, warnings, isPastBedtime: false };
 }
 
 function renderStudyPlan(plan) {
   const body = $('hwPlanBody');
   body.innerHTML = '';
-  const { blocks, totalMinutes, startMinutes, warnings } = plan;
+  const { blocks, totalMinutes, startMinutes, warnings, isPastBedtime } = plan;
+
+  // Past-bedtime: show only the sleep message
+  if (isPastBedtime) {
+    const el = document.createElement('div');
+    el.className = 'hw-plan-warning bedtime';
+    el.style.cssText = 'font-size:14px;line-height:1.6;margin:0';
+    el.textContent = "🌙 " + (warnings[0] && warnings[0].text || "It's 10:30 — time to wrap up and get to sleep.");
+    body.appendChild(el);
+    return;
+  }
 
   // Warnings banner
   warnings.forEach(w => {
     const el = document.createElement('div');
-    el.className = `hw-plan-warning ${w.type}`;
-    el.textContent = (w.type === 'late' ? '🌙 ' : w.type === 'heavy' ? '⚠️ ' : '🔴 ') + w.text;
+    el.className = 'hw-plan-warning ' + w.type;
+    const icon = w.type === 'bedtime-overload' ? '⏰ ' : w.type === 'heavy' ? '⚠️ ' : '🔴 ';
+    el.textContent = icon + w.text;
     body.appendChild(el);
   });
 
@@ -2767,7 +2804,23 @@ function renderStudyPlan(plan) {
   // Plan blocks
   blocks.forEach(block => {
     const el = document.createElement('div');
-    el.className = 'hw-plan-block' + (block.type === 'break' ? ' break' : '');
+    el.className = 'hw-plan-block' + (block.type === 'break' ? ' break' : block.type === 'bedtime' ? ' bedtime-block' : '');
+
+    if (block.type === 'bedtime') {
+      el.style.cssText = 'background:rgba(99,102,241,.08);border-color:rgba(99,102,241,.25)';
+      const timeEl = document.createElement('div');
+      timeEl.className = 'hw-plan-block-time';
+      timeEl.textContent = '10:30 PM';
+      const titleEl = document.createElement('div');
+      titleEl.className = 'hw-plan-block-title';
+      titleEl.textContent = '🌙 Bedtime — lights out!';
+      const metaEl = document.createElement('div');
+      metaEl.className = 'hw-plan-block-meta';
+      metaEl.textContent = '8 hours of sleep is non-negotiable.';
+      el.appendChild(timeEl); el.appendChild(titleEl); el.appendChild(metaEl);
+      body.appendChild(el);
+      return;
+    }
 
     const absMin = startMinutes + block.startMinute;
     const timeEl = document.createElement('div');
@@ -2786,7 +2839,8 @@ function renderStudyPlan(plan) {
     } else {
       const dot = TIER_DOT[block.task.tier] || '⚪';
       const chunkLabel = block.chunkNum ? ` (part ${block.chunkNum} of ${block.totalChunks})` : '';
-      titleEl.textContent = `${dot} ${block.task.title}${chunkLabel}`;
+      const truncNote  = block.truncated ? ' ⚠️' : '';
+      titleEl.textContent = `${dot} ${block.task.title}${chunkLabel}${truncNote}`;
       const metaEl = document.createElement('div');
       metaEl.className = 'hw-plan-block-meta';
       const parts = [];
@@ -2900,10 +2954,19 @@ function hwContext() {
     if (tierInfo)           parts.push(`[${tierInfo.label}]`);
     return parts.join(' ');
   });
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const isPastBedtime = nowMinutes >= BEDTIME_MINUTES;
+  const minutesUntilBed = Math.max(0, BEDTIME_MINUTES - nowMinutes);
   const totalTonight = tasks
     .filter(t => t.dueDate === today || !t.dueDate)
     .reduce((s, t) => s + (t.estimatedMinutes || 30), 0);
   const overload = totalTonight > 180 ? `\n⚠️ Tonight's workload is ~${Math.round(totalTonight/60)}hrs — help them prioritize.` : '';
+  const bedtimeNote = isPastBedtime
+    ? `\n🌙 IT IS PAST 10:30 PM. Do NOT help with homework. Encourage the student to sleep immediately and tackle remaining work tomorrow morning or during a free period.`
+    : minutesUntilBed < 60
+    ? `\n⏰ Less than ${minutesUntilBed} minutes until the 10:30 PM bedtime cutoff — flag this and help them focus on only the most critical work.`
+    : '';
   return `
 
 HOMEWORK PRIORITY SYSTEM:
@@ -2912,9 +2975,12 @@ You have access to the student's full homework list with priority tiers and due 
 Current homework:
 ${lines.join('\n')}
 
-Student study style: ${style.work_minutes} min work / ${style.break_minutes} min break (${style.label})${overload}
+Student study style: ${style.work_minutes} min work / ${style.break_minutes} min break (${style.label})${overload}${bedtimeNote}
 
 Rules you must always follow:
+- The student's bedtime is 10:30 PM. Never schedule or encourage work past this time.
+- Always prioritize 8 hours of sleep as non-negotiable for student wellbeing.
+- If it is past 10:30 PM and a student asks for help with homework, gently but firmly say: "I really think you should get some sleep — a rested brain will do better tomorrow than a tired one trying to push through tonight. Can this wait until morning?"
 - Essays and projects should NEVER be left entirely to the night before — proactively suggest spreading them out
 - If a student has a test in 3+ days, suggest starting review tonight even if nothing else is due
 - If tonight's workload exceeds 3 hours, warn them and help prioritize what matters most

@@ -855,6 +855,8 @@ body.signin-page{
 .hw-plan-warning.late{background:rgba(99,102,241,.1);color:#a5b4fc;border:1px solid rgba(99,102,241,.2)}
 .hw-plan-warning.heavy{background:rgba(239,68,68,.1);color:#fca5a5;border:1px solid rgba(239,68,68,.2)}
 .hw-plan-warning.overload{background:rgba(234,179,8,.1);color:#fde68a;border:1px solid rgba(234,179,8,.2)}
+.hw-plan-warning.bedtime{background:rgba(99,102,241,.1);color:#c4b5fd;border:1px solid rgba(99,102,241,.25)}
+.hw-plan-warning.bedtime-overload{background:rgba(234,179,8,.1);color:#fde68a;border:1px solid rgba(234,179,8,.2)}
 
 /* ─── PRIORITY SIDEBAR ───────────────────────────────────── */
 .sb-hw-tier-dot{font-size:10px;flex-shrink:0;line-height:1}
