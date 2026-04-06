@@ -879,6 +879,70 @@ body.signin-page{
 .sb-hw-open-btn{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:12px;color:var(--text-muted);transition:all .15s;margin-top:2px}
 .sb-hw-open-btn:hover{background:var(--surface-2);color:var(--accent)}
 
+/* ─── WORK TYPE CHOOSER ─────────────────────────────────── */
+.hw-type-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.hw-type-card{background:var(--surface-2);border:2px solid var(--border);border-radius:16px;padding:24px 16px;cursor:pointer;transition:all .18s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;font-family:inherit}
+.hw-type-card:hover{border-color:var(--accent);background:var(--accent-soft);transform:translateY(-2px)}
+.hw-type-card:active{transform:translateY(0)}
+.hw-type-icon{font-size:28px;margin-bottom:4px}
+.hw-type-label{font-size:14px;font-weight:600;color:var(--text)}
+.hw-type-desc{font-size:12px;color:var(--text-muted);line-height:1.4}
+
+/* ─── CONVERT TO PROJECT BUTTON ─────────────────────────── */
+.hw-convert-btn{background:none;border:1.5px dashed var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--text-muted);cursor:pointer;transition:all .15s;font-family:inherit;width:100%;text-align:left;margin-top:4px}
+.hw-convert-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+
+/* ─── PROJECT CREATION MODAL ────────────────────────────── */
+.hw-textarea{resize:vertical;min-height:60px;max-height:150px;line-height:1.5}
+.hw-modal-wide{width:min(500px,94vw)}
+
+/* ─── PROJECT PLAN DISPLAY ──────────────────────────────── */
+.proj-loading{display:flex;flex-direction:column;align-items:center;gap:14px;padding:40px 0}
+.proj-loading-orb{width:32px;height:32px;border-radius:50%;background:var(--accent);animation:proj-pulse 1.2s ease-in-out infinite}
+@keyframes proj-pulse{0%,100%{opacity:.3;transform:scale(.9)}50%{opacity:1;transform:scale(1.1)}}
+.proj-loading-text{font-size:14px;color:var(--text-muted);font-weight:500}
+
+.proj-plan-header{margin-bottom:16px}
+.proj-plan-name{font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px}
+.proj-plan-meta{font-size:12px;color:var(--text-muted)}
+
+.proj-day-card{background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:10px;transition:all .15s}
+.proj-day-card.today{border-color:var(--accent);background:var(--accent-soft)}
+.proj-day-card.completed{opacity:.55}
+.proj-day-card.buffer{border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.06)}
+.proj-day-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.proj-day-date{font-size:13px;font-weight:600;color:var(--text)}
+.proj-day-card.today .proj-day-date{color:var(--accent)}
+.proj-day-badge{font-size:10px;font-weight:600;border-radius:6px;padding:2px 8px;text-transform:uppercase;letter-spacing:.4px}
+.proj-day-badge.today-badge{background:var(--accent);color:#fff}
+.proj-day-badge.buffer-badge{background:rgba(34,197,94,.2);color:#86efac}
+.proj-day-badge.done-badge{background:rgba(123,105,245,.15);color:var(--accent)}
+.proj-day-badge.overdue-badge{background:rgba(239,68,68,.15);color:#fca5a5}
+.proj-day-task{font-size:14px;color:var(--text);font-weight:500;line-height:1.4}
+.proj-day-time{font-size:12px;color:var(--text-muted);margin-top:3px}
+.proj-day-check{display:flex;align-items:center;gap:6px;margin-top:8px;cursor:pointer}
+.proj-day-check input{accent-color:var(--accent);width:16px;height:16px;cursor:pointer}
+.proj-day-check label{font-size:12px;color:var(--text-muted);cursor:pointer}
+
+.proj-day-skip{background:none;border:none;font-size:11px;color:var(--text-muted);cursor:pointer;padding:2px 6px;transition:color .15s;font-family:inherit;opacity:.7}
+.proj-day-skip:hover{color:#f87171;opacity:1}
+
+.proj-plan-footer{display:flex;flex-direction:column;gap:8px}
+.proj-start-btn{background:var(--accent) !important}
+
+.proj-adjust-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px}
+.proj-adjust-bar label{font-size:12px;color:var(--text-muted);white-space:nowrap}
+.proj-adjust-bar select{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--text);font-family:inherit;flex:1;cursor:pointer}
+.proj-adjust-btn{background:var(--accent-soft);border:1px solid rgba(123,105,245,.2);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--accent);cursor:pointer;font-family:inherit;font-weight:600;white-space:nowrap;transition:all .15s}
+.proj-adjust-btn:hover{background:rgba(123,105,245,.2)}
+
+.proj-carryover-banner{background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.2);border-radius:10px;padding:10px 14px;font-size:13px;color:#fde68a;margin-bottom:12px;line-height:1.4}
+
+/* Light mode project overrides */
+.light .proj-day-badge.buffer-badge{background:rgba(34,197,94,.15);color:#166534}
+.light .proj-carryover-banner{background:rgba(234,179,8,.08);color:#92400e}
+.light .proj-day-card.buffer{background:rgba(34,197,94,.04)}
+
 /* ─── STUDY STYLE STEP ───────────────────────────────────── */
 .sched-style-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
 .sched-style-card{background:var(--surface-2);border:2px solid var(--border);border-radius:14px;padding:16px 10px;cursor:pointer;transition:all .15s;text-align:center}

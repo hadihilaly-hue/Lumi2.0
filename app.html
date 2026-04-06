@@ -399,6 +399,28 @@
   </div>
 </div>
 
+<!-- ─── WORK TYPE CHOOSER ─────────────────────────────────── -->
+<div class="hw-modal" id="hwTypeChooser" style="display:none">
+  <div class="hw-modal-head">
+    <button class="hw-modal-back" id="hwTypeBack">←</button>
+    <div class="hw-modal-title">Add Work</div>
+  </div>
+  <div class="hw-modal-body">
+    <div class="hw-type-grid">
+      <button class="hw-type-card" id="hwTypeProject">
+        <div class="hw-type-icon">📝</div>
+        <div class="hw-type-label">Project or Essay</div>
+        <div class="hw-type-desc">Multi-day plan + guidance</div>
+      </button>
+      <button class="hw-type-card" id="hwTypeHomework">
+        <div class="hw-type-icon">📚</div>
+        <div class="hw-type-label">Tonight's Homework</div>
+        <div class="hw-type-desc">Quick add to tonight's list</div>
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ─── HOMEWORK ADD MODAL ────────────────────────────────── -->
 <div class="hw-modal" id="hwAddModal" style="display:none">
   <div class="hw-modal-head">
@@ -425,9 +447,58 @@
       </div>
     </div>
     <div class="hw-time-hint" id="hwTimeHint"></div>
+    <button class="hw-convert-btn" id="hwConvertToProject">This will take more than one night → Convert to project plan</button>
   </div>
   <div class="hw-modal-footer">
     <button class="hw-plan-btn" id="hwAddSaveBtn">Save →</button>
+  </div>
+</div>
+
+<!-- ─── PROJECT CREATION MODAL ───────────────────────────── -->
+<div class="hw-modal" id="projCreateModal" style="display:none">
+  <div class="hw-modal-head">
+    <button class="hw-modal-back" id="projCreateBack">←</button>
+    <div class="hw-modal-title">New Project Plan</div>
+  </div>
+  <div class="hw-modal-body">
+    <div class="hw-field">
+      <label class="hw-label">What class is this for?</label>
+      <select class="hw-select" id="projClassSelect"></select>
+    </div>
+    <div class="hw-field">
+      <label class="hw-label">What's the project?</label>
+      <input class="hw-input" id="projTitleInput" placeholder="e.g. English Essay, History Research Paper…" autocomplete="off" maxlength="120">
+    </div>
+    <div class="hw-field">
+      <label class="hw-label">Due date</label>
+      <input class="hw-input" id="projDueInput" type="date">
+    </div>
+    <div class="hw-field">
+      <label class="hw-label">Any specific requirements? <span style="opacity:.5">(optional)</span></label>
+      <textarea class="hw-input hw-textarea" id="projReqInput" placeholder="e.g. 5 paragraphs, MLA format, needs 3 sources…" rows="3"></textarea>
+    </div>
+  </div>
+  <div class="hw-modal-footer">
+    <button class="hw-plan-btn" id="projCreateBtn">Generate plan →</button>
+  </div>
+</div>
+
+<!-- ─── PROJECT PLAN MODAL ───────────────────────────────── -->
+<div class="hw-modal hw-modal-wide" id="projPlanModal" style="display:none">
+  <div class="hw-modal-head">
+    <button class="hw-modal-back" id="projPlanBack">←</button>
+    <div class="hw-modal-title" id="projPlanTitle">Project Plan</div>
+  </div>
+  <div class="hw-modal-body" id="projPlanBody">
+    <div id="projPlanLoading" class="proj-loading" style="display:none">
+      <div class="proj-loading-orb"></div>
+      <div class="proj-loading-text">Lumi is building your plan…</div>
+    </div>
+    <div id="projPlanContent"></div>
+  </div>
+  <div class="hw-modal-footer proj-plan-footer" id="projPlanFooter" style="display:none">
+    <button class="hw-plan-btn proj-start-btn" id="projStartBtn">Start working on it now →</button>
+    <button class="hw-skip-btn" id="projSaveBtn">Save plan & close</button>
   </div>
 </div>
 
@@ -459,6 +530,6 @@
 <!-- Scripts at bottom so the loading screen renders immediately -->
 <script src="supabase.js"></script>
 <script src="auth.js"></script>
-<script src="app.js?v=18"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>

@@ -2615,6 +2615,8 @@ function startApp(savedKey) {
   wireVoiceListeners();
 
   loadHwFromSupabase().then(async () => {
+    await loadProjectsFromSupabase();
+    injectProjectTasksToHomework();
     await loadCalendarEvents();
     renderSidebar();
     checkDailyHwPrompt();
@@ -3894,7 +3896,7 @@ function renderHwSidebar(container) {
   const hdBtn = document.createElement('button');
   hdBtn.className = 'sb-hw-hd-btn';
   hdBtn.textContent = '+ Add';
-  hdBtn.addEventListener('click', () => { showHwAddModal(); closeSidebar(); });
+  hdBtn.addEventListener('click', () => { showWorkTypeChooser(); closeSidebar(); });
   hd.appendChild(hdLabel);
   hd.appendChild(hdBtn);
   container.appendChild(hd);
@@ -3963,6 +3965,52 @@ function renderHwSidebar(container) {
     tlBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> View tonight's timeline`;
     tlBtn.addEventListener('click', () => { showTimelineModal(); closeSidebar(); });
     container.appendChild(tlBtn);
+  }
+
+  // ── Active projects ────────────────────────────────────
+  const projects = getProjects().filter(p => !p.isComplete);
+  if (projects.length > 0) {
+    const projHd = document.createElement('div');
+    projHd.className = 'sb-hw-hd';
+    projHd.style.marginTop = '8px';
+    const projLabel = document.createElement('span');
+    projLabel.textContent = 'Projects';
+    projHd.appendChild(projLabel);
+    container.appendChild(projHd);
+
+    projects.forEach(proj => {
+      const today = todayStr();
+      const daysLeft = dateDiffDays(today, proj.dueDate);
+      const completedDays = proj.plan.filter(d => d.isComplete).length;
+      const totalDays = proj.plan.length;
+
+      const item = document.createElement('div');
+      item.className = 'sb-hw-item';
+      item.style.cursor = 'pointer';
+
+      const dot = document.createElement('span');
+      dot.className = 'sb-hw-tier-dot';
+      dot.textContent = '📝';
+
+      const titleEl = document.createElement('div');
+      titleEl.className = 'sb-hw-item-title';
+      titleEl.textContent = proj.title;
+
+      const metaEl = document.createElement('div');
+      metaEl.className = 'sb-hw-item-urgency';
+      metaEl.textContent = daysLeft <= 2 ? '🔴' : daysLeft <= 5 ? '🟠' : '📅';
+      metaEl.title = `Due ${fmtDateShort(proj.dueDate)} · ${completedDays}/${totalDays} done`;
+
+      item.appendChild(dot);
+      item.appendChild(titleEl);
+      item.appendChild(metaEl);
+      item.addEventListener('click', () => {
+        showProjectPlanModal(proj);
+        openHwBackdrop();
+        closeSidebar();
+      });
+      container.appendChild(item);
+    });
   }
 
   const div = document.createElement('div');
@@ -4034,6 +4082,31 @@ Plan homework only within free time blocks. Never schedule during calendar event
 If free time is tight, be honest with the student about what is realistic tonight.`;
   }
 
+  // Active projects context
+  let projContext = '';
+  const activeProjects = getProjects().filter(p => !p.isComplete);
+  if (activeProjects.length > 0) {
+    const projLines = activeProjects.map(p => {
+      const today = todayStr();
+      const daysLeft = dateDiffDays(today, p.dueDate);
+      const completedDays = p.plan.filter(d => d.isComplete).length;
+      const totalDays = p.plan.length;
+      const todayTask = p.plan.find(d => d.date === today && !d.isComplete);
+      const behindDays = p.plan.filter(d => d.date < today && !d.isComplete).length;
+      let line = `📝 ${p.title} (${p.className}) — due ${p.dueDate} [${daysLeft} days left, ${completedDays}/${totalDays} sessions done]`;
+      if (todayTask) line += `\n    Today's task: ${todayTask.label} (~${todayTask.estimatedMinutes} min)`;
+      if (behindDays > 0) line += `\n    ⚠️ Behind by ${behindDays} session${behindDays > 1 ? 's' : ''} — needs catch-up`;
+      return line;
+    });
+    projContext = `
+
+ACTIVE PROJECTS:
+${projLines.join('\n')}
+- Help the student stay on track with their project plans
+- If they're behind, help them prioritize catch-up work
+- Reference their specific project plan when discussing upcoming work`;
+  }
+
   return `
 
 HOMEWORK PRIORITY SYSTEM:
@@ -4042,7 +4115,7 @@ You have access to the student's full homework list with priority tiers and due 
 Current homework:
 ${lines.join('\n')}
 
-Student study style: ${style.work_minutes} min work / ${style.break_minutes} min break (${style.label})${overload}${bedtimeNote}${calContext}
+Student study style: ${style.work_minutes} min work / ${style.break_minutes} min break (${style.label})${overload}${bedtimeNote}${calContext}${projContext}
 
 Rules you must always follow:
 - The student's bedtime is 10:30 PM. Never schedule or encourage work past this time.
@@ -4067,9 +4140,606 @@ async function syncHwToSupabase() {
     await sb.from('profiles').upsert({
       id: currentUser.id,
       hw_tasks: tasks,
+      projects: getProjects(),
       hw_updated_at: new Date().toISOString()
     }, { onConflict: 'id' });
   } catch (e) { /* non-critical */ }
+}
+
+// ══════════════════════════════════════════════════════════
+// ── PROJECT / MULTI-DAY PLAN SYSTEM ──────────────────────
+// ══════════════════════════════════════════════════════════
+
+function getProjects() {
+  try { return JSON.parse(localStorage.getItem('lumi_projects') || '[]'); } catch { return []; }
+}
+function saveProjects(projects) { localStorage.setItem('lumi_projects', JSON.stringify(projects)); }
+function genProjId() { return 'proj_' + Math.random().toString(36).slice(2, 10); }
+
+function fmtDateShort(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${days[d.getDay()]} ${months[d.getMonth()]} ${d.getDate()}`;
+}
+
+function fmtDateDay(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return days[d.getDay()];
+}
+
+function dateDiffDays(a, b) {
+  return Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000);
+}
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+// ── Generate multi-day project plan ──────────────────────
+// Distributes work across available days with a buffer day before due date
+function generateProjectPlan(title, className, dueDate, requirements, unavailableDays = []) {
+  const today = todayStr();
+  const totalDays = dateDiffDays(today, dueDate);
+
+  if (totalDays <= 1) {
+    // Due today or tomorrow — treat as single-night task
+    return [{
+      date: today,
+      label: title,
+      estimatedMinutes: 60,
+      isComplete: false,
+      isBuffer: false
+    }];
+  }
+
+  // Determine project type from title/requirements
+  const t = (title + ' ' + (requirements || '')).toLowerCase();
+  const isEssay = /essay|paper|writing|composition|literary analysis/.test(t);
+  const isResearch = /research|report|study/.test(t);
+  const isPresentation = /presentation|slides|slideshow|keynote/.test(t);
+  const isLab = /lab report|lab write|experiment/.test(t);
+
+  // Build phase templates based on type
+  let phases;
+  if (isEssay) {
+    phases = [
+      { label: 'Brainstorm + develop thesis', fraction: 0.15, minMinutes: 20 },
+      { label: 'Research + gather evidence', fraction: 0.20, minMinutes: 25 },
+      { label: 'Create outline', fraction: 0.10, minMinutes: 15 },
+      { label: 'Draft body paragraphs', fraction: 0.25, minMinutes: 40 },
+      { label: 'Write intro + conclusion', fraction: 0.15, minMinutes: 25 },
+      { label: 'Revise, edit + proofread', fraction: 0.15, minMinutes: 20 },
+    ];
+  } else if (isResearch) {
+    phases = [
+      { label: 'Choose topic + initial research', fraction: 0.15, minMinutes: 25 },
+      { label: 'Deep research + take notes', fraction: 0.25, minMinutes: 40 },
+      { label: 'Create outline + organize sources', fraction: 0.15, minMinutes: 20 },
+      { label: 'Write first draft', fraction: 0.25, minMinutes: 45 },
+      { label: 'Revise + add citations', fraction: 0.12, minMinutes: 25 },
+      { label: 'Final proofread + formatting', fraction: 0.08, minMinutes: 15 },
+    ];
+  } else if (isPresentation) {
+    phases = [
+      { label: 'Research + gather content', fraction: 0.20, minMinutes: 25 },
+      { label: 'Plan slide structure + outline', fraction: 0.15, minMinutes: 20 },
+      { label: 'Design slides + add content', fraction: 0.30, minMinutes: 40 },
+      { label: 'Add visuals + polish design', fraction: 0.15, minMinutes: 25 },
+      { label: 'Practice run-through', fraction: 0.20, minMinutes: 20 },
+    ];
+  } else if (isLab) {
+    phases = [
+      { label: 'Review data + organize results', fraction: 0.20, minMinutes: 20 },
+      { label: 'Write methods + results sections', fraction: 0.30, minMinutes: 35 },
+      { label: 'Write analysis + discussion', fraction: 0.30, minMinutes: 35 },
+      { label: 'Write intro + conclusion, proofread', fraction: 0.20, minMinutes: 20 },
+    ];
+  } else {
+    // Generic project
+    phases = [
+      { label: 'Plan + gather materials', fraction: 0.15, minMinutes: 20 },
+      { label: 'Begin core work', fraction: 0.30, minMinutes: 30 },
+      { label: 'Continue building', fraction: 0.30, minMinutes: 30 },
+      { label: 'Refine + finalize', fraction: 0.15, minMinutes: 20 },
+      { label: 'Review + polish', fraction: 0.10, minMinutes: 15 },
+    ];
+  }
+
+  // Build list of available dates (exclude unavailable, keep buffer day)
+  const unavailSet = new Set(unavailableDays);
+  const bufferDate = addDays(dueDate, -1); // day before due = buffer/review
+  const availableDates = [];
+  for (let i = 0; i < totalDays - 1; i++) { // -1 to reserve buffer
+    const d = addDays(today, i);
+    if (!unavailSet.has(d)) availableDates.push(d);
+  }
+
+  // If buffer date is unavailable, use last available date as buffer
+  const bufferAvailable = !unavailSet.has(bufferDate);
+
+  // Distribute phases across available dates
+  // If more phases than dates, merge some; if more dates than phases, spread out
+  const plan = [];
+  if (availableDates.length === 0) {
+    // No available days — cram everything into today
+    plan.push({
+      date: today,
+      label: phases.map(p => p.label).join(' + '),
+      estimatedMinutes: phases.reduce((s, p) => s + p.minMinutes, 0),
+      isComplete: false,
+      isBuffer: false
+    });
+  } else if (availableDates.length >= phases.length) {
+    // More dates than phases — assign one phase per date, starting from the first
+    const step = availableDates.length / phases.length;
+    phases.forEach((phase, i) => {
+      const dateIdx = Math.min(Math.floor(i * step), availableDates.length - 1);
+      plan.push({
+        date: availableDates[dateIdx],
+        label: phase.label,
+        estimatedMinutes: phase.minMinutes,
+        isComplete: false,
+        isBuffer: false
+      });
+    });
+  } else {
+    // Fewer dates than phases — merge phases into available dates
+    const phasesPerDay = Math.ceil(phases.length / availableDates.length);
+    let phaseIdx = 0;
+    availableDates.forEach((date, dayIdx) => {
+      const endIdx = Math.min(phaseIdx + phasesPerDay, phases.length);
+      const dayPhases = phases.slice(phaseIdx, endIdx);
+      if (dayPhases.length === 0) return;
+      plan.push({
+        date,
+        label: dayPhases.map(p => p.label).join(' + '),
+        estimatedMinutes: dayPhases.reduce((s, p) => s + p.minMinutes, 0),
+        isComplete: false,
+        isBuffer: false
+      });
+      phaseIdx = endIdx;
+    });
+  }
+
+  // Add buffer day
+  const bufferDay = bufferAvailable ? bufferDate : (availableDates.length > 0 ? addDays(availableDates[availableDates.length - 1], 1) : dueDate);
+  plan.push({
+    date: bufferDay,
+    label: 'Final review + polish (buffer day)',
+    estimatedMinutes: 20,
+    isComplete: false,
+    isBuffer: true
+  });
+
+  return plan;
+}
+
+// ── Show/hide project modals ─────────────────────────────
+
+function showWorkTypeChooser() {
+  openHwBackdrop();
+  const modal = $('hwTypeChooser');
+  modal.style.display = 'flex';
+  modal.style.flexDirection = 'column';
+  requestAnimationFrame(() => modal.classList.add('open'));
+}
+
+function closeWorkTypeChooser() {
+  const modal = $('hwTypeChooser');
+  modal.classList.remove('open');
+  setTimeout(() => { modal.style.display = 'none'; }, 200);
+}
+
+function showProjectCreateModal(prefill = {}) {
+  const modal = $('projCreateModal');
+  modal.style.display = 'flex';
+  modal.style.flexDirection = 'column';
+  requestAnimationFrame(() => modal.classList.add('open'));
+
+  // Populate class selector
+  const sel = $('projClassSelect');
+  sel.innerHTML = '';
+  const schedule = getSchedule();
+  schedule.forEach(({ course }) => {
+    const opt = document.createElement('option');
+    opt.value = course;
+    opt.textContent = course;
+    sel.appendChild(opt);
+  });
+  if (prefill.className) sel.value = prefill.className;
+
+  // Defaults
+  $('projTitleInput').value = prefill.title || '';
+  $('projDueInput').value = prefill.dueDate || '';
+  $('projReqInput').value = prefill.requirements || '';
+
+  // Set min date to tomorrow
+  const tomorrow = addDays(todayStr(), 1);
+  $('projDueInput').min = tomorrow;
+}
+
+function closeProjectCreateModal() {
+  const modal = $('projCreateModal');
+  modal.classList.remove('open');
+  setTimeout(() => { modal.style.display = 'none'; }, 200);
+}
+
+let _currentProjId = null; // tracks which project the plan modal is showing
+
+function showProjectPlanModal(project) {
+  _currentProjId = project.id;
+  const modal = $('projPlanModal');
+  modal.style.display = 'flex';
+  modal.style.flexDirection = 'column';
+  requestAnimationFrame(() => modal.classList.add('open'));
+  renderProjectPlan(project);
+}
+
+function closeProjectPlanModal() {
+  const modal = $('projPlanModal');
+  modal.classList.remove('open');
+  _currentProjId = null;
+  setTimeout(() => { modal.style.display = 'none'; }, 200);
+}
+
+// ── Render the multi-day plan ────────────────────────────
+
+function renderProjectPlan(project) {
+  const title = $('projPlanTitle');
+  const body = $('projPlanContent');
+  const loading = $('projPlanLoading');
+  const footer = $('projPlanFooter');
+
+  loading.style.display = 'none';
+  footer.style.display = 'flex';
+  body.innerHTML = '';
+
+  title.textContent = project.title;
+
+  // Header
+  const hd = document.createElement('div');
+  hd.className = 'proj-plan-header';
+  const hdName = document.createElement('div');
+  hdName.className = 'proj-plan-name';
+  hdName.textContent = `${project.className} — due ${fmtDateShort(project.dueDate)}`;
+  const hdMeta = document.createElement('div');
+  hdMeta.className = 'proj-plan-meta';
+  const totalMin = project.plan.reduce((s, d) => s + d.estimatedMinutes, 0);
+  const totalH = Math.floor(totalMin / 60);
+  const totalM = totalMin % 60;
+  const timeStr = totalH > 0 ? `${totalH}h ${totalM > 0 ? totalM + 'm' : ''}`.trim() : `${totalM}m`;
+  hdMeta.textContent = `${project.plan.length} sessions · ~${timeStr} total`;
+  if (project.requirements) {
+    hdMeta.textContent += ` · ${project.requirements}`;
+  }
+  hd.appendChild(hdName);
+  hd.appendChild(hdMeta);
+  body.appendChild(hd);
+
+  // Check for carry-over (incomplete past days)
+  const today = todayStr();
+  const incompletePast = project.plan.filter(d => d.date < today && !d.isComplete);
+  if (incompletePast.length > 0) {
+    const banner = document.createElement('div');
+    banner.className = 'proj-carryover-banner';
+    banner.textContent = `⚠️ You have ${incompletePast.length} missed session${incompletePast.length > 1 ? 's' : ''}. Remaining work has been redistributed to upcoming days.`;
+    body.appendChild(banner);
+  }
+
+  // Adjust bar (remove a day)
+  const adjustBar = document.createElement('div');
+  adjustBar.className = 'proj-adjust-bar';
+  const adjustLabel = document.createElement('label');
+  adjustLabel.textContent = "Can't work on a day?";
+  const adjustSelect = document.createElement('select');
+  adjustSelect.id = 'projAdjustSelect';
+  // Only show future, incomplete dates
+  const futureDates = project.plan.filter(d => d.date >= today && !d.isComplete && !d.isBuffer);
+  if (futureDates.length > 1) {
+    futureDates.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.date;
+      opt.textContent = `${fmtDateDay(d.date)} (${fmtDateShort(d.date)})`;
+      adjustSelect.appendChild(opt);
+    });
+    const adjustBtn = document.createElement('button');
+    adjustBtn.className = 'proj-adjust-btn';
+    adjustBtn.textContent = 'Skip this day';
+    adjustBtn.addEventListener('click', () => {
+      const skipDate = adjustSelect.value;
+      if (skipDate) adjustProjectPlan(project.id, skipDate);
+    });
+    adjustBar.appendChild(adjustLabel);
+    adjustBar.appendChild(adjustSelect);
+    adjustBar.appendChild(adjustBtn);
+    body.appendChild(adjustBar);
+  }
+
+  // Day cards
+  project.plan.forEach(day => {
+    const card = document.createElement('div');
+    card.className = 'proj-day-card';
+    if (day.date === today) card.classList.add('today');
+    if (day.isComplete) card.classList.add('completed');
+    if (day.isBuffer) card.classList.add('buffer');
+
+    const head = document.createElement('div');
+    head.className = 'proj-day-head';
+    const dateEl = document.createElement('div');
+    dateEl.className = 'proj-day-date';
+    dateEl.textContent = `${fmtDateDay(day.date)} — ${fmtDateShort(day.date)}`;
+
+    const badge = document.createElement('span');
+    badge.className = 'proj-day-badge';
+    if (day.isComplete) {
+      badge.classList.add('done-badge');
+      badge.textContent = 'Done';
+    } else if (day.date === today) {
+      badge.classList.add('today-badge');
+      badge.textContent = 'Today';
+    } else if (day.date < today) {
+      badge.classList.add('overdue-badge');
+      badge.textContent = 'Missed';
+    } else if (day.isBuffer) {
+      badge.classList.add('buffer-badge');
+      badge.textContent = 'Buffer';
+    }
+
+    head.appendChild(dateEl);
+    if (badge.textContent) head.appendChild(badge);
+    card.appendChild(head);
+
+    const taskEl = document.createElement('div');
+    taskEl.className = 'proj-day-task';
+    taskEl.textContent = day.label;
+    card.appendChild(taskEl);
+
+    const timeEl = document.createElement('div');
+    timeEl.className = 'proj-day-time';
+    timeEl.textContent = `~${day.estimatedMinutes} min`;
+    card.appendChild(timeEl);
+
+    // Checkbox for today or past
+    if (!day.isComplete && day.date <= today) {
+      const checkWrap = document.createElement('div');
+      checkWrap.className = 'proj-day-check';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.id = 'projcheck_' + day.date;
+      cb.addEventListener('change', () => {
+        toggleProjectDayComplete(project.id, day.date);
+      });
+      const lbl = document.createElement('label');
+      lbl.htmlFor = cb.id;
+      lbl.textContent = 'Mark as done';
+      checkWrap.appendChild(cb);
+      checkWrap.appendChild(lbl);
+      card.appendChild(checkWrap);
+    }
+
+    body.appendChild(card);
+  });
+
+  // Due date line
+  const dueLine = document.createElement('div');
+  dueLine.className = 'proj-day-card';
+  dueLine.style.cssText = 'background:rgba(99,102,241,.08);border-color:rgba(99,102,241,.25);text-align:center';
+  dueLine.innerHTML = `<div class="proj-day-date" style="color:var(--accent)">📅 ${fmtDateShort(project.dueDate)} — Submit to ${project.teacherName.split(' ')[0]}</div>`;
+  body.appendChild(dueLine);
+}
+
+// ── Toggle a day complete ────────────────────────────────
+
+function toggleProjectDayComplete(projId, dateStr) {
+  const projects = getProjects();
+  const proj = projects.find(p => p.id === projId);
+  if (!proj) return;
+
+  const day = proj.plan.find(d => d.date === dateStr);
+  if (day) day.isComplete = !day.isComplete;
+
+  // Progress carry-over: redistribute incomplete past work to future days
+  applyCarryOver(proj);
+
+  saveProjects(projects);
+  renderProjectPlan(proj);
+  injectProjectTasksToHomework();
+  syncHwToSupabase();
+}
+
+// ── Progress carry-over ──────────────────────────────────
+// Redistribute incomplete past-day work into future days
+
+function applyCarryOver(project) {
+  const today = todayStr();
+  const incompletePast = project.plan.filter(d => d.date < today && !d.isComplete && !d.isBuffer);
+  if (incompletePast.length === 0) return;
+
+  // Gather leftover work labels
+  const leftoverLabels = incompletePast.map(d => d.label);
+  const leftoverMinutes = incompletePast.reduce((s, d) => s + d.estimatedMinutes, 0);
+
+  // Find future incomplete non-buffer days
+  const futureDays = project.plan.filter(d => d.date >= today && !d.isComplete && !d.isBuffer);
+  if (futureDays.length === 0) return;
+
+  // Add extra time to the first future day and note the carry-over
+  const firstFuture = futureDays[0];
+  const extraPerDay = Math.ceil(leftoverMinutes / futureDays.length);
+  futureDays.forEach(d => {
+    d.estimatedMinutes += extraPerDay;
+  });
+  // Prepend carry-over note to first day
+  if (!firstFuture.label.includes('(+ catch up')) {
+    firstFuture.label = firstFuture.label + ' (+ catch up on missed work)';
+  }
+}
+
+// ── Adjust plan: skip a day ──────────────────────────────
+
+function adjustProjectPlan(projId, skipDate) {
+  const projects = getProjects();
+  const proj = projects.find(p => p.id === projId);
+  if (!proj) return;
+
+  const skipDay = proj.plan.find(d => d.date === skipDate && !d.isComplete);
+  if (!skipDay) return;
+
+  // Remove the skipped day and redistribute its work
+  const skippedLabel = skipDay.label;
+  const skippedMinutes = skipDay.estimatedMinutes;
+  proj.plan = proj.plan.filter(d => d.date !== skipDate);
+
+  // Find remaining future incomplete non-buffer days
+  const today = todayStr();
+  const futureDays = proj.plan.filter(d => d.date >= today && !d.isComplete && !d.isBuffer);
+
+  if (futureDays.length > 0) {
+    const extraPerDay = Math.ceil(skippedMinutes / futureDays.length);
+    futureDays.forEach(d => {
+      d.estimatedMinutes += extraPerDay;
+    });
+    // Note on first available day
+    futureDays[0].label += ` (+ ${skippedLabel.split(' ').slice(0, 3).join(' ')}…)`;
+  }
+
+  // Track unavailable days
+  if (!proj.unavailableDays) proj.unavailableDays = [];
+  proj.unavailableDays.push(skipDate);
+
+  saveProjects(projects);
+  renderProjectPlan(proj);
+  injectProjectTasksToHomework();
+  showToast(`Skipped ${fmtDateDay(skipDate)} — work redistributed`);
+}
+
+// ── Create a new project ─────────────────────────────────
+
+function createProject(title, className, teacherName, dueDate, requirements) {
+  const plan = generateProjectPlan(title, className, dueDate, requirements);
+
+  const project = {
+    id: genProjId(),
+    title,
+    className,
+    teacherName,
+    dueDate,
+    requirements: requirements || '',
+    createdAt: new Date().toISOString(),
+    plan,
+    unavailableDays: [],
+    isComplete: false
+  };
+
+  const projects = getProjects();
+  projects.push(project);
+  saveProjects(projects);
+
+  // Auto-inject today's project tasks into homework
+  injectProjectTasksToHomework();
+
+  return project;
+}
+
+// ── Convert tonight's homework to project ────────────────
+
+function convertHwToProject(taskId) {
+  const tasks = getHwTasks();
+  const task = tasks.find(t => t.id === taskId);
+  if (!task) return;
+
+  // Pre-fill project modal with task info
+  closeHwAddModal();
+  showProjectCreateModal({
+    className: task.className,
+    title: task.title,
+    dueDate: '',
+    requirements: ''
+  });
+
+  // Remove from tonight's homework
+  const filtered = tasks.filter(t => t.id !== taskId);
+  saveHwTasks(filtered);
+  renderHwPopupTasks();
+}
+
+// ── Inject today's project tasks into homework ───────────
+// Adds today's project tasks as hw items so they show in the nightly planner
+
+function injectProjectTasksToHomework() {
+  const projects = getProjects();
+  const today = todayStr();
+  const tasks = getHwTasks();
+
+  projects.forEach(proj => {
+    if (proj.isComplete) return;
+    proj.plan.forEach(day => {
+      if (day.date !== today || day.isComplete) return;
+      // Check if already in homework (by project-linked ID)
+      const linkedId = 'pj_' + proj.id + '_' + day.date;
+      if (tasks.find(t => t.id === linkedId)) return;
+      // Add to homework
+      tasks.push({
+        id: linkedId,
+        title: `${proj.title}: ${day.label}`,
+        className: proj.className,
+        teacherName: proj.teacherName,
+        dueDate: today,
+        estimatedMinutes: day.estimatedMinutes,
+        isComplete: false,
+        isProjectTask: true,
+        projectId: proj.id,
+        createdAt: new Date().toISOString()
+      });
+    });
+  });
+
+  saveHwTasks(tasks);
+}
+
+// ── Open tutor for project's class ───────────────────────
+
+function startProjectTutor(projId) {
+  const projects = getProjects();
+  const proj = projects.find(p => p.id === projId);
+  if (!proj) return;
+
+  const schedule = getSchedule();
+  const entry = schedule.find(s => s.course === proj.className);
+  if (!entry) return;
+
+  const { subjectId } = lookupSubjectForCourse(entry.course);
+  closeProjectPlanModal();
+  closeHwPopup();
+  closeHwBackdrop();
+  openTutor(subjectId, entry.course, entry.teacher);
+}
+
+// ── Sync projects to Supabase ────────────────────────────
+
+async function syncProjectsToSupabase() {
+  if (!currentUser) return;
+  try {
+    await sb.from('profiles').upsert({
+      id: currentUser.id,
+      projects: getProjects(),
+    }, { onConflict: 'id' });
+  } catch {}
+}
+
+async function loadProjectsFromSupabase() {
+  if (!currentUser) return;
+  if (getProjects().length > 0) return;
+  try {
+    const { data } = await sb.from('profiles').select('projects').eq('id', currentUser.id).single();
+    if (data && Array.isArray(data.projects) && data.projects.length > 0) {
+      saveProjects(data.projects);
+    }
+  } catch {}
 }
 
 async function loadHwFromSupabase() {
@@ -4087,9 +4757,28 @@ async function loadHwFromSupabase() {
 // ── Wire all homework event listeners ─────────────────────
 function wireHwListeners() {
   $('hwPopupClose').addEventListener('click', closeHwPopup);
-  $('hwBackdrop').addEventListener('click', closeHwPopup);
+  $('hwBackdrop').addEventListener('click', () => {
+    closeHwPopup();
+    closeWorkTypeChooser();
+    closeProjectCreateModal();
+    closeProjectPlanModal();
+  });
 
+  // ── "+ Add homework" now opens type chooser ────────────
   $('hwPopupAddBtn').addEventListener('click', () => {
+    showWorkTypeChooser();
+  });
+
+  // ── Type chooser: Project vs Tonight's Homework ────────
+  $('hwTypeBack').addEventListener('click', () => {
+    closeWorkTypeChooser();
+  });
+  $('hwTypeProject').addEventListener('click', () => {
+    closeWorkTypeChooser();
+    showProjectCreateModal();
+  });
+  $('hwTypeHomework').addEventListener('click', () => {
+    closeWorkTypeChooser();
     showHwAddModal();
   });
 
@@ -4101,9 +4790,9 @@ function wireHwListeners() {
     showHwPlanModal();
   });
 
+  // ── Tonight's Homework modal ───────────────────────────
   $('hwAddBack').addEventListener('click', () => {
     closeHwAddModal();
-    // Re-open popup if it was showing
     if ($('hwPopup').classList.contains('open')) { /* already open */ }
     else { showHwPopup(); }
   });
@@ -4126,12 +4815,78 @@ function wireHwListeners() {
       createdAt:        new Date().toISOString()
     });
     closeHwAddModal();
-    // Return to popup
     renderHwPopupTasks();
     if (!$('hwPopup').classList.contains('open')) showHwPopup();
     showToast('Added!', 'ok');
   });
 
+  // ── "Convert to project" from tonight's homework ───────
+  $('hwConvertToProject').addEventListener('click', () => {
+    const title = $('hwTitleInput').value.trim();
+    const course = $('hwClassSelect').value;
+    closeHwAddModal();
+    showProjectCreateModal({
+      className: course,
+      title: title,
+      dueDate: '',
+      requirements: ''
+    });
+  });
+
+  // ── Project creation modal ─────────────────────────────
+  $('projCreateBack').addEventListener('click', () => {
+    closeProjectCreateModal();
+  });
+
+  $('projCreateBtn').addEventListener('click', () => {
+    const title = $('projTitleInput').value.trim();
+    if (!title) { showToast('Please name your project.'); return; }
+    const dueDate = $('projDueInput').value;
+    if (!dueDate) { showToast('Please set a due date.'); return; }
+    if (dueDate <= todayStr()) { showToast('Due date must be in the future.'); return; }
+
+    const course = $('projClassSelect').value;
+    const schedule = getSchedule();
+    const entry = schedule.find(s => s.course === course) || {};
+    const requirements = $('projReqInput').value.trim();
+
+    // Show loading state
+    closeProjectCreateModal();
+    const planModal = $('projPlanModal');
+    planModal.style.display = 'flex';
+    planModal.style.flexDirection = 'column';
+    requestAnimationFrame(() => planModal.classList.add('open'));
+    $('projPlanLoading').style.display = 'flex';
+    $('projPlanContent').innerHTML = '';
+    $('projPlanFooter').style.display = 'none';
+    $('projPlanTitle').textContent = 'Building your plan…';
+
+    // Small delay for the loading animation to feel real
+    setTimeout(() => {
+      const project = createProject(title, course, entry.teacher || '', dueDate, requirements);
+      renderProjectPlan(project);
+      syncProjectsToSupabase();
+    }, 600);
+  });
+
+  // ── Project plan modal ─────────────────────────────────
+  $('projPlanBack').addEventListener('click', () => {
+    closeProjectPlanModal();
+  });
+
+  $('projStartBtn').addEventListener('click', () => {
+    if (_currentProjId) startProjectTutor(_currentProjId);
+  });
+
+  $('projSaveBtn').addEventListener('click', () => {
+    closeProjectPlanModal();
+    closeHwPopup();
+    closeHwBackdrop();
+    showToast('Project plan saved!', 'ok');
+    renderSidebar();
+  });
+
+  // ── Study plan modal ───────────────────────────────────
   $('hwPlanBack').addEventListener('click', () => {
     closeHwPlanModal();
   });
