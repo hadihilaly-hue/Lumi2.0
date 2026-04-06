@@ -158,6 +158,35 @@ html.light .hist-dropdown{box-shadow:0 8px 28px rgba(0,0,0,.15)}
 }
 .hist-dd-item:hover{background:var(--surface-2);color:var(--text)}
 .hist-dd-item.danger:hover{background:rgba(255,80,80,.09);color:#ff7070}
+
+/* Inline confirmation popup */
+.inline-confirm{position:fixed;z-index:510;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;box-shadow:0 8px 28px rgba(0,0,0,.4);min-width:200px;max-width:280px;animation:ic-in .15s ease-out}
+@keyframes ic-in{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+.inline-confirm-text{font-size:12.5px;color:var(--text);line-height:1.45;margin-bottom:10px}
+.inline-confirm-btns{display:flex;gap:8px}
+.inline-confirm-btns button{flex:1;padding:7px 10px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:none;transition:opacity .15s}
+.ic-cancel{background:var(--surface-2);color:var(--text-muted)}
+.ic-cancel:hover{opacity:.8}
+.ic-delete{background:#ef4444;color:#fff}
+.ic-delete:hover{opacity:.85}
+html.light .inline-confirm{box-shadow:0 8px 28px rgba(0,0,0,.12)}
+
+/* Sidebar project delete button */
+.sb-proj-del{width:20px;height:20px;flex-shrink:0;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-faint);border-radius:5px;opacity:0;transition:opacity .13s,color .13s;font-size:13px}
+.sb-hw-item:hover .sb-proj-del{opacity:1}
+.sb-proj-del:hover{color:#ff7070}
+
+/* Project plan modal delete button */
+.proj-delete-btn{background:none;border:1px solid rgba(255,80,80,.25);border-radius:10px;padding:8px 14px;font-size:12px;color:#ff7070;cursor:pointer;font-family:inherit;transition:all .15s;width:100%;margin-top:4px}
+.proj-delete-btn:hover{background:rgba(255,80,80,.08)}
+
+/* Delete animation */
+.item-removing{opacity:0;transform:translateX(-20px);transition:opacity .25s,transform .25s;pointer-events:none}
+
+/* Settings cleanup section */
+.settings-cleanup-row{display:flex;gap:8px;margin-top:8px}
+.settings-cleanup-row .danger-btn{flex:1}
+
 .sb-empty{font-size:11.5px;color:var(--text-faint);font-style:italic;padding:4px 8px 8px;}
 
 /* divider + section label */

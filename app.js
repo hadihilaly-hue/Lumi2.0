@@ -920,6 +920,63 @@ function closeOpenMenu() {
   }
 }
 
+// ── Mobile long-press support ─────────────────────────────
+function addLongPress(el, callback, duration = 500) {
+  let timer = null;
+  let prevented = false;
+  el.addEventListener('touchstart', e => {
+    prevented = false;
+    timer = setTimeout(() => {
+      prevented = true;
+      e.preventDefault();
+      callback(e);
+    }, duration);
+  }, { passive: false });
+  el.addEventListener('touchend', () => { clearTimeout(timer); });
+  el.addEventListener('touchmove', () => { clearTimeout(timer); });
+  el.addEventListener('touchcancel', () => { clearTimeout(timer); });
+  // Prevent click after long press
+  el.addEventListener('click', e => { if (prevented) { e.preventDefault(); e.stopPropagation(); } }, true);
+}
+
+// ── Inline confirmation popup ─────────────────────────────
+let _activeInlineConfirm = null;
+
+function showInlineConfirm(anchorEl, text, onConfirm) {
+  dismissInlineConfirm();
+  const popup = document.createElement('div');
+  popup.className = 'inline-confirm';
+  popup.innerHTML = `
+    <div class="inline-confirm-text">${text}</div>
+    <div class="inline-confirm-btns">
+      <button class="ic-cancel">Cancel</button>
+      <button class="ic-delete">Delete</button>
+    </div>`;
+  const rect = anchorEl.getBoundingClientRect();
+  popup.style.top = (rect.bottom + 6) + 'px';
+  popup.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
+  document.body.appendChild(popup);
+  _activeInlineConfirm = popup;
+
+  popup.querySelector('.ic-cancel').addEventListener('click', e => { e.stopPropagation(); dismissInlineConfirm(); });
+  popup.querySelector('.ic-delete').addEventListener('click', e => { e.stopPropagation(); dismissInlineConfirm(); onConfirm(); });
+
+  // Dismiss on outside click (delayed so current click doesn't trigger)
+  setTimeout(() => {
+    const handler = e => { if (!popup.contains(e.target)) { dismissInlineConfirm(); document.removeEventListener('click', handler, true); } };
+    document.addEventListener('click', handler, true);
+    popup._outsideHandler = handler;
+  }, 10);
+}
+
+function dismissInlineConfirm() {
+  if (_activeInlineConfirm) {
+    if (_activeInlineConfirm._outsideHandler) document.removeEventListener('click', _activeInlineConfirm._outsideHandler, true);
+    _activeInlineConfirm.remove();
+    _activeInlineConfirm = null;
+  }
+}
+
 function openHistMenu(convId, menuBtn) {
   if (openMenuId === convId) { closeOpenMenu(); return; }
   closeOpenMenu();
@@ -938,7 +995,7 @@ function openHistMenu(convId, menuBtn) {
   const deleteItem = document.createElement('div');
   deleteItem.className = 'hist-dd-item danger';
   deleteItem.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg> Delete`;
-  deleteItem.addEventListener('click', e => { e.stopPropagation(); closeOpenMenu(); deleteConv(convId); });
+  deleteItem.addEventListener('click', e => { e.stopPropagation(); closeOpenMenu(); deleteConv(convId, menuBtn); });
 
   dd.appendChild(renameItem);
   dd.appendChild(deleteItem);
@@ -986,20 +1043,47 @@ function startRename(convId) {
   });
 }
 
-function deleteConv(convId) {
-  if (!confirm('Delete this conversation?')) return;
-  const convs = getConvs();
-  delete convs[convId];
-  saveConvs(convs);
-  deleteConvFromSupabase(convId);
-  if (S.currentId === convId) {
-    S.currentId = genId(); S.messages = []; S.exchangeCount = 0; S.tutorCtx = null;
-    S.ready = false; S.values.clear(); S.goals.clear(); S.interests.clear();
-    SB.mode = 'all'; SB.activeTeacher = null;
-    messagesEl.innerHTML = '';
-    showWelcome();
+function deleteConv(convId, anchorEl) {
+  const doDelete = () => {
+    // Animate out the sidebar item
+    const itemEl = document.querySelector(`.hist-title[data-id="${convId}"]`)?.closest('.hist-item');
+    if (itemEl) {
+      itemEl.classList.add('item-removing');
+      setTimeout(() => {
+        const convs = getConvs();
+        delete convs[convId];
+        saveConvs(convs);
+        deleteConvFromSupabase(convId);
+        if (S.currentId === convId) {
+          S.currentId = genId(); S.messages = []; S.exchangeCount = 0; S.tutorCtx = null;
+          S.ready = false; S.values.clear(); S.goals.clear(); S.interests.clear();
+          SB.mode = 'all'; SB.activeTeacher = null;
+          messagesEl.innerHTML = '';
+          showWelcome();
+        }
+        renderSidebar();
+      }, 250);
+    } else {
+      const convs = getConvs();
+      delete convs[convId];
+      saveConvs(convs);
+      deleteConvFromSupabase(convId);
+      if (S.currentId === convId) {
+        S.currentId = genId(); S.messages = []; S.exchangeCount = 0; S.tutorCtx = null;
+        S.ready = false; S.values.clear(); S.goals.clear(); S.interests.clear();
+        SB.mode = 'all'; SB.activeTeacher = null;
+        messagesEl.innerHTML = '';
+        showWelcome();
+      }
+      renderSidebar();
+    }
+  };
+
+  if (anchorEl) {
+    showInlineConfirm(anchorEl, "Delete this chat? This can't be undone.", doDelete);
+  } else {
+    doDelete();
   }
-  renderSidebar();
 }
 
 // ─── SEARCH DROPDOWN ─────────────────────────────────────────────────────────
@@ -1232,6 +1316,7 @@ function renderSidebar() {
       });
 
       menuBtn.addEventListener('click', e => { e.stopPropagation(); openHistMenu(conv.id, menuBtn); });
+      addLongPress(item, () => openHistMenu(conv.id, menuBtn));
       sbNav.appendChild(item);
     });
   } else if (!query) {
@@ -2560,6 +2645,20 @@ function wireListeners(savedKey) {
       closeSettings();
       location.reload();
     }
+  });
+
+  $('clearAllChatsBtn').addEventListener('click', e => {
+    showInlineConfirm(e.target, 'Delete ALL chats? This can\'t be undone.', () => {
+      clearAllChats();
+      closeSettings();
+    });
+  });
+
+  $('clearDoneProjectsBtn').addEventListener('click', e => {
+    showInlineConfirm(e.target, 'Remove all completed projects?', () => {
+      clearCompletedProjects();
+      closeSettings();
+    });
   });
 
   $('attachBtn').addEventListener('click', () => fileInput.click());
@@ -4001,14 +4100,25 @@ function renderHwSidebar(container) {
       metaEl.textContent = daysLeft <= 2 ? '🔴' : daysLeft <= 5 ? '🟠' : '📅';
       metaEl.title = `Due ${fmtDateShort(proj.dueDate)} · ${completedDays}/${totalDays} done`;
 
+      const delBtn = document.createElement('button');
+      delBtn.className = 'sb-proj-del';
+      delBtn.title = 'Delete project';
+      delBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>`;
+      delBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        deleteProject(proj.id, delBtn);
+      });
+
       item.appendChild(dot);
       item.appendChild(titleEl);
+      item.appendChild(delBtn);
       item.appendChild(metaEl);
       item.addEventListener('click', () => {
         showProjectPlanModal(proj);
         openHwBackdrop();
         closeSidebar();
       });
+      addLongPress(item, () => deleteProject(proj.id, item));
       container.appendChild(item);
     });
   }
@@ -4610,6 +4720,13 @@ function renderProjectPlan(project) {
   dueLine.style.cssText = 'background:rgba(99,102,241,.08);border-color:rgba(99,102,241,.25);text-align:center';
   dueLine.innerHTML = `<div class="proj-day-date" style="color:var(--accent)">📅 ${fmtDateShort(project.dueDate)} — Submit to ${project.teacherName.split(' ')[0]}</div>`;
   body.appendChild(dueLine);
+
+  // Delete project button at bottom
+  const delBtn = document.createElement('button');
+  delBtn.className = 'proj-delete-btn';
+  delBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg> Delete this project`;
+  delBtn.addEventListener('click', () => deleteProject(project.id, delBtn));
+  body.appendChild(delBtn);
 }
 
 // ── Toggle a day complete ────────────────────────────────
@@ -4838,6 +4955,64 @@ async function syncProjectsToSupabase() {
       projects: getProjects(),
     }, { onConflict: 'id' });
   } catch {}
+}
+
+function deleteProject(projId, anchorEl) {
+  const doDelete = () => {
+    // Remove from projects
+    const projects = getProjects().filter(p => p.id !== projId);
+    saveProjects(projects);
+
+    // Remove associated hw tasks injected from this project
+    const tasks = getHwTasks().filter(t => t.projectId !== projId);
+    saveHwTasks(tasks);
+
+    // Close plan modal if viewing this project
+    if (_currentProjId === projId) {
+      closeProjectPlanModal();
+      closeHwBackdrop();
+    }
+
+    syncHwToSupabase();
+    renderSidebar();
+    showToast('Project deleted');
+  };
+
+  if (anchorEl) {
+    showInlineConfirm(anchorEl, "Delete this project and its plan? This can't be undone.", doDelete);
+  } else {
+    doDelete();
+  }
+}
+
+function clearAllChats() {
+  const convs = getConvs();
+  // Delete each from Supabase
+  Object.keys(convs).forEach(id => deleteConvFromSupabase(id));
+  // Clear local
+  saveConvs({});
+  S.currentId = genId(); S.messages = []; S.exchangeCount = 0; S.tutorCtx = null;
+  S.ready = false; S.values.clear(); S.goals.clear(); S.interests.clear();
+  SB.mode = 'all'; SB.activeTeacher = null;
+  messagesEl.innerHTML = '';
+  showWelcome();
+  renderSidebar();
+  showToast('All chats cleared');
+}
+
+function clearCompletedProjects() {
+  const projects = getProjects();
+  const completed = projects.filter(p => p.isComplete);
+  if (!completed.length) { showToast('No completed projects to clear.'); return; }
+  // Remove associated hw tasks
+  const completedIds = new Set(completed.map(p => p.id));
+  const tasks = getHwTasks().filter(t => !completedIds.has(t.projectId));
+  saveHwTasks(tasks);
+  // Keep only incomplete projects
+  saveProjects(projects.filter(p => !p.isComplete));
+  syncHwToSupabase();
+  renderSidebar();
+  showToast(`${completed.length} completed project${completed.length > 1 ? 's' : ''} cleared`);
 }
 
 async function loadProjectsFromSupabase() {
