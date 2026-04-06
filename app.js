@@ -4379,26 +4379,27 @@ function clearProjFile() {
 
 function handleProjFile(file) {
   if (!file) return;
-  const maxMB = file.type === 'application/pdf' ? 32 : 5;
+  const maxMB = file.type === 'application/pdf' ? 32 : 10;
   if (file.size > maxMB * 1024 * 1024) { showToast(`File too large. Max ${maxMB}MB.`); return; }
 
   const isImage = file.type.startsWith('image/');
-  const isText = file.type === 'text/plain' || file.name.endsWith('.txt');
-  const isPdf = file.type === 'application/pdf';
-  if (!isImage && !isPdf && !isText) { showToast('Unsupported file — use PDF, image, or text.'); return; }
+  const isText = file.type === 'text/plain' || file.name.endsWith('.txt') || file.name.endsWith('.md');
+  const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
+  const isDoc = file.name.endsWith('.doc') || file.name.endsWith('.docx');
+  if (!isImage && !isPdf && !isText && !isDoc) { showToast('Unsupported file — use PDF, image, or text.'); return; }
 
   const reader = new FileReader();
   reader.onload = e => {
     const base64 = e.target.result.split(',')[1];
     const mediaType = file.type || 'text/plain';
-    _projPendingFile = { file, base64, mediaType, isImage, isText, isPdf };
+    _projPendingFile = { file, base64, mediaType, isImage, isText, isPdf, isDoc };
 
     // Show preview
     $('projDropzoneEmpty').style.display = 'none';
     $('projDropzonePreview').style.display = 'flex';
     $('projFileName').textContent = file.name;
     $('projFileSize').textContent = fmtBytes(file.size);
-    $('projFileIcon').textContent = isPdf ? '📕' : isImage ? '🖼️' : '📄';
+    $('projFileIcon').textContent = isPdf ? '📕' : isImage ? '🖼️' : isDoc ? '📘' : '📄';
   };
   reader.readAsDataURL(file);
 }
@@ -4417,15 +4418,23 @@ function wireProjDropzone() {
     if (input.files[0]) handleProjFile(input.files[0]);
   });
 
-  // Drag events
-  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
-  zone.addEventListener('dragleave', () => { zone.classList.remove('dragover'); });
+  // Drag events — must preventDefault on dragover AND drop at both zone and document level
+  // to stop the browser from navigating to the dropped file
+  zone.addEventListener('dragenter', e => { e.preventDefault(); e.stopPropagation(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); });
+  zone.addEventListener('dragleave', e => { e.stopPropagation(); zone.classList.remove('dragover'); });
   zone.addEventListener('drop', e => {
     e.preventDefault();
+    e.stopPropagation();
     zone.classList.remove('dragover');
     const file = e.dataTransfer.files[0];
     if (file) handleProjFile(file);
   });
+
+  // Prevent browser from opening dropped files anywhere on the modal
+  const modal = $('projCreateModal');
+  modal.addEventListener('dragover', e => e.preventDefault());
+  modal.addEventListener('drop', e => { e.preventDefault(); });
 
   // Remove button
   $('projFileRemove').addEventListener('click', e => {
