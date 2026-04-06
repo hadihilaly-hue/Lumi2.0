@@ -4255,12 +4255,13 @@ async function syncHwToSupabase() {
   if (!currentUser) return;
   const tasks = getHwTasks();
   try {
-    await sb.from('profiles').upsert({
+    const { error } = await sb.from('profiles').upsert({
       id: currentUser.id,
       hw_tasks: tasks,
       hw_updated_at: new Date().toISOString()
     });
-  } catch (e) { /* non-critical */ }
+    if (error) console.warn('[syncHw] upsert error:', error.message);
+  } catch (e) { console.warn('[syncHw] caught:', e); }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -5032,10 +5033,10 @@ function loadProjectsFromSupabase() {
 
 async function loadHwFromSupabase() {
   if (!currentUser) return;
-  // Only load from remote if local is empty (local is source of truth during session)
   if (getHwTasks().length > 0) return;
   try {
-    const { data } = await sb.from('profiles').select('hw_tasks').eq('id', currentUser.id).single();
+    const { data, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+    if (error) { console.warn('[loadHw] select error:', error.message); return; }
     if (data && Array.isArray(data.hw_tasks) && data.hw_tasks.length > 0) {
       saveHwTasks(data.hw_tasks);
     }
