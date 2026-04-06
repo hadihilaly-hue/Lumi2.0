@@ -2932,9 +2932,29 @@ async function fetchLumi() {
   }
 
   try {
-    const system = S.tutorCtx
+    let system = S.tutorCtx
       ? buildTutorSystem(S.tutorCtx.subjectName, S.tutorCtx.course, S.tutorCtx.teacher, S.tutorCtx.teacherProfile || null)
       : buildCompanionSystem();
+
+    // Inject active project context if the student is working on a project
+    if (_currentProjId) {
+      const proj = getProjects().find(p => p.id === _currentProjId);
+      if (proj) {
+        const today = todayStr();
+        const todayTask = proj.plan.find(d => d.date === today && !d.isComplete);
+        const taskLabel = todayTask ? todayTask.label : proj.plan[0]?.label || 'getting started';
+        system += `\n\nACTIVE PROJECT CONTEXT:
+The student is working on: ${proj.title}
+Class: ${proj.className}
+Due date: ${proj.dueDate}
+Today's task: ${taskLabel}
+${proj.requirements ? 'Requirements: ' + proj.requirements : ''}
+
+If they uploaded a rubric or project instructions it will be attached to their first message — read it carefully and use it to guide your help throughout the conversation.
+
+Remember: help them THINK through the project, never do it for them. Ask guiding questions, help them brainstorm, review their work, but the thinking must be theirs.`;
+      }
+    }
     const { clean, data } = await callAPI(apiKey, S.messages, system);
     typing.remove();
     S.messages.push({ role: 'assistant', content: clean });
@@ -4915,30 +4935,67 @@ function handleStartWorking() {
   console.log('START WORKING CLICKED');
 
   const projId = _currentProjId;
-  console.log('Project ID:', projId);
+  const proj = getProjects().find(p => p.id === projId);
+  if (!proj) { console.log('No project found'); return; }
+  console.log('Project:', proj.title, proj.className);
 
-  // Close all modals
+  // Close all modals immediately
   document.querySelectorAll('.hw-modal, .hw-popup, #hwPopup, #hwBackdrop').forEach(el => {
     el.style.display = 'none';
     el.classList.remove('open');
   });
   console.log('Modals closed');
 
-  // Fill the input after a tick so DOM is settled
+  // Find matching schedule entry for this class
+  const schedule = getSchedule();
+  const entry = schedule.find(s => s.course === proj.className);
+  console.log('Schedule entry:', entry ? entry.course : 'NOT FOUND');
+
+  // Build context message
+  const today = todayStr();
+  const todayTask = proj.plan.find(d => d.date === today && !d.isComplete);
+  const taskLabel = todayTask ? todayTask.label : proj.plan[0]?.label || 'getting started';
+  const contextMsg = `I'm working on my ${proj.title} for ${proj.className}, due ${proj.dueDate}. Today I need to: ${taskLabel}. Can you help me get started?`;
+
+  // If we have a matching teacher, open that tutor chat with a 3s safety timeout
+  if (entry) {
+    const { subjectId } = lookupSubjectForCourse(entry.course);
+    const safeOpen = Promise.race([
+      openTutor(subjectId, entry.course, entry.teacher),
+      new Promise(resolve => setTimeout(resolve, 3000))
+    ]);
+    safeOpen.then(() => {
+      setTimeout(() => {
+        // Attach rubric file if one was uploaded with the project
+        if (proj.rubricFile) {
+          const att = proj.rubricFile;
+          pendingAttachment = {
+            file: { name: att.name, size: 0, type: att.mediaType },
+            base64: att.base64,
+            mediaType: att.mediaType,
+            isImage: !!att.isImage,
+            isText: !!att.isText
+          };
+          showAttachPreview({ name: att.name, size: 0 }, att.base64, att.mediaType, !!att.isImage);
+          console.log('Rubric attached:', att.name);
+        }
+        msgInput.value = contextMsg;
+        msgInput.focus();
+        autoGrow(msgInput);
+        updateSendBtn();
+        console.log('Input filled — ready to send');
+      }, 300);
+    });
+    return;
+  }
+
+  // No matching class — just fill the input in the current chat
   setTimeout(() => {
-    const proj = getProjects().find(p => p.id === projId);
-    if (msgInput && proj) {
-      const today = todayStr();
-      const todayTask = proj.plan.find(d => d.date === today && !d.isComplete);
-      const taskLabel = todayTask ? todayTask.label : proj.plan[0]?.label || 'getting started';
-      msgInput.value = `I'm working on ${proj.title} for ${proj.className}, due ${proj.dueDate}. Today I need to: ${taskLabel}. Can you help me get started?`;
-      msgInput.focus();
-      autoGrow(msgInput);
-      updateSendBtn();
-      console.log('Input filled');
-    } else {
-      console.log('Could not find input or project', { input: !!msgInput, proj, projId });
-    }
+    msgInput.value = contextMsg;
+    msgInput.focus();
+    autoGrow(msgInput);
+    updateSendBtn();
+    console.log('Input filled (no class match)');
   }, 100);
 }
 
