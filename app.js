@@ -4251,17 +4251,9 @@ Rules you must always follow:
 }
 
 // ── Supabase sync ──────────────────────────────────────────
-async function syncHwToSupabase() {
-  if (!currentUser) return;
-  const tasks = getHwTasks();
-  try {
-    const { error } = await sb.from('profiles').upsert({
-      id: currentUser.id,
-      hw_tasks: tasks,
-      hw_updated_at: new Date().toISOString()
-    });
-    if (error) console.warn('[syncHw] upsert error:', error.message);
-  } catch (e) { console.warn('[syncHw] caught:', e); }
+// hw_tasks column does not exist in profiles table — localStorage only
+function syncHwToSupabase() {
+  // no-op: homework lives in localStorage only
 }
 
 // ══════════════════════════════════════════════════════════
@@ -5031,16 +5023,9 @@ function loadProjectsFromSupabase() {
   // no-op: projects live in localStorage only
 }
 
-async function loadHwFromSupabase() {
-  if (!currentUser) return;
-  if (getHwTasks().length > 0) return;
-  try {
-    const { data, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
-    if (error) { console.warn('[loadHw] select error:', error.message); return; }
-    if (data && Array.isArray(data.hw_tasks) && data.hw_tasks.length > 0) {
-      saveHwTasks(data.hw_tasks);
-    }
-  } catch (e) { /* ignore */ }
+// hw_tasks column does not exist in profiles table — localStorage only
+function loadHwFromSupabase() {
+  return Promise.resolve(); // no-op, returns a promise so .then() chains still work
 }
 
 // ── Wire all homework event listeners ─────────────────────
