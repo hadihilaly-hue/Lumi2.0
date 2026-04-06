@@ -252,6 +252,17 @@
         <div class="voice-dot"></div>
         <span>Listening…</span>
       </div>
+      <div class="voice-confirm-bar" id="voiceConfirmBar">
+        <div class="voice-confirm-text">
+          <span class="voice-confirm-icon">🎤</span>
+          <span class="voice-confirm-transcript" id="voiceConfirmText"></span>
+        </div>
+        <div class="voice-confirm-actions">
+          <button class="voice-confirm-btn send" id="voiceConfirmSend">✓ Send</button>
+          <button class="voice-confirm-btn rerecord" id="voiceConfirmRerecord">↺ Re-record</button>
+          <button class="voice-confirm-btn cancel" id="voiceConfirmCancel">✕ Cancel</button>
+        </div>
+      </div>
       <div class="input-area">
         <div class="attach-preview" id="attachPreview"></div>
         <div class="input-wrap">
@@ -448,6 +459,6 @@
 <!-- Scripts at bottom so the loading screen renders immediately -->
 <script src="supabase.js"></script>
 <script src="auth.js"></script>
-<script src="app.js?v=17"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>

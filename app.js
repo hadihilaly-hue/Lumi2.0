@@ -2196,64 +2196,70 @@ function checkSemesterBanner() {
 }
 
 // ─── VOICE / SPEECH ───────────────────────────────────────────────────────────
-let _recognition    = null;
-let _voiceMode      = localStorage.getItem('lumi_voice_mode') === 'true';
-let _muteTts        = localStorage.getItem('lumi_mute_tts')   === 'true';
-let _isRecording    = false;
-let _lastWasVoice   = false;   // did the last user message come from mic?
-let _voiceSendTimer = null;
-let _isSpeaking     = false;
+let _recognition     = null;
+let _voiceMode       = localStorage.getItem('lumi_voice_mode') === 'true';
+let _muteTts         = localStorage.getItem('lumi_mute_tts')   === 'true';
+let _isRecording     = false;
+let _lastWasVoice    = false;
+let _silenceTimer    = null;   // 2.5s silence → auto-stop
+let _transcript      = '';     // latest transcript text
+let _isSpeaking      = false;
 
 function initVoice() {
-  const MicBtn = $('micBtn');
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const micBtn = $('micBtn');
   if (!SpeechRec) {
-    if (MicBtn) { MicBtn.disabled = true; MicBtn.title = 'Voice input not supported — try Chrome'; }
+    if (micBtn) { micBtn.disabled = true; micBtn.title = 'Voice input not supported — try Chrome'; }
     return;
   }
 
   _recognition = new SpeechRec();
   _recognition.lang = 'en-US';
   _recognition.interimResults = true;
-  _recognition.continuous = false;
+  _recognition.continuous = true;   // we control when to stop
 
   _recognition.onstart = () => {
     _isRecording = true;
+    _transcript  = '';
     _updateMicBtn();
-    if (_voiceMode) _showListeningBar(true);
+    _showListeningBar(true);
+    _hideConfirmBar();
   };
 
   _recognition.onresult = (e) => {
-    clearTimeout(_voiceSendTimer);
-    const transcript = Array.from(e.results).map(r => r[0].transcript).join('');
-    msgInput.value = transcript;
+    // Collect full transcript (interim + final)
+    _transcript = Array.from(e.results).map(r => r[0].transcript).join('');
+    msgInput.value = _transcript;
     autoGrow(msgInput);
     updateSendBtn();
-    if (!_voiceMode) {
-      // Auto-send 1 s after speech settles (non-voice-mode)
-      _voiceSendTimer = setTimeout(() => {
-        if (msgInput.value.trim()) { _lastWasVoice = true; doSend(); }
-      }, 1000);
-    }
+    // Reset 2.5s silence timer on every new result
+    clearTimeout(_silenceTimer);
+    _silenceTimer = setTimeout(() => _stopRecording(), 2500);
   };
 
   _recognition.onend = () => {
     _isRecording = false;
+    clearTimeout(_silenceTimer);
     _updateMicBtn();
-    if (!_voiceMode) _showListeningBar(false);
-    // In voice mode the mic restarts automatically after Lumi finishes speaking
+    _showListeningBar(false);
+    // Show confirmation bar if we captured anything
+    if (_transcript.trim()) {
+      _showConfirmBar(_transcript.trim());
+    }
   };
 
   _recognition.onerror = (e) => {
     _isRecording = false;
+    clearTimeout(_silenceTimer);
     _updateMicBtn();
+    _showListeningBar(false);
     if (e.error === 'not-allowed') {
       showToast('Please allow microphone access in your browser settings to use voice input.');
     }
-    // Keep whatever was transcribed so far on other errors
+    // Keep whatever was transcribed so far — still show confirm if there's text
+    if (_transcript.trim()) _showConfirmBar(_transcript.trim());
   };
 
-  // Restore voice-mode state from last session
   if (_voiceMode) {
     document.body.classList.add('voice-mode-on');
     _startRecording();
@@ -2263,27 +2269,63 @@ function initVoice() {
 function _startRecording() {
   if (!_recognition) return;
   if (_isRecording) { _stopRecording(); return; }
-  _recognition.continuous = _voiceMode;
+  _hideConfirmBar();
+  msgInput.value = '';
+  updateSendBtn();
   try { _recognition.start(); } catch(e) {}
 }
 
 function _stopRecording() {
+  clearTimeout(_silenceTimer);
   if (_recognition && _isRecording) { try { _recognition.stop(); } catch(e) {} }
-  _isRecording = false;
-  _updateMicBtn();
-  _showListeningBar(false);
+  // onend fires next and handles showing the confirm bar
 }
 
 function _updateMicBtn() {
   const btn = $('micBtn');
   if (!btn) return;
-  btn.classList.toggle('recording',     _isRecording && !_voiceMode);
-  btn.classList.toggle('voice-active',  _isRecording &&  _voiceMode);
+  btn.classList.toggle('recording',    _isRecording);
+  btn.classList.toggle('voice-active', _isRecording && _voiceMode);
 }
 
 function _showListeningBar(show) {
   const bar = $('voiceListeningBar');
   if (bar) bar.classList.toggle('active', show);
+}
+
+// ── Confirmation bar ──────────────────────────────────────────────────────────
+function _showConfirmBar(text) {
+  const bar    = $('voiceConfirmBar');
+  const textEl = $('voiceConfirmText');
+  if (!bar || !textEl) return;
+  textEl.textContent = `"${text}"`;
+  bar.classList.add('active');
+}
+
+function _hideConfirmBar() {
+  const bar = $('voiceConfirmBar');
+  if (bar) bar.classList.remove('active');
+}
+
+function _voiceConfirmSend() {
+  _hideConfirmBar();
+  _lastWasVoice = true;
+  doSend();
+}
+
+function _voiceConfirmRerecord() {
+  _hideConfirmBar();
+  msgInput.value = '';
+  updateSendBtn();
+  _startRecording();
+}
+
+function _voiceConfirmCancel() {
+  _hideConfirmBar();
+  msgInput.value = '';
+  msgInput.style.height = 'auto';
+  updateSendBtn();
+  _transcript = '';
 }
 
 // Speak a Lumi response aloud
@@ -2349,15 +2391,23 @@ function _addSpeakerBtn(msgEl, text) {
 }
 
 function wireVoiceListeners() {
-  // Mic button
+  // Mic button — tap to start, tap again to stop early
   const micBtn = $('micBtn');
   if (micBtn) {
     micBtn.addEventListener('click', () => {
       if (!_recognition) { showToast('Voice input not supported in this browser — try Chrome'); return; }
       if (_isRecording) { _stopRecording(); }
-      else { _lastWasVoice = true; _startRecording(); }
+      else { _startRecording(); }
     });
   }
+
+  // Confirmation bar buttons
+  const confirmSend     = $('voiceConfirmSend');
+  const confirmRerecord = $('voiceConfirmRerecord');
+  const confirmCancel   = $('voiceConfirmCancel');
+  if (confirmSend)     confirmSend.addEventListener('click', _voiceConfirmSend);
+  if (confirmRerecord) confirmRerecord.addEventListener('click', _voiceConfirmRerecord);
+  if (confirmCancel)   confirmCancel.addEventListener('click', _voiceConfirmCancel);
 
   // Voice Mode toggle
   const vmToggle = $('voiceModeToggle');
