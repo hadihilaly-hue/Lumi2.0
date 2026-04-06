@@ -385,7 +385,7 @@ function syncScheduleToSupabase(schedule) {
     id: currentUser.id,
     schedule,
     schedule_updated_at: new Date().toISOString(),
-  }, { onConflict: 'id' })
+  })
     .then(({ error }) => { if (error) console.warn('Schedule sync error:', error); });
 }
 
@@ -697,7 +697,7 @@ function syncProfileToSupabase() {
     homework_start_time,
     study_style,
     onboarding_complete,
-  }, { onConflict: 'id' })
+  })
     .then(({ error }) => { if (error) console.warn('Supabase profile sync error:', error); });
 }
 
@@ -2114,7 +2114,7 @@ async function obSaveFullProfile() {
       pain_points:         OB.profile.pain_points || [],
       calendar_connected:  OB.profile.calendar_connected || false,
       onboarding_complete: true,
-    }, { onConflict: 'id' });
+    });
   } catch (e) { console.warn('Profile save error:', e); }
 }
 
@@ -2633,7 +2633,7 @@ function wireListeners(savedKey) {
               id: currentUser.id,
               name: null, grade: null,
               values_profile: { values: [], goals: [], interests: [] },
-            }, { onConflict: 'id' }),
+            }),
           ]);
         } catch (e) { console.warn('Supabase clear failed:', e); }
       }
@@ -3186,7 +3186,7 @@ function saveStudyStyle(style) { localStorage.setItem('lumi_study_style', JSON.s
 async function syncStudyStyleToSupabase(style) {
   if (!currentUser) return;
   try {
-    await sb.from('profiles').upsert({ id: currentUser.id, study_style: style }, { onConflict: 'id' });
+    await sb.from('profiles').upsert({ id: currentUser.id, study_style: style });
   } catch {}
 }
 
@@ -4252,7 +4252,7 @@ async function syncHwToSupabase() {
       hw_tasks: tasks,
       projects: getProjects(),
       hw_updated_at: new Date().toISOString()
-    }, { onConflict: 'id' });
+    });
   } catch (e) { /* non-critical */ }
 }
 
@@ -4911,38 +4911,38 @@ async function startProjectTutor(projId) {
   const backdrop = $('hwBackdrop');
   if (backdrop) { backdrop.style.display = 'none'; backdrop.classList.remove('open'); }
 
-  // Find the project
-  const proj = getProjects().find(p => p.id === projId);
-  if (!proj) { console.error('Project not found:', projId); return; }
-
-  // Find matching schedule entry
-  const schedule = getSchedule();
-  const entry = schedule.find(s => s.course === proj.className);
-  if (!entry) { showToast('Class not found in schedule.'); return; }
-
-  // Open tutor chat
-  const { subjectId } = lookupSubjectForCourse(entry.course);
   try {
+    // Find the project
+    const proj = getProjects().find(p => p.id === projId);
+    if (!proj) { console.error('Project not found:', projId); return; }
+
+    // Find matching schedule entry
+    const schedule = getSchedule();
+    const entry = schedule.find(s => s.course === proj.className);
+    if (!entry) { showToast('Class not found in schedule.'); return; }
+
+    // Open tutor chat
+    const { subjectId } = lookupSubjectForCourse(entry.course);
     await openTutor(subjectId, entry.course, entry.teacher);
+
+    // Build context message
+    const today = todayStr();
+    const todayTask = proj.plan.find(d => d.date === today && !d.isComplete);
+    const taskLabel = todayTask ? todayTask.label : proj.plan[0]?.label || 'getting started';
+
+    let contextMsg = `I'm working on my ${proj.title} for ${proj.className}, due ${fmtDateShort(proj.dueDate)}.`;
+    if (proj.requirements) contextMsg += ` Requirements: ${proj.requirements}.`;
+    contextMsg += ` Today I need to: ${taskLabel}. Can you help me get started?`;
+
+    // Set in input for the student to review and send
+    msgInput.value = contextMsg;
+    autoGrow(msgInput);
+    updateSendBtn();
+    msgInput.focus();
   } catch (e) {
-    console.error('openTutor error:', e);
-    return;
+    console.error('startProjectTutor error:', e);
+    showToast('Something went wrong — try opening the class chat directly.');
   }
-
-  // Build context message
-  const today = todayStr();
-  const todayTask = proj.plan.find(d => d.date === today && !d.isComplete);
-  const taskLabel = todayTask ? todayTask.label : proj.plan[0]?.label || 'getting started';
-
-  let contextMsg = `I'm working on my ${proj.title} for ${proj.className}, due ${fmtDateShort(proj.dueDate)}.`;
-  if (proj.requirements) contextMsg += ` Requirements: ${proj.requirements}.`;
-  contextMsg += ` Today I need to: ${taskLabel}. Can you help me get started?`;
-
-  // Set in input for the student to review and send
-  msgInput.value = contextMsg;
-  autoGrow(msgInput);
-  updateSendBtn();
-  msgInput.focus();
 }
 
 // ── Sync projects to Supabase ────────────────────────────
@@ -4953,7 +4953,7 @@ async function syncProjectsToSupabase() {
     await sb.from('profiles').upsert({
       id: currentUser.id,
       projects: getProjects(),
-    }, { onConflict: 'id' });
+    });
   } catch {}
 }
 
