@@ -4776,14 +4776,17 @@ function injectProjectTasksToHomework() {
 
 // ── Open tutor for project's class ───────────────────────
 
-function startProjectTutor(projId) {
+async function startProjectTutor(projId) {
   const projects = getProjects();
   const proj = projects.find(p => p.id === projId);
   if (!proj) return;
 
   const schedule = getSchedule();
   const entry = schedule.find(s => s.course === proj.className);
-  if (!entry) return;
+  if (!entry) {
+    showToast('Class not found in your schedule.');
+    return;
+  }
 
   const { subjectId } = lookupSubjectForCourse(entry.course);
 
@@ -4795,34 +4798,35 @@ function startProjectTutor(projId) {
   });
   closeHwBackdrop();
 
-  // Open tutor, then send rubric as first message if attached
-  openTutor(subjectId, entry.course, entry.teacher).then(() => {
-    const today = todayStr();
-    const todayTask = proj.plan.find(d => d.date === today && !d.isComplete);
-    const taskLabel = todayTask ? todayTask.label : proj.plan[0]?.label || 'get started';
+  // Open tutor session
+  await openTutor(subjectId, entry.course, entry.teacher);
 
-    // Build context message about the project
-    let contextMsg = `I'm working on my ${proj.title} for ${proj.className}, due ${fmtDateShort(proj.dueDate)}.`;
-    if (proj.requirements) contextMsg += ` Requirements: ${proj.requirements}.`;
-    contextMsg += ` Today I need to: ${taskLabel}. Can you help me get started?`;
+  // Pre-fill the input with project context so they can send it
+  const today = todayStr();
+  const todayTask = proj.plan.find(d => d.date === today && !d.isComplete);
+  const taskLabel = todayTask ? todayTask.label : proj.plan[0]?.label || 'get started';
 
-    // If rubric file is attached, send it as an attachment
-    if (proj.rubricFile) {
-      const att = proj.rubricFile;
-      if (att.isImage) {
-        pendingAttachment = { file: { name: att.name, size: 0 }, base64: att.base64, mediaType: att.mediaType, isImage: true, isText: false };
-      } else if (att.isPdf) {
-        pendingAttachment = { file: { name: att.name, size: 0 }, base64: att.base64, mediaType: att.mediaType, isImage: false, isText: false };
-      } else if (att.isText) {
-        pendingAttachment = { file: { name: att.name, size: 0 }, base64: att.base64, mediaType: att.mediaType, isImage: false, isText: true };
-      }
-    }
+  let contextMsg = `I'm working on my ${proj.title} for ${proj.className}, due ${fmtDateShort(proj.dueDate)}.`;
+  if (proj.requirements) contextMsg += ` Requirements: ${proj.requirements}.`;
+  contextMsg += ` Today I need to: ${taskLabel}. Can you help me get started?`;
 
-    // Set message and send
-    msgInput.value = contextMsg;
-    autoGrow(msgInput);
-    doSend();
-  });
+  // If rubric file is attached, set it as pending attachment
+  if (proj.rubricFile) {
+    const att = proj.rubricFile;
+    pendingAttachment = {
+      file: { name: att.name, size: 0, type: att.mediaType },
+      base64: att.base64,
+      mediaType: att.mediaType,
+      isImage: !!att.isImage,
+      isText: !!att.isText
+    };
+    showAttachPreview({ name: att.name, size: 0 }, att.base64, att.mediaType, !!att.isImage);
+  }
+
+  msgInput.value = contextMsg;
+  autoGrow(msgInput);
+  updateSendBtn();
+  msgInput.focus();
 }
 
 // ── Sync projects to Supabase ────────────────────────────
