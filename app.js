@@ -492,17 +492,24 @@ async function getTeacherProfile(teacherName, course) {
     const email = TEACHER_EMAIL_MAP[teacherName];
     if (!email) return null;
 
-    const { data, error } = await sb
+    // Race against a 5s timeout so this can never hang
+    const timeout = new Promise(resolve => setTimeout(() => resolve(null), 5000));
+    const query = sb
       .from('teacher_profiles')
       .select('*')
       .eq('teacher_email', email)
       .eq('class_name', course)
       .maybeSingle();
+
+    const result = await Promise.race([query, timeout]);
+    if (!result) return null; // timed out
+    const { data, error } = result;
     if (error || !data) return null;
 
     if (data.status !== 'complete') return { __notReady: true };
     return data;
-  } catch {
+  } catch (e) {
+    console.error('[getTeacherProfile] error:', e);
     return null;
   }
 }
@@ -864,13 +871,16 @@ async function openTutor(subjectId, course, teacher) {
   SB.mode = 'tutor'; SB.activeTeacher = { subjectId, course, teacher };
   messagesEl.innerHTML = '';
 
-  // Fetch teacher profile — check status before using
+  // Fetch teacher profile — with 5s hard timeout so it never hangs
   let profile = null;
   try {
-    profile = await getTeacherProfile(teacher, course);
-    console.log('[openTutor] profile fetched:', profile ? 'found' : 'null');
+    const profilePromise = getTeacherProfile(teacher, course);
+    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 5000));
+    profile = await Promise.race([profilePromise, timeoutPromise]);
+    console.log('[openTutor] profile:', profile ? 'found' : 'none');
   } catch (e) {
-    console.warn('[openTutor] profile fetch failed:', e);
+    console.warn('[openTutor] profile fetch error:', e);
+    profile = null;
   }
   let greeting;
   const firstName = teacher.split(' ')[0];
