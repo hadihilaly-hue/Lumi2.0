@@ -106,7 +106,8 @@ const MENLO_CURRICULUM = {
     "Sultans, Shahs, and Sovereigns": ["Sabahat Adil"],
     "Humanities I: Renaissances": ["Rebecca Gertmenian"],
     "Humanities II: Self-Portraits": ["Rebecca Gertmenian"],
-    "IP Capstone Seminar (H)": ["Peter Brown","Matthew Nelson"]
+    "IP Capstone Seminar (H)": ["Peter Brown","Matthew Nelson"],
+    "Democratic Backsliding (Test Course)": ["Test Teacher"]
   },
   "Math": {
     "Integrated Geometry & Algebra": ["Christine Walters"],
@@ -482,6 +483,7 @@ const TEACHER_EMAIL_MAP = {
   "Mingjung Chen":          "mchen@menloschool.org",
   "Jennifer Jordt":         "jjordt@menloschool.org",
   "Richard Harris":         "rharris@menloschool.org",
+  "Test Teacher":            "hadi.hilaly@menloschool.org",
 };
 
 // Fetch teacher profile from Supabase for a given teacher name and course.
