@@ -4713,9 +4713,15 @@ function startProjectTutor(projId) {
   if (!entry) return;
 
   const { subjectId } = lookupSubjectForCourse(entry.course);
-  closeProjectPlanModal();
-  closeHwPopup();
+
+  // Force-hide all modals immediately (no transition delays)
+  _currentProjId = null;
+  ['projPlanModal', 'projCreateModal', 'hwTypeChooser', 'hwAddModal', 'hwPopup'].forEach(id => {
+    const el = $(id);
+    if (el) { el.classList.remove('open'); el.style.display = 'none'; }
+  });
   closeHwBackdrop();
+
   openTutor(subjectId, entry.course, entry.teacher);
 }
 
