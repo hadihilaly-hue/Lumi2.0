@@ -4258,7 +4258,6 @@ async function syncHwToSupabase() {
     await sb.from('profiles').upsert({
       id: currentUser.id,
       hw_tasks: tasks,
-      projects: getProjects(),
       hw_updated_at: new Date().toISOString()
     });
   } catch (e) { /* non-critical */ }
@@ -4963,14 +4962,9 @@ async function startProjectTutor(projId) {
 
 // ── Sync projects to Supabase ────────────────────────────
 
-async function syncProjectsToSupabase() {
-  if (!currentUser) return;
-  try {
-    await sb.from('profiles').upsert({
-      id: currentUser.id,
-      projects: getProjects(),
-    });
-  } catch {}
+// Projects are stored in localStorage only (no Supabase column exists)
+function syncProjectsToSupabase() {
+  // no-op: projects live in localStorage only
 }
 
 function deleteProject(projId, anchorEl) {
@@ -5031,15 +5025,9 @@ function clearCompletedProjects() {
   showToast(`${completed.length} completed project${completed.length > 1 ? 's' : ''} cleared`);
 }
 
-async function loadProjectsFromSupabase() {
-  if (!currentUser) return;
-  if (getProjects().length > 0) return;
-  try {
-    const { data } = await sb.from('profiles').select('projects').eq('id', currentUser.id).single();
-    if (data && Array.isArray(data.projects) && data.projects.length > 0) {
-      saveProjects(data.projects);
-    }
-  } catch {}
+// Projects are stored in localStorage only (no Supabase column exists)
+function loadProjectsFromSupabase() {
+  // no-op: projects live in localStorage only
 }
 
 async function loadHwFromSupabase() {
