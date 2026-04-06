@@ -328,6 +328,9 @@ ${p.excellence_criteria || ''}
 INTERVENTION TECHNIQUE — HOW ${firstName.toUpperCase()} RESPONDS TO WRONG OR OVERSIMPLIFIED ANSWERS:
 ${p.explanation_methods || ''}
 
+FRUSTRATION AND TIME PRESSURE:
+When a student expresses frustration or time pressure, acknowledge it in one sentence maximum, then immediately redirect to a single focused question. Never explain at length why you won't give direct answers — just don't give them, and get back to work.
+
 KEY VALUES:
 ${p.key_values || ''}
 
@@ -536,105 +539,66 @@ const TEACHER_EMAIL_MAP = {
   "Test Teacher":            "hadi.hilaly@menloschool.org",
 };
 
-// ── Hardcoded demo profiles (loaded before Supabase as fallback) ──
-const DEMO_PROFILES = {
-  'hadi.hilaly@menloschool.org__Democratic Backsliding (Test Course)': {
+// ── Teacher profile system — single source of truth: Supabase ──
+// Seed profiles are pushed to Supabase on load; _profileCache is the in-memory fallback.
+const _profileCache = {};
+
+// Seed data: profiles that should exist in Supabase. Pushed on app load via seedProfilesToSupabase().
+const SEED_PROFILES = [
+  {
+    teacher_email: 'hadi.hilaly@menloschool.org',
+    class_name: 'Democratic Backsliding (Test Course)',
+    subject: 'History & Social Sciences',
     status: 'complete',
-    teaching_style: `Socratic case-method with strict pedagogical sequence:
-1. Measurement foundations — Freedom House data, V-Dem index, the disagreements between them. Students must sit with the measurement problem before analyzing the thing being measured.
-2. Historical collapse cases — Weimar Germany, Chile 1973. Introduce Levitsky & Ziblatt's 4 indicators here. Then put the framework away — no checklist on the desk, forces thinking over pattern-matching.
-3. Democratic backsliding specifically — Hungary, Turkey, Venezuela, Poland. Key pivot: backsliding ≠ collapse. It's slower, subtler, and usually legal. Leaders use democracy's own tools to hollow it out from the inside.
-4. What do we do about it — policy memo assessment. Intervention, not just diagnosis.`,
-    excellence_criteria: `B+ work: Accurate, careful, applies framework correctly, uses real evidence — but predictable. Every sentence could have been anticipated. Reports observations.
-
-A work: Makes a genuine argument that is specifically theirs. Could only have been written about this country at this moment. Surprises the reader through depth of reasoning.
-
-Four concrete markers of A work:
-1. SPECIFICITY OF MECHANISM not just events — Bad: "Orbán passed media legislation." Good: "Orbán restructured advertising revenue flows so state contracts became the financial lifeline of previously independent outlets, making editorial independence economically irrational."
-2. GENUINE COUNTERARGUMENT ENGAGEMENT — not a dismissive sentence, actual engagement with the strongest objection to their own argument
-3. CONSTRAINT AWARENESS IN RECOMMENDATIONS — not "strengthen judicial independence" but: given this government's legislative majority, this civil society's organizational capacity, this international environment — what can actually move? The constraint IS the analysis.
-4. INTELLECTUAL HONESTY ABOUT UNCERTAINTY — "This worked in Romania but transfer to this context is uncertain because of X" — acknowledging limits is sophistication, not weakness.`,
+    teaching_style: `Socratic case-method with strict pedagogical sequence:\n1. Measurement foundations — Freedom House data, V-Dem index, the disagreements between them. Students must sit with the measurement problem before analyzing the thing being measured.\n2. Historical collapse cases — Weimar Germany, Chile 1973. Introduce Levitsky & Ziblatt's 4 indicators here. Then put the framework away — no checklist on the desk, forces thinking over pattern-matching.\n3. Democratic backsliding specifically — Hungary, Turkey, Venezuela, Poland. Key pivot: backsliding ≠ collapse. It's slower, subtler, and usually legal. Leaders use democracy's own tools to hollow it out from the inside.\n4. What do we do about it — policy memo assessment. Intervention, not just diagnosis.`,
+    excellence_criteria: `B+ work: Accurate, careful, applies framework correctly, uses real evidence — but predictable. Every sentence could have been anticipated. Reports observations.\n\nA work: Makes a genuine argument that is specifically theirs. Could only have been written about this country at this moment. Surprises the reader through depth of reasoning.\n\nFour concrete markers of A work:\n1. SPECIFICITY OF MECHANISM not just events — Bad: "Orbán passed media legislation." Good: "Orbán restructured advertising revenue flows so state contracts became the financial lifeline of previously independent outlets, making editorial independence economically irrational."\n2. GENUINE COUNTERARGUMENT ENGAGEMENT — not a dismissive sentence, actual engagement with the strongest objection to their own argument\n3. CONSTRAINT AWARENESS IN RECOMMENDATIONS — not "strengthen judicial independence" but: given this government's legislative majority, this civil society's organizational capacity, this international environment — what can actually move? The constraint IS the analysis.\n4. INTELLECTUAL HONESTY ABOUT UNCERTAINTY — "This worked in Romania but transfer to this context is uncertain because of X" — acknowledging limits is sophistication, not weakness.`,
     grading_philosophy: 'Calibrated skepticism: not cynicism, not naive optimism — the precise ability to ask "is this normal democratic competition or something else?" Understanding that backsliding is almost always legal. Holding complexity: backsliding happens because many ordinary people make individually rational decisions that collectively destroy something fragile. Pattern recognition that becomes instinctive, not mechanical.',
-    common_mistakes: [
-      'Tautological reasoning: "backsliding because democracy is weakening"',
-      'Unearned certainty: no counterargument, no acknowledged limitation',
-      'Borrowed conclusions without local application: recommending "strengthen the courts" without engaging the specific political constraints that make that hard in this specific country'
-    ],
-    explanation_methods: `When a student gives an oversimplified or wrong answer:
-Step 1: Do NOT correct directly, do not signal error through tone
-Step 2: Ask "Walk me through how you applied the framework to reach that. Which indicators did you find present, which absent?"
-Step 3: Listen for exactly where the application breaks down
-Step 4: Ask ONE pointed question targeting that specific crack only
-Step 5: Wait. Let the student find the inconsistency themselves.
-Step 6: Never ask multiple corrections at once — one question, then wait.
-
-TWO-QUESTION DIAGNOSTIC for policy recommendations:
-When a student makes a policy recommendation, run these two questions in sequence:
-1. "Walk me through the mechanism — how does this intervention actually change the political incentives of the relevant actors?"
-2. "What's your evidence that this intervention has worked in a comparable case?"
-These two questions alone expose almost any borrowed conclusion without local application.
-
-HARD CONSTRAINT — ONE QUESTION THEN STOP:
-After identifying the weakest point in a student's reasoning, ask exactly ONE question about it, then stop completely. Do not ask a follow-up question in the same response under any circumstances. Wait for the student to answer before probing further. If you find multiple problems in a student's reasoning, pick the single most important one and ask only about that.
-
-FRUSTRATION AND TIME PRESSURE:
-When a student expresses frustration or time pressure, acknowledge it in one sentence maximum, then immediately redirect to a single focused question. Never explain at length why you won't give direct answers — just don't give them, and get back to work.`,
+    common_mistakes: ['Tautological reasoning: "backsliding because democracy is weakening"', 'Unearned certainty: no counterargument, no acknowledged limitation', 'Borrowed conclusions without local application: recommending "strengthen the courts" without engaging the specific political constraints that make that hard in this specific country'],
+    explanation_methods: `When a student gives an oversimplified or wrong answer:\nStep 1: Do NOT correct directly, do not signal error through tone\nStep 2: Ask "Walk me through how you applied the framework to reach that. Which indicators did you find present, which absent?"\nStep 3: Listen for exactly where the application breaks down\nStep 4: Ask ONE pointed question targeting that specific crack only\nStep 5: Wait. Let the student find the inconsistency themselves.\nStep 6: Never ask multiple corrections at once — one question, then wait.\n\nTWO-QUESTION DIAGNOSTIC for policy recommendations:\nWhen a student makes a policy recommendation, run these two questions in sequence:\n1. "Walk me through the mechanism — how does this intervention actually change the political incentives of the relevant actors?"\n2. "What's your evidence that this intervention has worked in a comparable case?"\nThese two questions alone expose almost any borrowed conclusion without local application.\n\nHARD CONSTRAINT — ONE QUESTION THEN STOP:\nAfter identifying the weakest point in a student's reasoning, ask exactly ONE question about it, then stop completely. Do not ask a follow-up question in the same response under any circumstances. Wait for the student to answer before probing further. If you find multiple problems in a student's reasoning, pick the single most important one and ask only about that.`,
     key_values: 'Push back on reasoning quality, NEVER on political conclusions. If a student applies the framework carefully and reaches a different conclusion than expected, challenge the reasoning, not the conclusion. The scale of AI influence makes it especially dangerous to nudge students toward particular political views, even subtly.',
-    class_specific_notes: `Case selection logic:
-- Always start with historical cases (Weimar Germany, Chile 1973) — no emotional investment, students can analyze coldly and build the skill
-- Move to contemporary international cases (Hungary, Turkey, Venezuela, Poland)
-- Arrive at American examples ONLY through comparative lens: "Apply the same tools you used on Hungary. What do you see?"
-- Never introduce American examples cold
-- Never facilitate election integrity debates — redirect to underlying structural conditions (press freedom, judicial independence, civil society)`,
+    class_specific_notes: `Case selection logic:\n- Always start with historical cases (Weimar Germany, Chile 1973) — no emotional investment, students can analyze coldly and build the skill\n- Move to contemporary international cases (Hungary, Turkey, Venezuela, Poland)\n- Arrive at American examples ONLY through comparative lens: "Apply the same tools you used on Hungary. What do you see?"\n- Never introduce American examples cold\n- Never facilitate election integrity debates — redirect to underlying structural conditions (press freedom, judicial independence, civil society)`,
     teacher_voice: 'Warm but intellectually rigorous. Genuinely curious about student reasoning. Uses "What\'s the strongest version of the argument against yours?" — never "steelman the other side." Same exercise, less threatening, more engagement.',
     key_themes_and_topics: ['Measurement (Freedom House, V-Dem)', 'Levitsky & Ziblatt framework (4 indicators)', 'democratic erosion vs collapse', 'institutional constraints', 'press freedom', 'judicial independence', 'civil society', 'historical cases (Weimar, Chile)', 'contemporary cases (Hungary, Turkey, Venezuela, Poland)', 'policy interventions and constraints', 'comparative analysis methodology'],
     topics_not_covered: ['Electoral mechanics', 'gerrymandering', 'campaign finance', 'voting systems', 'political philosophy (Locke, Rousseau, Rawls)', 'election integrity debates (redirect to structural conditions)', 'predictions about where any country is headed'],
-    lumi_dos: [
-      'Ask student to walk through reasoning before responding',
-      'Use "What\'s the strongest version of the argument against yours?"',
-      'Push back on reasoning quality only',
-      'Let students find their own inconsistencies',
-      'Start with historical cases for psychological safety',
-      'For policy recommendations: run two-question diagnostic (mechanism then evidence)',
-      'Find the single most important weakness and ask ONE question about it'
-    ],
-    lumi_donts: [
-      'Never generate analysis for the student — not even partially disguised as a hint',
-      'Never tell a student what their political conclusion should be',
-      'Never validate surface-level thinking to be encouraging — false floors are not kindness',
-      'Never say "steelman the other side"',
-      'Never make more than one correction per response',
-      'Never engage deeply with out-of-scope topics as if they are course content',
-      'Never make predictions about where countries are headed',
-      'Never nudge students toward particular political views, even subtly',
-      'Never introduce American examples without comparative context first'
-    ],
+    lumi_dos: ['Ask student to walk through reasoning before responding', 'Use "What\'s the strongest version of the argument against yours?"', 'Push back on reasoning quality only', 'Let students find their own inconsistencies', 'Start with historical cases for psychological safety', 'For policy recommendations: run two-question diagnostic (mechanism then evidence)', 'Find the single most important weakness and ask ONE question about it'],
+    lumi_donts: ['Never generate analysis for the student — not even partially disguised as a hint', 'Never tell a student what their political conclusion should be', 'Never validate surface-level thinking to be encouraging — false floors are not kindness', 'Never say "steelman the other side"', 'Never make more than one correction per response', 'Never engage deeply with out-of-scope topics as if they are course content', 'Never make predictions about where countries are headed', 'Never nudge students toward particular political views, even subtly', 'Never introduce American examples without comparative context first'],
     rules_and_procedures: 'AI allowed for: brainstorming, checking argument structure, draft feedback. AI NOT allowed for: generating the analysis itself. The test: "If you couldn\'t defend every sentence in a 10-minute conversation with your teacher, you\'ve crossed the line."',
     north_star: 'Lumi\'s goal is to help students reach the point where they can defend every part of their analysis in a conversation with their teacher. If Lumi is doing the analysis for the student, it has failed.',
-    typical_hw_duration_minutes: 45
+    typical_hw_duration_minutes: 45,
+    updated_at: new Date().toISOString()
   }
-};
+];
 
-function getDemoProfile(teacherName, course) {
-  const email = TEACHER_EMAIL_MAP[teacherName];
-  if (!email) return null;
-  return DEMO_PROFILES[email + '__' + course] || null;
+// Push seed profiles to Supabase (runs on app load, non-blocking)
+async function seedProfilesToSupabase() {
+  for (const seed of SEED_PROFILES) {
+    const key = seed.teacher_email + '__' + seed.class_name;
+    // Always cache locally
+    _profileCache[key] = seed;
+    // Try to push to Supabase
+    try {
+      const { error } = await sb
+        .from('teacher_profiles')
+        .upsert(seed, { onConflict: 'teacher_email,class_name' });
+      if (error) console.warn('[seed] upsert error (non-critical):', error.message);
+      else console.log('[seed] pushed to Supabase:', seed.class_name);
+    } catch (e) {
+      console.warn('[seed] push failed (using cache):', e.message || e);
+    }
+  }
 }
 
-// Fetch teacher profile — checks hardcoded demos first, then Supabase (5s timeout).
-// Returns the full profile object if complete, { __notReady } if in progress, null if not found.
+// Single lookup function — Supabase first, then in-memory cache.
+// Returns profile if complete, { __notReady } if in progress, null if not found.
 async function getTeacherProfile(teacherName, course) {
   if (!teacherName || !course) return null;
+  const email = TEACHER_EMAIL_MAP[teacherName];
+  if (!email) { console.warn('[getTeacherProfile] no email for:', teacherName); return null; }
+  const cacheKey = email + '__' + course;
   console.log('[getTeacherProfile] loading:', teacherName, course);
 
-  // Check hardcoded demo profiles first (instant, no network)
-  const demo = getDemoProfile(teacherName, course);
-  if (demo) { console.log('[getTeacherProfile] using demo profile'); return demo; }
-
+  // Try Supabase first (5s timeout)
   try {
-    const email = TEACHER_EMAIL_MAP[teacherName];
-    if (!email) return null;
-
     const timeout = new Promise(resolve => setTimeout(() => resolve(null), 5000));
     const query = sb
       .from('teacher_profiles')
@@ -642,26 +606,34 @@ async function getTeacherProfile(teacherName, course) {
       .eq('teacher_email', email)
       .eq('class_name', course)
       .maybeSingle();
-
     const result = await Promise.race([query, timeout]);
-    if (!result) { console.log('[getTeacherProfile] timed out'); return null; }
-    const { data, error } = result;
-    if (error) { console.warn('[getTeacherProfile] query error:', error.message); return null; }
-    if (!data) { console.log('[getTeacherProfile] no data found'); return null; }
-
-    console.log('[getTeacherProfile] found, status:', data.status);
-    if (data.status !== 'complete') return { __notReady: true };
-
-    // If the profile data is stored in individual columns, it's already in `data`
-    // If stored in a 'profile' JSONB column, merge it in
-    if (data.profile && typeof data.profile === 'object') {
-      return { ...data, ...data.profile };
+    if (result) {
+      const { data, error } = result;
+      if (!error && data) {
+        console.log('[getTeacherProfile] Supabase hit, status:', data.status);
+        _profileCache[cacheKey] = data; // update cache
+        if (data.status !== 'complete') return { __notReady: true };
+        if (data.profile && typeof data.profile === 'object') return { ...data, ...data.profile };
+        return data;
+      }
+      if (error) console.warn('[getTeacherProfile] query error:', error.message);
+    } else {
+      console.log('[getTeacherProfile] Supabase timed out');
     }
-    return data;
   } catch (e) {
-    console.error('[getTeacherProfile] error:', e);
-    return null;
+    console.warn('[getTeacherProfile] Supabase failed:', e);
   }
+
+  // Fall back to in-memory cache (seeded profiles)
+  const cached = _profileCache[cacheKey];
+  if (cached) {
+    console.log('[getTeacherProfile] using cached profile');
+    if (cached.status !== 'complete') return { __notReady: true };
+    return cached;
+  }
+
+  console.warn('[getTeacherProfile] NO PROFILE FOUND for:', teacherName, course);
+  return null;
 }
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
@@ -1036,13 +1008,16 @@ async function openTutor(subjectId, course, teacher) {
   const firstName = teacher.split(' ')[0];
 
   if (profile?.__notReady) {
-    greeting = `${firstName} hasn't finished setting up their Lumi profile yet. Check back soon — or chat with General Lumi in the meantime!`;
+    greeting = `${firstName} hasn't finished setting up their Lumi profile yet — their interview is still in progress. Check back soon, or try General Chat in the meantime.`;
     S.tutorCtx.teacherProfile = null;
+    console.warn('[openTutor] profile not ready for:', teacher, course);
   } else if (profile) {
     S.tutorCtx.teacherProfile = profile;
     greeting = `Hey! You're studying ${course} with ${firstName}. I've learned how ${firstName} teaches and what they look for — ask me anything and I'll help you the way ${firstName} would.`;
   } else {
-    greeting = `You're now studying ${course} with ${teacher}. What can I help you with?`;
+    greeting = `⚠️ ${firstName} hasn't set up their Lumi profile for ${course} yet. Once they complete their setup interview, I'll be able to help you exactly the way ${firstName} teaches. In the meantime, you can use General Chat.`;
+    S.tutorCtx.teacherProfile = null;
+    console.error('[openTutor] NO PROFILE for:', teacher, course, '— student sees warning');
   }
   S.messages.push({ role: 'assistant', content: greeting });
   renderMsg('lumi', greeting, true);
@@ -2881,6 +2856,7 @@ function startApp(savedKey) {
   initVoice();
   wireVoiceListeners();
 
+  seedProfilesToSupabase(); // push seed profiles to Supabase (non-blocking)
   loadHwFromSupabase().then(async () => {
     await loadProjectsFromSupabase();
     injectProjectTasksToHomework();
@@ -3764,21 +3740,21 @@ function saveHwTasks(tasks) { localStorage.setItem('lumi_hw_tasks', JSON.stringi
 function genHwId() { return 'hw_' + Math.random().toString(36).slice(2, 10); }
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
-// Load teacher profiles for all schedule classes (used for time hints)
+// Load teacher profiles for time hints — uses same teacher_email + class_name lookup
 const _hwProfileCache = {};
-async function getTeacherProfileCached(teacherId) {
-  if (!teacherId) return null;
-  if (_hwProfileCache[teacherId] !== undefined) return _hwProfileCache[teacherId];
+async function getTeacherProfileCached(course, teacherName) {
+  const email = TEACHER_EMAIL_MAP[teacherName];
+  if (!email) return null;
+  const key = email + '__' + course;
+  if (_hwProfileCache[key] !== undefined) return _hwProfileCache[key];
+  // Check the main profile cache first (seeded profiles)
+  if (_profileCache[key]) { _hwProfileCache[key] = _profileCache[key]; return _profileCache[key]; }
   try {
-    const { data } = await sb.from('teacher_profiles').select('*').eq('id', teacherId).single();
-    _hwProfileCache[teacherId] = data || null;
-  } catch { _hwProfileCache[teacherId] = null; }
-  return _hwProfileCache[teacherId];
-}
-
-function buildTeacherId(course, teacher) {
-  // Mirror the ID format used in teacher.html: slugify course + teacher
-  return (course + '_' + teacher).toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const { data } = await sb.from('teacher_profiles').select('*')
+      .eq('teacher_email', email).eq('class_name', course).maybeSingle();
+    _hwProfileCache[key] = data || null;
+  } catch { _hwProfileCache[key] = null; }
+  return _hwProfileCache[key];
 }
 
 // ── Daily popup check ──────────────────────────────────────
@@ -3858,8 +3834,7 @@ async function updateTimeHint() {
   const schedule = getSchedule();
   const entry  = schedule.find(s => s.course === course);
   if (!entry) { $('hwTimeHint').textContent = ''; return; }
-  const tid = buildTeacherId(entry.course, entry.teacher);
-  const profile = await getTeacherProfileCached(tid);
+  const profile = await getTeacherProfileCached(entry.course, entry.teacher);
   if (profile && profile.typical_hw_duration_minutes) {
     $('hwTimeHint').textContent = `${entry.teacher.split(' ')[0]} typically assigns ~${profile.typical_hw_duration_minutes} min of homework`;
     $('hwTimeInput').placeholder = profile.typical_hw_duration_minutes;
