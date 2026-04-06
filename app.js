@@ -4334,6 +4334,8 @@ function closeWorkTypeChooser() {
   setTimeout(() => { modal.style.display = 'none'; }, 200);
 }
 
+let _projPendingFile = null; // { file, base64, mediaType, isImage, isText }
+
 function showProjectCreateModal(prefill = {}) {
   const modal = $('projCreateModal');
   modal.style.display = 'flex';
@@ -4360,6 +4362,76 @@ function showProjectCreateModal(prefill = {}) {
   // Set min date to tomorrow
   const tomorrow = addDays(todayStr(), 1);
   $('projDueInput').min = tomorrow;
+
+  // Reset file upload
+  clearProjFile();
+}
+
+// ── Project file upload (drag & drop + click) ────────────
+
+function clearProjFile() {
+  _projPendingFile = null;
+  $('projFileInput').value = '';
+  $('projDropzoneEmpty').style.display = '';
+  $('projDropzonePreview').style.display = 'none';
+  $('projDropzone').classList.remove('dragover');
+}
+
+function handleProjFile(file) {
+  if (!file) return;
+  const maxMB = file.type === 'application/pdf' ? 32 : 5;
+  if (file.size > maxMB * 1024 * 1024) { showToast(`File too large. Max ${maxMB}MB.`); return; }
+
+  const isImage = file.type.startsWith('image/');
+  const isText = file.type === 'text/plain' || file.name.endsWith('.txt');
+  const isPdf = file.type === 'application/pdf';
+  if (!isImage && !isPdf && !isText) { showToast('Unsupported file — use PDF, image, or text.'); return; }
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const base64 = e.target.result.split(',')[1];
+    const mediaType = file.type || 'text/plain';
+    _projPendingFile = { file, base64, mediaType, isImage, isText, isPdf };
+
+    // Show preview
+    $('projDropzoneEmpty').style.display = 'none';
+    $('projDropzonePreview').style.display = 'flex';
+    $('projFileName').textContent = file.name;
+    $('projFileSize').textContent = fmtBytes(file.size);
+    $('projFileIcon').textContent = isPdf ? '📕' : isImage ? '🖼️' : '📄';
+  };
+  reader.readAsDataURL(file);
+}
+
+function wireProjDropzone() {
+  const zone = $('projDropzone');
+  const input = $('projFileInput');
+
+  // Click to browse
+  zone.addEventListener('click', e => {
+    if (e.target.closest('#projFileRemove')) return;
+    if (!_projPendingFile) input.click();
+  });
+
+  input.addEventListener('change', () => {
+    if (input.files[0]) handleProjFile(input.files[0]);
+  });
+
+  // Drag events
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => { zone.classList.remove('dragover'); });
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) handleProjFile(file);
+  });
+
+  // Remove button
+  $('projFileRemove').addEventListener('click', e => {
+    e.stopPropagation();
+    clearProjFile();
+  });
 }
 
 function closeProjectCreateModal() {
@@ -4619,7 +4691,7 @@ function adjustProjectPlan(projId, skipDate) {
 
 // ── Create a new project ─────────────────────────────────
 
-function createProject(title, className, teacherName, dueDate, requirements) {
+function createProject(title, className, teacherName, dueDate, requirements, fileData) {
   const plan = generateProjectPlan(title, className, dueDate, requirements);
 
   const project = {
@@ -4629,6 +4701,7 @@ function createProject(title, className, teacherName, dueDate, requirements) {
     teacherName,
     dueDate,
     requirements: requirements || '',
+    rubricFile: fileData || null,
     createdAt: new Date().toISOString(),
     plan,
     unavailableDays: [],
@@ -4722,7 +4795,34 @@ function startProjectTutor(projId) {
   });
   closeHwBackdrop();
 
-  openTutor(subjectId, entry.course, entry.teacher);
+  // Open tutor, then send rubric as first message if attached
+  openTutor(subjectId, entry.course, entry.teacher).then(() => {
+    const today = todayStr();
+    const todayTask = proj.plan.find(d => d.date === today && !d.isComplete);
+    const taskLabel = todayTask ? todayTask.label : proj.plan[0]?.label || 'get started';
+
+    // Build context message about the project
+    let contextMsg = `I'm working on my ${proj.title} for ${proj.className}, due ${fmtDateShort(proj.dueDate)}.`;
+    if (proj.requirements) contextMsg += ` Requirements: ${proj.requirements}.`;
+    contextMsg += ` Today I need to: ${taskLabel}. Can you help me get started?`;
+
+    // If rubric file is attached, send it as an attachment
+    if (proj.rubricFile) {
+      const att = proj.rubricFile;
+      if (att.isImage) {
+        pendingAttachment = { file: { name: att.name, size: 0 }, base64: att.base64, mediaType: att.mediaType, isImage: true, isText: false };
+      } else if (att.isPdf) {
+        pendingAttachment = { file: { name: att.name, size: 0 }, base64: att.base64, mediaType: att.mediaType, isImage: false, isText: false };
+      } else if (att.isText) {
+        pendingAttachment = { file: { name: att.name, size: 0 }, base64: att.base64, mediaType: att.mediaType, isImage: false, isText: true };
+      }
+    }
+
+    // Set message and send
+    msgInput.value = contextMsg;
+    autoGrow(msgInput);
+    doSend();
+  });
 }
 
 // ── Sync projects to Supabase ────────────────────────────
@@ -4867,9 +4967,20 @@ function wireHwListeners() {
     $('projPlanFooter').style.display = 'none';
     $('projPlanTitle').textContent = 'Building your plan…';
 
+    // Capture file before clearing
+    const fileData = _projPendingFile ? {
+      name: _projPendingFile.file.name,
+      base64: _projPendingFile.base64,
+      mediaType: _projPendingFile.mediaType,
+      isImage: _projPendingFile.isImage,
+      isText: _projPendingFile.isText,
+      isPdf: _projPendingFile.isPdf
+    } : null;
+    clearProjFile();
+
     // Small delay for the loading animation to feel real
     setTimeout(() => {
-      const project = createProject(title, course, entry.teacher || '', dueDate, requirements);
+      const project = createProject(title, course, entry.teacher || '', dueDate, requirements, fileData);
       renderProjectPlan(project);
       syncProjectsToSupabase();
     }, 600);
@@ -4901,4 +5012,7 @@ function wireHwListeners() {
     closeHwPlanModal();
     closeHwPopup();
   });
+
+  // ── Project file dropzone ──────────────────────────────
+  wireProjDropzone();
 }

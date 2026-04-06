@@ -474,8 +474,27 @@
       <input class="hw-input" id="projDueInput" type="date">
     </div>
     <div class="hw-field">
-      <label class="hw-label">Any specific requirements? <span style="opacity:.5">(optional)</span></label>
-      <textarea class="hw-input hw-textarea" id="projReqInput" placeholder="e.g. 5 paragraphs, MLA format, needs 3 sources…" rows="3"></textarea>
+      <label class="hw-label">Upload rubric & project info</label>
+      <div class="proj-dropzone" id="projDropzone">
+        <input type="file" id="projFileInput" accept="image/*,.pdf,.txt,.doc,.docx" style="display:none">
+        <div class="proj-dropzone-empty" id="projDropzoneEmpty">
+          <div class="proj-dropzone-icon">📎</div>
+          <div class="proj-dropzone-text">Drag & drop a file here</div>
+          <div class="proj-dropzone-hint">or <span class="proj-dropzone-link">browse</span> · PDF, image, or text</div>
+        </div>
+        <div class="proj-dropzone-preview" id="projDropzonePreview" style="display:none">
+          <div class="proj-dropzone-file-icon" id="projFileIcon">📄</div>
+          <div class="proj-dropzone-file-info">
+            <div class="proj-dropzone-file-name" id="projFileName"></div>
+            <div class="proj-dropzone-file-size" id="projFileSize"></div>
+          </div>
+          <button class="proj-dropzone-remove" id="projFileRemove" type="button">×</button>
+        </div>
+      </div>
+    </div>
+    <div class="hw-field">
+      <label class="hw-label">Additional notes <span style="opacity:.5">(optional)</span></label>
+      <textarea class="hw-input hw-textarea" id="projReqInput" placeholder="e.g. 5 paragraphs, MLA format, needs 3 sources…" rows="2"></textarea>
     </div>
   </div>
   <div class="hw-modal-footer">
