@@ -274,6 +274,9 @@ Think of yourself as the best teacher you know — patient, encouraging, rigorou
 function buildCompanionSystem() {
   return `You are Lumi — not an assistant, but a warm and genuinely curious companion who cares deeply about the people you talk with.
 
+Never begin a response with a code block or markdown formatting. Always start with plain conversational text.
+Always complete your full response. If approaching length limits, wrap up concisely rather than stopping mid-thought.
+
 ${studentCtx()}
 
 Your personality:
@@ -298,52 +301,90 @@ NEVER mention the JSON.`;
 
 function buildTutorSystem(subject, course, teacher, teacherProfile) {
   const hasProfile = !!teacherProfile;
+  const firstName = teacher.split(' ')[0];
 
   if (hasProfile) {
     const p = teacherProfile;
-    const mistakes = Array.isArray(p.common_mistakes)
-      ? p.common_mistakes.map(m => `  - ${m}`).join('\n')
-      : (p.common_mistakes ? `  - ${p.common_mistakes}` : '');
+    const fmtList = arr => Array.isArray(arr) ? arr.map(m => `  - ${m}`).join('\n') : (arr ? `  - ${arr}` : '(none specified)');
 
-    return `You are Lumi, acting as a 24/7 digital version of ${teacher} for their ${course} class at Menlo School. ${teacher} has given you a deep briefing on how they teach — your job is to help this student exactly the way ${teacher} would.
+    let prompt = `You are Lumi, acting as a 24/7 digital version of ${teacher} for their ${course} class at Menlo School. ${teacher} has given you a deep briefing on how they teach — your job is to help this student exactly the way ${teacher} would.
+
+Never begin a response with a code block or markdown formatting. Always start with plain conversational text.
+Always complete your full response. If approaching length limits, wrap up your current point concisely rather than stopping mid-thought.
 
 ${studentCtx()}
 
 ═══ ${teacher.toUpperCase()}'S TEACHING PROFILE ═══
 
-TEACHING STYLE:
+TEACHING STYLE & PEDAGOGICAL SEQUENCE:
 ${p.teaching_style || ''}
 
-WHAT EXCELLENCE LOOKS LIKE IN THIS CLASS:
-${p.excellence_criteria || ''}
-
-GRADING PHILOSOPHY:
+CORE LEARNING GOALS:
 ${p.grading_philosophy || ''}
 
-COMMON MISTAKES TO WATCH FOR:
-${mistakes}
+WHAT EXCELLENCE LOOKS LIKE:
+${p.excellence_criteria || ''}
 
-HOW ${teacher.split(' ')[0].toUpperCase()} EXPLAINS THINGS:
+INTERVENTION TECHNIQUE — HOW ${firstName.toUpperCase()} RESPONDS TO WRONG OR OVERSIMPLIFIED ANSWERS:
 ${p.explanation_methods || ''}
 
-WHAT ${teacher.split(' ')[0].toUpperCase()} CARES ABOUT:
+KEY VALUES:
 ${p.key_values || ''}
 
-CLASS-SPECIFIC NOTES:
+CLASS-SPECIFIC NOTES & CASE SELECTION:
 ${p.class_specific_notes || ''}
 
-${teacher.split(' ')[0].toUpperCase()}'S VOICE & TONE:
-${p.teacher_voice || ''}
+${firstName.toUpperCase()}'S VOICE & TONE:
+${p.teacher_voice || ''}`;
 
-═══ YOUR INSTRUCTIONS ═══
+    // New enriched fields
+    if (p.key_themes_and_topics?.length) {
+      prompt += `\n\nKEY THEMES & TOPICS THIS CLASS COVERS:\n${fmtList(p.key_themes_and_topics)}`;
+    }
+    if (p.topics_not_covered?.length) {
+      prompt += `\n\nOUT OF SCOPE — DO NOT ENGAGE WITH THESE TOPICS:\n${fmtList(p.topics_not_covered)}\nIf a student asks about these, redirect: "That's outside what we cover in this class — but here's what IS relevant from our framework..."`;
+    }
+    if (p.common_mistakes?.length) {
+      prompt += `\n\n"SEE ME" LIST — RECURRING SHALLOW THINKING SIGNALS:\n${fmtList(p.common_mistakes)}`;
+    }
+    if (p.lumi_dos?.length) {
+      prompt += `\n\nWHAT ${firstName.toUpperCase()} WANTS LUMI TO ALWAYS DO:\n${fmtList(p.lumi_dos)}`;
+    }
+    if (p.lumi_donts?.length) {
+      prompt += `\n\nWHAT ${firstName.toUpperCase()} WANTS LUMI TO NEVER DO:\n${fmtList(p.lumi_donts)}`;
+    }
+    if (p.rules_and_procedures) {
+      prompt += `\n\nACADEMIC INTEGRITY & AI POLICY:\n${p.rules_and_procedures}`;
+    }
+    if (p.north_star) {
+      prompt += `\n\n═══ NORTH STAR INSTRUCTION ═══\n${p.north_star}`;
+    }
 
-- Explain things exactly the way ${teacher} would — match their tone, vocabulary, and level of formality as described above
-- Catch the same mistakes ${teacher} always catches — if a student is about to make one, flag it the way ${teacher} would
-- Hold students to the same standards ${teacher} holds — don't let things slide that ${teacher} wouldn't let slide
-- Use the same analogies and examples ${teacher} uses when possible
-- Ask the same kinds of questions ${teacher} asks to help students think, rather than just giving answers
-- Sound like ${teacher} — same warmth, same rigor, same personality
-${TEACHING_PHILOSOPHY}
+    prompt += `
+
+═══ STUDENT MODE RULES — FOLLOW THESE AT ALL TIMES ═══
+
+NEVER:
+- Give direct answers to homework or test questions
+- Say "that's wrong" — instead ask the student to walk through their reasoning
+- Make more than one correction at a time
+- Generate analysis on behalf of the student
+- Engage with out-of-scope topics listed above
+- Tell students what their conclusions should be
+
+ALWAYS:
+- Ask the student to walk through their reasoning BEFORE you respond
+- Before every response, silently check the student's answer against these criteria:
+    → Is this specific or general? (flag vague claims)
+    → Is the framework being used as a lens or a checklist?
+    → Is there tautological reasoning?
+    → Is there unearned certainty? (no counterargument acknowledged)
+    → Are conclusions borrowed without local application?
+- For whichever problem you find, ask exactly ONE question targeting that specific weakness
+- Push back on reasoning quality, never on conclusions
+- Let students find their own inconsistencies
+- Match ${firstName}'s voice, tone, and intervention technique exactly
+
 ${hwContext()}
 Response length: SHORT — 1-3 sentences for simple questions. Longer only when a concept truly needs it. No essays.
 
@@ -351,10 +392,14 @@ After EVERY reply, append this JSON on its own line at the very end (stripped be
 {"values":["..."],"goals":["..."],"interests":["..."]}
 Only include NEWLY learned things about the student. Empty arrays if nothing new.
 NEVER mention the JSON.`;
+    return prompt;
   }
 
   // No profile yet — fallback to generic tutor
   return `You are tutoring a Menlo School student in ${course} with ${teacher}. Be helpful, specific to this subject, and calibrated to high school level.
+
+Never begin a response with a code block or markdown formatting. Always start with plain conversational text.
+Always complete your full response. If approaching length limits, wrap up concisely rather than stopping mid-thought.
 
 ${studentCtx()}
 
@@ -364,7 +409,7 @@ Your tutoring style:
 - Break down complex concepts step by step
 - Give specific, actionable feedback
 ${TEACHING_PHILOSOPHY}
-
+${hwContext()}
 Response length: SHORT — 1-3 sentences for simple questions. No essays.
 
 After EVERY reply, append this JSON on its own line at the very end (stripped before display):
@@ -486,15 +531,51 @@ const TEACHER_EMAIL_MAP = {
   "Test Teacher":            "hadi.hilaly@menloschool.org",
 };
 
+// ── Hardcoded demo profiles (loaded before Supabase as fallback) ──
+const DEMO_PROFILES = {
+  'hadi.hilaly@menloschool.org__Democratic Backsliding (Test Course)': {
+    status: 'complete',
+    teaching_style: 'Socratic case-method. Introduce framework briefly (Levitsky & Ziblatt\'s 4 indicators), then put the framework away. Present a case study with zero scaffolding: "What do you see?" Use Socratic questioning until the student finds their own inconsistencies. Historical cases first for psychological safety, then contemporary international, then American examples only through comparative lens.',
+    excellence_criteria: 'Specificity of evidence (named actors, dates, mechanisms — not feelings). Framework used as a LENS not a CHECKLIST (lens: pick most analytically interesting indicator and build around it; checklist: go through all four, assign scores, add them up). Treats constraints as seriously as goals. Intellectual honesty about uncertainty — acknowledges counterarguments and limitations.',
+    grading_philosophy: 'Great work shows calibrated skepticism — not cynicism, not naive optimism. Pattern recognition that is instinctive, not mechanical. Holding complexity: democratic backsliding is never one villain, it\'s many ordinary people making individually rational decisions.',
+    common_mistakes: [
+      'Tautological reasoning: "backsliding because democracy is weakening"',
+      'Unearned certainty: no counterargument, no acknowledged limitation',
+      'Borrowed conclusions without local application: recommending "strengthen the courts" without engaging with the specific political constraints that make that hard in this specific country'
+    ],
+    explanation_methods: 'When a student gives an oversimplified or wrong answer: do NOT correct directly. Ask "Walk me through how you applied the framework to reach that." Listen for where the application breaks down. Ask ONE pointed question targeting that specific crack. Let the student find the inconsistency themselves. Never ask multiple corrections at once.',
+    key_values: 'Calibrated skepticism. The ability to ask "is this normal democratic competition or something else?" Push back on reasoning quality, NEVER on political conclusions. If a student applies the framework carefully and reaches a different conclusion than expected, challenge the reasoning, not the conclusion.',
+    class_specific_notes: 'Case selection: start with historical cases (Weimar Germany) — no emotional investment. Move to contemporary international (Hungary, Turkey, Venezuela). Arrive at American examples ONLY through comparative lens: "Apply the same tools you used on Hungary. What do you see?" Never introduce American examples cold.',
+    teacher_voice: 'Warm but intellectually rigorous. Genuinely curious about student reasoning. Never uses "steelman the other side" — instead says "What\'s the strongest version of the argument against yours?" Same exercise, less threatening, more engagement.',
+    key_themes_and_topics: ['Levitsky & Ziblatt framework', 'democratic erosion patterns', 'institutional constraints', 'press freedom', 'judicial independence', 'civil society', 'historical cases (Weimar)', 'contemporary cases (Hungary, Turkey, Venezuela)', 'comparative analysis'],
+    topics_not_covered: ['Electoral mechanics', 'campaign finance', 'gerrymandering', 'voting systems', 'political philosophy (Locke, Rousseau, Rawls)', 'election integrity debates', 'predictions about where countries are headed'],
+    lumi_dos: ['Ask student to walk through reasoning before responding', 'Use "What\'s the strongest version of the argument against yours?"', 'Push back on reasoning quality', 'Let students find their own inconsistencies', 'Start with historical cases for safety'],
+    lumi_donts: ['Never give direct analysis', 'Never correct political conclusions', 'Never say "steelman the other side"', 'Never make more than one correction at a time', 'Never engage with out-of-scope topics', 'Never introduce American examples without comparative context'],
+    rules_and_procedures: 'AI allowed for: brainstorming, checking argument structure, draft feedback. AI NOT allowed for: generating the analysis itself. The test: "If you couldn\'t defend every sentence in a 10-minute conversation with your teacher, you\'ve crossed the line."',
+    north_star: 'Help students reach the point where they can defend every part of their analysis in a conversation with their teacher. If Lumi is doing the analysis for the student, it has failed.',
+    typical_hw_duration_minutes: 45
+  }
+};
+
+function getDemoProfile(teacherName, course) {
+  const email = TEACHER_EMAIL_MAP[teacherName];
+  if (!email) return null;
+  return DEMO_PROFILES[email + '__' + course] || null;
+}
+
 // Fetch teacher profile from Supabase for a given teacher name and course.
-// Returns the profile if status=complete, { __notReady: true } if in_progress/not_started, null if not found.
+// Falls back to hardcoded demo profiles. Returns profile if complete, { __notReady } if in progress, null if not found.
 async function getTeacherProfile(teacherName, course) {
   if (!teacherName || !course) return null;
+
+  // Check hardcoded demo profiles first (instant, no network)
+  const demo = getDemoProfile(teacherName, course);
+  if (demo) return demo;
+
   try {
     const email = TEACHER_EMAIL_MAP[teacherName];
     if (!email) return null;
 
-    // Race against a 5s timeout so this can never hang
     const timeout = new Promise(resolve => setTimeout(() => resolve(null), 5000));
     const query = sb
       .from('teacher_profiles')
@@ -504,7 +585,7 @@ async function getTeacherProfile(teacherName, course) {
       .maybeSingle();
 
     const result = await Promise.race([query, timeout]);
-    if (!result) return null; // timed out
+    if (!result) return null;
     const { data, error } = result;
     if (error || !data) return null;
 
@@ -2159,7 +2240,7 @@ async function startObConversation() {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
+        max_tokens: 2500,
         system: buildOnboardingSystem(),
         messages: [{ role: 'user', content: seedMsg }],
       }),
@@ -2212,7 +2293,7 @@ async function obSend() {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
+        max_tokens: 2500,
         system: buildOnboardingSystem(),
         messages: OB.messages,
       }),
@@ -3006,7 +3087,7 @@ async function callAPI(apiKey, msgs, system) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
+      max_tokens: 2500,
       stream: true,
       system,
       messages: msgs,
