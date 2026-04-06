@@ -4911,56 +4911,27 @@ function injectProjectTasksToHomework() {
 
 // ── Open tutor for project's class ───────────────────────
 
-async function startProjectTutor(projId) {
-  console.log('[startProjectTutor] 1. called with projId:', projId);
+function startProjectTutor(projId) {
+  // Find the project
+  const proj = getProjects().find(p => p.id === projId);
+  if (!proj) return;
 
-  // Force-close all modals immediately — no transitions, no delays
+  // Force close ALL modals immediately — synchronous, no transitions
   _currentProjId = null;
-  document.querySelectorAll('.hw-modal, .hw-popup, #hwPopup').forEach(el => {
+  document.querySelectorAll('.hw-modal, .hw-popup, #hwPopup, #hwBackdrop').forEach(el => {
     el.style.display = 'none';
     el.classList.remove('open');
   });
-  const backdrop = $('hwBackdrop');
-  if (backdrop) { backdrop.style.display = 'none'; backdrop.classList.remove('open'); }
-  console.log('[startProjectTutor] 2. modals closed');
 
-  try {
-    // Find the project
-    const proj = getProjects().find(p => p.id === projId);
-    console.log('[startProjectTutor] 3. project:', proj ? proj.title : 'NOT FOUND');
-    if (!proj) { showToast('Project not found.'); return; }
+  // Put context message in the input — student hits send themselves
+  const today = todayStr();
+  const todayTask = proj.plan.find(d => d.date === today && !d.isComplete);
+  const taskLabel = todayTask ? todayTask.label : proj.plan[0]?.label || 'getting started';
 
-    // Find matching schedule entry
-    const schedule = getSchedule();
-    const entry = schedule.find(s => s.course === proj.className);
-    console.log('[startProjectTutor] 4. schedule entry:', entry ? entry.course : 'NOT FOUND', 'looking for:', proj.className);
-    if (!entry) { showToast('Class not found in schedule.'); return; }
-
-    // Open tutor chat
-    const { subjectId } = lookupSubjectForCourse(entry.course);
-    console.log('[startProjectTutor] 5. calling openTutor with:', { subjectId, course: entry.course, teacher: entry.teacher });
-    await openTutor(subjectId, entry.course, entry.teacher);
-    console.log('[startProjectTutor] 6. openTutor resolved');
-
-    // Build context message
-    const today = todayStr();
-    const todayTask = proj.plan.find(d => d.date === today && !d.isComplete);
-    const taskLabel = todayTask ? todayTask.label : proj.plan[0]?.label || 'getting started';
-
-    let contextMsg = `I'm working on my ${proj.title} for ${proj.className}, due ${fmtDateShort(proj.dueDate)}.`;
-    if (proj.requirements) contextMsg += ` Requirements: ${proj.requirements}.`;
-    contextMsg += ` Today I need to: ${taskLabel}. Can you help me get started?`;
-
-    // Set in input for the student to review and send
-    msgInput.value = contextMsg;
-    autoGrow(msgInput);
-    updateSendBtn();
-    msgInput.focus();
-    console.log('[startProjectTutor] 7. DONE — input filled');
-  } catch (e) {
-    console.error('[startProjectTutor] ERROR:', e);
-    showToast('Something went wrong — try opening the class chat directly.');
-  }
+  msgInput.value = `I'm working on ${proj.title} for ${proj.className}, due ${proj.dueDate}. Today I need to: ${taskLabel}. Can you help me get started?`;
+  msgInput.focus();
+  autoGrow(msgInput);
+  updateSendBtn();
 }
 
 // ── Sync projects to Supabase ────────────────────────────
