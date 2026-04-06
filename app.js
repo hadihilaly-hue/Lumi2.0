@@ -4911,27 +4911,35 @@ function injectProjectTasksToHomework() {
 
 // ── Open tutor for project's class ───────────────────────
 
-function startProjectTutor(projId) {
-  // Find the project
-  const proj = getProjects().find(p => p.id === projId);
-  if (!proj) return;
+function handleStartWorking() {
+  console.log('START WORKING CLICKED');
 
-  // Force close ALL modals immediately — synchronous, no transitions
-  _currentProjId = null;
+  const projId = _currentProjId;
+  console.log('Project ID:', projId);
+
+  // Close all modals
   document.querySelectorAll('.hw-modal, .hw-popup, #hwPopup, #hwBackdrop').forEach(el => {
     el.style.display = 'none';
     el.classList.remove('open');
   });
+  console.log('Modals closed');
 
-  // Put context message in the input — student hits send themselves
-  const today = todayStr();
-  const todayTask = proj.plan.find(d => d.date === today && !d.isComplete);
-  const taskLabel = todayTask ? todayTask.label : proj.plan[0]?.label || 'getting started';
-
-  msgInput.value = `I'm working on ${proj.title} for ${proj.className}, due ${proj.dueDate}. Today I need to: ${taskLabel}. Can you help me get started?`;
-  msgInput.focus();
-  autoGrow(msgInput);
-  updateSendBtn();
+  // Fill the input after a tick so DOM is settled
+  setTimeout(() => {
+    const proj = getProjects().find(p => p.id === projId);
+    if (msgInput && proj) {
+      const today = todayStr();
+      const todayTask = proj.plan.find(d => d.date === today && !d.isComplete);
+      const taskLabel = todayTask ? todayTask.label : proj.plan[0]?.label || 'getting started';
+      msgInput.value = `I'm working on ${proj.title} for ${proj.className}, due ${proj.dueDate}. Today I need to: ${taskLabel}. Can you help me get started?`;
+      msgInput.focus();
+      autoGrow(msgInput);
+      updateSendBtn();
+      console.log('Input filled');
+    } else {
+      console.log('Could not find input or project', { input: !!msgInput, proj, projId });
+    }
+  }, 100);
 }
 
 // ── Sync projects to Supabase ────────────────────────────
@@ -5130,6 +5138,8 @@ function wireHwListeners() {
     // Small delay for the loading animation to feel real
     setTimeout(() => {
       const project = createProject(title, course, entry.teacher || '', dueDate, requirements, fileData);
+      _currentProjId = project.id;
+      console.log('Set current project:', project.id);
       renderProjectPlan(project);
       syncProjectsToSupabase();
     }, 600);
@@ -5140,9 +5150,7 @@ function wireHwListeners() {
     closeProjectPlanModal();
   });
 
-  $('projStartBtn').addEventListener('click', () => {
-    if (_currentProjId) startProjectTutor(_currentProjId);
-  });
+  // projStartBtn now uses inline onclick="handleStartWorking()"
 
   $('projSaveBtn').addEventListener('click', () => {
     closeProjectPlanModal();
