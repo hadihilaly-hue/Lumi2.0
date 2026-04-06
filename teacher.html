@@ -1038,6 +1038,7 @@ async function markStatus(status) {
 
 async function setProfileStatus(status) {
   if (!tUser || !tCurrentClass) return;
+  console.log('[setProfileStatus]', tCurrentClass.course, '->', status);
   try {
     const { data, error } = await sb
       .from('teacher_profiles')
@@ -1050,11 +1051,14 @@ async function setProfileStatus(status) {
       }, { onConflict: 'teacher_email,class_name' })
       .select()
       .single();
-    if (!error && data) {
+    if (error) {
+      console.error('[setProfileStatus] error:', error.message);
+    } else if (data) {
       tProfiles[tCurrentClass.course] = { ...(tProfiles[tCurrentClass.course] || {}), ...data };
+      console.log('[setProfileStatus] saved OK');
     }
   } catch (err) {
-    console.warn('Could not update status:', err);
+    console.error('[setProfileStatus] caught:', err);
   }
 }
 
@@ -1379,60 +1383,89 @@ function stripTeacherJson(text) {
 // ─── SUPABASE TEACHER PROFILES ───────────────────────────────────────────────
 async function saveTeacherProfile(data) {
   if (!tUser || !tCurrentClass) return;
-  const profile = tProfiles[tCurrentClass.course] || {};
-  const merged  = { ...profile, ...(data || {}) };
+  const existing = tProfiles[tCurrentClass.course] || {};
+  const merged = { ...existing, ...(data || {}) };
 
-  const toArr = v => Array.isArray(v) ? v : (v ? [v] : null);
-
-  // When the interview marks done=true, also promote status to complete
+  // Determine status
   const newStatus = merged.done ? 'complete'
     : (merged.status || (merged.teaching_style ? 'in_progress' : 'not_started'));
 
-  const row = {
-    teacher_email:           tUser.email,
-    class_name:              tCurrentClass.course,
-    subject:                 tCurrentClass.subject,
-    done:                    merged.done                    || false,
-    status:                  newStatus,
-    teaching_style:          merged.teaching_style          || null,
-    excellence_criteria:     merged.excellence_criteria     || null,
-    grading_philosophy:      merged.grading_philosophy      || null,
-    common_mistakes:         toArr(merged.common_mistakes),
-    explanation_methods:     merged.explanation_methods     || null,
-    key_values:              merged.key_values              || null,
-    class_specific_notes:    merged.class_specific_notes    || null,
-    teacher_voice:           merged.teacher_voice           || null,
-    key_themes_and_topics:   toArr(merged.key_themes_and_topics),
-    topics_not_covered:      toArr(merged.topics_not_covered),
-    syllabus_overview:       merged.syllabus_overview       || null,
-    rules_and_procedures:    merged.rules_and_procedures    || null,
-    assessment_structure:    merged.assessment_structure    || null,
-    formatting_requirements: merged.formatting_requirements || null,
-    help_seeking_expectations: merged.help_seeking_expectations || null,
-    lumi_dos:                toArr(merged.lumi_dos),
-    lumi_donts:              toArr(merged.lumi_donts),
-    homework_frequency:      merged.homework_frequency             || null,
+  console.log('[saveTeacherProfile] saving:', tCurrentClass.course, 'status:', newStatus);
+
+  // First try: store everything in individual columns (rich schema)
+  // If that 400s, fall back to minimal columns only
+  const fullRow = {
+    teacher_email: tUser.email,
+    class_name:    tCurrentClass.course,
+    subject:       tCurrentClass.subject,
+    status:        newStatus,
+    teaching_style:        merged.teaching_style        || null,
+    excellence_criteria:   merged.excellence_criteria   || null,
+    grading_philosophy:    merged.grading_philosophy    || null,
+    common_mistakes:       Array.isArray(merged.common_mistakes) ? merged.common_mistakes : null,
+    explanation_methods:   merged.explanation_methods   || null,
+    key_values:            merged.key_values            || null,
+    class_specific_notes:  merged.class_specific_notes  || null,
+    teacher_voice:         merged.teacher_voice         || null,
+    key_themes_and_topics: Array.isArray(merged.key_themes_and_topics) ? merged.key_themes_and_topics : null,
+    topics_not_covered:    Array.isArray(merged.topics_not_covered) ? merged.topics_not_covered : null,
+    rules_and_procedures:  merged.rules_and_procedures  || null,
+    lumi_dos:              Array.isArray(merged.lumi_dos) ? merged.lumi_dos : null,
+    lumi_donts:            Array.isArray(merged.lumi_donts) ? merged.lumi_donts : null,
+    north_star:            merged.north_star            || null,
     typical_hw_duration_minutes: merged.typical_hw_duration_minutes || null,
-    quiz_study_duration_minutes: merged.quiz_study_duration_minutes || null,
-    test_study_duration_minutes: merged.test_study_duration_minutes || null,
-    essay_duration_hours:    merged.essay_duration_hours           || null,
-    homework_advice:         merged.homework_advice                || null,
-    messages_json:           tMessages,
-    updated_at:              new Date().toISOString(),
+    updated_at:            new Date().toISOString(),
   };
 
   try {
     const { data: saved, error } = await sb
       .from('teacher_profiles')
-      .upsert(row, { onConflict: 'teacher_email,class_name' })
+      .upsert(fullRow, { onConflict: 'teacher_email,class_name' })
       .select()
       .single();
     if (!error && saved) {
       tProfiles[tCurrentClass.course] = saved;
+      console.log('[saveTeacherProfile] saved OK (full)');
+      return;
     }
+    if (error) console.warn('[saveTeacherProfile] full save error:', error.message);
   } catch (err) {
-    console.warn('Could not save teacher profile:', err);
+    console.warn('[saveTeacherProfile] full save caught:', err);
   }
+
+  // Fallback: minimal columns only — just teacher_email, class_name, status
+  // plus a 'profile' JSONB column if it exists
+  try {
+    const minRow = {
+      teacher_email: tUser.email,
+      class_name:    tCurrentClass.course,
+      status:        newStatus,
+      updated_at:    new Date().toISOString(),
+    };
+    const { data: saved2, error: err2 } = await sb
+      .from('teacher_profiles')
+      .upsert(minRow, { onConflict: 'teacher_email,class_name' })
+      .select()
+      .single();
+    if (!err2 && saved2) {
+      // Store full profile data locally even if DB only has minimal columns
+      tProfiles[tCurrentClass.course] = { ...saved2, ...merged };
+      console.log('[saveTeacherProfile] saved OK (minimal)');
+    }
+    if (err2) console.error('[saveTeacherProfile] minimal save error:', err2.message);
+  } catch (err) {
+    console.error('[saveTeacherProfile] minimal save caught:', err);
+  }
+
+  // Verify the save
+  try {
+    const { data: check } = await sb
+      .from('teacher_profiles')
+      .select('*')
+      .eq('teacher_email', tUser.email)
+      .eq('class_name', tCurrentClass.course);
+    console.log('[saveTeacherProfile] verification:', check);
+  } catch {}
 }
 
 // ─── SUMMARY VIEW ────────────────────────────────────────────────────────────

@@ -563,14 +563,15 @@ function getDemoProfile(teacherName, course) {
   return DEMO_PROFILES[email + '__' + course] || null;
 }
 
-// Fetch teacher profile from Supabase for a given teacher name and course.
-// Falls back to hardcoded demo profiles. Returns profile if complete, { __notReady } if in progress, null if not found.
+// Fetch teacher profile — checks hardcoded demos first, then Supabase (5s timeout).
+// Returns the full profile object if complete, { __notReady } if in progress, null if not found.
 async function getTeacherProfile(teacherName, course) {
   if (!teacherName || !course) return null;
+  console.log('[getTeacherProfile] loading:', teacherName, course);
 
   // Check hardcoded demo profiles first (instant, no network)
   const demo = getDemoProfile(teacherName, course);
-  if (demo) return demo;
+  if (demo) { console.log('[getTeacherProfile] using demo profile'); return demo; }
 
   try {
     const email = TEACHER_EMAIL_MAP[teacherName];
@@ -585,11 +586,19 @@ async function getTeacherProfile(teacherName, course) {
       .maybeSingle();
 
     const result = await Promise.race([query, timeout]);
-    if (!result) return null;
+    if (!result) { console.log('[getTeacherProfile] timed out'); return null; }
     const { data, error } = result;
-    if (error || !data) return null;
+    if (error) { console.warn('[getTeacherProfile] query error:', error.message); return null; }
+    if (!data) { console.log('[getTeacherProfile] no data found'); return null; }
 
+    console.log('[getTeacherProfile] found, status:', data.status);
     if (data.status !== 'complete') return { __notReady: true };
+
+    // If the profile data is stored in individual columns, it's already in `data`
+    // If stored in a 'profile' JSONB column, merge it in
+    if (data.profile && typeof data.profile === 'object') {
+      return { ...data, ...data.profile };
+    }
     return data;
   } catch (e) {
     console.error('[getTeacherProfile] error:', e);
