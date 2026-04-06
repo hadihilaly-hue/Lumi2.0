@@ -4374,67 +4374,66 @@ function clearProjFile() {
   $('projFileInput').value = '';
   $('projDropzoneEmpty').style.display = '';
   $('projDropzonePreview').style.display = 'none';
-  $('projDropzone').classList.remove('dragover');
+  $('projDropzone').classList.remove('drag-over');
 }
 
 function handleProjFile(file) {
   if (!file) return;
-  const maxMB = file.type === 'application/pdf' ? 32 : 10;
-  if (file.size > maxMB * 1024 * 1024) { showToast(`File too large. Max ${maxMB}MB.`); return; }
-
-  const isImage = file.type.startsWith('image/');
-  const isText = file.type === 'text/plain' || file.name.endsWith('.txt') || file.name.endsWith('.md');
-  const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
-  const isDoc = file.name.endsWith('.doc') || file.name.endsWith('.docx');
-  if (!isImage && !isPdf && !isText && !isDoc) { showToast('Unsupported file — use PDF, image, or text.'); return; }
+  const allowed = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'text/plain'];
+  if (!allowed.includes(file.type)) {
+    showToast('Please upload a PDF, image, or text file');
+    return;
+  }
 
   const reader = new FileReader();
   reader.onload = e => {
     const base64 = e.target.result.split(',')[1];
-    const mediaType = file.type || 'text/plain';
-    _projPendingFile = { file, base64, mediaType, isImage, isText, isPdf, isDoc };
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+    const isText = file.type === 'text/plain';
+    _projPendingFile = { file, base64, mediaType: file.type, isImage, isText, isPdf };
 
     // Show preview
     $('projDropzoneEmpty').style.display = 'none';
     $('projDropzonePreview').style.display = 'flex';
     $('projFileName').textContent = file.name;
     $('projFileSize').textContent = fmtBytes(file.size);
-    $('projFileIcon').textContent = isPdf ? '📕' : isImage ? '🖼️' : isDoc ? '📘' : '📄';
+    $('projFileIcon').textContent = isPdf ? '📕' : isImage ? '🖼️' : '📄';
   };
   reader.readAsDataURL(file);
 }
 
 function wireProjDropzone() {
   const zone = $('projDropzone');
-  const input = $('projFileInput');
+  const fileInput = $('projFileInput');
+  if (!zone || !fileInput) return;
 
-  // Click to browse
-  zone.addEventListener('click', e => {
-    if (e.target.closest('#projFileRemove')) return;
-    if (!_projPendingFile) input.click();
+  // Prevent browser from opening file on drop — at document AND zone level
+  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+    document.addEventListener(evt, e => e.preventDefault());
+    zone.addEventListener(evt, e => e.preventDefault());
   });
 
-  input.addEventListener('change', () => {
-    if (input.files[0]) handleProjFile(input.files[0]);
-  });
+  // Highlight on drag over
+  zone.addEventListener('dragenter', () => zone.classList.add('drag-over'));
+  zone.addEventListener('dragover',  () => zone.classList.add('drag-over'));
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
 
-  // Drag events — must preventDefault on dragover AND drop at both zone and document level
-  // to stop the browser from navigating to the dropped file
-  zone.addEventListener('dragenter', e => { e.preventDefault(); e.stopPropagation(); zone.classList.add('dragover'); });
-  zone.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); });
-  zone.addEventListener('dragleave', e => { e.stopPropagation(); zone.classList.remove('dragover'); });
+  // Handle drop
   zone.addEventListener('drop', e => {
-    e.preventDefault();
-    e.stopPropagation();
-    zone.classList.remove('dragover');
+    zone.classList.remove('drag-over');
     const file = e.dataTransfer.files[0];
     if (file) handleProjFile(file);
   });
 
-  // Prevent browser from opening dropped files anywhere on the modal
-  const modal = $('projCreateModal');
-  modal.addEventListener('dragover', e => e.preventDefault());
-  modal.addEventListener('drop', e => { e.preventDefault(); });
+  // Handle click to browse
+  zone.addEventListener('click', e => {
+    if (e.target.closest('#projFileRemove')) return;
+    fileInput.click();
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) handleProjFile(fileInput.files[0]);
+  });
 
   // Remove button
   $('projFileRemove').addEventListener('click', e => {
@@ -4786,52 +4785,43 @@ function injectProjectTasksToHomework() {
 // ── Open tutor for project's class ───────────────────────
 
 async function startProjectTutor(projId) {
-  const projects = getProjects();
-  const proj = projects.find(p => p.id === projId);
-  if (!proj) return;
+  // Force-close all modals immediately — no transitions, no delays
+  _currentProjId = null;
+  document.querySelectorAll('.hw-modal, .hw-popup, #hwPopup').forEach(el => {
+    el.style.display = 'none';
+    el.classList.remove('open');
+  });
+  const backdrop = $('hwBackdrop');
+  if (backdrop) { backdrop.style.display = 'none'; backdrop.classList.remove('open'); }
 
+  // Find the project
+  const proj = getProjects().find(p => p.id === projId);
+  if (!proj) { console.error('Project not found:', projId); return; }
+
+  // Find matching schedule entry
   const schedule = getSchedule();
   const entry = schedule.find(s => s.course === proj.className);
-  if (!entry) {
-    showToast('Class not found in your schedule.');
+  if (!entry) { showToast('Class not found in schedule.'); return; }
+
+  // Open tutor chat
+  const { subjectId } = lookupSubjectForCourse(entry.course);
+  try {
+    await openTutor(subjectId, entry.course, entry.teacher);
+  } catch (e) {
+    console.error('openTutor error:', e);
     return;
   }
 
-  const { subjectId } = lookupSubjectForCourse(entry.course);
-
-  // Force-hide all modals immediately (no transition delays)
-  _currentProjId = null;
-  ['projPlanModal', 'projCreateModal', 'hwTypeChooser', 'hwAddModal', 'hwPopup'].forEach(id => {
-    const el = $(id);
-    if (el) { el.classList.remove('open'); el.style.display = 'none'; }
-  });
-  closeHwBackdrop();
-
-  // Open tutor session
-  await openTutor(subjectId, entry.course, entry.teacher);
-
-  // Pre-fill the input with project context so they can send it
+  // Build context message
   const today = todayStr();
   const todayTask = proj.plan.find(d => d.date === today && !d.isComplete);
-  const taskLabel = todayTask ? todayTask.label : proj.plan[0]?.label || 'get started';
+  const taskLabel = todayTask ? todayTask.label : proj.plan[0]?.label || 'getting started';
 
   let contextMsg = `I'm working on my ${proj.title} for ${proj.className}, due ${fmtDateShort(proj.dueDate)}.`;
   if (proj.requirements) contextMsg += ` Requirements: ${proj.requirements}.`;
   contextMsg += ` Today I need to: ${taskLabel}. Can you help me get started?`;
 
-  // If rubric file is attached, set it as pending attachment
-  if (proj.rubricFile) {
-    const att = proj.rubricFile;
-    pendingAttachment = {
-      file: { name: att.name, size: 0, type: att.mediaType },
-      base64: att.base64,
-      mediaType: att.mediaType,
-      isImage: !!att.isImage,
-      isText: !!att.isText
-    };
-    showAttachPreview({ name: att.name, size: 0 }, att.base64, att.mediaType, !!att.isImage);
-  }
-
+  // Set in input for the student to review and send
   msgInput.value = contextMsg;
   autoGrow(msgInput);
   updateSendBtn();
