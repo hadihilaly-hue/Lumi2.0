@@ -851,6 +851,7 @@ function newChat() {
 
 // ─── OPEN TUTOR SESSION ───────────────────────────────────────────────────────
 async function openTutor(subjectId, course, teacher) {
+  console.log('[openTutor] start:', { subjectId, course, teacher });
   clearSearch();
   saveCurrentConv();
   const subjectName = SUBJECTS.find(s => s.id === subjectId)?.name || subjectId;
@@ -864,7 +865,13 @@ async function openTutor(subjectId, course, teacher) {
   messagesEl.innerHTML = '';
 
   // Fetch teacher profile — check status before using
-  const profile = await getTeacherProfile(teacher, course);
+  let profile = null;
+  try {
+    profile = await getTeacherProfile(teacher, course);
+    console.log('[openTutor] profile fetched:', profile ? 'found' : 'null');
+  } catch (e) {
+    console.warn('[openTutor] profile fetch failed:', e);
+  }
   let greeting;
   const firstName = teacher.split(' ')[0];
 
@@ -883,6 +890,7 @@ async function openTutor(subjectId, course, teacher) {
   renderSidebar();
   scrollBottom();
   msgInput.focus();
+  console.log('[openTutor] done');
 }
 
 // ─── OPEN GENERAL CHAT ───────────────────────────────────────────────────────
@@ -4902,6 +4910,8 @@ function injectProjectTasksToHomework() {
 // ── Open tutor for project's class ───────────────────────
 
 async function startProjectTutor(projId) {
+  console.log('[startProjectTutor] 1. called with projId:', projId);
+
   // Force-close all modals immediately — no transitions, no delays
   _currentProjId = null;
   document.querySelectorAll('.hw-modal, .hw-popup, #hwPopup').forEach(el => {
@@ -4910,20 +4920,25 @@ async function startProjectTutor(projId) {
   });
   const backdrop = $('hwBackdrop');
   if (backdrop) { backdrop.style.display = 'none'; backdrop.classList.remove('open'); }
+  console.log('[startProjectTutor] 2. modals closed');
 
   try {
     // Find the project
     const proj = getProjects().find(p => p.id === projId);
-    if (!proj) { console.error('Project not found:', projId); return; }
+    console.log('[startProjectTutor] 3. project:', proj ? proj.title : 'NOT FOUND');
+    if (!proj) { showToast('Project not found.'); return; }
 
     // Find matching schedule entry
     const schedule = getSchedule();
     const entry = schedule.find(s => s.course === proj.className);
+    console.log('[startProjectTutor] 4. schedule entry:', entry ? entry.course : 'NOT FOUND', 'looking for:', proj.className);
     if (!entry) { showToast('Class not found in schedule.'); return; }
 
     // Open tutor chat
     const { subjectId } = lookupSubjectForCourse(entry.course);
+    console.log('[startProjectTutor] 5. calling openTutor with:', { subjectId, course: entry.course, teacher: entry.teacher });
     await openTutor(subjectId, entry.course, entry.teacher);
+    console.log('[startProjectTutor] 6. openTutor resolved');
 
     // Build context message
     const today = todayStr();
@@ -4939,8 +4954,9 @@ async function startProjectTutor(projId) {
     autoGrow(msgInput);
     updateSendBtn();
     msgInput.focus();
+    console.log('[startProjectTutor] 7. DONE — input filled');
   } catch (e) {
-    console.error('startProjectTutor error:', e);
+    console.error('[startProjectTutor] ERROR:', e);
     showToast('Something went wrong — try opening the class chat directly.');
   }
 }
@@ -5194,3 +5210,19 @@ function wireHwListeners() {
   // ── Project file dropzone ──────────────────────────────
   wireProjDropzone();
 }
+
+// ── Debug: test startProjectTutor from console ───────────
+window.testProjectButton = async function() {
+  console.log('Testing startProjectTutor...');
+  const projects = getProjects();
+  console.log('Projects found:', projects.length, projects.map(p => ({ id: p.id, title: p.title, class: p.className })));
+  if (projects.length > 0) {
+    const proj = projects[0];
+    console.log('Testing with project:', proj.id, proj.title);
+    await startProjectTutor(proj.id);
+    console.log('Done — no freeze!');
+  } else {
+    console.log('No projects found to test with');
+  }
+};
+console.log('Run window.testProjectButton() in console to test the Start Working button');
