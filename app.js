@@ -2050,6 +2050,8 @@ RULES:
 - If they give a vague answer, gently probe once for more detail
 - Keep the whole thing warm and under 3 minutes
 - The 10:30pm bedtime is non-negotiable — mention it warmly in the wrap-up, don't ask about it
+- Never begin a response with a code block or markdown formatting. Always start with plain conversational text.
+- Always complete your full response. If approaching length limits, wrap up your current point concisely rather than stopping mid-thought.
 
 After EVERY response (including the opening), append on the very last line:
 ###PROFILE_UPDATE:{"name":"","study_style":{"work_minutes":25,"break_minutes":5,"label":"Short Bursts"},"learning_style":"mixed","homework_start_time":"18:00","typical_activities":"","pain_points":[],"calendar_connected":false,"onboarding_complete":false}
@@ -3259,6 +3261,8 @@ function renderMsg(role, content, animate, att) {
 
 function fmtText(text) {
   if (!text) return '';
+  if (typeof marked !== 'undefined') return marked.parse(text, { breaks: true });
+  // Fallback if marked hasn't loaded
   let s = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   s = s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code>$1</code>');
   const ps = s.split(/\n\n+/);

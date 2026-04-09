@@ -569,6 +569,7 @@ body { overflow: auto; display: block; }
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="supabase.js"></script>
 <script src="auth.js"></script>
 <script>
@@ -1203,7 +1204,7 @@ async function streamReply() {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
+        max_tokens: 2500,
         stream: true,
         system,
         messages: tMessages,
@@ -1237,7 +1238,7 @@ async function streamReply() {
           const ev = JSON.parse(raw);
           if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
             full += ev.delta.text;
-            bubbleEl.textContent = stripTeacherJson(full);
+            bubbleEl.innerHTML = fmtText(stripTeacherJson(full));
             scrollTBottom();
           }
         } catch {}
@@ -1246,7 +1247,7 @@ async function streamReply() {
 
     // Parse hidden JSON
     const parsed = parseTeacherResponse(full);
-    bubbleEl.textContent = parsed.clean;
+    bubbleEl.innerHTML = fmtText(parsed.clean);
     scrollTBottom();
 
     // Push assistant message (full text including JSON, stripped on display)
@@ -1286,6 +1287,8 @@ RULES:
 - Use minimal validation before each question (one sentence maximum)
 - Split compound questions — one question per turn, no exceptions
 - Prioritize depth over breadth — better to deeply understand 6 areas than superficially cover 10
+- Never begin a response with a code block or markdown formatting. Always start with plain conversational text.
+- Always complete your full response. If approaching length limits, wrap up your current point concisely rather than stopping mid-thought.
 
 Work through these areas in this exact priority order:
 
@@ -1379,6 +1382,18 @@ function stripTeacherJson(text) {
     try { const p = JSON.parse(cand); if ('done' in p) return text.slice(0, idx).trimEnd(); } catch {}
   }
   return text;
+}
+
+// ─── MARKDOWN RENDERING ─────────────────────────────────────────────────────
+function fmtText(text) {
+  if (!text) return '';
+  if (typeof marked !== 'undefined') return marked.parse(text, { breaks: true });
+  // Fallback if marked hasn't loaded
+  let s = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  s = s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code>$1</code>');
+  const ps = s.split(/\n\n+/);
+  if (ps.length > 1) return ps.map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`).join('');
+  return `<p>${s.replace(/\n/g,'<br>')}</p>`;
 }
 
 // ─── SUPABASE TEACHER PROFILES ───────────────────────────────────────────────
