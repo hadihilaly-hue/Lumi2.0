@@ -597,16 +597,28 @@ const SEED_PROFILES = [
 ];
 
 // Push seed profiles to Supabase (runs on app load, non-blocking)
+// Columns that exist in the Supabase teacher_profiles table
+const TEACHER_PROFILE_COLUMNS = [
+  'teacher_email','class_name','subject','status','done',
+  'teaching_style','excellence_criteria','grading_philosophy',
+  'common_mistakes','explanation_methods','key_values',
+  'class_specific_notes','teacher_voice','messages_json',
+  'created_at','updated_at'
+];
+
 async function seedProfilesToSupabase() {
   for (const seed of SEED_PROFILES) {
     const key = seed.teacher_email + '__' + seed.class_name;
-    // Always cache locally
+    // Always cache locally (full object including extra fields)
     _profileCache[key] = seed;
+    // Filter to only columns that exist in the table
+    const row = {};
+    TEACHER_PROFILE_COLUMNS.forEach(col => { if (seed[col] !== undefined) row[col] = seed[col]; });
     // Try to push to Supabase
     try {
       const { error } = await sb
         .from('teacher_profiles')
-        .upsert(seed, { onConflict: 'teacher_email,class_name' });
+        .upsert(row, { onConflict: 'teacher_email,class_name' });
       if (error) console.warn('[seed] upsert error (non-critical):', error.message);
       else console.log('[seed] pushed to Supabase:', seed.class_name);
     } catch (e) {
