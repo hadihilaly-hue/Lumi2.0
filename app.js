@@ -542,6 +542,33 @@ const TEACHER_EMAIL_MAP = {
 // ── Teacher profile system — single source of truth: Supabase ──
 // Seed profiles are pushed to Supabase on load; _profileCache is the in-memory fallback.
 const _profileCache = {};
+const _profileStatusCache = {}; // { 'course::teacher': 'ready' | 'pending' }
+
+async function preloadProfileStatuses() {
+  const schedule = getSchedule();
+  if (!schedule.length) return;
+  const emails = [...new Set(schedule.map(s => TEACHER_EMAIL_MAP[s.teacher]).filter(Boolean))];
+  if (!emails.length) return;
+  try {
+    const { data, error } = await sb
+      .from('teacher_profiles')
+      .select('teacher_email, class_name, status')
+      .in('teacher_email', emails);
+    if (error) { console.warn('[preloadProfileStatuses] error:', error); return; }
+    // Build a lookup: email__class -> status
+    const lookup = {};
+    (data || []).forEach(row => { lookup[row.teacher_email + '__' + row.class_name] = row.status; });
+    // Map each scheduled class
+    schedule.forEach(({ course, teacher }) => {
+      const email = TEACHER_EMAIL_MAP[teacher];
+      const key = course + '::' + teacher;
+      if (!email) { _profileStatusCache[key] = 'pending'; return; }
+      const status = lookup[email + '__' + course];
+      _profileStatusCache[key] = status === 'complete' ? 'ready' : 'pending';
+    });
+    renderSidebar();
+  } catch (e) { console.warn('[preloadProfileStatuses] failed:', e); }
+}
 
 // Seed data: profiles that should exist in Supabase. Pushed on app load via seedProfilesToSupabase().
 const SEED_PROFILES = [
@@ -1418,9 +1445,14 @@ function renderSidebar() {
       const tch = document.createElement('span');
       tch.className = 'sb-my-class-teacher';
       tch.textContent = lastName;
+      const profileStatus = _profileStatusCache[course + '::' + teacher];
+      const badge = document.createElement('span');
+      badge.className = 'sb-profile-badge ' + (profileStatus === 'ready' ? 'ready' : 'pending');
+      badge.textContent = profileStatus === 'ready' ? 'Profile ready' : 'Profile pending';
       item.appendChild(star);
       item.appendChild(name);
       item.appendChild(tch);
+      item.appendChild(badge);
       item.addEventListener('click', () => {
         const { subjectId } = lookupSubjectForCourse(course);
         openTutor(subjectId, course, teacher);
@@ -2896,6 +2928,7 @@ function startApp(savedKey) {
   wireVoiceListeners();
 
   seedProfilesToSupabase(); // push seed profiles to Supabase (non-blocking)
+  preloadProfileStatuses(); // fetch teacher profile statuses for sidebar badges (non-blocking)
   loadHwFromSupabase().then(async () => {
     await loadProjectsFromSupabase();
     injectProjectTasksToHomework();
