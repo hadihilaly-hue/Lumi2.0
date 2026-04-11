@@ -4017,6 +4017,23 @@ function addHwTask(task) {
   saveHwTasks(tasks);
 }
 
+// ── Homework detail view ──────────────────────────────────
+function showHwDetail(id) {
+  const task = getHwTasks().find(t => t.id === id);
+  if (!task) return;
+  $('hwDetailTitle').textContent = task.title;
+  $('hwDetailClass').textContent = task.className || '—';
+  $('hwDetailDue').textContent = task.dueDate || 'No date set';
+  $('hwDetailTime').textContent = task.estimatedMinutes ? task.estimatedMinutes + ' min' : '—';
+  $('hwDetailStatus').textContent = task.isComplete ? 'Complete' : 'In progress';
+  const toggleBtn = $('hwDetailToggleBtn');
+  toggleBtn.textContent = task.isComplete ? 'Mark incomplete' : 'Mark complete';
+  toggleBtn.onclick = () => { toggleHwTask(id); showHwDetail(id); };
+  $('hwDetailBack').onclick = () => { $('hwDetailModal').style.display = 'none'; };
+  $('hwDetailCloseBtn').onclick = () => { $('hwDetailModal').style.display = 'none'; };
+  $('hwDetailModal').style.display = '';
+}
+
 // ── Study plan generator ───────────────────────────────────
 const BEDTIME_MINUTES = 22 * 60 + 30; // 10:30 PM
 
@@ -4274,15 +4291,28 @@ function renderHwSidebar(container) {
       titleEl.className = 'sb-hw-item-title';
       titleEl.textContent = task.title;
 
-      const urgencyEl = document.createElement('div');
-      urgencyEl.className = 'sb-hw-item-urgency';
-      urgencyEl.textContent = isTonight ? '⚡' : '📅';
-      urgencyEl.title = isTonight ? 'Due tonight' : ('Due ' + (task.dueDate || ''));
+      // Colored urgency badge based on due date proximity
+      const urgencyEl = document.createElement('span');
+      let urgencyClass = 'later', urgencyText = 'Due later';
+      if (!task.dueDate) {
+        urgencyClass = 'nodate'; urgencyText = 'No date';
+      } else {
+        const daysLeft = dateDiffDays(today, task.dueDate);
+        if (daysLeft <= 0) { urgencyClass = 'overdue'; urgencyText = 'Overdue'; }
+        else if (daysLeft <= 1) { urgencyClass = 'tomorrow'; urgencyText = 'Due tomorrow'; }
+        else if (daysLeft <= 7) { urgencyClass = 'week'; urgencyText = 'Due this week'; }
+      }
+      urgencyEl.className = 'sb-hw-urgency ' + urgencyClass;
+      urgencyEl.textContent = urgencyText;
 
       item.appendChild(check);
       item.appendChild(dotEl);
       item.appendChild(titleEl);
       item.appendChild(urgencyEl);
+      item.addEventListener('click', e => {
+        if (e.target.closest('.sb-hw-check')) return;
+        showHwDetail(task.id);
+      });
       container.appendChild(item);
     });
   }
@@ -4482,7 +4512,24 @@ Rules you must always follow:
 // ── Supabase sync ──────────────────────────────────────────
 // hw_tasks column does not exist in profiles table — localStorage only
 function syncHwToSupabase() {
-  // no-op: homework lives in localStorage only
+  if (!currentUser) return;
+  const tasks = getHwTasks();
+  const rows = tasks.map(t => ({
+    id: t.id,
+    user_id: currentUser.id,
+    title: t.title,
+    class_name: t.className || null,
+    teacher_name: t.teacherName || null,
+    due_date: t.dueDate || null,
+    estimated_minutes: t.estimatedMinutes || null,
+    is_complete: !!t.isComplete,
+  }));
+  if (!rows.length) {
+    sb.from('homework').delete().eq('user_id', currentUser.id).then(() => {});
+    return;
+  }
+  sb.from('homework').upsert(rows, { onConflict: 'id' })
+    .then(({ error }) => { if (error) console.warn('[syncHw] upsert error:', error); });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -5269,8 +5316,27 @@ function loadProjectsFromSupabase() {
 }
 
 // hw_tasks column does not exist in profiles table — localStorage only
-function loadHwFromSupabase() {
-  return Promise.resolve(); // no-op, returns a promise so .then() chains still work
+async function loadHwFromSupabase() {
+  if (!currentUser) return;
+  try {
+    const { data, error } = await sb
+      .from('homework')
+      .select('*')
+      .eq('user_id', currentUser.id);
+    if (error) { console.warn('[loadHw] error:', error); return; }
+    if (!data || !data.length) return;
+    const tasks = data.map(row => ({
+      id: row.id,
+      title: row.title,
+      className: row.class_name || '',
+      teacherName: row.teacher_name || '',
+      dueDate: row.due_date || '',
+      estimatedMinutes: row.estimated_minutes || null,
+      isComplete: !!row.is_complete,
+      createdAt: row.created_at,
+    }));
+    saveHwTasks(tasks);
+  } catch (e) { console.warn('[loadHw] failed:', e); }
 }
 
 // ── Wire all homework event listeners ─────────────────────
