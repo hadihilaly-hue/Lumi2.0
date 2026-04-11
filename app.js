@@ -393,7 +393,7 @@ ALWAYS:
 - Let students find their own inconsistencies
 - Match ${firstName}'s voice, tone, and intervention technique exactly
 
-${hwContext()}
+${hwContext()}${activeHwForClass(course)}
 Response length: SHORT — 1-3 sentences for simple questions. Longer only when a concept truly needs it. No essays.
 
 After EVERY reply, append this JSON on its own line at the very end (stripped before display):
@@ -417,7 +417,7 @@ Your tutoring style:
 - Break down complex concepts step by step
 - Give specific, actionable feedback
 ${TEACHING_PHILOSOPHY}
-${hwContext()}
+${hwContext()}${activeHwForClass(course)}
 Response length: SHORT — 1-3 sentences for simple questions. No essays.
 
 After EVERY reply, append this JSON on its own line at the very end (stripped before display):
@@ -4509,8 +4509,17 @@ Rules you must always follow:
 - If nothing is due tonight but Tier 1 work is due soon, proactively suggest working on it now`;
 }
 
+// ── Class-specific homework context for tutor system prompt ──
+function activeHwForClass(course) {
+  const tasks = getHwTasks().filter(t => !t.isComplete && t.className === course);
+  if (!tasks.length) return '';
+  tasks.sort((a, b) => (a.dueDate || '9999') < (b.dueDate || '9999') ? -1 : 1);
+  const t = tasks[0];
+  const dueStr = t.dueDate || 'no specific date';
+  return `\nThe student is currently working on: ${t.title}, due ${dueStr}. Tailor your guidance toward helping them complete this assignment.`;
+}
+
 // ── Supabase sync ──────────────────────────────────────────
-// hw_tasks column does not exist in profiles table — localStorage only
 function syncHwToSupabase() {
   if (!currentUser) return;
   const tasks = getHwTasks();
