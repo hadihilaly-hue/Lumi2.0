@@ -672,6 +672,9 @@ const keyInput      = $('keyInput');
 
 let pendingAttachment = null;
 
+// Tracks which classes have shown the intro slide this session (not persisted)
+const _introShownFor = new Set();
+
 // ─── SUPABASE SYNC ────────────────────────────────────────────────────────────
 
 // Helper: look up subjectId + subjectName for a given course name
@@ -993,6 +996,40 @@ async function openTutor(subjectId, course, teacher) {
   SB.mode = 'tutor'; SB.activeTeacher = { subjectId, course, teacher };
   messagesEl.innerHTML = '';
 
+  // Show intro slide once per session per class
+  const introKey = course + '::' + teacher;
+  if (!_introShownFor.has(introKey)) {
+    showIntroSlide(course, () => {
+      _introShownFor.add(introKey);
+      finishOpenTutor(subjectId, course, teacher, subjectName);
+    });
+    return;
+  }
+
+  await finishOpenTutor(subjectId, course, teacher, subjectName);
+}
+
+function showIntroSlide(course, onGo) {
+  const slide = $('introSlide');
+  const name = getStudentName();
+  $('introGreeting').textContent = name !== 'there'
+    ? `Hey ${name}. Your teacher is in.`
+    : 'Hey. Your teacher is in.';
+  $('introPill').textContent = course;
+  slide.style.display = '';
+  $('chatPanel').style.display = 'none';
+
+  const goBtn = $('introGoBtn');
+  const handler = () => {
+    goBtn.removeEventListener('click', handler);
+    slide.style.display = 'none';
+    $('chatPanel').style.display = '';
+    onGo();
+  };
+  goBtn.addEventListener('click', handler);
+}
+
+async function finishOpenTutor(subjectId, course, teacher, subjectName) {
   // Fetch teacher profile — with 5s hard timeout so it never hangs
   let profile = null;
   try {
