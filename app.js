@@ -711,8 +711,11 @@ const keyInput      = $('keyInput');
 
 let pendingAttachment = null;
 
-// Tracks which classes have shown the intro slide this session (not persisted)
-const _introShownFor = new Set();
+// Tracks which classes have shown the intro slide (persisted across sessions)
+const _introShownFor = new Set(
+  (() => { try { return JSON.parse(localStorage.getItem('lumi_intro_shown') || '[]'); } catch { return []; } })()
+);
+function _saveIntroShown() { localStorage.setItem('lumi_intro_shown', JSON.stringify([..._introShownFor])); }
 
 // ─── SUPABASE SYNC ────────────────────────────────────────────────────────────
 
@@ -1040,6 +1043,7 @@ async function openTutor(subjectId, course, teacher) {
   if (!_introShownFor.has(introKey)) {
     showIntroSlide(course, () => {
       _introShownFor.add(introKey);
+      _saveIntroShown();
       finishOpenTutor(subjectId, course, teacher, subjectName);
     });
     return;
