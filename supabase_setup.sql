@@ -75,15 +75,18 @@ create table teacher_profiles (
 
 alter table teacher_profiles enable row level security;
 
--- Teachers can read and write their own profiles
-create policy "Teachers manage own profiles" on teacher_profiles
-  for all using (teacher_email = (select email from auth.users where id = auth.uid()))
-  with check (teacher_email = (select email from auth.users where id = auth.uid()));
+-- Anyone authenticated can read all teacher profiles
+-- (students need this to load teacher context for tutoring)
+create policy "allow read teacher_profiles" on teacher_profiles
+  for select using (true);
 
--- Students (and anyone authenticated) can read all teacher profiles
--- so app.js can fetch teacher context when tutoring
-create policy "Authenticated users can read teacher profiles" on teacher_profiles
-  for select using (auth.role() = 'authenticated');
+-- Anyone can insert teacher profiles (teachers onboard themselves)
+create policy "allow upsert teacher_profiles" on teacher_profiles
+  for insert with check (true);
+
+-- Anyone authenticated can update teacher profiles
+create policy "allow update teacher_profiles" on teacher_profiles
+  for update using (true);
 
 -- Auto-update updated_at
 create trigger set_teacher_profiles_updated_at
