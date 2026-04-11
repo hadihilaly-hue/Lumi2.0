@@ -93,7 +93,7 @@ create trigger set_teacher_profiles_updated_at
 
 -- ─── HOMEWORK ────────────────────────────────────────────────────────────────
 
-create table homework (
+create table homework_tasks (
   id                text primary key,
   user_id           uuid not null references auth.users on delete cascade,
   title             text not null,
@@ -106,12 +106,12 @@ create table homework (
   updated_at        timestamp with time zone default timezone('utc'::text, now())
 );
 
-alter table homework enable row level security;
+alter table homework_tasks enable row level security;
 
-create policy "Users manage own homework" on homework
+create policy "Users manage own homework" on homework_tasks
   for all using (auth.uid() = user_id);
 
-create trigger set_homework_updated_at
-  before update on homework
+create trigger set_homework_tasks_updated_at
+  before update on homework_tasks
   for each row
   execute function update_updated_at_column();

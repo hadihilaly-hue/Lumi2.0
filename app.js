@@ -4534,10 +4534,10 @@ function syncHwToSupabase() {
     is_complete: !!t.isComplete,
   }));
   if (!rows.length) {
-    sb.from('homework').delete().eq('user_id', currentUser.id).then(() => {});
+    sb.from('homework_tasks').delete().eq('user_id', currentUser.id).then(() => {});
     return;
   }
-  sb.from('homework').upsert(rows, { onConflict: 'id' })
+  sb.from('homework_tasks').upsert(rows, { onConflict: 'id' })
     .then(({ error }) => { if (error) console.warn('[syncHw] upsert error:', error); });
 }
 
@@ -5329,7 +5329,7 @@ async function loadHwFromSupabase() {
   if (!currentUser) return;
   try {
     const { data, error } = await sb
-      .from('homework')
+      .from('homework_tasks')
       .select('*')
       .eq('user_id', currentUser.id);
     if (error) { console.warn('[loadHw] error:', error); return; }
