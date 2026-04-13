@@ -107,7 +107,6 @@ const MENLO_CURRICULUM = {
     "Humanities I: Renaissances": ["Rebecca Gertmenian"],
     "Humanities II: Self-Portraits": ["Rebecca Gertmenian"],
     "IP Capstone Seminar (H)": ["Peter Brown","Matthew Nelson"],
-    "Democratic Backsliding (Test Course)": ["Test Teacher"]
   },
   "Math": {
     "Integrated Geometry & Algebra": ["Christine Walters"],
@@ -568,63 +567,6 @@ async function preloadProfileStatuses() {
     });
     renderSidebar();
   } catch (e) { console.warn('[preloadProfileStatuses] failed:', e); }
-}
-
-// Seed data: profiles that should exist in Supabase. Pushed on app load via seedProfilesToSupabase().
-const SEED_PROFILES = [
-  {
-    teacher_email: 'hadi.hilaly@menloschool.org',
-    class_name: 'Democratic Backsliding (Test Course)',
-    subject: 'History & Social Sciences',
-    status: 'complete',
-    teaching_style: `Socratic case-method with strict pedagogical sequence:\n1. Measurement foundations — Freedom House data, V-Dem index, the disagreements between them. Students must sit with the measurement problem before analyzing the thing being measured.\n2. Historical collapse cases — Weimar Germany, Chile 1973. Introduce Levitsky & Ziblatt's 4 indicators here. Then put the framework away — no checklist on the desk, forces thinking over pattern-matching.\n3. Democratic backsliding specifically — Hungary, Turkey, Venezuela, Poland. Key pivot: backsliding ≠ collapse. It's slower, subtler, and usually legal. Leaders use democracy's own tools to hollow it out from the inside.\n4. What do we do about it — policy memo assessment. Intervention, not just diagnosis.`,
-    excellence_criteria: `B+ work: Accurate, careful, applies framework correctly, uses real evidence — but predictable. Every sentence could have been anticipated. Reports observations.\n\nA work: Makes a genuine argument that is specifically theirs. Could only have been written about this country at this moment. Surprises the reader through depth of reasoning.\n\nFour concrete markers of A work:\n1. SPECIFICITY OF MECHANISM not just events — Bad: "Orbán passed media legislation." Good: "Orbán restructured advertising revenue flows so state contracts became the financial lifeline of previously independent outlets, making editorial independence economically irrational."\n2. GENUINE COUNTERARGUMENT ENGAGEMENT — not a dismissive sentence, actual engagement with the strongest objection to their own argument\n3. CONSTRAINT AWARENESS IN RECOMMENDATIONS — not "strengthen judicial independence" but: given this government's legislative majority, this civil society's organizational capacity, this international environment — what can actually move? The constraint IS the analysis.\n4. INTELLECTUAL HONESTY ABOUT UNCERTAINTY — "This worked in Romania but transfer to this context is uncertain because of X" — acknowledging limits is sophistication, not weakness.`,
-    grading_philosophy: 'Calibrated skepticism: not cynicism, not naive optimism — the precise ability to ask "is this normal democratic competition or something else?" Understanding that backsliding is almost always legal. Holding complexity: backsliding happens because many ordinary people make individually rational decisions that collectively destroy something fragile. Pattern recognition that becomes instinctive, not mechanical.',
-    common_mistakes: ['Tautological reasoning: "backsliding because democracy is weakening"', 'Unearned certainty: no counterargument, no acknowledged limitation', 'Borrowed conclusions without local application: recommending "strengthen the courts" without engaging the specific political constraints that make that hard in this specific country'],
-    explanation_methods: `When a student gives an oversimplified or wrong answer:\nStep 1: Do NOT correct directly, do not signal error through tone\nStep 2: Ask "Walk me through how you applied the framework to reach that. Which indicators did you find present, which absent?"\nStep 3: Listen for exactly where the application breaks down\nStep 4: Ask ONE pointed question targeting that specific crack only\nStep 5: Wait. Let the student find the inconsistency themselves.\nStep 6: Never ask multiple corrections at once — one question, then wait.\n\nTWO-QUESTION DIAGNOSTIC for policy recommendations:\nWhen a student makes a policy recommendation, run these two questions in sequence:\n1. "Walk me through the mechanism — how does this intervention actually change the political incentives of the relevant actors?"\n2. "What's your evidence that this intervention has worked in a comparable case?"\nThese two questions alone expose almost any borrowed conclusion without local application.\n\nHARD CONSTRAINT — ONE QUESTION THEN STOP:\nAfter identifying the weakest point in a student's reasoning, ask exactly ONE question about it, then stop completely. Do not ask a follow-up question in the same response under any circumstances. Wait for the student to answer before probing further. If you find multiple problems in a student's reasoning, pick the single most important one and ask only about that.`,
-    key_values: 'Push back on reasoning quality, NEVER on political conclusions. If a student applies the framework carefully and reaches a different conclusion than expected, challenge the reasoning, not the conclusion. The scale of AI influence makes it especially dangerous to nudge students toward particular political views, even subtly.',
-    class_specific_notes: `Case selection logic:\n- Always start with historical cases (Weimar Germany, Chile 1973) — no emotional investment, students can analyze coldly and build the skill\n- Move to contemporary international cases (Hungary, Turkey, Venezuela, Poland)\n- Arrive at American examples ONLY through comparative lens: "Apply the same tools you used on Hungary. What do you see?"\n- Never introduce American examples cold\n- Never facilitate election integrity debates — redirect to underlying structural conditions (press freedom, judicial independence, civil society)`,
-    teacher_voice: 'Warm but intellectually rigorous. Genuinely curious about student reasoning. Uses "What\'s the strongest version of the argument against yours?" — never "steelman the other side." Same exercise, less threatening, more engagement.',
-    key_themes_and_topics: ['Measurement (Freedom House, V-Dem)', 'Levitsky & Ziblatt framework (4 indicators)', 'democratic erosion vs collapse', 'institutional constraints', 'press freedom', 'judicial independence', 'civil society', 'historical cases (Weimar, Chile)', 'contemporary cases (Hungary, Turkey, Venezuela, Poland)', 'policy interventions and constraints', 'comparative analysis methodology'],
-    topics_not_covered: ['Electoral mechanics', 'gerrymandering', 'campaign finance', 'voting systems', 'political philosophy (Locke, Rousseau, Rawls)', 'election integrity debates (redirect to structural conditions)', 'predictions about where any country is headed'],
-    lumi_dos: ['Ask student to walk through reasoning before responding', 'Use "What\'s the strongest version of the argument against yours?"', 'Push back on reasoning quality only', 'Let students find their own inconsistencies', 'Start with historical cases for psychological safety', 'For policy recommendations: run two-question diagnostic (mechanism then evidence)', 'Find the single most important weakness and ask ONE question about it'],
-    lumi_donts: ['Never generate analysis for the student — not even partially disguised as a hint', 'Never tell a student what their political conclusion should be', 'Never validate surface-level thinking to be encouraging — false floors are not kindness', 'Never say "steelman the other side"', 'Never make more than one correction per response', 'Never engage deeply with out-of-scope topics as if they are course content', 'Never make predictions about where countries are headed', 'Never nudge students toward particular political views, even subtly', 'Never introduce American examples without comparative context first'],
-    rules_and_procedures: 'AI allowed for: brainstorming, checking argument structure, draft feedback. AI NOT allowed for: generating the analysis itself. The test: "If you couldn\'t defend every sentence in a 10-minute conversation with your teacher, you\'ve crossed the line."',
-    north_star: 'Lumi\'s goal is to help students reach the point where they can defend every part of their analysis in a conversation with their teacher. If Lumi is doing the analysis for the student, it has failed.',
-    typical_hw_duration_minutes: 45,
-    updated_at: new Date().toISOString()
-  }
-];
-
-// Push seed profiles to Supabase (runs on app load, non-blocking)
-// Columns that exist in the Supabase teacher_profiles table
-const TEACHER_PROFILE_COLUMNS = [
-  'teacher_email','class_name','subject','status','done',
-  'teaching_style','excellence_criteria','grading_philosophy',
-  'common_mistakes','explanation_methods','key_values',
-  'class_specific_notes','teacher_voice','messages_json',
-  'created_at','updated_at'
-];
-
-async function seedProfilesToSupabase() {
-  for (const seed of SEED_PROFILES) {
-    const key = seed.teacher_email + '__' + seed.class_name;
-    // Always cache locally (full object including extra fields)
-    _profileCache[key] = seed;
-    // Filter to only columns that exist in the table
-    const row = {};
-    TEACHER_PROFILE_COLUMNS.forEach(col => { if (seed[col] !== undefined) row[col] = seed[col]; });
-    // Try to push to Supabase
-    try {
-      const { error } = await sb
-        .from('teacher_profiles')
-        .upsert(row, { onConflict: 'teacher_email,class_name' });
-      if (error) console.warn('[seed] upsert error (non-critical):', error.message);
-      else console.log('[seed] pushed to Supabase:', seed.class_name);
-    } catch (e) {
-      console.warn('[seed] push failed (using cache):', e.message || e);
-    }
-  }
 }
 
 // Single lookup function — Supabase first, then in-memory cache.
@@ -1090,17 +1032,33 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
   if (profile?.__notReady) {
     greeting = `${firstName} hasn't finished setting up their Lumi profile yet — their interview is still in progress. Check back soon, or try General Chat in the meantime.`;
     S.tutorCtx.teacherProfile = null;
+    msgInput.disabled = true;
+    msgInput.placeholder = 'Chat unavailable \u2014 use General Chat until this teacher completes setup';
+    $('sendBtn').disabled = true;
     console.warn('[openTutor] profile not ready for:', teacher, course);
   } else if (profile) {
     S.tutorCtx.teacherProfile = profile;
     greeting = `Hey! You're studying ${course} with ${firstName}. I've learned how ${firstName} teaches and what they look for — ask me anything and I'll help you the way ${firstName} would.`;
+    msgInput.disabled = false;
+    msgInput.placeholder = 'Say something\u2026';
+    $('sendBtn').disabled = false;
   } else {
-    greeting = `⚠️ ${firstName} hasn't set up their Lumi profile for ${course} yet. Once they complete their setup interview, I'll be able to help you exactly the way ${firstName} teaches. In the meantime, you can use General Chat.`;
+    greeting = `\u26a0\ufe0f ${firstName} hasn't set up their Lumi profile for ${course} yet. Once they complete their setup interview, I'll be able to help you exactly the way ${firstName} teaches. In the meantime, you can use General Chat.`;
     S.tutorCtx.teacherProfile = null;
-    console.error('[openTutor] NO PROFILE for:', teacher, course, '— student sees warning');
+    msgInput.disabled = true;
+    msgInput.placeholder = 'Chat unavailable \u2014 use General Chat until this teacher completes setup';
+    $('sendBtn').disabled = true;
+    console.error('[openTutor] NO PROFILE for:', teacher, course, '\u2014 student sees warning');
   }
   S.messages.push({ role: 'assistant', content: greeting });
   renderMsg('lumi', greeting, true);
+  // Add "Open General Chat" button for pending/missing profiles
+  if (!profile || profile.__notReady) {
+    const btnWrap = document.createElement('div');
+    btnWrap.style.cssText = 'text-align:center;margin:12px 0';
+    btnWrap.innerHTML = '<button class="pending-gen-chat-btn" onclick="openGeneralChat()">Open General Chat instead \u2192</button>';
+    messagesEl.appendChild(btnWrap);
+  }
   saveCurrentConv();
   renderSidebar();
   scrollBottom();
@@ -1112,6 +1070,9 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
 function openGeneralChat() {
   clearSearch();
   saveCurrentConv();
+  msgInput.disabled = false;
+  msgInput.placeholder = 'Say something\u2026';
+  $('sendBtn').disabled = false;
   const name = getStudentName();
   S.currentId     = genId();
   S.messages      = [];
@@ -1124,6 +1085,28 @@ function openGeneralChat() {
   const greeting = name !== 'there' ? `Hey ${name}! What's on your mind?` : `Hey! What's on your mind?`;
   S.messages.push({ role: 'assistant', content: greeting });
   renderMsg('lumi', greeting, true);
+  // S4: Add suggested prompt cards
+  const promptCards = document.createElement('div');
+  promptCards.className = 'general-prompt-cards';
+  promptCards.id = 'generalPromptCards';
+  const prompts = [
+    { icon: '\ud83d\udcda', text: 'Help me study for a test' },
+    { icon: '\ud83d\udca1', text: 'Explain a concept I\'m stuck on' },
+    { icon: '\u270f\ufe0f', text: 'Help me outline an essay' },
+    { icon: '\u2705', text: 'Review my homework approach' }
+  ];
+  prompts.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'general-prompt-card';
+    card.innerHTML = `<div class="general-prompt-card-icon">${p.icon}</div><div class="general-prompt-card-text">${p.text}</div>`;
+    card.addEventListener('click', () => {
+      msgInput.value = p.text;
+      msgInput.focus();
+      promptCards.remove();
+    });
+    promptCards.appendChild(card);
+  });
+  messagesEl.appendChild(promptCards);
   saveCurrentConv();
   renderSidebar();
   scrollBottom();
@@ -1464,7 +1447,8 @@ function renderSidebar() {
       const profileStatus = _profileStatusCache[course + '::' + teacher];
       const badge = document.createElement('span');
       badge.className = 'sb-profile-badge ' + (profileStatus === 'ready' ? 'ready' : 'pending');
-      badge.textContent = profileStatus === 'ready' ? 'Profile ready' : 'Profile pending';
+      badge.textContent = '';
+      badge.dataset.tip = profileStatus === 'ready' ? 'Profile ready' : 'Profile pending';
       item.appendChild(star);
       item.appendChild(name);
       item.appendChild(tch);
@@ -2943,7 +2927,6 @@ function startApp(savedKey) {
   initVoice();
   wireVoiceListeners();
 
-  seedProfilesToSupabase(); // push seed profiles to Supabase (non-blocking)
   preloadProfileStatuses(); // fetch teacher profile statuses for sidebar badges (non-blocking)
   loadHwFromSupabase().then(async () => {
     await loadProjectsFromSupabase();
@@ -3062,6 +3045,8 @@ function handleFileSelect(file) {
 async function doSend() {
   const text = msgInput.value.trim();
   if (!text && !pendingAttachment) return;
+  // Remove prompt cards on first send
+  const pc = $('generalPromptCards'); if (pc) pc.remove();
   if (S.busy) return;
   if (!localStorage.getItem('lumi_key')) { showToast('Add your API key in Settings.'); openSettings(); return; }
 
@@ -3849,6 +3834,7 @@ async function getTeacherProfileCached(course, teacherName) {
 
 // ── Daily popup check ──────────────────────────────────────
 function checkDailyHwPrompt() {
+  if (sessionStorage.getItem('homeworkCheckinShown')) return; // only auto-show once per session
   const lastDate = localStorage.getItem('lumi_hw_date');
   if (lastDate === todayStr()) return;           // already shown today
   const schedule = getSchedule();
@@ -3871,6 +3857,7 @@ function openHwBackdrop()  { $('hwBackdrop').classList.add('open'); }
 function closeHwBackdrop() { $('hwBackdrop').classList.remove('open'); }
 
 function showHwPopup() {
+  sessionStorage.setItem('homeworkCheckinShown', 'true');
   localStorage.setItem('lumi_hw_date', todayStr());
   openHwBackdrop();
   const popup = $('hwPopup');
@@ -3905,7 +3892,19 @@ function showHwAddModal(prefillClass) {
     opt.textContent = course;
     sel.appendChild(opt);
   });
-  if (prefillClass) sel.value = prefillClass;
+  // S9: Default to prefill, current tutor context, or placeholder
+  if (prefillClass) {
+    sel.value = prefillClass;
+  } else if (S.tutorCtx?.course) {
+    sel.value = S.tutorCtx.course;
+  } else {
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Select a class\u2026';
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    sel.insertBefore(placeholder, sel.firstChild);
+  }
 
   // Default due date = today
   $('hwDueInput').value = todayStr();

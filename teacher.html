@@ -331,7 +331,7 @@ body { overflow: auto; display: block; }
 .t-status-dot {
   width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; display: inline-block;
 }
-.t-status-dot.not_started { background: #ef4444; box-shadow: 0 0 5px rgba(239,68,68,.45); }
+.t-status-dot.not_started { background: #9CA3AF; box-shadow: 0 0 5px rgba(156,163,175,.35); }
 .t-status-dot.in_progress { background: #fbbf24; box-shadow: 0 0 5px rgba(251,191,36,.45); }
 .t-status-dot.complete    { background: #34d399; box-shadow: 0 0 5px rgba(52,211,153,.45); }
 
@@ -401,6 +401,8 @@ body { overflow: auto; display: block; }
   .t-home-body { padding: 24px 16px 48px; }
   .t-home-header { padding: 14px 16px; }
   .t-cards-grid { grid-template-columns: 1fr; }
+  .t-filter-bar { flex-direction: column; }
+  .t-filter-pills { width: 100%; }
 }
 </style>
 </head>
@@ -452,13 +454,13 @@ body { overflow: auto; display: block; }
 <!-- HOME VIEW -->
 <div id="homeView" style="display:none">
   <div class="t-home-header">
-    <div class="t-home-header-left">
+    <a href="#" onclick="goHome(); return false;" class="t-home-header-left" style="text-decoration:none;color:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
       <div class="t-hdr-mark">✦</div>
       <div>
         <div class="t-hdr-title">Lumi <span style="color:var(--text-muted);font-weight:400">·</span> Teacher Portal</div>
         <div class="t-hdr-sub">Menlo School</div>
       </div>
-    </div>
+    </a>
     <div class="t-hdr-right">
       <div class="t-hdr-user">
         <div class="t-hdr-avatar" id="hdrAvatar"></div>
@@ -474,6 +476,16 @@ body { overflow: auto; display: block; }
       <p>Click a class to complete Lumi's setup interview. Once done, your students will get AI tutoring calibrated to your teaching style.</p>
     </div>
     <div class="t-section-label">Your Classes</div>
+    <div class="t-filter-bar" id="tFilterBar" style="display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap">
+      <input class="t-filter-search" id="tClassSearch" placeholder="Search classes..." autocomplete="off"
+        style="flex:1;min-width:180px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-family:inherit;font-size:13px;color:var(--text);outline:none">
+      <div class="t-filter-pills" id="tFilterPills" style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="t-filter-pill active" data-status="all" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--accent-soft);color:var(--accent);transition:all .15s">All</button>
+        <button class="t-filter-pill" data-status="not_started" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);transition:all .15s">Not Started</button>
+        <button class="t-filter-pill" data-status="in_progress" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);transition:all .15s">In Progress</button>
+        <button class="t-filter-pill" data-status="complete" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);transition:all .15s">Complete</button>
+      </div>
+    </div>
     <div class="t-cards-grid" id="classCards"></div>
     <div style="margin-top:32px">
       <div class="t-section-label" style="margin-bottom:14px">Anthropic API Key</div>
@@ -512,9 +524,6 @@ body { overflow: auto; display: block; }
         <div class="t-class-display-name" id="sbClassName"></div>
       </div>
       <div class="t-sb-divider"></div>
-      <div class="t-sb-key-label">API Key</div>
-      <input class="t-sb-key-input" id="sbKeyInput" type="password" placeholder="sk-ant-…" autocomplete="off">
-      <div class="t-sb-key-saved" id="sbKeySaved"></div>
     </div>
     <div class="t-chat-sb-foot">
       <button class="t-sb-signout" onclick="doSignOut()">
@@ -938,6 +947,23 @@ async function bootHome() {
   // Load all teacher profiles from Supabase
   await loadAllTeacherProfiles();
   renderClassCards();
+
+  // T2: Wire filter bar
+  document.getElementById('tClassSearch')?.addEventListener('input', renderClassCards);
+  document.querySelectorAll('.t-filter-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('.t-filter-pill').forEach(p => {
+        p.classList.remove('active');
+        p.style.background = 'var(--surface)';
+        p.style.color = 'var(--text-muted)';
+      });
+      pill.classList.add('active');
+      pill.style.background = 'var(--accent-soft)';
+      pill.style.color = 'var(--accent)';
+      renderClassCards();
+    });
+  });
+
   showView('homeView');
 }
 
@@ -968,26 +994,58 @@ function lookupSubjectForCourse(courseName) {
 
 function renderClassCards() {
   const grid = document.getElementById('classCards');
+  const filterBar = document.getElementById('tFilterBar');
   grid.innerHTML = '';
+
+  // T8: Empty state for no classes
+  if (!tTeacher.classes || tTeacher.classes.length === 0) {
+    if (filterBar) filterBar.style.display = 'none';
+    grid.innerHTML = `
+      <div style="grid-column:1/-1;text-align:center;padding:60px 20px">
+        <div style="font-size:48px;margin-bottom:16px">📚</div>
+        <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px">No classes yet</div>
+        <div style="font-size:14px;color:var(--text-muted);max-width:340px;margin:0 auto;line-height:1.6">
+          Your classes will appear here once an administrator adds them to your account. Contact your school admin if you believe this is an error.
+        </div>
+      </div>`;
+    return;
+  }
+  if (filterBar) filterBar.style.display = 'flex';
+
+  // T2: Read filter state
+  const searchTerm = (document.getElementById('tClassSearch')?.value || '').toLowerCase().trim();
+  const activeFilter = document.querySelector('.t-filter-pill.active')?.dataset.status || 'all';
+
   tTeacher.classes.forEach(course => {
     const subject     = lookupSubjectForCourse(course);
     const profile     = tProfiles[course];
-    // Use explicit status field; fall back to inferring from done/data for old rows
     const rawStatus   = profile?.status
       || (profile?.done ? 'complete' : (profile?.teaching_style ? 'in_progress' : 'not_started'));
     const status      = rawStatus;
+
+    // T2: Filter by search and status
+    if (searchTerm && !course.toLowerCase().includes(searchTerm) && !subject.toLowerCase().includes(searchTerm)) return;
+    if (activeFilter !== 'all' && status !== activeFilter) return;
 
     const dotClass    = status === 'complete' ? 'complete'
                       : status === 'in_progress' ? 'in_progress' : 'not_started';
     const statusLabel = status === 'complete' ? 'Complete'
                       : status === 'in_progress' ? 'In Progress' : 'Not Started';
     const btnLabel    = status === 'complete' ? 'View & Edit'
-                      : status === 'in_progress' ? 'Continue' : 'Get Started';
+                      : status === 'in_progress' ? 'Resume interview' : 'Start setup interview';
 
     const previewText = profile?.teaching_style || profile?.key_values || '';
 
+    // T4: Compute progress for in-progress cards
+    const msgCount = profile?.messages_json?.length || 0;
+    const questionsAnswered = Math.min(8, Math.floor(msgCount / 2));
+    const progressPct = status === 'complete' ? 100 : Math.round((questionsAnswered / 8) * 100);
+
     const card = document.createElement('div');
     card.className = 't-card';
+    // T5: Colored left border by status
+    card.style.borderLeft = '3px solid ' + (status === 'complete' ? '#34d399' : status === 'in_progress' ? '#fbbf24' : '#9CA3AF');
+
     card.innerHTML = `
       <div class="t-card-subject">${escHtml(subject)}</div>
       <div class="t-card-course">${escHtml(course)}</div>
@@ -995,7 +1053,14 @@ function renderClassCards() {
         <span class="t-status-dot ${dotClass}"></span>
         <span style="font-size:11.5px;color:var(--text-muted);font-weight:500">${statusLabel}</span>
       </div>
+      ${status === 'in_progress' ? `
+        <div style="width:100%;height:4px;background:var(--surface-2);border-radius:2px;overflow:hidden;margin-top:6px">
+          <div style="height:100%;background:var(--accent);border-radius:2px;width:${progressPct}%;transition:width .3s"></div>
+        </div>
+        <div style="font-size:10.5px;color:var(--text-muted);margin-top:2px">${questionsAnswered}/8 questions answered</div>
+      ` : ''}
       ${previewText ? `<div class="t-card-preview">${escHtml(previewText)}</div>` : ''}
+      ${status === 'complete' ? `<div style="font-size:10px;color:#34d399;font-weight:600;margin-top:4px">✓ Setup complete</div>` : ''}
       <div style="margin-top:8px;font-size:12px;font-weight:600;color:var(--accent)">${escHtml(btnLabel)} →</div>
     `;
     card.addEventListener('click', () => openClassChat({ course, subject }));
@@ -1074,21 +1139,6 @@ async function openClassChat({ course, subject }) {
   document.getElementById('sbClassName').textContent = course;
   document.getElementById('chatHeaderName').textContent = course;
   document.getElementById('chatHeaderSub').textContent  = `${subject} · Teacher setup`;
-
-  // Wire API key input in sidebar
-  const sbKey = document.getElementById('sbKeyInput');
-  sbKey.value = localStorage.getItem('lumi_key') ? '••••••••' : '';
-  sbKey.addEventListener('input', () => {
-    const v = sbKey.value.trim();
-    if (v && !v.startsWith('•')) {
-      localStorage.setItem('lumi_key', v);
-      sbKey.value = '••••••••';
-      document.getElementById('sbKeySaved').textContent  = '✓ Key saved';
-      document.getElementById('sbKeySaved').style.display = 'block';
-      setTimeout(() => { document.getElementById('sbKeySaved').style.display = 'none'; }, 2000);
-      updateInputState();
-    }
-  });
 
   // Wire send
   const input   = document.getElementById('tInput');

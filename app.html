@@ -197,7 +197,7 @@
     <!-- Search -->
     <div class="sb-search-wrap">
       <span class="sb-search-ico"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
-      <input class="sb-search" id="sbSearch" placeholder="Search teachers & classes…" autocomplete="off">
+      <input class="sb-search" id="sbSearch" placeholder="Search teachers & classes…" autocomplete="off" value="">
     </div>
 
     <!-- Search results dropdown (shown when typing) -->
@@ -339,12 +339,17 @@
       </div>
     </div>
 
-    <!-- API Key -->
+    <!-- API Key (collapsed under Advanced) -->
     <div class="settings-section">
-      <div class="settings-section-title">API Key</div>
-      <input type="password" class="settings-input" id="keyInput" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
-      <button class="settings-save-btn" id="saveKeyBtn">Save key</button>
-      <div class="settings-hint">Your key is stored locally and never shared.</div>
+      <details class="settings-advanced">
+        <summary class="settings-advanced-toggle">Advanced</summary>
+        <div style="margin-top:10px">
+          <div class="settings-section-title" style="margin-bottom:10px">API Key</div>
+          <input type="password" class="settings-input" id="keyInput" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+          <button class="settings-save-btn" id="saveKeyBtn">Save key</button>
+          <div class="settings-hint">Your key is stored locally and never shared.</div>
+        </div>
+      </details>
     </div>
 
     <!-- Calendar Integration -->
