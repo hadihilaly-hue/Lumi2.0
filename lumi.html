@@ -563,12 +563,6 @@ html.light .hist-dropdown{box-shadow:0 8px 28px rgba(0,0,0,.15)}
       </div>
     </div>
     <div class="settings-section">
-      <div class="settings-section-title">API Key</div>
-      <input type="password" class="settings-input" id="keyInput" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
-      <button class="settings-save-btn" id="saveKeyBtn">Save key</button>
-      <div class="settings-hint">Your key is stored locally and never shared.</div>
-    </div>
-    <div class="settings-section">
       <div class="settings-section-title">Memory</div>
       <button class="danger-btn" id="clearMemBtn">Clear all memory</button>
     </div>
@@ -824,7 +818,7 @@ let pendingAttachment = null;
 const sbNav       = $('sbNav');
 const sbSearch    = $('sbSearch');
 const themeToggle = $('themeToggle');
-const keyInput    = $('keyInput');
+// API key is now server-side (Netlify function); no client-side key needed
 
 // ─── CONVERSATION STORAGE ─────────────────────────────────────────────────────
 function genId() { return 'conv_'+Date.now()+'_'+Math.random().toString(36).slice(2,5); }
@@ -926,7 +920,7 @@ function newChat() {
   showWelcome();
 
   renderSidebar();
-  if (localStorage.getItem('lumi_key')) startLumi();
+  startLumi();
 }
 
 // ─── OPEN TUTOR SESSION ───────────────────────────────────────────────────────
@@ -1335,22 +1329,18 @@ function init() {
     themeToggle.checked = true;
   }
 
-  // API key
-  const savedKey = localStorage.getItem('lumi_key');
-  if (savedKey) keyInput.value = savedKey;
-
   // Check onboarding
   const onboarded = localStorage.getItem('lumi_name');
   if (!onboarded) {
-    initOnboarding(() => { wireListeners(savedKey); startApp(savedKey); });
+    initOnboarding(() => { wireListeners(); startApp(); });
     return;
   }
   $('onboarding').style.display = 'none';
-  startApp(savedKey);
-  wireListeners(savedKey);
+  startApp();
+  wireListeners();
 }
 
-function wireListeners(savedKey) {
+function wireListeners() {
   // New Chat
   $('newChatBtn').addEventListener('click', () => {
     if (S.messages.length > 0) {
@@ -1379,16 +1369,6 @@ function wireListeners(savedKey) {
     const light = themeToggle.checked;
     document.documentElement.classList.toggle('light', light);
     localStorage.setItem('lumi_theme', light ? 'light' : 'dark');
-  });
-
-  $('saveKeyBtn').addEventListener('click', () => {
-    const key = keyInput.value.trim();
-    if (key) {
-      localStorage.setItem('lumi_key', key);
-      showToast('API key saved.', 'ok');
-      closeSettings();
-      if (!S.ready) startLumi();
-    } else showToast('Please enter an API key.');
   });
 
   $('clearMemBtn').addEventListener('click', () => {
@@ -1441,7 +1421,7 @@ function wireListeners(savedKey) {
   sendBtn.addEventListener('click', doSend);
 }
 
-function startApp(savedKey) {
+function startApp() {
   migrateOldData();
   // Always start fresh on page load — previous convs accessible in sidebar
   S.currentId = genId();
@@ -1455,7 +1435,7 @@ function openSettings()  { $('settingsDrawer').classList.add('open'); $('setting
 function closeSettings() { $('settingsDrawer').classList.remove('open'); $('settingsOverlay').classList.remove('open'); }
 
 function updateSendBtn() {
-  sendBtn.disabled = !localStorage.getItem('lumi_key') || (!msgInput.value.trim() && !pendingAttachment) || S.busy;
+  sendBtn.disabled = (!msgInput.value.trim() && !pendingAttachment) || S.busy;
 }
 function autoGrow(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
 
@@ -1539,8 +1519,6 @@ async function doSend() {
   const text = msgInput.value.trim();
   if (!text && !pendingAttachment) return;
   if (S.busy) return;
-  if (!localStorage.getItem('lumi_key')) { showToast('Add your API key in Settings.'); openSettings(); return; }
-
   if (!S.ready) {
     S.ready = true;
     const w = document.getElementById('welcome'); if (w) w.remove();
@@ -1581,21 +1559,15 @@ async function doSend() {
 
 // ─── GENERATE TITLE ──────────────────────────────────────────────────────────
 async function generateTitle(convId, firstUserMsg) {
-  const apiKey = localStorage.getItem('lumi_key');
-  if (!apiKey || !firstUserMsg) return;
+  if (!firstUserMsg) return;
   // Only generate if the conv doesn't already have a real title
   const convs = getConvs();
   if (!convs[convId] || convs[convId].title) return;
   try {
     const prompt = `Generate a short 4-6 word title for this conversation. Just the title, nothing else, no punctuation at the end: ${firstUserMsg.slice(0, 300)}`;
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/anthropic', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-haiku-4-5',
         max_tokens: 20,
@@ -1623,7 +1595,7 @@ async function fetchLumi() {
     const system = S.tutorCtx
       ? buildTutorSystem(S.tutorCtx.subjectName, S.tutorCtx.course, S.tutorCtx.teacher)
       : buildCompanionSystem();
-    const { clean, data } = await callAPI(localStorage.getItem('lumi_key'), S.messages, system);
+    const { clean, data } = await callAPI(S.messages, system);
     typing.remove();
     S.messages.push({ role:'assistant', content:clean });
     S.exchangeCount++;
@@ -1651,15 +1623,10 @@ async function fetchLumi() {
 }
 
 // ─── API CALL ────────────────────────────────────────────────────────────────
-async function callAPI(apiKey, msgs, system) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+async function callAPI(msgs, system) {
+  const res = await fetch('/api/anthropic', {
     method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version':'2023-06-01',
-      'anthropic-dangerous-direct-browser-access':'true',
-    },
+    headers:{ 'Content-Type':'application/json' },
     body: JSON.stringify({
       model:'claude-sonnet-4-20250514',
       max_tokens:2500,

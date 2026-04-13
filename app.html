@@ -20,20 +20,6 @@
 <!-- ─── ONBOARDING ─────────────────────────────────────── -->
 <div class="onboarding" id="onboarding" style="display:none">
 
-  <!-- API-key gate (only shown when no key is saved) -->
-  <div class="ob-key-step" id="obKeyStep" style="display:none">
-    <div class="ob-logo">
-      <div class="ob-logo-mark">✦</div>
-      <div class="ob-logo-name">Lumi</div>
-      <div class="ob-logo-school">Menlo School</div>
-    </div>
-    <div class="ob-card">
-      <div class="ob-q">One quick thing first<span class="ob-q-sub">Lumi runs on the Claude API. Paste your Anthropic key to get started — it stays on your device.</span></div>
-      <input class="ob-name-input" id="obKeyInput" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
-      <button class="ob-cta" id="obKeyNext" disabled>Start talking to Lumi →</button>
-    </div>
-  </div>
-
   <!-- Conversational chat onboarding -->
   <div class="ob-chat-wrap" id="obChatWrap" style="display:none">
     <div class="ob-chat-header">
@@ -337,19 +323,6 @@
           <div class="toggle-thumb"></div>
         </label>
       </div>
-    </div>
-
-    <!-- API Key (collapsed under Advanced) -->
-    <div class="settings-section">
-      <details class="settings-advanced">
-        <summary class="settings-advanced-toggle">Advanced</summary>
-        <div style="margin-top:10px">
-          <div class="settings-section-title" style="margin-bottom:10px">API Key</div>
-          <input type="password" class="settings-input" id="keyInput" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
-          <button class="settings-save-btn" id="saveKeyBtn">Save key</button>
-          <div class="settings-hint">Your key is stored locally and never shared.</div>
-        </div>
-      </details>
     </div>
 
     <!-- Calendar Integration -->

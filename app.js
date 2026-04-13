@@ -649,7 +649,7 @@ const fileInput     = $('fileInput');
 const sbNav         = $('sbNav');
 const sbSearch      = $('sbSearch');
 const themeToggle   = $('themeToggle');
-const keyInput      = $('keyInput');
+// API key is now server-side (Netlify function); no client-side key needed
 
 let pendingAttachment = null;
 
@@ -962,7 +962,7 @@ function newChat() {
   messagesEl.innerHTML = '';
   showWelcome();
   renderSidebar();
-  if (localStorage.getItem('lumi_key')) startLumi();
+  startLumi();
 }
 
 // ─── OPEN TUTOR SESSION ───────────────────────────────────────────────────────
@@ -2142,32 +2142,11 @@ function initOnboarding(onDone) {
   const googleName = currentUser?.user_metadata?.full_name || currentUser?.user_metadata?.name || '';
   if (googleName) OB.profile.name = googleName.split(' ')[0];
 
-  const savedKey = localStorage.getItem('lumi_key');
-  if (!savedKey) {
-    showObKeyGate();
-  } else {
-    showObChatUI();
-    startObConversation();
-  }
-}
-
-function showObKeyGate() {
-  $('obKeyStep').style.display  = '';
-  $('obChatWrap').style.display = 'none';
-  const input = $('obKeyInput');
-  const btn   = $('obKeyNext');
-  input.addEventListener('input', () => { btn.disabled = !input.value.trim().startsWith('sk-'); });
-  btn.addEventListener('click', () => {
-    const key = input.value.trim();
-    if (!key) return;
-    localStorage.setItem('lumi_key', key);
-    showObChatUI();
-    startObConversation();
-  });
+  showObChatUI();
+  startObConversation();
 }
 
 function showObChatUI() {
-  $('obKeyStep').style.display  = 'none';
   $('obChatWrap').style.display = '';
   const input = $('obInput');
   const btn   = $('obSend');
@@ -2335,7 +2314,6 @@ async function obSaveFullProfile() {
 async function startObConversation() {
   OB.busy = true;
   obShowTyping();
-  const key = localStorage.getItem('lumi_key');
 
   // Seed with Google name if available so AI uses it immediately
   const seedMsg = OB.profile.name
@@ -2343,14 +2321,9 @@ async function startObConversation() {
     : 'Hi!';
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/anthropic', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 2500,
@@ -2393,17 +2366,11 @@ async function obSend() {
 
   OB.busy = true;
   obShowTyping();
-  const key = localStorage.getItem('lumi_key');
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/anthropic', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 2500,
@@ -2745,17 +2712,13 @@ function init() {
     themeToggle.checked = true;
   }
 
-  // API key
-  const savedKey = localStorage.getItem('lumi_key');
-  if (savedKey) keyInput.value = savedKey;
-
   // Onboarding + schedule setup
   // Gate on onboarding_complete so a Supabase-restored name doesn't skip the interview
   const hasOnboarded = localStorage.getItem('lumi_onboarding_complete') === 'true';
   const hasName      = !!localStorage.getItem('lumi_name');
   const hasSchedule  = getSchedule().length > 0;
 
-  wireListeners(savedKey);
+  wireListeners();
 
   // Show conversational onboarding for brand-new users (no name at all),
   // then hand off to the class/grade picker box
@@ -2763,7 +2726,7 @@ function init() {
     $('onboarding').style.display = '';
     initOnboarding(() => {
       // After the chat, always show the class+grade picker
-      initScheduleSetup(() => startApp(savedKey));
+      initScheduleSetup(() => startApp());
     });
     return;
   }
@@ -2771,7 +2734,7 @@ function init() {
   // Has name from the new onboarding flow — already completed
   if (hasOnboarded) {
     $('onboarding').style.display = 'none';
-    startApp(savedKey);
+    startApp();
     return;
   }
 
@@ -2779,14 +2742,14 @@ function init() {
   $('onboarding').style.display = 'none';
 
   if (!hasSchedule) {
-    initScheduleSetup(() => startApp(savedKey));
+    initScheduleSetup(() => startApp());
     return;
   }
 
-  startApp(savedKey);
+  startApp();
 }
 
-function wireListeners(savedKey) {
+function wireListeners() {
   $('newChatBtn').addEventListener('click', () => {
     if (S.messages.length > 0) {
       if (confirm('Start a new chat? Your current conversation will be saved.')) newChat();
@@ -2810,19 +2773,6 @@ function wireListeners(savedKey) {
     const light = themeToggle.checked;
     document.documentElement.classList.toggle('light', light);
     localStorage.setItem('lumi_theme', light ? 'light' : 'dark');
-  });
-
-  $('saveKeyBtn').addEventListener('click', () => {
-    const key = keyInput.value.trim();
-    if (key) {
-      localStorage.setItem('lumi_key', key);
-      showToast('API key saved. You\'re ready to chat!', 'ok');
-      closeSettings();
-      updateSendBtn();
-      if (!S.ready) startLumi();
-    } else {
-      showToast('Please enter a valid API key (starts with sk-ant-).');
-    }
   });
 
   $('updateScheduleBtn').addEventListener('click', () => {
@@ -2909,7 +2859,7 @@ function wireListeners(savedKey) {
   sendBtn.addEventListener('click', doSend);
 }
 
-function startApp(savedKey) {
+function startApp() {
   migrateOldData();
   S.currentId = genId();
   wireHwListeners();
@@ -2938,7 +2888,6 @@ function startApp(savedKey) {
   renderSidebar();
   showWelcome();
   checkSemesterBanner();
-  if (!savedKey) showNoKeyBanner();
 
   // Wire timeline modal close buttons
   const tlClose   = $('timelineClose');
@@ -2947,28 +2896,13 @@ function startApp(savedKey) {
   if (tlBackdrop) tlBackdrop.addEventListener('click', closeTimelineModal);
 }
 
-function showNoKeyBanner() {
-  if ($('noKeyBanner')) return;
-  const b = document.createElement('div');
-  b.id = 'noKeyBanner';
-  b.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a0a00;border:1px solid rgba(255,160,50,.3);color:#ffb060;font-size:13px;padding:10px 18px;border-radius:10px;z-index:300;text-align:center;max-width:340px;line-height:1.5;cursor:pointer;';
-  b.innerHTML = '🔑 <strong>Add your Anthropic API key</strong> to start chatting.<br><span style="font-size:11px;opacity:.8">Click Settings (bottom-left) → API Key</span>';
-  b.addEventListener('click', () => { openSettings(); b.remove(); });
-  document.body.appendChild(b);
-  // Auto-hide when key is saved
-  const observer = new MutationObserver(() => {
-    if (localStorage.getItem('lumi_key') && $('noKeyBanner')) $('noKeyBanner').remove();
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-}
-
 function openSidebar()   { $('sidebar').classList.add('open');    $('sbOverlay').classList.add('open'); }
 function closeSidebar()  { $('sidebar').classList.remove('open'); $('sbOverlay').classList.remove('open'); }
 function openSettings()  { $('settingsDrawer').classList.add('open');    $('settingsOverlay').classList.add('open'); }
 function closeSettings() { $('settingsDrawer').classList.remove('open'); $('settingsOverlay').classList.remove('open'); }
 
 function updateSendBtn() {
-  sendBtn.disabled = !localStorage.getItem('lumi_key') || (!msgInput.value.trim() && !pendingAttachment) || S.busy;
+  sendBtn.disabled = (!msgInput.value.trim() && !pendingAttachment) || S.busy;
 }
 function autoGrow(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }
 
@@ -3048,8 +2982,6 @@ async function doSend() {
   // Remove prompt cards on first send
   const pc = $('generalPromptCards'); if (pc) pc.remove();
   if (S.busy) return;
-  if (!localStorage.getItem('lumi_key')) { showToast('Add your API key in Settings.'); openSettings(); return; }
-
   if (!S.ready) { S.ready = true; const w = document.getElementById('welcome'); if (w) w.remove(); }
 
   const att = pendingAttachment;
@@ -3084,20 +3016,14 @@ async function doSend() {
 
 // ─── GENERATE TITLE ──────────────────────────────────────────────────────────
 async function generateTitle(convId, firstUserMsg) {
-  const apiKey = localStorage.getItem('lumi_key');
-  if (!apiKey || !firstUserMsg) return;
+  if (!firstUserMsg) return;
   const convs = getConvs();
   if (!convs[convId] || convs[convId].title) return;
   try {
     const prompt = `Generate a short 4-6 word title for this conversation. Just the title, nothing else, no punctuation at the end: ${firstUserMsg.slice(0, 300)}`;
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/anthropic', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 20, messages: [{ role: 'user', content: prompt }] }),
     });
     if (!res.ok) return;
@@ -3121,14 +3047,6 @@ async function fetchLumi() {
   const typing = makeTyping();
   messagesEl.appendChild(typing);
   scrollBottom();
-
-  const apiKey = localStorage.getItem('lumi_key');
-  if (!apiKey) {
-    typing.remove();
-    renderError('No API key found. Open Settings (bottom-left) and paste your Anthropic API key.');
-    S.busy = false; updateSendBtn();
-    return;
-  }
 
   try {
     let system = S.tutorCtx
@@ -3154,7 +3072,7 @@ If they uploaded a rubric or project instructions it will be attached to their f
 Remember: help them THINK through the project, never do it for them. Ask guiding questions, help them brainstorm, review their work, but the thinking must be theirs.`;
       }
     }
-    const { clean, data } = await callAPI(apiKey, S.messages, system);
+    const { clean, data } = await callAPI(S.messages, system);
     typing.remove();
     S.messages.push({ role: 'assistant', content: clean });
     S.exchangeCount++;
@@ -3192,15 +3110,10 @@ function renderError(msg) {
 }
 
 // ─── API CALL ────────────────────────────────────────────────────────────────
-async function callAPI(apiKey, msgs, system) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+async function callAPI(msgs, system) {
+  const res = await fetch('/api/anthropic', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 2500,

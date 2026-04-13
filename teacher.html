@@ -393,6 +393,203 @@ body { overflow: auto; display: block; }
 .t-send-btn:disabled { opacity: .35; cursor: not-allowed; }
 .t-send-btn svg { width: 16px; height: 16px; stroke: #fff; fill: none; }
 
+/* ─── STUDENT PROFILE VIEW ─────────────────────────────────── */
+#profileView { display:flex; height:100vh; background:#F5F3FB; }
+.sp-sidebar {
+  width:280px; flex-shrink:0; background:#FFFFFF;
+  border-right:1px solid #ECE9F5; display:flex; flex-direction:column;
+  height:100vh; overflow:hidden;
+}
+.sp-sb-top { padding:20px 16px 0; }
+.sp-logo {
+  display:flex; align-items:center; gap:10px;
+  padding:6px 8px 16px; border-bottom:1px solid #ECE9F5; margin-bottom:8px;
+}
+.sp-logo-icon {
+  width:32px; height:32px; background:#7B5CCC; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  color:#fff; font-weight:600; font-size:14px; flex-shrink:0;
+}
+.sp-logo-text { font-weight:600; font-size:15px; color:#1F1B2E; }
+.sp-logo-sub { font-size:11px; color:#8B82A6; }
+.sp-back {
+  display:flex; align-items:center; gap:6px; padding:8px 10px;
+  font-size:13px; color:#8B82A6; cursor:pointer; border-radius:6px;
+  border:none; background:none; font-family:inherit; width:100%; text-align:left;
+}
+.sp-back:hover { background:#F5F3FB; color:#5B3FBF; }
+.sp-section-label {
+  font-size:10px; font-weight:600; letter-spacing:.08em; color:#8B82A6;
+  padding:12px 8px 6px; text-transform:uppercase;
+}
+.sp-class-list { flex:1; overflow-y:auto; padding:0 16px 16px; }
+.sp-class-list::-webkit-scrollbar { width:3px; }
+.sp-class-list::-webkit-scrollbar-thumb { background:#ECE9F5; border-radius:3px; }
+.sp-class-row {
+  padding:10px 12px; border-radius:8px; cursor:pointer;
+  display:flex; align-items:center; justify-content:space-between;
+  font-size:14px; transition:background .15s; color:#2B253F;
+}
+.sp-class-row:hover { background:#F5F3FB; }
+.sp-class-row.expanded { background:#F5F3FB; color:#5B3FBF; font-weight:500; }
+.sp-class-row.pending { color:#B5ADCC; }
+.sp-arrow { font-size:10px; color:#B5ADCC; transition:transform .2s; }
+.sp-class-row.expanded .sp-arrow { transform:rotate(90deg); }
+.sp-block-list { padding-left:16px; display:none; }
+.sp-class-row.expanded + .sp-block-list { display:block; }
+.sp-block-label {
+  font-size:11px; font-weight:600; color:#8B82A6;
+  padding:8px 12px 4px; letter-spacing:.06em; text-transform:uppercase;
+}
+.sp-student-item {
+  display:flex; align-items:center; gap:10px; padding:8px 12px;
+  border-radius:8px; cursor:pointer; font-size:14px; transition:background .15s;
+  color:#2B253F;
+}
+.sp-student-item:hover { background:#F5F3FB; }
+.sp-student-item.active { background:#EDE7FB; color:#5B3FBF; font-weight:500; }
+.sp-avatar {
+  width:28px; height:28px; border-radius:50%; background:#D4C9F0; color:#5B3FBF;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:600; flex-shrink:0;
+}
+.sp-pending-badge {
+  font-size:10px; color:#B5ADCC; background:#F5F3FB;
+  padding:2px 8px; border-radius:10px; margin-left:auto;
+}
+.sp-setup-msg {
+  font-size:12px; color:#8B82A6; padding:8px 12px; line-height:1.5;
+}
+.sp-sb-foot {
+  padding:12px 16px; border-top:1px solid #ECE9F5;
+  display:flex; flex-direction:column; gap:6px;
+}
+.sp-sb-link {
+  display:flex; align-items:center; gap:7px; padding:8px 12px;
+  background:none; border:1px solid #ECE9F5; border-radius:8px;
+  color:#8B82A6; font-family:inherit; font-size:12.5px; cursor:pointer;
+  transition:all .15s; text-decoration:none;
+}
+.sp-sb-link:hover { border-color:#5B3FBF; color:#5B3FBF; }
+.sp-sb-link.accent { border-color:rgba(123,92,204,.3); color:#5B3FBF; background:rgba(123,92,204,.06); }
+.sp-sb-signout:hover { border-color:#ff6b6b; color:#ff6b6b; }
+
+/* Main content */
+.sp-main {
+  flex:1; padding:32px 40px; overflow-y:auto; max-width:900px;
+}
+.sp-empty-main {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  flex:1; color:#8B82A6; font-size:14px; text-align:center; padding:60px 20px;
+}
+.sp-breadcrumb { font-size:13px; color:#8B82A6; margin-bottom:16px; }
+.sp-breadcrumb span+span::before { content:"›"; margin:0 8px; color:#CFC7E3; }
+.sp-header { display:flex; align-items:center; gap:16px; margin-bottom:28px; }
+.sp-header-avatar {
+  width:56px; height:56px; border-radius:50%;
+  background:linear-gradient(135deg,#8B6FD8,#5B3FBF);
+  color:#fff; display:flex; align-items:center; justify-content:center;
+  font-size:20px; font-weight:600; flex-shrink:0;
+}
+.sp-header-info h1 { font-size:24px; font-weight:600; margin-bottom:4px; color:#1F1B2E; }
+.sp-header-meta { font-size:13px; color:#8B82A6; }
+.sp-insight {
+  background:linear-gradient(135deg,#EDE7FB,#F5F3FB);
+  border-radius:12px; padding:16px 18px; margin-bottom:20px;
+  font-size:14px; color:#2B253F; line-height:1.55;
+}
+.sp-insight-label {
+  font-size:11px; font-weight:600; letter-spacing:.08em; color:#5B3FBF;
+  text-transform:uppercase; margin-bottom:6px; display:flex; align-items:center; gap:6px;
+}
+.sp-teach {
+  background:#fff; border:2px solid #EDE7FB; border-radius:14px;
+  padding:20px; margin-bottom:24px; transition:border-color .2s;
+}
+.sp-teach:focus-within { border-color:#7B5CCC; box-shadow:0 0 0 4px rgba(123,92,204,.1); }
+.sp-teach-label {
+  display:flex; align-items:center; gap:8px; font-size:14px;
+  font-weight:600; color:#2B253F; margin-bottom:10px;
+}
+.sp-teach-sub { font-size:12px; color:#8B82A6; margin-bottom:12px; font-weight:normal; }
+.sp-teach textarea {
+  width:100%; border:none; outline:none; resize:none;
+  font-size:15px; font-family:inherit; color:#1F1B2E;
+  min-height:48px; line-height:1.5; background:transparent;
+}
+.sp-teach textarea::placeholder { color:#B5ADCC; }
+.sp-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.sp-chip {
+  padding:6px 12px; background:#F5F3FB; border:1px solid #ECE9F5;
+  border-radius:999px; font-size:12px; color:#5B3FBF;
+  cursor:pointer; transition:all .15s; font-family:inherit;
+}
+.sp-chip:hover { background:#EDE7FB; border-color:#C9BCEE; }
+.sp-teach-actions { display:flex; justify-content:flex-end; margin-top:12px; gap:8px; }
+.sp-btn-primary {
+  background:#5B3FBF; color:#fff; border:none; padding:10px 18px;
+  border-radius:8px; font-size:13px; font-weight:500; cursor:pointer;
+  font-family:inherit; transition:background .15s;
+}
+.sp-btn-primary:hover { background:#4A2FA8; }
+.sp-btn-secondary {
+  background:transparent; color:#8B82A6; border:none;
+  padding:10px 14px; font-size:13px; cursor:pointer; font-family:inherit;
+}
+.sp-section-title {
+  font-size:12px; font-weight:600; letter-spacing:.08em; color:#8B82A6;
+  text-transform:uppercase; margin:28px 0 12px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.sp-section-count {
+  background:#EDE7FB; color:#5B3FBF; padding:2px 8px;
+  border-radius:10px; font-size:11px; letter-spacing:0;
+}
+.sp-note {
+  background:#fff; border:1px solid #ECE9F5; border-radius:10px;
+  padding:14px 16px; margin-bottom:10px; display:flex; gap:12px;
+  align-items:flex-start; transition:border-color .15s;
+}
+.sp-note:hover { border-color:#C9BCEE; }
+.sp-note-source {
+  width:32px; height:32px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; flex-shrink:0;
+}
+.sp-note-source.teacher { background:#FEF3C7; }
+.sp-note-source.lumi { background:#EDE7FB; }
+.sp-note-content { flex:1; min-width:0; }
+.sp-note-text { font-size:14px; color:#1F1B2E; line-height:1.5; margin-bottom:4px; }
+.sp-note-text[contenteditable=true] {
+  outline:none; background:#F5F3FB; border-radius:6px; padding:4px 6px;
+}
+.sp-note-meta { font-size:12px; color:#8B82A6; }
+.sp-note-actions { display:flex; gap:4px; opacity:0; transition:opacity .15s; }
+.sp-note:hover .sp-note-actions { opacity:1; }
+.sp-icon-btn {
+  width:28px; height:28px; border:none; background:transparent; border-radius:6px;
+  cursor:pointer; color:#8B82A6; display:flex; align-items:center;
+  justify-content:center; font-size:13px;
+}
+.sp-icon-btn:hover { background:#F5F3FB; color:#5B3FBF; }
+.sp-activity {
+  background:#fff; border:1px solid #ECE9F5; border-radius:10px;
+  padding:14px 16px; margin-bottom:8px; display:flex; align-items:center;
+  gap:12px; font-size:13px;
+}
+.sp-activity-date { color:#8B82A6; font-size:12px; width:70px; flex-shrink:0; }
+.sp-activity-desc { flex:1; color:#2B253F; }
+.sp-activity-duration { color:#8B82A6; font-size:12px; }
+.sp-activity-tag { padding:2px 8px; border-radius:10px; font-size:11px; font-weight:500; }
+.sp-tag-good { background:#D1FAE5; color:#047857; }
+.sp-tag-stuck { background:#FEE2E2; color:#B91C1C; }
+#spToast {
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+  background:#1F1B2E; color:#fff; padding:10px 18px; border-radius:8px;
+  font-size:13px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:500;
+}
+#spToast.show { opacity:1; }
+
 /* ─── RESPONSIVE ───────────────────────────────────────────── */
 @media (max-width: 640px) {
   .t-chat-sidebar { width: 220px; }
@@ -487,18 +684,6 @@ body { overflow: auto; display: block; }
       </div>
     </div>
     <div class="t-cards-grid" id="classCards"></div>
-    <div style="margin-top:32px">
-      <div class="t-section-label" style="margin-bottom:14px">Anthropic API Key</div>
-      <div class="t-api-section">
-        <h3>Connect your API key</h3>
-        <p>Lumi uses Claude to power conversations. Your key is stored locally and never sent to any server other than Anthropic's API.</p>
-        <div class="t-api-row">
-          <input class="t-api-input" id="homeKeyInput" type="password" placeholder="sk-ant-…" autocomplete="off">
-          <button class="t-api-save" id="homeKeySave">Save</button>
-        </div>
-        <div class="t-api-saved" id="homeKeySaved">✓ Key saved</div>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -543,9 +728,6 @@ body { overflow: auto; display: block; }
     </div>
     <div class="t-messages" id="tMessages"></div>
     <div class="t-chat-input-area">
-      <div class="t-no-key-banner" id="tNoKeyBanner">
-        ⚠️ No API key set — enter your Anthropic key in the sidebar to start chatting.
-      </div>
       <div class="t-input-row">
         <textarea class="t-input" id="tInput" rows="1" placeholder="Reply to Lumi…" disabled></textarea>
         <button class="t-send-btn" id="tSendBtn" disabled>
@@ -555,6 +737,35 @@ body { overflow: auto; display: block; }
     </div>
   </div>
 </div>
+
+<!-- STUDENT PROFILE VIEW -->
+<div id="profileView" style="display:none">
+  <aside class="sp-sidebar">
+    <div class="sp-sb-top">
+      <div class="sp-logo">
+        <div class="sp-logo-icon">L</div>
+        <div>
+          <div class="sp-logo-text">Lumi</div>
+          <div class="sp-logo-sub">Teacher Portal</div>
+        </div>
+      </div>
+      <button class="sp-back" onclick="goHome()">← Back to Dashboard</button>
+      <div class="sp-section-label">Your Classes</div>
+    </div>
+    <div class="sp-class-list" id="spClassList"></div>
+    <div class="sp-sb-foot">
+      <a href="app.html" class="sp-sb-link accent">🎒 Student Mode</a>
+      <button class="sp-sb-link sp-sb-signout" onclick="doSignOut()">Sign out</button>
+    </div>
+  </aside>
+  <main class="sp-main" id="spMain">
+    <div class="sp-empty-main">
+      <div style="font-size:40px;margin-bottom:12px">👈</div>
+      <div>Select a student from the sidebar</div>
+    </div>
+  </main>
+</div>
+<div id="spToast"></div>
 
 <!-- STATUS POPUP -->
 <div id="statusPopupOverlay" style="display:none">
@@ -822,10 +1033,11 @@ let tPendingNavigation = null;   // callback waiting behind status popup
 
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
 function showView(name) {
-  ['authLoading','signinView','unknownView','homeView','chatView'].forEach(id => {
+  ['authLoading','signinView','unknownView','homeView','chatView','profileView'].forEach(id => {
     document.getElementById(id).style.display = 'none';
   });
-  document.getElementById(name).style.display = name === 'chatView' ? 'flex' : (name === 'homeView' ? 'block' : 'flex');
+  const flexViews = ['chatView','profileView','signinView','unknownView','authLoading'];
+  document.getElementById(name).style.display = flexViews.includes(name) ? 'flex' : 'block';
 }
 
 // ─── AUTH INIT ────────────────────────────────────────────────────────────────
@@ -929,20 +1141,6 @@ async function bootHome() {
   } else {
     avatarEl.textContent = firstName[0].toUpperCase();
   }
-
-  // Load API key
-  const savedKey = localStorage.getItem('lumi_key') || '';
-  document.getElementById('homeKeyInput').value = savedKey ? '••••••••' : '';
-
-  document.getElementById('homeKeySave').addEventListener('click', () => {
-    const val = document.getElementById('homeKeyInput').value.trim();
-    if (!val || val.startsWith('•')) return;
-    localStorage.setItem('lumi_key', val);
-    document.getElementById('homeKeyInput').value = '••••••••';
-    const saved = document.getElementById('homeKeySaved');
-    saved.style.display = 'block';
-    setTimeout(() => { saved.style.display = 'none'; }, 2000);
-  });
 
   // Load all teacher profiles from Supabase
   await loadAllTeacherProfiles();
@@ -1061,6 +1259,7 @@ function renderClassCards() {
       ` : ''}
       ${previewText ? `<div class="t-card-preview">${escHtml(previewText)}</div>` : ''}
       ${status === 'complete' ? `<div style="font-size:10px;color:#34d399;font-weight:600;margin-top:4px">✓ Setup complete</div>` : ''}
+      ${status === 'complete' ? `<div onclick="openStudentProfiles('${escHtml(course)}'); event.stopPropagation();" style="font-size:12px;color:var(--accent);font-weight:500;margin-top:6px;cursor:pointer;padding:4px 0">👥 View students →</div>` : ''}
       <div style="margin-top:8px;font-size:12px;font-weight:600;color:var(--accent)">${escHtml(btnLabel)} →</div>
     `;
     card.addEventListener('click', () => openClassChat({ course, subject }));
@@ -1197,13 +1396,10 @@ function updateBadge(done) {
 }
 
 function updateInputState() {
-  const hasKey  = !!localStorage.getItem('lumi_key');
-  const banner  = document.getElementById('tNoKeyBanner');
   const input   = document.getElementById('tInput');
   const sendBtn = document.getElementById('tSendBtn');
-  banner.style.display  = hasKey ? 'none' : 'block';
-  input.disabled        = !hasKey || tBusy;
-  sendBtn.disabled      = !hasKey || tBusy;
+  input.disabled        = tBusy;
+  sendBtn.disabled      = tBusy;
 }
 
 async function startInterview() {
@@ -1231,8 +1427,6 @@ async function streamReply() {
   tBusy = true;
   updateInputState();
 
-  const apiKey = localStorage.getItem('lumi_key');
-  if (!apiKey) { tBusy = false; updateInputState(); return; }
 
   // Add typing indicator
   const typingEl = addTyping();
@@ -1244,14 +1438,9 @@ async function streamReply() {
     // Create message element for streaming
     const msgEl = createLumiMsgEl();
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/anthropic', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 2500,
@@ -1710,6 +1899,478 @@ function escHtml(s) {
 const animStyle = document.createElement('style');
 animStyle.textContent = `@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`;
 document.head.appendChild(animStyle);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── STUDENT PROFILE SYSTEM ──────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── Data Layer ───────────────────────────────────────────────────────────────
+
+const SP_KEY = 'lumi_student_profiles';
+let spActiveStudent = null; // { classId, blockId, studentId }
+
+function getStudentData() {
+  try {
+    const raw = localStorage.getItem(SP_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  const data = seedStudentData();
+  saveStudentData(data);
+  return data;
+}
+
+function saveStudentData(data) {
+  localStorage.setItem(SP_KEY, JSON.stringify(data));
+}
+
+function seedStudentData() {
+  return {
+    classes: [
+      {
+        id: 'english-2', name: 'English 2',
+        blocks: [
+          {
+            id: 'block-a', label: 'Block A',
+            students: [
+              { id: 'alex-chen', name: 'Alex Chen', grade: '10th' },
+              { id: 'emma-morrison', name: 'Emma Morrison', grade: '10th' },
+              { id: 'jake-park', name: 'Jake Park', grade: '10th' }
+            ]
+          },
+          {
+            id: 'block-b', label: 'Block B',
+            students: [
+              { id: 'hadi-hilaly', name: 'Hadi Hilaly', grade: '10th' },
+              { id: 'maya-rodriguez', name: 'Maya Rodriguez', grade: '10th' },
+              { id: 'sam-kim', name: 'Sam Kim', grade: '10th' },
+              { id: 'tara-brooks', name: 'Tara Brooks', grade: '10th' }
+            ]
+          }
+        ]
+      },
+      {
+        id: 'creative-nonfiction', name: 'Creative Nonfiction (H)',
+        blocks: [
+          {
+            id: 'block-a', label: 'Block A',
+            students: [
+              { id: 'lena-ostroff', name: 'Lena Ostroff', grade: '11th' },
+              { id: 'ravi-kapoor', name: 'Ravi Kapoor', grade: '11th' },
+              { id: 'sofia-reyes', name: 'Sofia Reyes', grade: '12th' }
+            ]
+          }
+        ]
+      },
+      {
+        id: 'cafe-society', name: 'Cafe Society',
+        blocks: [
+          {
+            id: 'block-a', label: 'Block A',
+            students: [
+              { id: 'jordan-walsh', name: 'Jordan Walsh', grade: '12th' },
+              { id: 'nia-thompson', name: 'Nia Thompson', grade: '11th' }
+            ]
+          }
+        ]
+      }
+    ],
+    studentProfiles: {
+      'hadi-hilaly': {
+        glance: 'Strong writer who gets stuck on evidence integration. Responds well to sports analogies and benefits from seeing his reasoning challenged before being given answers.',
+        notes: [
+          { id: 'n1', source: 'teacher', text: 'Strong on thesis statements, weaker on evidence integration — always prompt him to tie quotes back to his argument.', createdAt: '2026-04-03', author: 'You' },
+          { id: 'n2', source: 'teacher', text: 'Gets defensive when corrected directly — lead with what\'s working before pointing out issues.', createdAt: '2026-03-28', author: 'You' },
+          { id: 'n3', source: 'lumi', text: 'Responds really well to sports analogies — used a basketball example to explain narrative tension and it clicked.', createdAt: '2026-04-09' },
+          { id: 'n4', source: 'lumi', text: 'Tends to skip the planning step on essays and jump straight to writing. Gentle reminder to outline helps.', createdAt: '2026-04-11' }
+        ],
+        sessions: [
+          { date: '2026-04-11', desc: 'Of Mice and Men essay — thesis + evidence', duration: 35, outcome: 'clicked' },
+          { date: '2026-04-09', desc: 'Practice thesis statements', duration: 22, outcome: 'clicked' },
+          { date: '2026-04-06', desc: 'Symbolism in chapter 4', duration: 18, outcome: 'stuck' }
+        ]
+      },
+      'alex-chen': {
+        glance: 'Quiet but perceptive. Writes concise arguments but needs encouragement to elaborate and add nuance.',
+        notes: [
+          { id: 'n5', source: 'teacher', text: 'Excellent close reader — push him to go beyond observation into interpretation.', createdAt: '2026-04-05', author: 'You' }
+        ],
+        sessions: [
+          { date: '2026-04-10', desc: 'Character analysis essay outline', duration: 28, outcome: 'clicked' }
+        ]
+      },
+      'maya-rodriguez': {
+        glance: 'Creative thinker who sometimes loses focus on the prompt. Benefits from structured frameworks.',
+        notes: [
+          { id: 'n6', source: 'lumi', text: 'Works best when given a clear checklist of what the essay needs before starting.', createdAt: '2026-04-08' }
+        ],
+        sessions: [
+          { date: '2026-04-10', desc: 'Essay structure practice', duration: 25, outcome: 'clicked' },
+          { date: '2026-04-07', desc: 'Free writing exercise', duration: 15, outcome: 'stuck' }
+        ]
+      }
+    }
+  };
+}
+
+function getInitials(name) {
+  return name.split(' ').map(w => w[0]).join('').toUpperCase();
+}
+
+function genNoteId() {
+  return 'n' + Date.now() + Math.random().toString(36).slice(2, 6);
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[d.getMonth()] + ' ' + d.getDate();
+}
+
+function showSpToast(msg) {
+  const t = document.getElementById('spToast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ── Sidebar Rendering ────────────────────────────────────────────────────────
+
+let spExpandedClass = null; // currently expanded class id
+
+function renderSpSidebar(expandClassId) {
+  const data = getStudentData();
+  const list = document.getElementById('spClassList');
+  list.innerHTML = '';
+
+  data.classes.forEach(cls => {
+    // Check if teacher setup is complete for this class
+    const profile = tProfiles[cls.name];
+    const status = profile?.status
+      || (profile?.done ? 'complete' : (profile?.teaching_style ? 'in_progress' : 'not_started'));
+    const isComplete = status === 'complete';
+    const isExpanded = (expandClassId === cls.id) || (spExpandedClass === cls.id);
+
+    // Class row
+    const row = document.createElement('div');
+    row.className = 'sp-class-row' + (isExpanded ? ' expanded' : '') + (!isComplete ? ' pending' : '');
+    row.innerHTML = `
+      <span>${escHtml(cls.name)}</span>
+      ${!isComplete ? '<span class="sp-pending-badge">Setup pending</span>' : ''}
+      <span class="sp-arrow">▶</span>
+    `;
+    row.addEventListener('click', () => {
+      if (!isComplete) {
+        // Open setup interview for this class
+        const subject = lookupSubjectForCourse(cls.name);
+        openClassChat({ course: cls.name, subject });
+        return;
+      }
+      if (spExpandedClass === cls.id) {
+        spExpandedClass = null;
+      } else {
+        spExpandedClass = cls.id;
+      }
+      renderSpSidebar();
+    });
+    list.appendChild(row);
+
+    // Block list (only if expanded and complete)
+    if (isExpanded && isComplete) {
+      const blockList = document.createElement('div');
+      blockList.className = 'sp-block-list';
+      blockList.style.display = 'block';
+
+      const hasMultipleBlocks = cls.blocks.length > 1;
+
+      cls.blocks.forEach(block => {
+        // Show block label only if multiple blocks
+        if (hasMultipleBlocks) {
+          const label = document.createElement('div');
+          label.className = 'sp-block-label';
+          label.textContent = block.label + ' · ' + block.students.length + ' students';
+          blockList.appendChild(label);
+        }
+
+        block.students.forEach(student => {
+          const isActive = spActiveStudent &&
+            spActiveStudent.classId === cls.id &&
+            spActiveStudent.blockId === block.id &&
+            spActiveStudent.studentId === student.id;
+
+          const item = document.createElement('div');
+          item.className = 'sp-student-item' + (isActive ? ' active' : '');
+          item.innerHTML = `<div class="sp-avatar">${getInitials(student.name)}</div>${escHtml(student.name)}`;
+          item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            spActiveStudent = { classId: cls.id, blockId: block.id, studentId: student.id };
+            renderSpSidebar();
+            renderStudentProfile(student, cls.name, hasMultipleBlocks ? block.label : null);
+          });
+          blockList.appendChild(item);
+        });
+      });
+
+      list.appendChild(blockList);
+    }
+  });
+}
+
+// ── Profile Rendering ────────────────────────────────────────────────────────
+
+function renderStudentProfile(student, className, blockLabel) {
+  const main = document.getElementById('spMain');
+  const data = getStudentData();
+  const profile = data.studentProfiles[student.id] || { glance: '', notes: [], sessions: [] };
+  const initials = getInitials(student.name);
+  const firstName = student.name.split(' ')[0];
+  const sessionCount = profile.sessions?.length || 0;
+  const lastSession = profile.sessions?.[0];
+  const lastActiveText = lastSession ? formatDate(lastSession.date) : 'No sessions yet';
+  const pronoun = 'them'; // gender-neutral default
+
+  // Breadcrumb
+  let breadcrumb = `<span>${escHtml(className)}</span>`;
+  if (blockLabel) breadcrumb += `<span>${escHtml(blockLabel)}</span>`;
+  breadcrumb += `<span style="color:#2B253F;font-weight:500">${escHtml(student.name)}</span>`;
+
+  // Notes HTML
+  const notesHtml = (profile.notes || []).map(note => `
+    <div class="sp-note" data-note-id="${note.id}">
+      <div class="sp-note-source ${note.source}">${note.source === 'teacher' ? '👩‍🏫' : '✨'}</div>
+      <div class="sp-note-content">
+        <div class="sp-note-text" id="sp-nt-${note.id}">${escHtml(note.text)}</div>
+        <div class="sp-note-meta">${note.source === 'teacher' ? (note.author || 'You') + ' · ' : 'Learned by Lumi · '}${formatDate(note.createdAt)}</div>
+      </div>
+      <div class="sp-note-actions">
+        <button class="sp-icon-btn" title="Edit" onclick="editStudentNote('${student.id}','${note.id}')">✏️</button>
+        <button class="sp-icon-btn" title="Remove" onclick="removeStudentNote('${student.id}','${note.id}')">✕</button>
+      </div>
+    </div>
+  `).join('');
+
+  // Sessions HTML
+  const sessionsHtml = (profile.sessions || []).map(s => `
+    <div class="sp-activity">
+      <div class="sp-activity-date">${formatDate(s.date)}</div>
+      <div class="sp-activity-desc">${escHtml(s.desc)}</div>
+      <div class="sp-activity-duration">${s.duration} min</div>
+      <div class="sp-activity-tag ${s.outcome === 'clicked' ? 'sp-tag-good' : 'sp-tag-stuck'}">${s.outcome === 'clicked' ? 'clicked' : 'got stuck'}</div>
+    </div>
+  `).join('');
+
+  main.innerHTML = `
+    <div class="sp-breadcrumb">${breadcrumb}</div>
+    <div class="sp-header">
+      <div class="sp-header-avatar">${initials}</div>
+      <div class="sp-header-info">
+        <h1>${escHtml(student.name)}</h1>
+        <div class="sp-header-meta">${escHtml(student.grade)} grade · ${sessionCount} session${sessionCount !== 1 ? 's' : ''} with Lumi · Last active ${lastActiveText}</div>
+      </div>
+    </div>
+
+    ${profile.glance ? `
+      <div class="sp-insight">
+        <div class="sp-insight-label">✨ At a glance</div>
+        ${escHtml(profile.glance)}
+      </div>
+    ` : ''}
+
+    <div class="sp-teach">
+      <div class="sp-teach-label">
+        💡 Teach Lumi something about ${escHtml(firstName)}
+        <span class="sp-teach-sub" style="margin-left:auto">Lumi will use this in every session with ${pronoun}</span>
+      </div>
+      <textarea id="spNoteInput" placeholder="e.g. ${escHtml(firstName)} gets frustrated when you give him the answer too quickly — make him show his reasoning first."></textarea>
+      <div class="sp-chips">
+        <button class="sp-chip" onclick="fillSpChip(this)">How they learn best…</button>
+        <button class="sp-chip" onclick="fillSpChip(this)">What to avoid…</button>
+        <button class="sp-chip" onclick="fillSpChip(this)">Strengths to lean into…</button>
+        <button class="sp-chip" onclick="fillSpChip(this)">Things they struggle with…</button>
+      </div>
+      <div class="sp-teach-actions">
+        <button class="sp-btn-secondary" onclick="document.getElementById('spNoteInput').value=''">Cancel</button>
+        <button class="sp-btn-primary" onclick="saveStudentNote('${student.id}')">Save to profile</button>
+      </div>
+    </div>
+
+    <div class="sp-section-title">
+      What Lumi knows about ${escHtml(firstName)}
+      <span class="sp-section-count">${(profile.notes||[]).length} note${(profile.notes||[]).length !== 1 ? 's' : ''}</span>
+    </div>
+    <div id="spNotesList">${notesHtml || '<div style="font-size:13px;color:#8B82A6;padding:12px 0">No notes yet — teach Lumi something about ' + escHtml(firstName) + ' above.</div>'}</div>
+
+    <div class="sp-section-title">
+      Recent sessions
+      <span class="sp-section-count">${sessionCount > 0 ? 'Last 7 days' : 'None'}</span>
+    </div>
+    ${sessionsHtml || '<div style="font-size:13px;color:#8B82A6;padding:12px 0">No sessions yet.</div>'}
+    <div style="height:40px"></div>
+  `;
+
+  // Wire Cmd/Ctrl+Enter to save
+  const textarea = document.getElementById('spNoteInput');
+  if (textarea) {
+    textarea.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveStudentNote(student.id);
+    });
+  }
+}
+
+// ── Note CRUD ────────────────────────────────────────────────────────────────
+
+function saveStudentNote(studentId) {
+  const textarea = document.getElementById('spNoteInput');
+  const text = textarea?.value.trim();
+  if (!text) return;
+
+  const data = getStudentData();
+  if (!data.studentProfiles[studentId]) {
+    data.studentProfiles[studentId] = { glance: '', notes: [], sessions: [] };
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  data.studentProfiles[studentId].notes.unshift({
+    id: genNoteId(),
+    source: 'teacher',
+    text,
+    createdAt: today,
+    author: 'You'
+  });
+  saveStudentData(data);
+
+  // Find the student object to re-render
+  const student = findStudentById(studentId);
+  if (student) {
+    const cls = findClassForStudent(studentId);
+    const block = findBlockForStudent(studentId);
+    const hasMulti = cls && cls.blocks.length > 1;
+    renderStudentProfile(student, cls.name, hasMulti ? block.label : null);
+  }
+
+  showSpToast('Saved to ' + (student?.name.split(' ')[0] || 'student') + '\'s profile ✓');
+}
+
+function removeStudentNote(studentId, noteId) {
+  const data = getStudentData();
+  const profile = data.studentProfiles[studentId];
+  if (!profile) return;
+  profile.notes = profile.notes.filter(n => n.id !== noteId);
+  saveStudentData(data);
+
+  // Re-render
+  const student = findStudentById(studentId);
+  if (student) {
+    const cls = findClassForStudent(studentId);
+    const block = findBlockForStudent(studentId);
+    const hasMulti = cls && cls.blocks.length > 1;
+    renderStudentProfile(student, cls.name, hasMulti ? block.label : null);
+  }
+}
+
+function editStudentNote(studentId, noteId) {
+  const el = document.getElementById('sp-nt-' + noteId);
+  if (!el || el.contentEditable === 'true') return;
+
+  el.contentEditable = 'true';
+  el.focus();
+
+  // Select all text
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  // Save on blur or Enter
+  function save() {
+    el.contentEditable = 'false';
+    const newText = el.textContent.trim();
+    if (!newText) { removeStudentNote(studentId, noteId); return; }
+
+    const data = getStudentData();
+    const note = data.studentProfiles[studentId]?.notes.find(n => n.id === noteId);
+    if (note) {
+      note.text = newText;
+      saveStudentData(data);
+    }
+    el.removeEventListener('blur', save);
+  }
+
+  el.addEventListener('blur', save);
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); }
+    if (e.key === 'Escape') { el.contentEditable = 'false'; /* revert would need re-render */ }
+  });
+}
+
+function fillSpChip(el) {
+  const textarea = document.getElementById('spNoteInput');
+  if (!textarea) return;
+  const prompts = {
+    'How they learn best…': 'They learn best when ',
+    'What to avoid…': 'Avoid ',
+    'Strengths to lean into…': 'Lean into their strength of ',
+    'Things they struggle with…': 'They struggle with '
+  };
+  textarea.value = prompts[el.textContent] || '';
+  textarea.focus();
+}
+
+// ── Lookup Helpers ───────────────────────────────────────────────────────────
+
+function findStudentById(studentId) {
+  const data = getStudentData();
+  for (const cls of data.classes) {
+    for (const block of cls.blocks) {
+      const s = block.students.find(s => s.id === studentId);
+      if (s) return s;
+    }
+  }
+  return null;
+}
+
+function findClassForStudent(studentId) {
+  const data = getStudentData();
+  for (const cls of data.classes) {
+    for (const block of cls.blocks) {
+      if (block.students.some(s => s.id === studentId)) return cls;
+    }
+  }
+  return null;
+}
+
+function findBlockForStudent(studentId) {
+  const data = getStudentData();
+  for (const cls of data.classes) {
+    for (const block of cls.blocks) {
+      if (block.students.some(s => s.id === studentId)) return block;
+    }
+  }
+  return null;
+}
+
+// ── Entry Point ──────────────────────────────────────────────────────────────
+
+function openStudentProfiles(courseName) {
+  const data = getStudentData();
+  const cls = data.classes.find(c => c.name === courseName);
+
+  spExpandedClass = cls ? cls.id : null;
+  spActiveStudent = null;
+
+  showView('profileView');
+  renderSpSidebar(cls?.id);
+
+  // Auto-select first student
+  if (cls && cls.blocks.length && cls.blocks[0].students.length) {
+    const firstBlock = cls.blocks[0];
+    const firstStudent = firstBlock.students[0];
+    spActiveStudent = { classId: cls.id, blockId: firstBlock.id, studentId: firstStudent.id };
+    renderSpSidebar();
+    renderStudentProfile(firstStudent, cls.name, cls.blocks.length > 1 ? firstBlock.label : null);
+  }
+}
+
 </script>
 </body>
 </html>
