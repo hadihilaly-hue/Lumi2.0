@@ -1,0 +1,4 @@
+teacher-config.js
+.env
+node_modules/
+.netlify/

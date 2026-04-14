@@ -792,6 +792,7 @@ body { overflow: auto; display: block; }
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="supabase.js"></script>
 <script src="auth.js"></script>
+<script src="teacher-config.js"></script>
 <script>
 // ─── CURRICULUM (same as app.js) ─────────────────────────────────────────────
 const MENLO_CURRICULUM = {
@@ -1438,9 +1439,14 @@ async function streamReply() {
     // Create message element for streaming
     const msgEl = createLumiMsgEl();
 
-    const res = await fetch('/api/anthropic', {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': TEACHER_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 2500,
