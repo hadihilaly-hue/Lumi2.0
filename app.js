@@ -361,6 +361,9 @@ ${p.teacher_voice || ''}`;
     if (p.north_star) {
       prompt += `\n\n═══ NORTH STAR INSTRUCTION ═══\n${p.north_star}`;
     }
+    if (p.welcome_message) {
+      prompt += `\n\nTEACHER'S WELCOME MESSAGE TO STUDENTS (already shown — do not repeat or rephrase):\n${p.welcome_message}`;
+    }
 
     prompt += `
 
@@ -1038,7 +1041,12 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
     console.warn('[openTutor] profile not ready for:', teacher, course);
   } else if (profile) {
     S.tutorCtx.teacherProfile = profile;
-    greeting = `Hey! You're studying ${course} with ${firstName}. I've learned how ${firstName} teaches and what they look for — ask me anything and I'll help you the way ${firstName} would.`;
+    if (profile.welcome_message) {
+      renderTeacherNote(teacher, profile.welcome_message);
+      greeting = `I'm ready when you are — ask me anything about ${course}.`;
+    } else {
+      greeting = `Hey! You're studying ${course} with ${firstName}. I've learned how ${firstName} teaches and what they look for — ask me anything and I'll help you the way ${firstName} would.`;
+    }
     msgInput.disabled = false;
     msgInput.placeholder = 'Say something\u2026';
     $('sendBtn').disabled = false;
@@ -3173,6 +3181,21 @@ function applyProfile({ values = [], goals = [], interests = [] }) {
   };
   add(values, S.values); add(goals, S.goals); add(interests, S.interests);
   if (anyNew) saveCurrentConv();
+}
+
+// ─── RENDER TEACHER NOTE ────────────────────────────────────────────────────
+function renderTeacherNote(teacher, message) {
+  const firstName = teacher.split(' ')[0];
+  const el = document.createElement('div');
+  el.className = 'teacher-note';
+  const label = document.createElement('div');
+  label.className = 'teacher-note-label';
+  label.textContent = `A note from ${firstName}`;
+  const bubble = document.createElement('div');
+  bubble.className = 'teacher-note-bubble';
+  bubble.textContent = message;
+  el.append(label, bubble);
+  messagesEl.appendChild(el);
 }
 
 // ─── RENDER MESSAGE ──────────────────────────────────────────────────────────

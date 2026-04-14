@@ -356,6 +356,9 @@ html.light .inline-confirm{box-shadow:0 8px 28px rgba(0,0,0,.12)}
 .msg-bubble{padding:12px 16px;border-radius:var(--radius);font-size:14px;line-height:1.7;word-wrap:break-word;}
 .msg.user .msg-bubble{background:var(--user-bg);color:#fff;border-bottom-right-radius:4px;}
 .msg.lumi .msg-bubble{background:var(--lumi-bg);color:var(--text);border:1px solid var(--border);border-bottom-left-radius:4px;}
+.teacher-note{margin:12px 16px 8px;max-width:680px}
+.teacher-note-label{font-size:11px;color:var(--text-muted);font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.teacher-note-bubble{background:var(--accent-soft);border-left:3px solid var(--accent);border-radius:0 12px 12px 0;padding:14px 18px;font-size:14px;line-height:1.6;color:var(--text);white-space:pre-wrap}
 .msg-bubble p{margin:0}.msg-bubble p+p{margin-top:9px}
 .msg-bubble strong{font-weight:600}.msg-bubble em{color:var(--text-muted)}
 .msg-bubble code{font-family:'SF Mono',Monaco,'Courier New',monospace;font-size:12px;background:rgba(59,39,120,.06);padding:1px 5px;border-radius:4px;}
