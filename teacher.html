@@ -1439,22 +1439,32 @@ async function streamReply() {
     // Create message element for streaming
     const msgEl = createLumiMsgEl();
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': TEACHER_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
+    const apiBody = JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 2500,
         stream: true,
         system,
         messages: tMessages,
-      }),
-    });
+      });
+
+    // Use direct API if local config exists, otherwise use Netlify proxy
+    const useDirectAPI = typeof TEACHER_API_KEY !== 'undefined' && TEACHER_API_KEY && TEACHER_API_KEY !== 'your-api-key-here';
+    const res = useDirectAPI
+      ? await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': TEACHER_API_KEY,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true',
+          },
+          body: apiBody,
+        })
+      : await fetch('/api/anthropic', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: apiBody,
+        });
 
     typingEl.remove();
 
