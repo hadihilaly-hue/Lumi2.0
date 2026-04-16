@@ -4139,7 +4139,7 @@ function renderStudyPlan(plan) {
   body.appendChild(summary);
 
   // Plan blocks
-  blocks.forEach(block => {
+  blocks.forEach((block, i) => {
     const el = document.createElement('div');
     el.className = 'hw-plan-block' + (block.type === 'break' ? ' break' : block.type === 'bedtime' ? ' bedtime-block' : '');
 
@@ -4188,9 +4188,132 @@ function renderStudyPlan(plan) {
       metaEl.textContent = parts.join(' · ');
       el.appendChild(timeEl); el.appendChild(titleEl);
       if (parts.length) el.appendChild(metaEl);
+
+      // Edit pencil button
+      const editBtn = document.createElement('button');
+      editBtn.className = 'hw-plan-block-edit-btn';
+      editBtn.innerHTML = '✏️';
+      editBtn.title = 'Edit block';
+      const blockIdx = i;
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleBlockEditMode(el, blockIdx, blocks, startMinutes, plan);
+      });
+      el.appendChild(editBtn);
     }
     body.appendChild(el);
   });
+
+  // "+ Add block" button
+  const addBlockBtn = document.createElement('button');
+  addBlockBtn.className = 'hw-plan-add-block';
+  addBlockBtn.textContent = '+ Add block';
+  addBlockBtn.addEventListener('click', () => {
+    addCustomBlock(blocks, startMinutes, plan);
+  });
+  body.appendChild(addBlockBtn);
+}
+
+// Save edited plan to localStorage
+function saveEditedPlan(blocks, startMinutes) {
+  const data = blocks.filter(b => b.type === 'task').map(b => ({
+    title: b.task.title,
+    duration: b.duration,
+    className: b.task.className || '',
+    tier: b.task.tier || ''
+  }));
+  localStorage.setItem('lumi_edited_plan', JSON.stringify({ date: todayStr(), blocks: data, startMinutes }));
+}
+
+function getEditedPlan() {
+  try {
+    const raw = localStorage.getItem('lumi_edited_plan');
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data.date !== todayStr()) { localStorage.removeItem('lumi_edited_plan'); return null; }
+    return data;
+  } catch { return null; }
+}
+
+function toggleBlockEditMode(el, blockIdx, blocks, startMinutes, plan) {
+  // If already in edit mode, close it
+  const existing = el.querySelector('.hw-plan-edit-row');
+  if (existing) { existing.remove(); return; }
+
+  const block = blocks[blockIdx];
+  if (!block || block.type !== 'task') return;
+
+  const row = document.createElement('div');
+  row.className = 'hw-plan-edit-row';
+
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.value = block.task.title;
+  nameInput.placeholder = 'Task name';
+
+  const durSelect = document.createElement('select');
+  [10, 15, 20, 25, 30, 45, 60].forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m; opt.textContent = m + ' min';
+    if (m === block.duration) opt.selected = true;
+    durSelect.appendChild(opt);
+  });
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'hw-plan-edit-del';
+  delBtn.title = 'Delete block';
+  delBtn.textContent = '🗑️';
+  delBtn.addEventListener('click', () => {
+    blocks.splice(blockIdx, 1);
+    saveEditedPlan(blocks, startMinutes);
+    reRenderPlan(blocks, startMinutes, plan);
+  });
+
+  // Auto-save on change
+  nameInput.addEventListener('change', () => {
+    block.task.title = nameInput.value.trim() || block.task.title;
+    saveEditedPlan(blocks, startMinutes);
+    reRenderPlan(blocks, startMinutes, plan);
+  });
+  durSelect.addEventListener('change', () => {
+    block.duration = parseInt(durSelect.value);
+    saveEditedPlan(blocks, startMinutes);
+    reRenderPlan(blocks, startMinutes, plan);
+  });
+
+  row.appendChild(nameInput);
+  row.appendChild(durSelect);
+  row.appendChild(delBtn);
+  el.appendChild(row);
+}
+
+function addCustomBlock(blocks, startMinutes, plan) {
+  const lastBlock = blocks[blocks.length - 1];
+  const lastEnd = lastBlock ? lastBlock.startMinute + (lastBlock.duration || 0) : 0;
+  const newBlock = {
+    type: 'task',
+    task: { title: 'New task', className: '', tier: 'TIER_3_REVIEW', id: 'custom_' + Date.now() },
+    duration: 25,
+    startMinute: lastEnd,
+    chunkNum: null,
+    totalChunks: null,
+    truncated: false
+  };
+  // Insert before bedtime block if present
+  const bedIdx = blocks.findIndex(b => b.type === 'bedtime');
+  if (bedIdx >= 0) blocks.splice(bedIdx, 0, newBlock);
+  else blocks.push(newBlock);
+  saveEditedPlan(blocks, startMinutes);
+  reRenderPlan(blocks, startMinutes, plan);
+}
+
+function reRenderPlan(blocks, startMinutes, plan) {
+  // Recalculate start minutes for each block
+  let elapsed = 0;
+  blocks.forEach(b => { b.startMinute = elapsed; elapsed += (b.duration || 0); });
+  plan.blocks = blocks;
+  plan.totalMinutes = elapsed;
+  renderStudyPlan(plan);
 }
 
 // ── Planner floating strip state ───────────────────────────
