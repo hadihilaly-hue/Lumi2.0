@@ -1054,10 +1054,10 @@ body.signin-page{
 /* ─── PLAN WARNINGS ──────────────────────────────────────── */
 .hw-plan-warning{border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px;line-height:1.4}
 .hw-plan-warning.late{background:rgba(99,102,241,.1);color:#a5b4fc;border:1px solid rgba(99,102,241,.2)}
-.hw-plan-warning.heavy{background:rgba(239,68,68,.1);color:#fca5a5;border:1px solid rgba(239,68,68,.2)}
-.hw-plan-warning.overload{background:rgba(234,179,8,.1);color:#fde68a;border:1px solid rgba(234,179,8,.2)}
+.hw-plan-warning.heavy{background:#FFF3CD;color:#92600A;border:1px solid rgba(146,96,10,.2)}
+.hw-plan-warning.overload{background:#FFF3CD;color:#92600A;border:1px solid rgba(146,96,10,.2)}
 .hw-plan-warning.bedtime{background:rgba(99,102,241,.1);color:#c4b5fd;border:1px solid rgba(99,102,241,.25)}
-.hw-plan-warning.bedtime-overload{background:rgba(234,179,8,.1);color:#fde68a;border:1px solid rgba(234,179,8,.2)}
+.hw-plan-warning.bedtime-overload{background:#FFF3CD;color:#92600A;border:1px solid rgba(146,96,10,.2)}
 
 /* ─── PLANNER SLIDE-IN PANEL ────────────────────────────── */
 #hwPlanModal{position:fixed;top:0;right:0;bottom:0;left:auto;width:min(420px,92vw);transform:translateX(100%);border-radius:0;max-height:100vh;z-index:701;box-shadow:-8px 0 40px rgba(0,0,0,.4);transition:transform .3s cubic-bezier(.4,0,.2,1),opacity .3s}
