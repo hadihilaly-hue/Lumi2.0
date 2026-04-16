@@ -66,6 +66,7 @@ async function fetchClaudeProxy(body, options = {}) {
     headers: {
       'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
     },
     body: JSON.stringify(body),
     ...options,
