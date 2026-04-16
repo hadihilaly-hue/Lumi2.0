@@ -4193,6 +4193,69 @@ function renderStudyPlan(plan) {
   });
 }
 
+// ── Planner floating strip state ───────────────────────────
+let _plannerBlocks = [];
+let _plannerBlockIdx = 0;
+let _plannerTimerInterval = null;
+let _plannerStartedAt = null;
+
+function startPlannerStrip(blocks) {
+  _plannerBlocks = blocks.filter(b => b.type === 'task');
+  if (!_plannerBlocks.length) return;
+  _plannerBlockIdx = 0;
+  _plannerStartedAt = Date.now();
+  updatePlannerStrip();
+  $('plannerStrip').style.display = 'flex';
+  if (_plannerTimerInterval) clearInterval(_plannerTimerInterval);
+  _plannerTimerInterval = setInterval(updatePlannerStripTimer, 1000);
+}
+
+function updatePlannerStrip() {
+  if (_plannerBlockIdx >= _plannerBlocks.length) {
+    closePlannerStrip();
+    showToast('All blocks done! 🎉', 'ok');
+    return;
+  }
+  const block = _plannerBlocks[_plannerBlockIdx];
+  const taskName = block.task ? block.task.title : 'Study block';
+  const chunkLabel = block.chunkNum ? ` (part ${block.chunkNum}/${block.totalChunks})` : '';
+  $('plannerStripTask').textContent = taskName + chunkLabel;
+  _plannerStartedAt = Date.now();
+  updatePlannerStripTimer();
+}
+
+function updatePlannerStripTimer() {
+  if (_plannerBlockIdx >= _plannerBlocks.length) return;
+  const block = _plannerBlocks[_plannerBlockIdx];
+  const dur = (block.duration || 25) * 60 * 1000;
+  const elapsed = Date.now() - _plannerStartedAt;
+  const remaining = Math.max(0, dur - elapsed);
+  const mins = Math.floor(remaining / 60000);
+  const secs = Math.floor((remaining % 60000) / 1000);
+  $('plannerStripTimer').textContent = `${mins}:${secs.toString().padStart(2, '0')} remaining`;
+  if (remaining <= 0) {
+    $('plannerStripTimer').textContent = 'Time\'s up!';
+  }
+}
+
+function advancePlannerBlock() {
+  _plannerBlockIdx++;
+  if (_plannerBlockIdx >= _plannerBlocks.length) {
+    closePlannerStrip();
+    showToast('All blocks done! 🎉', 'ok');
+    return;
+  }
+  _plannerStartedAt = Date.now();
+  updatePlannerStrip();
+}
+
+function closePlannerStrip() {
+  $('plannerStrip').style.display = 'none';
+  if (_plannerTimerInterval) { clearInterval(_plannerTimerInterval); _plannerTimerInterval = null; }
+  _plannerBlocks = [];
+  _plannerBlockIdx = 0;
+}
+
 // ── Sidebar homework checklist ─────────────────────────────
 function renderHwSidebar(container) {
   const tasks = getHwTasks();
@@ -5469,8 +5532,22 @@ function wireHwListeners() {
   });
 
   $('hwPlanDoneBtn').addEventListener('click', () => {
+    // Collapse planner to floating strip with timer
+    const tasks = getHwTasks().filter(t => !t.isComplete);
+    const plan = _calEvents.length > 0 ? buildStudyPlanWithCalendar(tasks) : buildStudyPlan(tasks);
     closeHwPlanModal();
     closeHwPopup();
+    startPlannerStrip(plan.blocks);
+  });
+
+  // Floating strip: click info area to re-expand planner
+  $('plannerStripInfo').addEventListener('click', () => {
+    showHwPlanModal();
+  });
+  // Floating strip: "Done" button advances to next block
+  $('plannerStripDone').addEventListener('click', (e) => {
+    e.stopPropagation();
+    advancePlannerBlock();
   });
 
   // ── Project file dropzone ──────────────────────────────
