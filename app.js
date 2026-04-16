@@ -52,6 +52,37 @@ let currentUser = null;
   init();
 })();
 
+// ─── CLAUDE API PROXY ─────────────────────────────────────────────────────────
+const CLAUDE_PROXY_URL = 'https://mzrzmfkfjfdwsjwblbzz.supabase.co/functions/v1/claude-proxy';
+
+// Helper to make authenticated API calls to the Claude proxy
+async function fetchClaudeProxy(body, options = {}) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error('Not authenticated. Please sign in again.');
+  }
+
+  const res = await fetch(CLAUDE_PROXY_URL, {
+    headers: {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+    ...options,
+    method: 'POST',
+  });
+
+  // Handle rate limiting
+  if (res.status === 429) {
+    const errData = await res.json().catch(() => ({}));
+    const match = errData.error?.match(/\((\d+)\/day\)/);
+    const limit = match ? match[1] : '100';
+    throw new Error(`You've hit today's Lumi limit (${limit} messages per day). Try again tomorrow!`);
+  }
+
+  return res;
+}
+
 // ─── CURRICULUM DATA ──────────────────────────────────────────────────────────
 const MENLO_CURRICULUM = {
   "English": {
@@ -2329,15 +2360,11 @@ async function startObConversation() {
     : 'Hi!';
 
   try {
-    const res = await fetch('/api/anthropic', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2500,
-        system: buildOnboardingSystem(),
-        messages: [{ role: 'user', content: seedMsg }],
-      }),
+    const res = await fetchClaudeProxy({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2500,
+      system: buildOnboardingSystem(),
+      messages: [{ role: 'user', content: seedMsg }],
     });
     obHideTyping();
     if (!res.ok) throw new Error('API error ' + res.status);
@@ -2376,15 +2403,11 @@ async function obSend() {
   obShowTyping();
 
   try {
-    const res = await fetch('/api/anthropic', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2500,
-        system: buildOnboardingSystem(),
-        messages: OB.messages,
-      }),
+    const res = await fetchClaudeProxy({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2500,
+      system: buildOnboardingSystem(),
+      messages: OB.messages,
     });
     obHideTyping();
     if (!res.ok) throw new Error('API error ' + res.status);
@@ -3029,11 +3052,7 @@ async function generateTitle(convId, firstUserMsg) {
   if (!convs[convId] || convs[convId].title) return;
   try {
     const prompt = `Generate a short 4-6 word title for this conversation. Just the title, nothing else, no punctuation at the end: ${firstUserMsg.slice(0, 300)}`;
-    const res = await fetch('/api/anthropic', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 20, messages: [{ role: 'user', content: prompt }] }),
-    });
+    const res = await fetchClaudeProxy({ model: 'claude-haiku-4-5', max_tokens: 20, messages: [{ role: 'user', content: prompt }] });
     if (!res.ok) return;
     const data  = await res.json();
     const title = data.content?.[0]?.text?.trim().replace(/[.!?]$/, '');
@@ -3119,16 +3138,12 @@ function renderError(msg) {
 
 // ─── API CALL ────────────────────────────────────────────────────────────────
 async function callAPI(msgs, system) {
-  const res = await fetch('/api/anthropic', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2500,
-      stream: true,
-      system,
-      messages: msgs,
-    }),
+  const res = await fetchClaudeProxy({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 2500,
+    stream: true,
+    system,
+    messages: msgs,
   });
 
   if (!res.ok) {

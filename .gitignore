@@ -1,4 +1,7 @@
 teacher-config.js
+teacher-config*.txt
 .env
+.env.*
 node_modules/
 .netlify/
+supabase/.temp/

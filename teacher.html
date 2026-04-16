@@ -792,8 +792,33 @@ body { overflow: auto; display: block; }
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="supabase.js"></script>
 <script src="auth.js"></script>
-<script src="teacher-config.js"></script>
 <script>
+// ─── CLAUDE API PROXY ─────────────────────────────────────────────────────────
+const CLAUDE_PROXY_URL = 'https://mzrzmfkfjfdwsjwblbzz.supabase.co/functions/v1/claude-proxy';
+
+async function fetchClaudeProxy(body, options = {}) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error('Not authenticated. Please sign in again.');
+  }
+  const res = await fetch(CLAUDE_PROXY_URL, {
+    headers: {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+    ...options,
+    method: 'POST',
+  });
+  if (res.status === 429) {
+    const errData = await res.json().catch(() => ({}));
+    const match = errData.error?.match(/\((\d+)\/day\)/);
+    const limit = match ? match[1] : '500';
+    throw new Error(`You've hit today's limit (${limit} messages per day). Try again tomorrow!`);
+  }
+  return res;
+}
+
 // ─── CURRICULUM (same as app.js) ─────────────────────────────────────────────
 const MENLO_CURRICULUM = {
   "English": {
@@ -1439,32 +1464,13 @@ async function streamReply() {
     // Create message element for streaming
     const msgEl = createLumiMsgEl();
 
-    const apiBody = JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2500,
-        stream: true,
-        system,
-        messages: tMessages,
-      });
-
-    // Use direct API if local config exists, otherwise use Netlify proxy
-    const useDirectAPI = typeof TEACHER_API_KEY !== 'undefined' && TEACHER_API_KEY && TEACHER_API_KEY !== 'your-api-key-here';
-    const res = useDirectAPI
-      ? await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': TEACHER_API_KEY,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-          },
-          body: apiBody,
-        })
-      : await fetch('/api/anthropic', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: apiBody,
-        });
+    const res = await fetchClaudeProxy({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2500,
+      stream: true,
+      system,
+      messages: tMessages,
+    });
 
     typingEl.remove();
 
