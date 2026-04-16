@@ -4249,7 +4249,7 @@ function renderHwSidebar(container) {
         urgencyClass = 'nodate'; urgencyText = 'No date';
       } else {
         const daysLeft = dateDiffDays(today, task.dueDate);
-        if (daysLeft <= 0) { urgencyClass = 'overdue'; urgencyText = 'Overdue'; }
+        if (daysLeft <= 0) { urgencyClass = 'in-progress'; urgencyText = 'In Progress'; }
         else if (daysLeft <= 1) { urgencyClass = 'tomorrow'; urgencyText = 'Due tomorrow'; }
         else if (daysLeft <= 7) { urgencyClass = 'week'; urgencyText = 'Due this week'; }
       }
