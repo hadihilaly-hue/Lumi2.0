@@ -3880,15 +3880,21 @@ function showHwPlanModal() {
   const plan  = _calEvents.length > 0 ? buildStudyPlanWithCalendar(tasks) : buildStudyPlan(tasks);
   renderStudyPlan(plan);
   const modal = $('hwPlanModal');
+  const backdrop = $('hwPlanBackdrop');
   modal.style.display = 'flex';
   modal.style.flexDirection = 'column';
-  requestAnimationFrame(() => modal.classList.add('open'));
+  requestAnimationFrame(() => {
+    modal.classList.add('open');
+    backdrop.classList.add('open');
+  });
 }
 
 function closeHwPlanModal() {
   const modal = $('hwPlanModal');
+  const backdrop = $('hwPlanBackdrop');
   modal.classList.remove('open');
-  setTimeout(() => { modal.style.display = 'none'; }, 200);
+  backdrop.classList.remove('open');
+  setTimeout(() => { modal.style.display = 'none'; }, 300);
 }
 
 // ── Render popup task list ─────────────────────────────────
@@ -4197,12 +4203,26 @@ function renderHwSidebar(container) {
   hd.className = 'sb-hw-hd';
   const hdLabel = document.createElement('span');
   hdLabel.textContent = 'My Homework';
+  const hdBtns = document.createElement('div');
+  hdBtns.style.cssText = 'display:flex;align-items:center;gap:6px';
   const hdBtn = document.createElement('button');
   hdBtn.className = 'sb-hw-hd-btn';
   hdBtn.textContent = '+ Add';
   hdBtn.addEventListener('click', () => { showWorkTypeChooser(); closeSidebar(); });
+  const planBtn = document.createElement('button');
+  planBtn.className = 'sb-hw-planner-btn';
+  planBtn.title = 'Open planner';
+  planBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`;
+  planBtn.addEventListener('click', () => {
+    const tasks = getHwTasks().filter(t => !t.isComplete);
+    if (!tasks.length) { showToast('Add some homework first!'); return; }
+    showHwPlanModal();
+    closeSidebar();
+  });
+  hdBtns.appendChild(hdBtn);
+  hdBtns.appendChild(planBtn);
   hd.appendChild(hdLabel);
-  hd.appendChild(hdBtn);
+  hd.appendChild(hdBtns);
   container.appendChild(hd);
 
   if (!tasks.length) {
@@ -4268,12 +4288,7 @@ function renderHwSidebar(container) {
     });
   }
 
-  // "Open planner" button
-  const openBtn = document.createElement('div');
-  openBtn.className = 'sb-hw-open-btn';
-  openBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Open planner`;
-  openBtn.addEventListener('click', () => { showHwPopup(); closeSidebar(); });
-  container.appendChild(openBtn);
+  // "Open planner" button removed — now in header as icon button
 
   if (isCalendarConnected() || _calEvents.length > 0) {
     const tlBtn = document.createElement('div');
@@ -5442,8 +5457,14 @@ function wireHwListeners() {
     renderSidebar();
   });
 
-  // ── Study plan modal ───────────────────────────────────
+  // ── Study plan panel (slide-in drawer) ──────────────────
   $('hwPlanBack').addEventListener('click', () => {
+    closeHwPlanModal();
+  });
+  $('hwPlanClose').addEventListener('click', () => {
+    closeHwPlanModal();
+  });
+  $('hwPlanBackdrop').addEventListener('click', () => {
     closeHwPlanModal();
   });
 
