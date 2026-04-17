@@ -336,7 +336,6 @@ function buildTutorSystem(subject, course, teacher, teacherProfile) {
 
   if (hasProfile) {
     const p = teacherProfile;
-    const fmtList = arr => Array.isArray(arr) ? arr.map(m => `  - ${m}`).join('\n') : (arr ? `  - ${arr}` : '(none specified)');
 
     let prompt = `You are Lumi, acting as a 24/7 digital version of ${teacher} for their ${course} class at Menlo School. ${teacher} has given you a deep briefing on how they teach — your job is to help this student exactly the way ${teacher} would.
 
@@ -345,56 +344,18 @@ Always complete your full response. If approaching length limits, wrap up your c
 
 ${studentCtx()}
 
-═══ ${teacher.toUpperCase()}'S TEACHING PROFILE ═══
+═══ HOW ${firstName.toUpperCase()} WANTS YOU TO HELP STUDENTS ═══
+${p.engagement_rules || '(No rules specified)'}
 
-TEACHING STYLE & PEDAGOGICAL SEQUENCE:
-${p.teaching_style || ''}
+═══ HOW ${firstName.toUpperCase()} TALKS AND TEACHES ═══
+${p.teaching_voice || '(No voice specified)'}
 
-CORE LEARNING GOALS:
-${p.grading_philosophy || ''}
+═══ ABOUT THIS COURSE ═══
+${p.course_info || '(No course info)'}`;
 
-WHAT EXCELLENCE LOOKS LIKE:
-${p.excellence_criteria || ''}
-
-INTERVENTION TECHNIQUE — HOW ${firstName.toUpperCase()} RESPONDS TO WRONG OR OVERSIMPLIFIED ANSWERS:
-${p.explanation_methods || ''}
-
-FRUSTRATION AND TIME PRESSURE:
-When a student expresses frustration or time pressure, acknowledge it in one sentence maximum, then immediately redirect to a single focused question. Never explain at length why you won't give direct answers — just don't give them, and get back to work.
-
-KEY VALUES:
-${p.key_values || ''}
-
-CLASS-SPECIFIC NOTES & CASE SELECTION:
-${p.class_specific_notes || ''}
-
-${firstName.toUpperCase()}'S VOICE & TONE:
-${p.teacher_voice || ''}`;
-
-    // New enriched fields
-    if (p.key_themes_and_topics?.length) {
-      prompt += `\n\nKEY THEMES & TOPICS THIS CLASS COVERS:\n${fmtList(p.key_themes_and_topics)}`;
-    }
-    if (p.topics_not_covered?.length) {
-      prompt += `\n\nOUT OF SCOPE — DO NOT ENGAGE WITH THESE TOPICS:\n${fmtList(p.topics_not_covered)}\nIf a student asks about these, redirect: "That's outside what we cover in this class — but here's what IS relevant from our framework..."`;
-    }
-    if (p.common_mistakes?.length) {
-      prompt += `\n\n"SEE ME" LIST — RECURRING SHALLOW THINKING SIGNALS:\n${fmtList(p.common_mistakes)}`;
-    }
-    if (p.lumi_dos?.length) {
-      prompt += `\n\nWHAT ${firstName.toUpperCase()} WANTS LUMI TO ALWAYS DO:\n${fmtList(p.lumi_dos)}`;
-    }
-    if (p.lumi_donts?.length) {
-      prompt += `\n\nWHAT ${firstName.toUpperCase()} WANTS LUMI TO NEVER DO:\n${fmtList(p.lumi_donts)}`;
-    }
-    if (p.rules_and_procedures) {
-      prompt += `\n\nACADEMIC INTEGRITY & AI POLICY:\n${p.rules_and_procedures}`;
-    }
-    if (p.north_star) {
-      prompt += `\n\n═══ NORTH STAR INSTRUCTION ═══\n${p.north_star}`;
-    }
-    if (p.welcome_message) {
-      prompt += `\n\nTEACHER'S WELCOME MESSAGE TO STUDENTS (already shown — do not repeat or rephrase):\n${p.welcome_message}`;
+    // Include syllabus text if available
+    if (p.syllabus_text) {
+      prompt += `\n\n═══ COURSE SYLLABUS ═══\n${p.syllabus_text}`;
     }
 
     prompt += `
@@ -406,26 +367,18 @@ NEVER:
 - Say "that's wrong" — instead ask the student to walk through their reasoning
 - Make more than one correction per response
 - Generate analysis on behalf of the student — not even partially disguised as a hint
-- Engage deeply with out-of-scope topics as if they are course content
-- Tell students what their political conclusions should be
+- Tell students what their conclusions should be
 - Validate surface-level thinking to be encouraging — false floors are not kindness
-- Nudge students toward particular political views, even subtly
 
 ALWAYS:
 - Ask the student to walk through their reasoning BEFORE you respond
-- Before every response, silently check the student's answer against these criteria:
-    → Is this specific (mechanism) or general (event)?
-    → Is the framework being used as a lens or a checklist?
-    → Is there tautological reasoning?
-    → Is there unearned certainty? (no counterargument acknowledged)
-    → Are conclusions borrowed without local application?
 - Find the single most important weakness and ask exactly ONE question targeting it
-- For policy recommendations, run the two-question diagnostic in sequence:
-    1. "Walk me through the mechanism — how does this intervention actually change the political incentives of the relevant actors?"
-    2. "What's your evidence that this intervention has worked in a comparable case?"
 - Push back on reasoning quality, never on conclusions
 - Let students find their own inconsistencies
-- Match ${firstName}'s voice, tone, and intervention technique exactly
+- Match ${firstName}'s voice, tone, and teaching style exactly
+
+FRUSTRATION AND TIME PRESSURE:
+When a student expresses frustration or time pressure, acknowledge it in one sentence maximum, then immediately redirect to a single focused question. Never explain at length why you won't give direct answers — just don't give them, and get back to work.
 
 ${hwContext()}${activeHwForClass(course)}
 Response length: SHORT — 1-3 sentences for simple questions. Longer only when a concept truly needs it. No essays.
@@ -586,19 +539,19 @@ async function preloadProfileStatuses() {
   try {
     const { data, error } = await sb
       .from('teacher_profiles')
-      .select('teacher_email, class_name, status')
+      .select('teacher_email, course_name, done')
       .in('teacher_email', emails);
     if (error) { console.warn('[preloadProfileStatuses] error:', error); return; }
-    // Build a lookup: email__class -> status
+    // Build a lookup: email__course -> done
     const lookup = {};
-    (data || []).forEach(row => { lookup[row.teacher_email + '__' + row.class_name] = row.status; });
+    (data || []).forEach(row => { lookup[row.teacher_email + '__' + row.course_name] = row.done; });
     // Map each scheduled class
     schedule.forEach(({ course, teacher }) => {
       const email = TEACHER_EMAIL_MAP[teacher];
       const key = course + '::' + teacher;
       if (!email) { _profileStatusCache[key] = 'pending'; return; }
-      const status = lookup[email + '__' + course];
-      _profileStatusCache[key] = status === 'complete' ? 'ready' : 'pending';
+      const done = lookup[email + '__' + course];
+      _profileStatusCache[key] = done === true ? 'ready' : 'pending';
     });
     renderSidebar();
   } catch (e) { console.warn('[preloadProfileStatuses] failed:', e); }
@@ -620,16 +573,15 @@ async function getTeacherProfile(teacherName, course) {
       .from('teacher_profiles')
       .select('*')
       .eq('teacher_email', email)
-      .eq('class_name', course)
+      .eq('course_name', course)
       .maybeSingle();
     const result = await Promise.race([query, timeout]);
     if (result) {
       const { data, error } = result;
       if (!error && data) {
-        console.log('[getTeacherProfile] Supabase hit, status:', data.status);
+        console.log('[getTeacherProfile] Supabase hit, done:', data.done);
         _profileCache[cacheKey] = data; // update cache
-        if (data.status !== 'complete') return { __notReady: true };
-        if (data.profile && typeof data.profile === 'object') return { ...data, ...data.profile };
+        if (!data.done) return { __notReady: true };
         return data;
       }
       if (error) console.warn('[getTeacherProfile] query error:', error.message);
@@ -644,7 +596,7 @@ async function getTeacherProfile(teacherName, course) {
   const cached = _profileCache[cacheKey];
   if (cached) {
     console.log('[getTeacherProfile] using cached profile');
-    if (cached.status !== 'complete') return { __notReady: true };
+    if (!cached.done) return { __notReady: true };
     return cached;
   }
 

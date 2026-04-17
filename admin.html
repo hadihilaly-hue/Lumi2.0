@@ -445,11 +445,11 @@ async function loadAndRender() {
   try {
     const { data, error } = await sb
       .from('teacher_profiles')
-      .select('teacher_email, class_name, status, done, updated_at, teaching_style, key_values');
+      .select('teacher_email, course_name, done, updated_at, engagement_rules, teaching_voice');
     if (!error && data) {
       aProfiles = {};
       data.forEach(row => {
-        aProfiles[`${row.teacher_email}|${row.class_name}`] = row;
+        aProfiles[`${row.teacher_email}|${row.course_name}`] = row;
       });
     }
   } catch (err) {
@@ -474,7 +474,7 @@ function updateRefreshTime() {
 function getStatus(email, course) {
   const row = aProfiles[`${email}|${course}`];
   if (!row) return 'not_started';
-  return row.status || (row.done ? 'complete' : (row.teaching_style ? 'in_progress' : 'not_started'));
+  return row.done ? 'complete' : 'not_started';
 }
 
 function renderDashboard() {

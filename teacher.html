@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 /* ─── TEACHER PORTAL OVERRIDES ─────────────────────────────── */
 body { overflow: auto; display: block; }
@@ -168,164 +169,6 @@ body { overflow: auto; display: block; }
   font-size: 12px; color: var(--text-muted); line-height: 1.5;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.t-api-section {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 14px; padding: 20px 22px;
-}
-.t-api-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
-.t-api-section p  { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
-.t-api-row { display: flex; gap: 8px; }
-.t-api-input {
-  flex: 1; background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 8px; padding: 9px 12px; color: var(--text);
-  font-family: inherit; font-size: 13px; outline: none; transition: border-color .15s;
-}
-.t-api-input:focus { border-color: var(--accent); }
-.t-api-save {
-  background: var(--accent); border: none; border-radius: 8px;
-  padding: 9px 16px; color: #fff; font-family: inherit; font-size: 13px;
-  font-weight: 500; cursor: pointer; transition: opacity .15s; white-space: nowrap;
-}
-.t-api-save:hover { opacity: .85; }
-.t-api-saved {
-  font-size: 12px; color: #34d399; margin-top: 6px;
-  display: none; transition: opacity .3s;
-}
-
-/* ─── CHAT VIEW ────────────────────────────────────────────── */
-#chatView { height: 100vh; display: flex; }
-.t-chat-sidebar {
-  width: 250px; flex-shrink: 0; background: var(--sb-bg);
-  border-right: 1px solid var(--border); display: flex; flex-direction: column;
-  height: 100vh; padding: 20px 0 0;
-}
-.t-chat-sb-logo {
-  display: flex; align-items: center; gap: 9px; padding: 0 16px 20px;
-  border-bottom: 1px solid var(--border);
-}
-.t-chat-sb-logo-mark {
-  width: 28px; height: 28px; background: var(--accent); border-radius: 8px;
-  display: flex; align-items: center; justify-content: center; font-size: 13px;
-  box-shadow: 0 0 12px var(--accent-glow);
-}
-.t-chat-sb-logo-text { font-size: 14px; font-weight: 600; }
-.t-chat-sb-logo-sub  { font-size: 10px; color: var(--text-muted); font-weight: 400; }
-.t-chat-sb-body { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
-.t-back-btn {
-  display: flex; align-items: center; gap: 7px; width: 100%;
-  padding: 9px 12px; background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); color: var(--text-muted);
-  font-family: inherit; font-size: 12.5px; cursor: pointer; transition: all .15s;
-}
-.t-back-btn:hover { border-color: var(--accent); color: var(--accent); }
-.t-back-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; flex-shrink: 0; }
-.t-class-label {
-  font-size: 10px; font-weight: 600; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: .6px; padding: 4px 4px 2px;
-}
-.t-class-display {
-  background: var(--accent-soft); border: 1px solid rgba(123,105,245,.22);
-  border-radius: 8px; padding: 10px 12px;
-}
-.t-class-display-subject { font-size: 10px; color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
-.t-class-display-name    { font-size: 13px; font-weight: 600; color: var(--text); margin-top: 3px; line-height: 1.3; }
-.t-sb-divider { height: 1px; background: var(--border); margin: 4px 0; }
-.t-sb-key-label { font-size: 11px; color: var(--text-muted); padding: 2px 4px; font-weight: 500; }
-.t-sb-key-input {
-  width: 100%; background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 7px; padding: 8px 10px; color: var(--text);
-  font-family: inherit; font-size: 12px; outline: none; transition: border-color .15s;
-}
-.t-sb-key-input:focus { border-color: var(--accent); }
-.t-sb-key-saved { font-size: 11px; color: #34d399; margin-top: 4px; display: none; }
-.t-chat-sb-foot { padding: 12px 16px; border-top: 1px solid var(--border); }
-.t-sb-signout {
-  display: flex; align-items: center; gap: 7px; width: 100%;
-  padding: 8px 12px; background: none; border: 1px solid var(--border);
-  border-radius: 8px; color: var(--text-muted);
-  font-family: inherit; font-size: 12.5px; cursor: pointer; transition: all .15s;
-}
-.t-sb-signout:hover { border-color: #ff6b6b; color: #ff6b6b; }
-.t-sb-signout svg { width: 13px; height: 13px; stroke: currentColor; fill: none; }
-
-.t-chat-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-.t-chat-header {
-  background: var(--surface); border-bottom: 1px solid var(--border);
-  padding: 14px 24px; display: flex; align-items: center; gap: 12px;
-  flex-shrink: 0;
-}
-.t-chat-header-icon {
-  width: 34px; height: 34px; background: var(--accent); border-radius: 9px;
-  display: flex; align-items: center; justify-content: center; font-size: 15px;
-  box-shadow: 0 0 12px var(--accent-glow); flex-shrink: 0;
-}
-.t-chat-header-name { font-size: 14px; font-weight: 600; }
-.t-chat-header-sub  { font-size: 12px; color: var(--text-muted); }
-.t-chat-header-badge {
-  margin-left: auto; font-size: 11px; font-weight: 500;
-  padding: 4px 10px; border-radius: 20px;
-}
-.t-chat-header-badge.complete { background: rgba(52,211,153,.1); color: #34d399; }
-.t-chat-header-badge.progress { background: var(--accent-soft); color: var(--accent); }
-
-.t-messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
-.t-messages::-webkit-scrollbar { width: 4px; }
-.t-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-.t-msg { display: flex; flex-direction: column; max-width: 78%; }
-.t-msg.lumi  { align-self: flex-start; }
-.t-msg.user  { align-self: flex-end; }
-.t-msg-head  { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
-.t-msg-avatar {
-  width: 24px; height: 24px; background: var(--accent); border-radius: 7px;
-  display: flex; align-items: center; justify-content: center; font-size: 11px;
-}
-.t-msg-name { font-size: 11.5px; font-weight: 600; color: var(--text-muted); }
-.t-msg-bubble {
-  padding: 12px 15px; border-radius: 14px; font-size: 14px; line-height: 1.6;
-  white-space: pre-wrap; word-break: break-word;
-}
-.t-msg.lumi .t-msg-bubble {
-  background: var(--lumi-bg); border: 1px solid var(--border);
-  border-top-left-radius: 4px; color: var(--text);
-}
-.t-msg.user .t-msg-bubble {
-  background: var(--user-bg); color: #fff;
-  border-bottom-right-radius: 4px;
-}
-.t-msg.error .t-msg-bubble {
-  background: rgba(255,80,80,.08); border: 1px solid rgba(255,80,80,.2);
-  color: #ff8585;
-}
-
-/* Typing indicator */
-.t-typing .t-msg-bubble {
-  display: flex; align-items: center; gap: 4px; padding: 12px 16px;
-}
-.t-dot {
-  width: 6px; height: 6px; background: var(--text-muted); border-radius: 50%;
-  animation: dotPulse 1.4s ease-in-out infinite;
-}
-.t-dot:nth-child(2) { animation-delay: .2s; }
-.t-dot:nth-child(3) { animation-delay: .4s; }
-@keyframes dotPulse { 0%,80%,100%{opacity:.3;transform:scale(1)} 40%{opacity:1;transform:scale(1.2)} }
-
-/* Summary card */
-.t-summary-card {
-  background: rgba(52,211,153,.06); border: 1px solid rgba(52,211,153,.18);
-  border-radius: 14px; padding: 20px 22px; margin: 8px 0;
-}
-.t-summary-card h3 { font-size: 13px; font-weight: 600; color: #34d399; margin-bottom: 12px; }
-.t-summary-field { margin-bottom: 10px; }
-.t-summary-field-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 3px; }
-.t-summary-field-val   { font-size: 13px; color: var(--text); line-height: 1.5; }
-.t-reinterview-btn {
-  display: inline-flex; align-items: center; gap: 6px; margin-top: 14px;
-  padding: 8px 14px; background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 8px; color: var(--text-muted); font-family: inherit;
-  font-size: 12px; cursor: pointer; transition: all .15s;
-}
-.t-reinterview-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ─── STATUS DOTS ──────────────────────────────────────────────────────────── */
 .t-status-dot {
@@ -335,272 +178,235 @@ body { overflow: auto; display: block; }
 .t-status-dot.in_progress { background: #fbbf24; box-shadow: 0 0 5px rgba(251,191,36,.45); }
 .t-status-dot.complete    { background: #34d399; box-shadow: 0 0 5px rgba(52,211,153,.45); }
 
-/* ─── STATUS POPUP ─────────────────────────────────────────────────────────── */
-#statusPopupOverlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
-  z-index: 300; display: flex; align-items: center; justify-content: center; padding: 24px;
-  animation: fadeIn .18s ease;
+/* ─── WIZARD VIEW ─────────────────────────────────────────── */
+#wizardView {
+  min-height: 100vh; display: flex; flex-direction: column;
 }
-.t-status-popup {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 20px; padding: 32px 28px; max-width: 380px; width: 100%;
-  box-shadow: 0 24px 60px rgba(0,0,0,.45);
-  animation: slideUp .22s ease;
+.wizard-header {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 16px 32px; display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 40;
 }
-@keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
-.t-status-popup h3 { font-size: 16px; font-weight: 600; margin-bottom: 20px; line-height: 1.4; }
-.t-popup-option {
-  display: flex; align-items: flex-start; gap: 14px; width: 100%;
+.wizard-header-left { display: flex; align-items: center; gap: 12px; }
+.wizard-back-btn {
+  display: flex; align-items: center; gap: 6px; padding: 8px 12px;
   background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 12px; padding: 16px; cursor: pointer; text-align: left;
-  font-family: inherit; color: var(--text); transition: all .18s; margin-bottom: 10px;
+  border-radius: 8px; color: var(--text-muted); font-family: inherit;
+  font-size: 13px; cursor: pointer; transition: all .15s;
 }
-.t-popup-option:hover { border-color: var(--accent); background: var(--accent-soft); }
-.t-popup-option-icon  { font-size: 20px; flex-shrink: 0; line-height: 1.2; }
-.t-popup-option-title { font-size: 13.5px; font-weight: 600; margin-bottom: 3px; }
-.t-popup-option-desc  { font-size: 12px; color: var(--text-muted); line-height: 1.45; }
-.t-popup-note {
-  font-size: 11.5px; color: var(--text-faint); text-align: center;
-  margin-top: 16px; line-height: 1.5; padding: 0 4px;
+.wizard-back-btn:hover { border-color: var(--accent); color: var(--accent); }
+.wizard-class-name { font-size: 15px; font-weight: 600; }
+.wizard-class-subject { font-size: 11px; color: var(--text-muted); }
+
+.wizard-progress {
+  display: flex; align-items: center; gap: 8px;
+}
+.wizard-step-dot {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--border);
+  transition: all .2s;
+}
+.wizard-step-dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+.wizard-step-dot.completed { background: #34d399; }
+.wizard-step-label { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
+
+.wizard-body {
+  flex: 1; max-width: 700px; width: 100%; margin: 0 auto; padding: 40px 24px 80px;
 }
 
-.t-chat-input-area {
-  padding: 16px 24px; background: var(--surface);
-  border-top: 1px solid var(--border); flex-shrink: 0;
-}
-.t-no-key-banner {
-  display: none; background: rgba(251,191,36,.07); border: 1px solid rgba(251,191,36,.2);
-  border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #fbbf24;
-  margin-bottom: 10px; text-align: center;
-}
-.t-input-row {
-  display: flex; gap: 10px; align-items: flex-end;
-}
-.t-input {
-  flex: 1; background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 12px; padding: 11px 15px; color: var(--text);
-  font-family: inherit; font-size: 14px; outline: none; resize: none;
-  max-height: 140px; line-height: 1.5; transition: border-color .15s;
-}
-.t-input:focus { border-color: var(--accent); }
-.t-input:disabled { opacity: .5; }
-.t-send-btn {
-  width: 40px; height: 40px; background: var(--accent); border: none;
-  border-radius: 10px; display: flex; align-items: center; justify-content: center;
-  cursor: pointer; transition: opacity .15s; flex-shrink: 0;
-}
-.t-send-btn:hover { opacity: .85; }
-.t-send-btn:disabled { opacity: .35; cursor: not-allowed; }
-.t-send-btn svg { width: 16px; height: 16px; stroke: #fff; fill: none; }
+.wizard-step { display: none; }
+.wizard-step.active { display: block; }
 
-/* ─── STUDENT PROFILE VIEW ─────────────────────────────────── */
-#profileView { display:flex; height:100vh; background:#F5F3FB; }
-.sp-sidebar {
-  width:280px; flex-shrink:0; background:#FFFFFF;
-  border-right:1px solid #ECE9F5; display:flex; flex-direction:column;
-  height:100vh; overflow:hidden;
+.wizard-question-title {
+  font-size: 22px; font-weight: 600; line-height: 1.35; margin-bottom: 20px;
 }
-.sp-sb-top { padding:20px 16px 0; }
-.sp-logo {
-  display:flex; align-items:center; gap:10px;
-  padding:6px 8px 16px; border-bottom:1px solid #ECE9F5; margin-bottom:8px;
+.wizard-sub-prompts {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;
 }
-.sp-logo-icon {
-  width:32px; height:32px; background:#7B5CCC; border-radius:8px;
-  display:flex; align-items:center; justify-content:center;
-  color:#fff; font-weight:600; font-size:14px; flex-shrink:0;
+.wizard-sub-prompt {
+  padding: 6px 12px; background: var(--accent-soft); border: 1px solid rgba(123,105,245,.2);
+  border-radius: 20px; font-size: 12px; color: var(--accent); font-weight: 500;
 }
-.sp-logo-text { font-weight:600; font-size:15px; color:#1F1B2E; }
-.sp-logo-sub { font-size:11px; color:#8B82A6; }
-.sp-back {
-  display:flex; align-items:center; gap:6px; padding:8px 10px;
-  font-size:13px; color:#8B82A6; cursor:pointer; border-radius:6px;
-  border:none; background:none; font-family:inherit; width:100%; text-align:left;
+.wizard-examples-toggle {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; font-size: 13px; color: var(--text-muted);
+  cursor: pointer; margin-bottom: 16px; font-family: inherit; transition: all .15s;
 }
-.sp-back:hover { background:#F5F3FB; color:#5B3FBF; }
-.sp-section-label {
-  font-size:10px; font-weight:600; letter-spacing:.08em; color:#8B82A6;
-  padding:12px 8px 6px; text-transform:uppercase;
+.wizard-examples-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.wizard-examples-toggle .arrow { transition: transform .2s; }
+.wizard-examples-toggle.open .arrow { transform: rotate(180deg); }
+.wizard-examples {
+  display: none; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px 18px; margin-bottom: 20px;
 }
-.sp-class-list { flex:1; overflow-y:auto; padding:0 16px 16px; }
-.sp-class-list::-webkit-scrollbar { width:3px; }
-.sp-class-list::-webkit-scrollbar-thumb { background:#ECE9F5; border-radius:3px; }
-.sp-class-row {
-  padding:10px 12px; border-radius:8px; cursor:pointer;
-  display:flex; align-items:center; justify-content:space-between;
-  font-size:14px; transition:background .15s; color:#2B253F;
+.wizard-examples.open { display: block; }
+.wizard-example {
+  margin-bottom: 14px;
 }
-.sp-class-row:hover { background:#F5F3FB; }
-.sp-class-row.expanded { background:#F5F3FB; color:#5B3FBF; font-weight:500; }
-.sp-class-row.pending { color:#B5ADCC; }
-.sp-arrow { font-size:10px; color:#B5ADCC; transition:transform .2s; }
-.sp-class-row.expanded .sp-arrow { transform:rotate(90deg); }
-.sp-block-list { padding-left:16px; display:none; }
-.sp-class-row.expanded + .sp-block-list { display:block; }
-.sp-block-label {
-  font-size:11px; font-weight:600; color:#8B82A6;
-  padding:8px 12px 4px; letter-spacing:.06em; text-transform:uppercase;
+.wizard-example:last-child { margin-bottom: 0; }
+.wizard-example-label {
+  font-size: 11px; font-weight: 600; color: var(--accent);
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;
 }
-.sp-student-item {
-  display:flex; align-items:center; gap:10px; padding:8px 12px;
-  border-radius:8px; cursor:pointer; font-size:14px; transition:background .15s;
-  color:#2B253F;
+.wizard-example-text {
+  font-size: 13px; color: var(--text-muted); line-height: 1.55;
+  font-style: italic;
 }
-.sp-student-item:hover { background:#F5F3FB; }
-.sp-student-item.active { background:#EDE7FB; color:#5B3FBF; font-weight:500; }
-.sp-avatar {
-  width:28px; height:28px; border-radius:50%; background:#D4C9F0; color:#5B3FBF;
-  display:flex; align-items:center; justify-content:center;
-  font-size:11px; font-weight:600; flex-shrink:0;
-}
-.sp-pending-badge {
-  font-size:10px; color:#B5ADCC; background:#F5F3FB;
-  padding:2px 8px; border-radius:10px; margin-left:auto;
-}
-.sp-setup-msg {
-  font-size:12px; color:#8B82A6; padding:8px 12px; line-height:1.5;
-}
-.sp-sb-foot {
-  padding:12px 16px; border-top:1px solid #ECE9F5;
-  display:flex; flex-direction:column; gap:6px;
-}
-.sp-sb-link {
-  display:flex; align-items:center; gap:7px; padding:8px 12px;
-  background:none; border:1px solid #ECE9F5; border-radius:8px;
-  color:#8B82A6; font-family:inherit; font-size:12.5px; cursor:pointer;
-  transition:all .15s; text-decoration:none;
-}
-.sp-sb-link:hover { border-color:#5B3FBF; color:#5B3FBF; }
-.sp-sb-link.accent { border-color:rgba(123,92,204,.3); color:#5B3FBF; background:rgba(123,92,204,.06); }
-.sp-sb-signout:hover { border-color:#ff6b6b; color:#ff6b6b; }
 
-/* Main content */
-.sp-main {
-  flex:1; padding:32px 40px; overflow-y:auto; max-width:900px;
+.wizard-textarea-wrap {
+  position: relative; margin-bottom: 12px;
 }
-.sp-empty-main {
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  flex:1; color:#8B82A6; font-size:14px; text-align:center; padding:60px 20px;
+.wizard-textarea {
+  width: 100%; min-height: 180px; padding: 16px; padding-right: 50px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; font-family: inherit; font-size: 14px;
+  color: var(--text); resize: vertical; outline: none; line-height: 1.6;
+  transition: border-color .15s;
 }
-.sp-breadcrumb { font-size:13px; color:#8B82A6; margin-bottom:16px; }
-.sp-breadcrumb span+span::before { content:"›"; margin:0 8px; color:#CFC7E3; }
-.sp-header { display:flex; align-items:center; gap:16px; margin-bottom:28px; }
-.sp-header-avatar {
-  width:56px; height:56px; border-radius:50%;
-  background:linear-gradient(135deg,#8B6FD8,#5B3FBF);
-  color:#fff; display:flex; align-items:center; justify-content:center;
-  font-size:20px; font-weight:600; flex-shrink:0;
+.wizard-textarea:focus { border-color: var(--accent); }
+.wizard-textarea::placeholder { color: var(--text-muted); }
+.wizard-mic-btn {
+  position: absolute; right: 12px; top: 12px;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--surface-2); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all .15s;
 }
-.sp-header-info h1 { font-size:24px; font-weight:600; margin-bottom:4px; color:#1F1B2E; }
-.sp-header-meta { font-size:13px; color:#8B82A6; }
-.sp-insight {
-  background:linear-gradient(135deg,#EDE7FB,#F5F3FB);
-  border-radius:12px; padding:16px 18px; margin-bottom:20px;
-  font-size:14px; color:#2B253F; line-height:1.55;
+.wizard-mic-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+.wizard-mic-btn.recording {
+  background: rgba(239,68,68,.1); border-color: #ef4444;
+  animation: pulse 1s ease-in-out infinite;
 }
-.sp-insight-label {
-  font-size:11px; font-weight:600; letter-spacing:.08em; color:#5B3FBF;
-  text-transform:uppercase; margin-bottom:6px; display:flex; align-items:center; gap:6px;
-}
-.sp-teach {
-  background:#fff; border:2px solid #EDE7FB; border-radius:14px;
-  padding:20px; margin-bottom:24px; transition:border-color .2s;
-}
-.sp-teach:focus-within { border-color:#7B5CCC; box-shadow:0 0 0 4px rgba(123,92,204,.1); }
-.sp-teach-label {
-  display:flex; align-items:center; gap:8px; font-size:14px;
-  font-weight:600; color:#2B253F; margin-bottom:10px;
-}
-.sp-teach-sub { font-size:12px; color:#8B82A6; margin-bottom:12px; font-weight:normal; }
-.sp-teach textarea {
-  width:100%; border:none; outline:none; resize:none;
-  font-size:15px; font-family:inherit; color:#1F1B2E;
-  min-height:48px; line-height:1.5; background:transparent;
-}
-.sp-teach textarea::placeholder { color:#B5ADCC; }
-.sp-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
-.sp-chip {
-  padding:6px 12px; background:#F5F3FB; border:1px solid #ECE9F5;
-  border-radius:999px; font-size:12px; color:#5B3FBF;
-  cursor:pointer; transition:all .15s; font-family:inherit;
-}
-.sp-chip:hover { background:#EDE7FB; border-color:#C9BCEE; }
-.sp-teach-actions { display:flex; justify-content:flex-end; margin-top:12px; gap:8px; }
-.sp-btn-primary {
-  background:#5B3FBF; color:#fff; border:none; padding:10px 18px;
-  border-radius:8px; font-size:13px; font-weight:500; cursor:pointer;
-  font-family:inherit; transition:background .15s;
-}
-.sp-btn-primary:hover { background:#4A2FA8; }
-.sp-btn-secondary {
-  background:transparent; color:#8B82A6; border:none;
-  padding:10px 14px; font-size:13px; cursor:pointer; font-family:inherit;
-}
-.sp-section-title {
-  font-size:12px; font-weight:600; letter-spacing:.08em; color:#8B82A6;
-  text-transform:uppercase; margin:28px 0 12px;
-  display:flex; align-items:center; justify-content:space-between;
-}
-.sp-section-count {
-  background:#EDE7FB; color:#5B3FBF; padding:2px 8px;
-  border-radius:10px; font-size:11px; letter-spacing:0;
-}
-.sp-note {
-  background:#fff; border:1px solid #ECE9F5; border-radius:10px;
-  padding:14px 16px; margin-bottom:10px; display:flex; gap:12px;
-  align-items:flex-start; transition:border-color .15s;
-}
-.sp-note:hover { border-color:#C9BCEE; }
-.sp-note-source {
-  width:32px; height:32px; border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  font-size:13px; flex-shrink:0;
-}
-.sp-note-source.teacher { background:#FEF3C7; }
-.sp-note-source.lumi { background:#EDE7FB; }
-.sp-note-content { flex:1; min-width:0; }
-.sp-note-text { font-size:14px; color:#1F1B2E; line-height:1.5; margin-bottom:4px; }
-.sp-note-text[contenteditable=true] {
-  outline:none; background:#F5F3FB; border-radius:6px; padding:4px 6px;
-}
-.sp-note-meta { font-size:12px; color:#8B82A6; }
-.sp-note-actions { display:flex; gap:4px; opacity:0; transition:opacity .15s; }
-.sp-note:hover .sp-note-actions { opacity:1; }
-.sp-icon-btn {
-  width:28px; height:28px; border:none; background:transparent; border-radius:6px;
-  cursor:pointer; color:#8B82A6; display:flex; align-items:center;
-  justify-content:center; font-size:13px;
-}
-.sp-icon-btn:hover { background:#F5F3FB; color:#5B3FBF; }
-.sp-activity {
-  background:#fff; border:1px solid #ECE9F5; border-radius:10px;
-  padding:14px 16px; margin-bottom:8px; display:flex; align-items:center;
-  gap:12px; font-size:13px;
-}
-.sp-activity-date { color:#8B82A6; font-size:12px; width:70px; flex-shrink:0; }
-.sp-activity-desc { flex:1; color:#2B253F; }
-.sp-activity-duration { color:#8B82A6; font-size:12px; }
-.sp-activity-tag { padding:2px 8px; border-radius:10px; font-size:11px; font-weight:500; }
-.sp-tag-good { background:#D1FAE5; color:#047857; }
-.sp-tag-stuck { background:#FEE2E2; color:#B91C1C; }
-#spToast {
-  position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
-  background:#1F1B2E; color:#fff; padding:10px 18px; border-radius:8px;
-  font-size:13px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:500;
-}
-#spToast.show { opacity:1; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.6} }
+.wizard-mic-btn svg { width: 18px; height: 18px; stroke: var(--text-muted); fill: none; }
+.wizard-mic-btn.recording svg { stroke: #ef4444; }
 
-/* ─── RESPONSIVE ───────────────────────────────────────────── */
-@media (max-width: 640px) {
-  .t-chat-sidebar { width: 220px; }
-  .t-messages { padding: 16px; }
-  .t-msg { max-width: 90%; }
-  .t-home-body { padding: 24px 16px 48px; }
-  .t-home-header { padding: 14px 16px; }
-  .t-cards-grid { grid-template-columns: 1fr; }
-  .t-filter-bar { flex-direction: column; }
-  .t-filter-pills { width: 100%; }
+.wizard-word-count {
+  font-size: 12px; color: var(--text-muted); margin-bottom: 20px;
 }
+.wizard-word-count.valid { color: #34d399; }
+.wizard-word-count.invalid { color: #ef4444; }
+
+.wizard-nav {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+}
+.wizard-prev-btn {
+  padding: 12px 20px; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 10px; font-family: inherit; font-size: 14px; font-weight: 500;
+  color: var(--text-muted); cursor: pointer; transition: all .15s;
+}
+.wizard-prev-btn:hover { border-color: var(--accent); color: var(--accent); }
+.wizard-next-btn {
+  padding: 12px 24px; background: var(--accent); border: none;
+  border-radius: 10px; font-family: inherit; font-size: 14px; font-weight: 600;
+  color: #fff; cursor: pointer; transition: all .15s;
+}
+.wizard-next-btn:hover:not(:disabled) { opacity: .9; }
+.wizard-next-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ─── SYLLABUS UPLOAD ─────────────────────────────────────── */
+.syllabus-upload-area {
+  margin-bottom: 20px; padding: 20px;
+  background: var(--surface-2); border: 2px dashed var(--border);
+  border-radius: 12px; text-align: center; transition: all .15s;
+  cursor: pointer;
+}
+.syllabus-upload-area:hover { border-color: var(--accent); background: var(--accent-soft); }
+.syllabus-upload-area.has-file { border-style: solid; border-color: #34d399; }
+.syllabus-upload-icon { font-size: 32px; margin-bottom: 8px; }
+.syllabus-upload-text { font-size: 14px; color: var(--text-muted); margin-bottom: 4px; }
+.syllabus-upload-hint { font-size: 12px; color: var(--text-faint); }
+.syllabus-file-name {
+  display: none; margin-top: 10px; padding: 8px 12px;
+  background: rgba(52,211,153,.1); border: 1px solid rgba(52,211,153,.2);
+  border-radius: 8px; font-size: 13px; color: #34d399;
+}
+.syllabus-upload-area.has-file .syllabus-file-name { display: block; }
+#syllabusFileInput { display: none; }
+
+/* ─── TEMPLATE BANNER ─────────────────────────────────────── */
+.template-banner {
+  display: none; background: rgba(123,105,245,.08);
+  border: 1px solid rgba(123,105,245,.2); border-radius: 12px;
+  padding: 16px 18px; margin-bottom: 20px;
+}
+.template-banner.show { display: block; }
+.template-banner-icon { font-size: 20px; margin-bottom: 8px; }
+.template-banner-text { font-size: 14px; color: var(--text); margin-bottom: 12px; line-height: 1.5; }
+.template-banner-buttons { display: flex; gap: 10px; }
+.template-use-btn {
+  padding: 8px 16px; background: var(--accent); border: none;
+  border-radius: 8px; font-family: inherit; font-size: 13px; font-weight: 500;
+  color: #fff; cursor: pointer; transition: all .15s;
+}
+.template-use-btn:hover { opacity: .9; }
+.template-skip-btn {
+  padding: 8px 16px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; font-family: inherit; font-size: 13px; font-weight: 500;
+  color: var(--text-muted); cursor: pointer; transition: all .15s;
+}
+.template-skip-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ─── SUMMARY VIEW ─────────────────────────────────────────── */
+.summary-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 20px 22px; margin-bottom: 16px;
+}
+.summary-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.summary-card-label {
+  font-size: 12px; font-weight: 600; color: var(--accent);
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.summary-card-edit {
+  padding: 6px 12px; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 6px; font-family: inherit; font-size: 12px;
+  color: var(--text-muted); cursor: pointer; transition: all .15s;
+}
+.summary-card-edit:hover { border-color: var(--accent); color: var(--accent); }
+.summary-card-content {
+  font-size: 14px; color: var(--text); line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.summary-share-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 18px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 12px;
+  margin-bottom: 24px;
+}
+.summary-share-checkbox {
+  width: 20px; height: 20px; accent-color: var(--accent);
+}
+.summary-share-label {
+  font-size: 14px; color: var(--text); flex: 1;
+}
+.summary-share-hint {
+  font-size: 12px; color: var(--text-muted); margin-top: 2px;
+}
+
+.summary-save-btn {
+  width: 100%; padding: 14px 24px; background: var(--accent);
+  border: none; border-radius: 12px; font-family: inherit;
+  font-size: 15px; font-weight: 600; color: #fff;
+  cursor: pointer; transition: all .15s;
+}
+.summary-save-btn:hover { opacity: .9; }
+.summary-save-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ─── TOAST ───────────────────────────────────────────────── */
+.t-toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 12px 20px; border-radius: 10px; font-size: 14px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.2);
+  opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 100;
+}
+.t-toast.show { opacity: 1; }
+.t-toast.success { border-color: #34d399; color: #34d399; }
+.t-toast.error { border-color: #ef4444; color: #ef4444; }
 </style>
 </head>
 <body>
@@ -608,8 +414,7 @@ body { overflow: auto; display: block; }
 <!-- AUTH LOADING -->
 <div id="authLoading">
   <div class="auth-spinner"></div>
-  <div id="tAuthText" style="font-size:13px;color:var(--text-muted);margin-top:10px">Loading…</div>
-  <button id="tReloadBtn" onclick="location.reload()" style="display:none;margin-top:16px;padding:10px 22px;background:var(--accent);border:none;border-radius:10px;color:#fff;font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;">Reload</button>
+  <div style="font-size:13px;color:var(--text-muted);margin-top:8px">Loading…</div>
 </div>
 
 <!-- SIGN-IN VIEW -->
@@ -618,10 +423,10 @@ body { overflow: auto; display: block; }
     <div class="t-logo">
       <div class="t-logo-mark">✦</div>
       <h1>Lumi</h1>
-      <p>Teacher Portal · Menlo School</p>
+      <p>Teacher Portal</p>
     </div>
-    <div class="t-signin-title">Welcome, teacher</div>
-    <div class="t-signin-sub">Sign in to set up your Lumi teaching profile</div>
+    <div class="t-signin-title">Sign in to set up your classes</div>
+    <div class="t-signin-sub">Use your @menloschool.org email</div>
     <div class="t-error" id="tSigninError"></div>
     <button class="t-google-btn" id="tSigninBtn">
       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -632,18 +437,17 @@ body { overflow: auto; display: block; }
       </svg>
       Sign in with Google
     </button>
-    <div class="t-signin-foot">Menlo School staff only · @menloschool.org accounts</div>
+    <div class="t-signin-foot">For Menlo School teachers only</div>
   </div>
 </div>
 
 <!-- UNKNOWN TEACHER VIEW -->
 <div id="unknownView" style="display:none">
   <div class="t-unknown-box">
-    <div class="t-unknown-icon">🤔</div>
-    <h2>Account not set up</h2>
-    <p>Your account has not been set up yet.</p>
-    <div class="t-unknown-email" id="tUnknownEmail"></div>
-    <p style="margin-bottom:20px">Please contact your administrator.</p>
+    <div class="t-unknown-icon">👋</div>
+    <h2>Not a registered teacher</h2>
+    <p>Your email isn't in our teacher database yet.</p>
+    <p class="t-unknown-email" id="unknownEmail"></p>
     <button class="t-signout-btn" onclick="doSignOut()">Sign out</button>
   </div>
 </div>
@@ -651,35 +455,33 @@ body { overflow: auto; display: block; }
 <!-- HOME VIEW -->
 <div id="homeView" style="display:none">
   <div class="t-home-header">
-    <a href="#" onclick="goHome(); return false;" class="t-home-header-left" style="text-decoration:none;color:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
+    <div class="t-home-header-left">
       <div class="t-hdr-mark">✦</div>
       <div>
         <div class="t-hdr-title">Lumi <span style="color:var(--text-muted);font-weight:400">·</span> Teacher Portal</div>
         <div class="t-hdr-sub">Menlo School</div>
       </div>
-    </a>
+    </div>
     <div class="t-hdr-right">
-      <div class="t-hdr-user">
-        <div class="t-hdr-avatar" id="hdrAvatar"></div>
-        <span id="hdrName" style="font-size:13px"></span>
-      </div>
       <a href="app.html" style="font-size:12px;font-weight:500;color:var(--accent);text-decoration:none;padding:6px 12px;border:1px solid rgba(123,105,245,.3);border-radius:7px;background:var(--accent-soft)">🎒 Student Mode</a>
+      <div class="t-hdr-user">
+        <span id="hdrName"></span>
+        <div class="t-hdr-avatar" id="hdrAvatar"></div>
+      </div>
       <button class="t-hdr-signout" onclick="doSignOut()">Sign out</button>
     </div>
   </div>
   <div class="t-home-body">
     <div class="t-welcome">
-      <h2 id="welcomeHeading">Welcome back</h2>
-      <p>Click a class to complete Lumi's setup interview. Once done, your students will get AI tutoring calibrated to your teaching style.</p>
+      <h2 id="welcomeHeading">Welcome</h2>
+      <p>Set up your classes so Lumi can help your students like you would.</p>
     </div>
     <div class="t-section-label">Your Classes</div>
-    <div class="t-filter-bar" id="tFilterBar" style="display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap">
-      <input class="t-filter-search" id="tClassSearch" placeholder="Search classes..." autocomplete="off"
-        style="flex:1;min-width:180px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-family:inherit;font-size:13px;color:var(--text);outline:none">
-      <div class="t-filter-pills" id="tFilterPills" style="display:flex;gap:6px;flex-wrap:wrap">
+    <div id="tFilterBar" style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+      <input type="text" id="tClassSearch" placeholder="Search classes…" style="flex:1;max-width:220px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;color:var(--text);outline:none">
+      <div style="display:flex;gap:6px">
         <button class="t-filter-pill active" data-status="all" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--accent-soft);color:var(--accent);transition:all .15s">All</button>
         <button class="t-filter-pill" data-status="not_started" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);transition:all .15s">Not Started</button>
-        <button class="t-filter-pill" data-status="in_progress" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);transition:all .15s">In Progress</button>
         <button class="t-filter-pill" data-status="complete" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);transition:all .15s">Complete</button>
       </div>
     </div>
@@ -687,139 +489,215 @@ body { overflow: auto; display: block; }
   </div>
 </div>
 
-<!-- CHAT VIEW -->
-<div id="chatView" style="display:none">
-  <div class="t-chat-sidebar">
-    <div class="t-chat-sb-logo">
-      <div class="t-chat-sb-logo-mark">✦</div>
+<!-- WIZARD VIEW -->
+<div id="wizardView" style="display:none">
+  <div class="wizard-header">
+    <div class="wizard-header-left">
+      <button class="wizard-back-btn" onclick="goHome()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>
       <div>
-        <div class="t-chat-sb-logo-text">Lumi</div>
-        <div class="t-chat-sb-logo-sub">Teacher Portal</div>
+        <div class="wizard-class-name" id="wizardClassName"></div>
+        <div class="wizard-class-subject" id="wizardClassSubject"></div>
       </div>
     </div>
-    <div class="t-chat-sb-body">
-      <button class="t-back-btn" onclick="goHome()">
-        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-        Back to Home
-      </button>
-      <a href="app.html" class="t-back-btn" style="border-color:rgba(123,105,245,.3);color:var(--accent);background:var(--accent-soft);text-decoration:none">🎒 Student Mode</a>
-      <div class="t-class-label">Current class</div>
-      <div class="t-class-display">
-        <div class="t-class-display-subject" id="sbSubject"></div>
-        <div class="t-class-display-name" id="sbClassName"></div>
-      </div>
-      <div class="t-sb-divider"></div>
-    </div>
-    <div class="t-chat-sb-foot">
-      <button class="t-sb-signout" onclick="doSignOut()">
-        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        Sign out
-      </button>
+    <div class="wizard-progress">
+      <div class="wizard-step-dot" data-step="1"></div>
+      <div class="wizard-step-dot" data-step="2"></div>
+      <div class="wizard-step-dot" data-step="3"></div>
+      <div class="wizard-step-dot" data-step="4"></div>
+      <span class="wizard-step-label" id="wizardStepLabel">Step 1 of 4</span>
     </div>
   </div>
-  <div class="t-chat-main">
-    <div class="t-chat-header">
-      <div class="t-chat-header-icon">✦</div>
-      <div>
-        <div class="t-chat-header-name" id="chatHeaderName">Lumi</div>
-        <div class="t-chat-header-sub" id="chatHeaderSub">Teacher setup interview</div>
-      </div>
-      <div class="t-chat-header-badge progress" id="chatHeaderBadge">Setting up…</div>
-    </div>
-    <div class="t-messages" id="tMessages"></div>
-    <div class="t-chat-input-area">
-      <div class="t-input-row">
-        <textarea class="t-input" id="tInput" rows="1" placeholder="Reply to Lumi…" disabled></textarea>
-        <button class="t-send-btn" id="tSendBtn" disabled>
-          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
 
-<!-- STUDENT PROFILE VIEW -->
-<div id="profileView" style="display:none">
-  <aside class="sp-sidebar">
-    <div class="sp-sb-top">
-      <div class="sp-logo">
-        <div class="sp-logo-icon">L</div>
-        <div>
-          <div class="sp-logo-text">Lumi</div>
-          <div class="sp-logo-sub">Teacher Portal</div>
+  <div class="wizard-body">
+    <!-- STEP 1: Engagement Rules -->
+    <div class="wizard-step" data-step="1">
+      <h2 class="wizard-question-title">How do you want students to engage with Lumi?</h2>
+      <div class="wizard-sub-prompts">
+        <span class="wizard-sub-prompt">What's off-limits?</span>
+        <span class="wizard-sub-prompt">What should Lumi always do first?</span>
+        <span class="wizard-sub-prompt">How far should Lumi go when stuck?</span>
+        <span class="wizard-sub-prompt">What's useful vs. doing it for them?</span>
+      </div>
+      <button class="wizard-examples-toggle" onclick="toggleExamples(this)">
+        <span>Show examples</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="wizard-examples">
+        <div class="wizard-example">
+          <div class="wizard-example-label">History Example</div>
+          <div class="wizard-example-text">"Students should come having read the text — no summarizing. For essay feedback, ask what argument they're making first. Never write sentences for them. If they don't understand a concept, ask what they DO understand first, then fill gaps."</div>
+        </div>
+        <div class="wizard-example">
+          <div class="wizard-example-label">Math Example</div>
+          <div class="wizard-example-text">"Never solve a problem, even if they beg. Ask where they got stuck and what they tried. If they haven't tried anything, send them back. When wrong, ask them to explain how they got it — the mistake teaches more than the answer."</div>
         </div>
       </div>
-      <button class="sp-back" onclick="goHome()">← Back to Dashboard</button>
-      <div class="sp-section-label">Your Classes</div>
+      <div class="wizard-textarea-wrap">
+        <textarea class="wizard-textarea" id="engagementRulesInput" placeholder="Describe how you want Lumi to work with your students…"></textarea>
+        <button class="wizard-mic-btn" onclick="toggleMic('engagementRulesInput')">
+          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
+      </div>
+      <div class="wizard-word-count" id="engagementRulesCount">0 / 50 words minimum</div>
+      <div class="wizard-nav">
+        <div></div>
+        <button class="wizard-next-btn" id="step1NextBtn" onclick="nextStep()" disabled>Continue</button>
+      </div>
     </div>
-    <div class="sp-class-list" id="spClassList"></div>
-    <div class="sp-sb-foot">
-      <a href="app.html" class="sp-sb-link accent">🎒 Student Mode</a>
-      <button class="sp-sb-link sp-sb-signout" onclick="doSignOut()">Sign out</button>
-    </div>
-  </aside>
-  <main class="sp-main" id="spMain">
-    <div class="sp-empty-main">
-      <div style="font-size:40px;margin-bottom:12px">👈</div>
-      <div>Select a student from the sidebar</div>
-    </div>
-  </main>
-</div>
-<div id="spToast"></div>
 
-<!-- STATUS POPUP -->
-<div id="statusPopupOverlay" style="display:none">
-  <div class="t-status-popup">
-    <h3 id="statusPopupTitle">How's your profile going?</h3>
-    <button class="t-popup-option" onclick="markStatus('complete')">
-      <div class="t-popup-option-icon">✅</div>
-      <div>
-        <div class="t-popup-option-title">Mark as Complete</div>
-        <div class="t-popup-option-desc">I'm happy with my profile — students can use it now</div>
+    <!-- STEP 2: Teaching Voice -->
+    <div class="wizard-step" data-step="2">
+      <h2 class="wizard-question-title">What does your teaching voice sound like?</h2>
+      <div class="wizard-sub-prompts">
+        <span class="wizard-sub-prompt">Warm/dry/direct?</span>
+        <span class="wizard-sub-prompt">Humor?</span>
+        <span class="wizard-sub-prompt">Phrases/metaphors?</span>
+        <span class="wizard-sub-prompt">Push coasting vs. struggling students?</span>
       </div>
-    </button>
-    <button class="t-popup-option" onclick="markStatus('in_progress')">
-      <div class="t-popup-option-icon">⏸️</div>
-      <div>
-        <div class="t-popup-option-title">Still Working On It</div>
-        <div class="t-popup-option-desc">I want to come back and add more later</div>
+      <button class="wizard-examples-toggle" onclick="toggleExamples(this)">
+        <span>Show examples</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="wizard-examples">
+        <div class="wizard-example">
+          <div class="wizard-example-label">History Example</div>
+          <div class="wizard-example-text">"Warm but I don't sugarcoat. I tell students when thinking is fuzzy or sharp. I use modern analogies — 'Medici were basically VCs.' With coasting students, I ask the harder version back. With struggling students, I ask 'what's one thing you DO know?'"</div>
+        </div>
+        <div class="wizard-example">
+          <div class="wizard-example-label">Math Example</div>
+          <div class="wizard-example-text">"Direct and matter-of-fact. I get excited about clean solutions. Same PEMDAS joke every year. Cooking analogies — 'can't add frosting before cake is baked.' With coasting students, ask what a harder version looks like. With struggling, go back to a problem they solved."</div>
+        </div>
       </div>
-    </button>
-    <div class="t-popup-note">You can always edit your profile even after marking it complete</div>
+      <div class="wizard-textarea-wrap">
+        <textarea class="wizard-textarea" id="teachingVoiceInput" placeholder="Describe your teaching style and voice…"></textarea>
+        <button class="wizard-mic-btn" onclick="toggleMic('teachingVoiceInput')">
+          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
+      </div>
+      <div class="wizard-word-count" id="teachingVoiceCount">0 / 50 words minimum</div>
+      <div class="wizard-nav">
+        <button class="wizard-prev-btn" onclick="prevStep()">Back</button>
+        <button class="wizard-next-btn" id="step2NextBtn" onclick="nextStep()" disabled>Continue</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: Course Info + Syllabus -->
+    <div class="wizard-step" data-step="3">
+      <h2 class="wizard-question-title">What do students need to know about your course?</h2>
+      <div class="wizard-sub-prompts">
+        <span class="wizard-sub-prompt">Main units/topics?</span>
+        <span class="wizard-sub-prompt">Textbook/readings?</span>
+        <span class="wizard-sub-prompt">Recurring assignments?</span>
+        <span class="wizard-sub-prompt">Common misconceptions?</span>
+      </div>
+
+      <!-- Template Banner -->
+      <div class="template-banner" id="templateBanner">
+        <div class="template-banner-icon">📋</div>
+        <div class="template-banner-text">Another teacher shared their course info for <strong id="templateCourseName"></strong>. Want to use it as a starting point?</div>
+        <div class="template-banner-buttons">
+          <button class="template-use-btn" onclick="useTemplate()">Use as starting point</button>
+          <button class="template-skip-btn" onclick="skipTemplate()">Start fresh</button>
+        </div>
+      </div>
+
+      <!-- Syllabus Upload -->
+      <div class="syllabus-upload-area" onclick="document.getElementById('syllabusFileInput').click()">
+        <div class="syllabus-upload-icon">📄</div>
+        <div class="syllabus-upload-text">Got a syllabus? Upload it (PDF only)</div>
+        <div class="syllabus-upload-hint">We'll extract the text to help fill in your course info</div>
+        <div class="syllabus-file-name" id="syllabusFileName"></div>
+      </div>
+      <input type="file" id="syllabusFileInput" accept="application/pdf" onchange="handleSyllabusUpload(event)">
+
+      <button class="wizard-examples-toggle" onclick="toggleExamples(this)">
+        <span>Show examples</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="wizard-examples">
+        <div class="wizard-example">
+          <div class="wizard-example-label">History Example</div>
+          <div class="wizard-example-text">"US History, Reconstruction to present. Four units. Foner's Give Me Liberty. Weekly quizzes, one DBQ per unit. Students confuse Progressive Era with New Deal. Essays summarize instead of argue."</div>
+        </div>
+        <div class="wizard-example">
+          <div class="wizard-example-label">Math Example</div>
+          <div class="wizard-example-text">"Algebra 2 with Trig. Polynomials, rationals, exponentials, trig identities. Larson textbook. Problem sets every other day. Students mess up signs constantly. Confuse domain with range."</div>
+        </div>
+      </div>
+      <div class="wizard-textarea-wrap">
+        <textarea class="wizard-textarea" id="courseInfoInput" placeholder="Describe your course structure, topics, and common student challenges…"></textarea>
+        <button class="wizard-mic-btn" onclick="toggleMic('courseInfoInput')">
+          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
+      </div>
+      <div class="wizard-word-count" id="courseInfoCount">0 / 50 words minimum</div>
+      <div class="wizard-nav">
+        <button class="wizard-prev-btn" onclick="prevStep()">Back</button>
+        <button class="wizard-next-btn" id="step3NextBtn" onclick="nextStep()" disabled>Review & Save</button>
+      </div>
+    </div>
+
+    <!-- STEP 4: Summary -->
+    <div class="wizard-step" data-step="4">
+      <h2 class="wizard-question-title">Review your profile</h2>
+      <p style="color:var(--text-muted);margin-bottom:24px">Make sure everything looks good before saving.</p>
+
+      <div class="summary-card">
+        <div class="summary-card-header">
+          <span class="summary-card-label">Engagement Rules</span>
+          <button class="summary-card-edit" onclick="editField(1)">Edit</button>
+        </div>
+        <div class="summary-card-content" id="summaryEngagementRules"></div>
+      </div>
+
+      <div class="summary-card">
+        <div class="summary-card-header">
+          <span class="summary-card-label">Teaching Voice</span>
+          <button class="summary-card-edit" onclick="editField(2)">Edit</button>
+        </div>
+        <div class="summary-card-content" id="summaryTeachingVoice"></div>
+      </div>
+
+      <div class="summary-card">
+        <div class="summary-card-header">
+          <span class="summary-card-label">Course Info</span>
+          <button class="summary-card-edit" onclick="editField(3)">Edit</button>
+        </div>
+        <div class="summary-card-content" id="summaryCourseInfo"></div>
+      </div>
+
+      <div id="summarySyllabusCard" class="summary-card" style="display:none">
+        <div class="summary-card-header">
+          <span class="summary-card-label">Syllabus Uploaded</span>
+        </div>
+        <div class="summary-card-content" id="summarySyllabusName"></div>
+      </div>
+
+      <div class="summary-share-row">
+        <input type="checkbox" class="summary-share-checkbox" id="shareCourseInfoCheckbox">
+        <div>
+          <div class="summary-share-label">Let other teachers of this course use my course info and syllabus as a starting point</div>
+          <div class="summary-share-hint">They won't see your name — but anything you write here will be visible to them</div>
+        </div>
+      </div>
+
+      <div class="wizard-nav">
+        <button class="wizard-prev-btn" onclick="prevStep()">Back</button>
+        <button class="summary-save-btn" id="saveProfileBtn" onclick="saveTeacherProfile()">Save and Finish</button>
+      </div>
+    </div>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<!-- TOAST -->
+<div class="t-toast" id="toast"></div>
+
 <script src="supabase.js"></script>
 <script src="auth.js"></script>
 <script>
-// ─── CLAUDE API PROXY ─────────────────────────────────────────────────────────
-const CLAUDE_PROXY_URL = 'https://mzrzmfkfjfdwsjwblbzz.supabase.co/functions/v1/claude-proxy';
-
-async function fetchClaudeProxy(body, options = {}) {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session?.access_token) {
-    throw new Error('Not authenticated. Please sign in again.');
-  }
-  const res = await fetch(CLAUDE_PROXY_URL, {
-    headers: {
-      'Authorization': `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json',
-      'apikey': SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify(body),
-    ...options,
-    method: 'POST',
-  });
-  if (res.status === 429) {
-    const errData = await res.json().catch(() => ({}));
-    const match = errData.error?.match(/\((\d+)\/day\)/);
-    const limit = match ? match[1] : '500';
-    throw new Error(`You've hit today's limit (${limit} messages per day). Try again tomorrow!`);
-  }
-  return res;
-}
-
 // ─── CURRICULUM (same as app.js) ─────────────────────────────────────────────
 const MENLO_CURRICULUM = {
   "English": {
@@ -949,79 +827,77 @@ const MENLO_CURRICULUM = {
   }
 };
 
-// ─── TEACHER EMAIL MAP ───────────────────────────────────────────────────────
-// Maps teacher full name (as it appears in MENLO_CURRICULUM) → full @menloschool.org email
 const TEACHER_EMAIL_MAP = {
-  "Rachel Blumenthal":      "rblumenthal@menloschool.org",
-  "Whitney Newton":         "wnewton@menloschool.org",
-  "Margaret Ramsey":        "mramsey@menloschool.org",
-  "Andrew Warren":          "awarren@menloschool.org",
-  "Jay Bush":               "jbush@menloschool.org",
-  "Lily Chan":              "lchan@menloschool.org",
-  "Rebecca Gertmenian":     "rgertmenian@menloschool.org",
-  "Meghann Schroers-Martin":"mschroers-martin@menloschool.org",
-  "Tom Garvey":             "tgarvey@menloschool.org",
-  "Oscar King":             "oking@menloschool.org",
-  "Maura Sincoff":          "msincoff@menloschool.org",
-  "Cara Plamondon":         "cplamondon@menloschool.org",
-  "Bridgett Longust":       "blongust@menloschool.org",
-  "Sabahat Adil":           "sadil@menloschool.org",
-  "Franco Cruz-Ochoa":      "fcruz-ochoa@menloschool.org",
-  "Katharine Hanson":       "khanson@menloschool.org",
-  "Nicholas Merlesena":     "nmerlesena@menloschool.org",
-  "Miles Bennett-Smith":    "mbennett-smith@menloschool.org",
-  "Glenn Davis":            "gdavis@menloschool.org",
-  "Trevor McNeil":          "tmcneil@menloschool.org",
-  "Joseph Mitchell":        "jmitchell@menloschool.org",
-  "Jack Bowen":             "jbowen@menloschool.org",
-  "Dylan Citrin Cummins":   "dcitrin-cummins@menloschool.org",
-  "Charles Hanson":         "chanson@menloschool.org",
-  "Matthew Nelson":         "mnelson@menloschool.org",
-  "John Schafer":           "jschafer@menloschool.org",
-  "Peter Brown":            "pbrown@menloschool.org",
-  "Christine Walters":      "cwalters@menloschool.org",
-  "Rebecca Akers":          "rakers@menloschool.org",
-  "Joe Rabison":            "jrabison@menloschool.org",
-  "Sujata Ganpule":         "sganpule@menloschool.org",
-  "Randall Joss":           "rjoss@menloschool.org",
-  "Nandhini Namasivayam":   "nnamasivayam@menloschool.org",
-  "Jacqueline Arreaga":     "jarreaga@menloschool.org",
-  "Danielle Jensen":        "djensen@menloschool.org",
-  "Yu-Loung Chang":         "ychang@menloschool.org",
-  "Dave Lowell":            "dlowell@menloschool.org",
-  "Reeve Garrett":          "rgarrett@menloschool.org",
-  "Jude Loeffler":          "jloeffler@menloschool.org",
-  "Dennis Millstein":       "dmillstein@menloschool.org",
-  "Douglas Kiang":          "dkiang@menloschool.org",
+  "Rachel Blumenthal": "rblumenthal@menloschool.org",
+  "Whitney Newton": "wnewton@menloschool.org",
+  "Margaret Ramsey": "mramsey@menloschool.org",
+  "Andrew Warren": "awarren@menloschool.org",
+  "Jay Bush": "jbush@menloschool.org",
+  "Lily Chan": "lchan@menloschool.org",
+  "Rebecca Gertmenian": "rgertmenian@menloschool.org",
+  "Meghann Schroers-Martin": "mschroers-martin@menloschool.org",
+  "Tom Garvey": "tgarvey@menloschool.org",
+  "Oscar King": "oking@menloschool.org",
+  "Maura Sincoff": "msincoff@menloschool.org",
+  "Cara Plamondon": "cplamondon@menloschool.org",
+  "Bridgett Longust": "blongust@menloschool.org",
+  "Sabahat Adil": "sadil@menloschool.org",
+  "Franco Cruz-Ochoa": "fcruz-ochoa@menloschool.org",
+  "Katharine Hanson": "khanson@menloschool.org",
+  "Nicholas Merlesena": "nmerlesena@menloschool.org",
+  "Miles Bennett-Smith": "mbennett-smith@menloschool.org",
+  "Glenn Davis": "gdavis@menloschool.org",
+  "Trevor McNeil": "tmcneil@menloschool.org",
+  "Joseph Mitchell": "jmitchell@menloschool.org",
+  "Jack Bowen": "jbowen@menloschool.org",
+  "Dylan Citrin Cummins": "dcitrin-cummins@menloschool.org",
+  "Charles Hanson": "chanson@menloschool.org",
+  "Matthew Nelson": "mnelson@menloschool.org",
+  "John Schafer": "jschafer@menloschool.org",
+  "Peter Brown": "pbrown@menloschool.org",
+  "Christine Walters": "cwalters@menloschool.org",
+  "Rebecca Akers": "rakers@menloschool.org",
+  "Joe Rabison": "jrabison@menloschool.org",
+  "Sujata Ganpule": "sganpule@menloschool.org",
+  "Randall Joss": "rjoss@menloschool.org",
+  "Nandhini Namasivayam": "nnamasivayam@menloschool.org",
+  "Jacqueline Arreaga": "jarreaga@menloschool.org",
+  "Danielle Jensen": "djensen@menloschool.org",
+  "Yu-Loung Chang": "ychang@menloschool.org",
+  "Dave Lowell": "dlowell@menloschool.org",
+  "Reeve Garrett": "rgarrett@menloschool.org",
+  "Jude Loeffler": "jloeffler@menloschool.org",
+  "Dennis Millstein": "dmillstein@menloschool.org",
+  "Douglas Kiang": "dkiang@menloschool.org",
   "Zachary Blickensderfer": "zblickensderfer@menloschool.org",
-  "Chrissy Orangio":        "corangio@menloschool.org",
-  "Laura Huntley":          "lhuntley@menloschool.org",
-  "Mary McKenna":           "mmckenna@menloschool.org",
-  "Zachary Eagleton":       "zeagleton@menloschool.org",
-  "Eugenia McCauley":       "emccauley@menloschool.org",
-  "Nina Arnberg":           "narnberg@menloschool.org",
-  "Zane Moore":             "zmoore@menloschool.org",
-  "Matthew Varvir":         "mvarvir@menloschool.org",
-  "Todd Hardie":            "thardie@menloschool.org",
-  "Cristina Weaver":        "cweaver@menloschool.org",
-  "Tatyana Buxton":         "tbuxton@menloschool.org",
-  "James Dann":             "jdann@menloschool.org",
-  "James Formato":          "jformato@menloschool.org",
-  "Leo Jaimez":             "ljaimez@menloschool.org",
-  "Janet Tennyson":         "jtennyson@menloschool.org",
-  "Adolfo Guevara":         "aguevara@menloschool.org",
-  "Perla Amaral":           "pamaral@menloschool.org",
-  "Patricia Frias":         "pfrias@menloschool.org",
-  "Marie Sajja":            "msajja@menloschool.org",
-  "Corinne Chung":          "cchung@menloschool.org",
-  "Rita Yeh":               "ryeh@menloschool.org",
-  "Mingjung Chen":          "mchen@menloschool.org",
-  "Jennifer Jordt":         "jjordt@menloschool.org",
-  "Richard Harris":         "rharris@menloschool.org",
-  "Test Teacher":            "hadi.hilaly@menloschool.org",
+  "Chrissy Orangio": "corangio@menloschool.org",
+  "Laura Huntley": "lhuntley@menloschool.org",
+  "Mary McKenna": "mmckenna@menloschool.org",
+  "Zachary Eagleton": "zeagleton@menloschool.org",
+  "Eugenia McCauley": "emccauley@menloschool.org",
+  "Nina Arnberg": "narnberg@menloschool.org",
+  "Zane Moore": "zmoore@menloschool.org",
+  "Matthew Varvir": "mvarvir@menloschool.org",
+  "Todd Hardie": "thardie@menloschool.org",
+  "Cristina Weaver": "cweaver@menloschool.org",
+  "Tatyana Buxton": "tbuxton@menloschool.org",
+  "James Dann": "jdann@menloschool.org",
+  "James Formato": "jformato@menloschool.org",
+  "Leo Jaimez": "ljaimez@menloschool.org",
+  "Janet Tennyson": "jtennyson@menloschool.org",
+  "Adolfo Guevara": "aguevara@menloschool.org",
+  "Perla Amaral": "pamaral@menloschool.org",
+  "Patricia Frias": "pfrias@menloschool.org",
+  "Marie Sajja": "msajja@menloschool.org",
+  "Corinne Chung": "cchung@menloschool.org",
+  "Rita Yeh": "ryeh@menloschool.org",
+  "Mingjung Chen": "mchen@menloschool.org",
+  "Jennifer Jordt": "jjordt@menloschool.org",
+  "Richard Harris": "rharris@menloschool.org",
+  "Test Teacher": "hadi.hilaly@menloschool.org",
 };
 
-// Build TEACHER_DATABASE keyed by full email → { name, classes: string[] }
+// Build TEACHER_DATABASE keyed by email
 function buildTeacherDatabase() {
   const db = {};
   for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
@@ -1030,9 +906,7 @@ function buildTeacherDatabase() {
         const email = TEACHER_EMAIL_MAP[teacher];
         if (!email) continue;
         if (!db[email]) db[email] = { name: teacher, classes: [] };
-        if (!db[email].classes.includes(course)) {
-          db[email].classes.push(course);
-        }
+        if (!db[email].classes.includes(course)) db[email].classes.push(course);
       }
     }
   }
@@ -1044,32 +918,32 @@ function buildTeacherDatabase() {
     }
   }
   db['hadi.hilaly@menloschool.org'] = { name: 'Hadi Hilaly', classes: allClasses };
-  db['rharris@menloschool.org']     = { name: 'Richard Harris', classes: ['Algebra 2 with Trig'] };
   return db;
 }
 const TEACHER_DATABASE = buildTeacherDatabase();
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
-let tUser              = null;   // Supabase user
-let tTeacher           = null;   // { name, classes: string[] } from TEACHER_DATABASE
-let tProfiles          = {};     // { "Course Name": { done, status, teaching_style, … } }
-let tCurrentClass      = null;   // { course, subject } currently in chat
-let tMessages          = [];     // conversation messages for current class
-let tBusy              = false;
-let tPendingNavigation = null;   // callback waiting behind status popup
+let tUser = null;
+let tTeacher = null;
+let tProfiles = {};
+let tCurrentClass = null;
+let tCurrentStep = 1;
+let tSyllabusFile = null;
+let tSyllabusText = '';
+let tTemplateData = null;
+let tRecognition = null;
+let tRecordingField = null;
 
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
 function showView(name) {
-  ['authLoading','signinView','unknownView','homeView','chatView','profileView'].forEach(id => {
+  ['authLoading','signinView','unknownView','homeView','wizardView'].forEach(id => {
     document.getElementById(id).style.display = 'none';
   });
-  const flexViews = ['chatView','profileView','signinView','unknownView','authLoading'];
-  document.getElementById(name).style.display = flexViews.includes(name) ? 'flex' : 'block';
+  document.getElementById(name).style.display = name === 'authLoading' ? 'flex' : (name === 'wizardView' ? 'flex' : 'block');
 }
 
-// ─── AUTH INIT ────────────────────────────────────────────────────────────────
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
 (async () => {
-  // Simple auth check — reads from localStorage, instant
   const { data: { session } } = await sb.auth.getSession();
   if (!session) {
     showView('signinView');
@@ -1079,73 +953,36 @@ function showView(name) {
   handleUser(session.user);
 })();
 
-// ─── ACCESS CONTROL ───────────────────────────────────────────────────────────
-// Derived directly from TEACHER_DATABASE — no separate list to maintain
-const ALLOWED_TEACHER_EMAILS = Object.keys(TEACHER_DATABASE);
-
-
 async function handleUser(user) {
-  if (!isMenloEmail(user.email)) {
-    sb.auth.signOut();
-    window.location.replace('index.html?error=domain');
-    return;
-  }
-
   tUser = user;
-
-  // Look up teacher by full email address
-  const found = TEACHER_DATABASE[user.email.toLowerCase()];
+  const email = user.email.toLowerCase();
+  const found = TEACHER_DATABASE[email];
   if (!found) {
-    document.getElementById('tUnknownEmail').textContent = user.email;
+    document.getElementById('unknownEmail').textContent = email;
     showView('unknownView');
     return;
   }
-
   tTeacher = found;
-
-  // Check if a specific class was requested via ?class= (e.g. from student settings shortcut)
-  const classParam = new URLSearchParams(window.location.search).get('class');
-  if (classParam) {
-    history.replaceState({}, '', window.location.pathname); // clean URL
-    if (tTeacher.classes.includes(classParam)) {
-      const classSubject = lookupSubjectForCourse(classParam);
-      await bootHome();
-      openClassChat({ course: classParam, subject: classSubject });
-      return;
-    }
-  }
-
-  bootHome();
+  await bootHome();
 }
 
-// ─── SIGN IN ──────────────────────────────────────────────────────────────────
 function wireSigninBtn() {
   const btn = document.getElementById('tSigninBtn');
   if (!btn) return;
   btn.addEventListener('click', async () => {
     btn.disabled = true;
-    btn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-    </svg> Redirecting to Google…`;
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Redirecting…`;
     try {
-      const base       = window.location.href.replace(/\/[^/]*$/, '/');
+      const base = window.location.href.replace(/\/[^/]*$/, '/');
       const redirectTo = base + 'teacher.html';
-      const { error }  = await sb.auth.signInWithOAuth({
+      const { error } = await sb.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo, queryParams: { hd: 'menloschool.org' } },
       });
       if (error) throw error;
     } catch (err) {
       btn.disabled = false;
-      btn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-      </svg> Sign in with Google`;
+      btn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Sign in with Google`;
       document.getElementById('tSigninError').textContent = 'Something went wrong. Please try again.';
       document.getElementById('tSigninError').style.display = 'block';
     }
@@ -1154,26 +991,26 @@ function wireSigninBtn() {
 
 // ─── HOME VIEW ────────────────────────────────────────────────────────────────
 async function bootHome() {
-  const meta     = tUser.user_metadata || {};
+  const meta = tUser.user_metadata || {};
   const fullName = meta.full_name || meta.name || tTeacher.name;
   const firstName = fullName.split(' ')[0];
 
   document.getElementById('welcomeHeading').textContent = `Welcome, ${firstName}`;
-  document.getElementById('hdrName').textContent        = fullName;
+  document.getElementById('hdrName').textContent = fullName;
 
   const avatarEl = document.getElementById('hdrAvatar');
+  avatarEl.innerHTML = '';
   if (meta.avatar_url) {
-    const img = document.createElement('img'); img.src = meta.avatar_url; img.alt = '';
+    const img = document.createElement('img');
+    img.src = meta.avatar_url;
     avatarEl.appendChild(img);
   } else {
     avatarEl.textContent = firstName[0].toUpperCase();
   }
 
-  // Load all teacher profiles from Supabase
   await loadAllTeacherProfiles();
   renderClassCards();
 
-  // T2: Wire filter bar
   document.getElementById('tClassSearch')?.addEventListener('input', renderClassCards);
   document.querySelectorAll('.t-filter-pill').forEach(pill => {
     pill.addEventListener('click', () => {
@@ -1194,8 +1031,7 @@ async function bootHome() {
 
 async function loadAllTeacherProfiles() {
   try {
-    const { data: { session } } = await sb.auth.getSession();
-    const email = session?.user?.email;
+    const email = tUser?.email;
     if (!email) return;
     const { data, error } = await sb
       .from('teacher_profiles')
@@ -1203,13 +1039,12 @@ async function loadAllTeacherProfiles() {
       .eq('teacher_email', email);
     if (error || !data) return;
     tProfiles = {};
-    data.forEach(row => { tProfiles[row.class_name] = row; });
+    data.forEach(row => { tProfiles[row.course_name] = row; });
   } catch (err) {
     console.warn('Could not load teacher profiles:', err);
   }
 }
 
-// Returns the subject (department) for a given course name by scanning MENLO_CURRICULUM
 function lookupSubjectForCourse(courseName) {
   for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
     if (courses[courseName]) return subject;
@@ -1222,7 +1057,6 @@ function renderClassCards() {
   const filterBar = document.getElementById('tFilterBar');
   grid.innerHTML = '';
 
-  // T8: Empty state for no classes
   if (!tTeacher.classes || tTeacher.classes.length === 0) {
     if (filterBar) filterBar.style.display = 'none';
     grid.innerHTML = `
@@ -1230,1178 +1064,432 @@ function renderClassCards() {
         <div style="font-size:48px;margin-bottom:16px">📚</div>
         <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px">No classes yet</div>
         <div style="font-size:14px;color:var(--text-muted);max-width:340px;margin:0 auto;line-height:1.6">
-          Your classes will appear here once an administrator adds them to your account. Contact your school admin if you believe this is an error.
+          Your classes will appear here once an administrator adds them to your account.
         </div>
       </div>`;
     return;
   }
   if (filterBar) filterBar.style.display = 'flex';
 
-  // T2: Read filter state
   const searchTerm = (document.getElementById('tClassSearch')?.value || '').toLowerCase().trim();
   const activeFilter = document.querySelector('.t-filter-pill.active')?.dataset.status || 'all';
 
   tTeacher.classes.forEach(course => {
-    const subject     = lookupSubjectForCourse(course);
-    const profile     = tProfiles[course];
-    const rawStatus   = profile?.status
-      || (profile?.done ? 'complete' : (profile?.teaching_style ? 'in_progress' : 'not_started'));
-    const status      = rawStatus;
+    const subject = lookupSubjectForCourse(course);
+    const profile = tProfiles[course];
+    const status = profile?.done ? 'complete' : 'not_started';
 
-    // T2: Filter by search and status
     if (searchTerm && !course.toLowerCase().includes(searchTerm) && !subject.toLowerCase().includes(searchTerm)) return;
     if (activeFilter !== 'all' && status !== activeFilter) return;
 
-    const dotClass    = status === 'complete' ? 'complete'
-                      : status === 'in_progress' ? 'in_progress' : 'not_started';
-    const statusLabel = status === 'complete' ? 'Complete'
-                      : status === 'in_progress' ? 'In Progress' : 'Not Started';
-    const btnLabel    = status === 'complete' ? 'View & Edit'
-                      : status === 'in_progress' ? 'Resume interview' : 'Start setup interview';
+    const dotClass = status === 'complete' ? 'complete' : 'not_started';
+    const statusLabel = status === 'complete' ? 'Complete' : 'Not Started';
+    const btnLabel = status === 'complete' ? 'View & Edit' : 'Set up profile';
 
-    const previewText = profile?.teaching_style || profile?.key_values || '';
-
-    // T4: Compute progress for in-progress cards
-    const msgCount = profile?.messages_json?.length || 0;
-    const questionsAnswered = Math.min(8, Math.floor(msgCount / 2));
-    const progressPct = status === 'complete' ? 100 : Math.round((questionsAnswered / 8) * 100);
+    const previewText = profile?.engagement_rules || profile?.teaching_voice || '';
 
     const card = document.createElement('div');
     card.className = 't-card';
-    // T5: Colored left border by status
-    card.style.borderLeft = '3px solid ' + (status === 'complete' ? '#34d399' : status === 'in_progress' ? '#fbbf24' : '#9CA3AF');
-
+    card.style.borderLeft = '3px solid ' + (status === 'complete' ? '#34d399' : '#9CA3AF');
     card.innerHTML = `
       <div class="t-card-subject">${escHtml(subject)}</div>
       <div class="t-card-course">${escHtml(course)}</div>
-      <div class="t-card-meta" style="display:flex;align-items:center;gap:8px;margin-top:2px">
+      <div class="t-card-meta">
         <span class="t-status-dot ${dotClass}"></span>
         <span style="font-size:11.5px;color:var(--text-muted);font-weight:500">${statusLabel}</span>
       </div>
-      ${status === 'in_progress' ? `
-        <div style="width:100%;height:4px;background:var(--surface-2);border-radius:2px;overflow:hidden;margin-top:6px">
-          <div style="height:100%;background:var(--accent);border-radius:2px;width:${progressPct}%;transition:width .3s"></div>
-        </div>
-        <div style="font-size:10.5px;color:var(--text-muted);margin-top:2px">${questionsAnswered}/8 questions answered</div>
-      ` : ''}
       ${previewText ? `<div class="t-card-preview">${escHtml(previewText)}</div>` : ''}
       ${status === 'complete' ? `<div style="font-size:10px;color:#34d399;font-weight:600;margin-top:4px">✓ Setup complete</div>` : ''}
-      ${status === 'complete' ? `<div onclick="openStudentProfiles('${escHtml(course)}'); event.stopPropagation();" style="font-size:12px;color:var(--accent);font-weight:500;margin-top:6px;cursor:pointer;padding:4px 0">👥 View students →</div>` : ''}
       <div style="margin-top:8px;font-size:12px;font-weight:600;color:var(--accent)">${escHtml(btnLabel)} →</div>
     `;
-    card.addEventListener('click', () => openClassChat({ course, subject }));
+    card.addEventListener('click', () => openWizard(course, subject));
     grid.appendChild(card);
   });
 }
 
 function goHome() {
-  promptStatusThenDo(() => {
-    showView('homeView');
-    renderClassCards();
+  showView('homeView');
+  renderClassCards();
+}
+
+// ─── WIZARD ────────────────────────────────────────────────────────────────────
+async function openWizard(course, subject) {
+  tCurrentClass = { course, subject };
+  tCurrentStep = 1;
+  tSyllabusFile = null;
+  tSyllabusText = '';
+  tTemplateData = null;
+
+  document.getElementById('wizardClassName').textContent = course;
+  document.getElementById('wizardClassSubject').textContent = subject;
+
+  // Load existing profile if any
+  const profile = tProfiles[course];
+  document.getElementById('engagementRulesInput').value = profile?.engagement_rules || '';
+  document.getElementById('teachingVoiceInput').value = profile?.teaching_voice || '';
+  document.getElementById('courseInfoInput').value = profile?.course_info || '';
+
+  if (profile?.syllabus_file_path) {
+    tSyllabusFile = { name: profile.syllabus_file_path.split('/').pop() };
+    tSyllabusText = profile.syllabus_text || '';
+    document.getElementById('syllabusFileName').textContent = '✓ ' + tSyllabusFile.name;
+    document.querySelector('.syllabus-upload-area').classList.add('has-file');
+  } else {
+    document.getElementById('syllabusFileName').textContent = '';
+    document.querySelector('.syllabus-upload-area').classList.remove('has-file');
+  }
+
+  document.getElementById('shareCourseInfoCheckbox').checked = profile?.share_course_info || false;
+
+  // Check for templates
+  await checkForTemplate();
+
+  // Update word counts
+  updateWordCount('engagementRulesInput', 'engagementRulesCount', 'step1NextBtn');
+  updateWordCount('teachingVoiceInput', 'teachingVoiceCount', 'step2NextBtn');
+  updateWordCount('courseInfoInput', 'courseInfoCount', 'step3NextBtn');
+
+  // Wire up input listeners
+  ['engagementRulesInput', 'teachingVoiceInput', 'courseInfoInput'].forEach(id => {
+    const el = document.getElementById(id);
+    el.removeEventListener('input', el._wordCountHandler);
+    const handler = () => {
+      const countId = id.replace('Input', 'Count');
+      const btnId = id === 'engagementRulesInput' ? 'step1NextBtn' :
+                    id === 'teachingVoiceInput' ? 'step2NextBtn' : 'step3NextBtn';
+      updateWordCount(id, countId, btnId);
+    };
+    el._wordCountHandler = handler;
+    el.addEventListener('input', handler);
   });
+
+  showStep(1);
+  showView('wizardView');
 }
 
-// ─── STATUS POPUP ─────────────────────────────────────────────────────────────
-function promptStatusThenDo(callback) {
-  if (!tCurrentClass) { callback(); return; }
-  const profile = tProfiles[tCurrentClass.course];
-  const status  = profile?.status
-    || (profile?.done ? 'complete' : (profile?.teaching_style ? 'in_progress' : 'not_started'));
-  // Only interrupt if actively in progress
-  if (status !== 'in_progress') { callback(); return; }
-  tPendingNavigation = callback;
-  document.getElementById('statusPopupTitle').textContent =
-    `How's your ${tCurrentClass.course} profile going?`;
-  document.getElementById('statusPopupOverlay').style.display = 'flex';
-}
+function showStep(n) {
+  tCurrentStep = n;
+  document.querySelectorAll('.wizard-step').forEach(el => el.classList.remove('active'));
+  document.querySelector(`.wizard-step[data-step="${n}"]`).classList.add('active');
 
-function closeStatusPopup() {
-  document.getElementById('statusPopupOverlay').style.display = 'none';
-}
+  document.querySelectorAll('.wizard-step-dot').forEach(dot => {
+    const step = parseInt(dot.dataset.step);
+    dot.classList.remove('active', 'completed');
+    if (step === n) dot.classList.add('active');
+    else if (step < n) dot.classList.add('completed');
+  });
 
-async function markStatus(status) {
-  closeStatusPopup();
-  await setProfileStatus(status);
-  if (tPendingNavigation) {
-    tPendingNavigation();
-    tPendingNavigation = null;
+  document.getElementById('wizardStepLabel').textContent = `Step ${n} of 4`;
+
+  // Update summary on step 4
+  if (n === 4) {
+    document.getElementById('summaryEngagementRules').textContent = document.getElementById('engagementRulesInput').value || '(Not filled)';
+    document.getElementById('summaryTeachingVoice').textContent = document.getElementById('teachingVoiceInput').value || '(Not filled)';
+    document.getElementById('summaryCourseInfo').textContent = document.getElementById('courseInfoInput').value || '(Not filled)';
+
+    if (tSyllabusFile) {
+      document.getElementById('summarySyllabusCard').style.display = 'block';
+      document.getElementById('summarySyllabusName').textContent = tSyllabusFile.name;
+    } else {
+      document.getElementById('summarySyllabusCard').style.display = 'none';
+    }
   }
 }
 
-async function setProfileStatus(status) {
-  if (!tUser || !tCurrentClass) return;
-  console.log('[setProfileStatus]', tCurrentClass.course, '->', status);
+function nextStep() {
+  if (tCurrentStep < 4) showStep(tCurrentStep + 1);
+}
+
+function prevStep() {
+  if (tCurrentStep > 1) showStep(tCurrentStep - 1);
+}
+
+function editField(step) {
+  showStep(step);
+}
+
+// ─── WORD COUNT ────────────────────────────────────────────────────────────────
+function countWords(text) {
+  return text.trim().split(/\s+/).filter(w => w.length > 0).length;
+}
+
+function updateWordCount(inputId, countId, btnId) {
+  const text = document.getElementById(inputId).value;
+  const count = countWords(text);
+  const countEl = document.getElementById(countId);
+  const btn = document.getElementById(btnId);
+
+  countEl.textContent = `${count} / 50 words minimum`;
+  if (count >= 50) {
+    countEl.classList.add('valid');
+    countEl.classList.remove('invalid');
+    btn.disabled = false;
+  } else {
+    countEl.classList.remove('valid');
+    countEl.classList.add('invalid');
+    btn.disabled = true;
+  }
+}
+
+// ─── EXAMPLES TOGGLE ─────────────────────────────────────────────────────────
+function toggleExamples(btn) {
+  btn.classList.toggle('open');
+  const examples = btn.nextElementSibling;
+  examples.classList.toggle('open');
+  btn.querySelector('span:first-child').textContent = examples.classList.contains('open') ? 'Hide examples' : 'Show examples';
+}
+
+// ─── SPEECH RECOGNITION ─────────────────────────────────────────────────────
+function initSpeechRecognition() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    return null;
+  }
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+  return recognition;
+}
+
+function toggleMic(inputId) {
+  const btn = document.querySelector(`#${inputId}`).parentElement.querySelector('.wizard-mic-btn');
+  const input = document.getElementById(inputId);
+
+  if (tRecordingField === inputId && tRecognition) {
+    tRecognition.stop();
+    btn.classList.remove('recording');
+    tRecordingField = null;
+    return;
+  }
+
+  // Stop any existing recording
+  if (tRecognition && tRecordingField) {
+    const prevBtn = document.querySelector(`#${tRecordingField}`).parentElement.querySelector('.wizard-mic-btn');
+    prevBtn.classList.remove('recording');
+    tRecognition.stop();
+  }
+
+  tRecognition = initSpeechRecognition();
+  if (!tRecognition) {
+    showToast('Speech recognition not supported in this browser', 'error');
+    return;
+  }
+
+  tRecordingField = inputId;
+  btn.classList.add('recording');
+
+  let finalTranscript = input.value;
+  if (finalTranscript && !finalTranscript.endsWith(' ')) finalTranscript += ' ';
+
+  tRecognition.onresult = (event) => {
+    let interimTranscript = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      if (event.results[i].isFinal) {
+        finalTranscript += event.results[i][0].transcript + ' ';
+      } else {
+        interimTranscript += event.results[i][0].transcript;
+      }
+    }
+    input.value = finalTranscript + interimTranscript;
+    input.dispatchEvent(new Event('input'));
+  };
+
+  tRecognition.onerror = (event) => {
+    console.error('Speech recognition error:', event.error);
+    btn.classList.remove('recording');
+    tRecordingField = null;
+    if (event.error === 'not-allowed') {
+      showToast('Microphone access denied', 'error');
+    }
+  };
+
+  tRecognition.onend = () => {
+    btn.classList.remove('recording');
+    tRecordingField = null;
+  };
+
+  tRecognition.start();
+}
+
+// ─── SYLLABUS UPLOAD ─────────────────────────────────────────────────────────
+async function handleSyllabusUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (file.type !== 'application/pdf') {
+    showToast('Please upload a PDF file', 'error');
+    return;
+  }
+
+  tSyllabusFile = file;
+  document.getElementById('syllabusFileName').textContent = '✓ ' + file.name;
+  document.querySelector('.syllabus-upload-area').classList.add('has-file');
+
+  // Extract text from PDF
   try {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let text = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(item => item.str).join(' ') + '\n';
+    }
+    tSyllabusText = text.trim();
+
+    // Append to course info if it's mostly empty
+    const courseInput = document.getElementById('courseInfoInput');
+    if (countWords(courseInput.value) < 20) {
+      courseInput.value = (courseInput.value ? courseInput.value + '\n\n' : '') +
+        '--- Extracted from syllabus ---\n' + tSyllabusText.substring(0, 2000);
+      courseInput.dispatchEvent(new Event('input'));
+    }
+
+    showToast('Syllabus uploaded and text extracted', 'success');
+  } catch (err) {
+    console.error('PDF extraction error:', err);
+    showToast('Could not extract text from PDF', 'error');
+  }
+}
+
+// ─── TEMPLATE BORROWING ─────────────────────────────────────────────────────
+async function checkForTemplate() {
+  const course = tCurrentClass.course;
+  try {
+    const { data, error } = await sb
+      .from('teacher_profiles')
+      .select('course_info, syllabus_text, syllabus_file_path')
+      .eq('course_name', course)
+      .eq('share_course_info', true)
+      .neq('teacher_email', tUser.email)
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    if (!error && data && data.length > 0 && data[0].course_info) {
+      tTemplateData = data[0];
+      document.getElementById('templateCourseName').textContent = course;
+      document.getElementById('templateBanner').classList.add('show');
+    } else {
+      document.getElementById('templateBanner').classList.remove('show');
+    }
+  } catch (err) {
+    console.warn('Template check failed:', err);
+  }
+}
+
+function useTemplate() {
+  if (!tTemplateData) return;
+
+  document.getElementById('courseInfoInput').value = tTemplateData.course_info;
+  document.getElementById('courseInfoInput').dispatchEvent(new Event('input'));
+
+  if (tTemplateData.syllabus_text) {
+    tSyllabusText = tTemplateData.syllabus_text;
+    tSyllabusFile = { name: 'Template syllabus (shared)' };
+    document.getElementById('syllabusFileName').textContent = '✓ Using shared syllabus';
+    document.querySelector('.syllabus-upload-area').classList.add('has-file');
+  }
+
+  document.getElementById('templateBanner').classList.remove('show');
+
+  // Show notice about using shared content
+  const notice = document.createElement('div');
+  notice.className = 'template-notice';
+  notice.innerHTML = '📋 Using shared course info and syllabus text. Upload your own PDF below to replace.';
+  notice.style.cssText = 'padding:12px 16px;background:rgba(123,105,245,.08);border:1px solid rgba(123,105,245,.2);border-radius:8px;font-size:13px;color:var(--text);margin-bottom:16px;';
+  const uploadArea = document.querySelector('.syllabus-upload-area');
+  if (uploadArea && !document.querySelector('.template-notice')) {
+    uploadArea.parentNode.insertBefore(notice, uploadArea);
+  }
+
+  showToast('Template loaded!', 'success');
+}
+
+function skipTemplate() {
+  document.getElementById('templateBanner').classList.remove('show');
+}
+
+// ─── SAVE PROFILE ────────────────────────────────────────────────────────────
+async function saveTeacherProfile() {
+  const btn = document.getElementById('saveProfileBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  const engagementRules = document.getElementById('engagementRulesInput').value.trim();
+  const teachingVoice = document.getElementById('teachingVoiceInput').value.trim();
+  const courseInfo = document.getElementById('courseInfoInput').value.trim();
+  const shareCourseInfo = document.getElementById('shareCourseInfoCheckbox').checked;
+
+  try {
+    // Upload syllabus file if new
+    let syllabusFilePath = tProfiles[tCurrentClass.course]?.syllabus_file_path || null;
+    if (tSyllabusFile && tSyllabusFile instanceof File) {
+      const filePath = `${tUser.email}/${tCurrentClass.course}/${Date.now()}_${tSyllabusFile.name}`;
+      const { error: uploadError } = await sb.storage
+        .from('syllabi')
+        .upload(filePath, tSyllabusFile);
+      if (uploadError) {
+        console.warn('Syllabus upload failed:', uploadError);
+      } else {
+        syllabusFilePath = filePath;
+      }
+    }
+
+    // Save to database
     const { data, error } = await sb
       .from('teacher_profiles')
       .upsert({
         teacher_email: tUser.email,
-        class_name:    tCurrentClass.course,
-        subject:       tCurrentClass.subject,
-        status,
-        updated_at:    new Date().toISOString(),
-      }, { onConflict: 'teacher_email,class_name' })
+        course_name: tCurrentClass.course,
+        engagement_rules: engagementRules,
+        teaching_voice: teachingVoice,
+        course_info: courseInfo,
+        syllabus_file_path: syllabusFilePath,
+        syllabus_text: tSyllabusText || null,
+        syllabus_uploaded_at: syllabusFilePath ? new Date().toISOString() : null,
+        share_course_info: shareCourseInfo,
+        done: true,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'teacher_email,course_name' })
       .select()
       .single();
-    if (error) {
-      console.error('[setProfileStatus] error:', error.message);
-    } else if (data) {
-      tProfiles[tCurrentClass.course] = { ...(tProfiles[tCurrentClass.course] || {}), ...data };
-      console.log('[setProfileStatus] saved OK');
-    }
-  } catch (err) {
-    console.error('[setProfileStatus] caught:', err);
-  }
-}
 
-// ─── CHAT VIEW ────────────────────────────────────────────────────────────────
-async function openClassChat({ course, subject }) {
-  tCurrentClass = { course, subject };
-  tMessages     = [];
-  tBusy         = false;
+    if (error) throw error;
 
-  // Update sidebar
-  document.getElementById('sbSubject').textContent  = subject;
-  document.getElementById('sbClassName').textContent = course;
-  document.getElementById('chatHeaderName').textContent = course;
-  document.getElementById('chatHeaderSub').textContent  = `${subject} · Teacher setup`;
+    tProfiles[tCurrentClass.course] = data;
+    showToast('Profile saved!', 'success');
 
-  // Wire send
-  const input   = document.getElementById('tInput');
-  const sendBtn = document.getElementById('tSendBtn');
-  // Remove old listeners
-  input.replaceWith(input.cloneNode(true));
-  sendBtn.replaceWith(sendBtn.cloneNode(true));
-  const newInput   = document.getElementById('tInput');
-  const newSendBtn = document.getElementById('tSendBtn');
-
-  newInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
-  });
-  newInput.addEventListener('input', () => {
-    newInput.style.height = 'auto';
-    newInput.style.height = Math.min(newInput.scrollHeight, 140) + 'px';
-  });
-  newSendBtn.addEventListener('click', handleSend);
-
-  showView('chatView');
-  updateInputState();
-
-  // Auto-set status to in_progress when first opened
-  const existingProfile = tProfiles[course];
-  const existingStatus  = existingProfile?.status
-    || (existingProfile?.done ? 'complete' : (existingProfile?.teaching_style ? 'in_progress' : 'not_started'));
-  if (existingStatus === 'not_started') {
-    await setProfileStatus('in_progress');
-  }
-
-  // Clear messages
-  document.getElementById('tMessages').innerHTML = '';
-
-  // Load profile & decide what to show
-  const profile = tProfiles[course];
-  if (profile?.done === true) {
-    showSummaryView(profile);
-    updateBadge(true);
-  } else {
-    updateBadge(false);
-    // Restore messages from saved profile, or start fresh
-    if (profile?.messages_json?.length) {
-      tMessages = profile.messages_json;
-      tMessages.forEach(m => renderTMsg(m.role, m.content));
-    } else {
-      // Lumi opens first
-      await startInterview();
-    }
-  }
-}
-
-function updateBadge(done) {
-  const badge = document.getElementById('chatHeaderBadge');
-  badge.textContent  = done ? '✓ Complete' : 'Setting up…';
-  badge.className    = 't-chat-header-badge ' + (done ? 'complete' : 'progress');
-}
-
-function updateInputState() {
-  const input   = document.getElementById('tInput');
-  const sendBtn = document.getElementById('tSendBtn');
-  input.disabled        = tBusy;
-  sendBtn.disabled      = tBusy;
-}
-
-async function startInterview() {
-  const firstName = tTeacher.name.split(' ')[0];
-  // Kickoff with a user message so Lumi can reply as assistant
-  tMessages = [{ role: 'user', content: 'Hello!' }];
-  await streamReply();
-}
-
-async function handleSend() {
-  if (tBusy) return;
-  const input = document.getElementById('tInput');
-  const text  = input.value.trim();
-  if (!text) return;
-
-  input.value = '';
-  input.style.height = 'auto';
-
-  tMessages.push({ role: 'user', content: text });
-  renderTMsg('user', text);
-  await streamReply();
-}
-
-async function streamReply() {
-  tBusy = true;
-  updateInputState();
-
-
-  // Add typing indicator
-  const typingEl = addTyping();
-
-  try {
-    const system = buildTeacherSystem();
-    let   full   = '';
-
-    // Create message element for streaming
-    const msgEl = createLumiMsgEl();
-
-    const res = await fetchClaudeProxy({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2500,
-      stream: true,
-      system,
-      messages: tMessages,
-    });
-
-    typingEl.remove();
-
-    if (!res.ok) {
-      let errMsg = `API error ${res.status}`;
-      try { const e = await res.json(); errMsg = e.error?.message || errMsg; } catch {}
-      throw new Error(errMsg);
-    }
-
-    document.getElementById('tMessages').appendChild(msgEl);
-    const bubbleEl = msgEl.querySelector('.t-msg-bubble');
-
-    const reader = res.body.getReader(), dec = new TextDecoder();
-    let buf = '';
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      let nl;
-      while ((nl = buf.indexOf('\n')) !== -1) {
-        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
-        if (!line.startsWith('data: ')) continue;
-        const raw = line.slice(6);
-        if (raw === '[DONE]') continue;
-        try {
-          const ev = JSON.parse(raw);
-          if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
-            full += ev.delta.text;
-            bubbleEl.innerHTML = fmtText(stripTeacherJson(full));
-            scrollTBottom();
-          }
-        } catch {}
-      }
-    }
-
-    // Parse hidden JSON
-    const parsed = parseTeacherResponse(full);
-    bubbleEl.innerHTML = fmtText(parsed.clean);
-    scrollTBottom();
-
-    // Push assistant message (full text including JSON, stripped on display)
-    tMessages.push({ role: 'assistant', content: full });
-
-    // Save profile state
-    await saveTeacherProfile(parsed.data);
-
-    // If done, update view
-    if (parsed.data?.done === true) {
-      updateBadge(true);
-      // Show summary card below last message
-      if (parsed.data.summary) {
-        showSummaryCard(parsed.data);
-      }
-    }
+    setTimeout(() => {
+      goHome();
+    }, 1000);
 
   } catch (err) {
-    typingEl.remove();
-    renderTError('⚠️ ' + err.message);
+    console.error('Save error:', err);
+    showToast('Failed to save: ' + err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Save and Finish';
   }
-
-  tBusy = false;
-  updateInputState();
 }
 
-// ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
-function buildTeacherSystem() {
-  const firstName = tTeacher.name.split(' ')[0];
-  return `You are Lumi, conducting a deep onboarding interview with ${firstName} (${tTeacher.name}) about their ${tCurrentClass.course} class at Menlo School. Your goal is to understand this teacher so thoroughly that you could replicate their teaching style, grading philosophy, classroom approach, curriculum, and rules — for students at 11pm when the teacher isn't available.
-
-You are warm, curious, and genuinely interested. This is a conversation, not a form. Ask ONE question at a time — never compound questions. Go deep on each answer before moving on. React naturally: follow up, ask for examples, express genuine curiosity.
-
-RULES:
-- Stay under 8 questions total (follow-ups don't count, but use them sparingly)
-- Ask behavioral questions over content questions — never ask administrative questions (late work policy, etc.)
-- Use minimal validation before each question (one sentence maximum)
-- Split compound questions — one question per turn, no exceptions
-- Prioritize depth over breadth — better to deeply understand 6 areas than superficially cover 10
-- Never begin a response with a code block or markdown formatting. Always start with plain conversational text.
-- Always complete your full response. If approaching length limits, wrap up your current point concisely rather than stopping mid-thought.
-
-Work through these areas in this exact priority order:
-
-1. CORE LEARNING GOALS
-"What do you want students to truly grasp in this class — not just know, but deeply understand?"
-Follow up for specifics. Extract their north star instruction for Lumi.
-
-2. ABSOLUTE BOUNDARIES
-"What do you NEVER want Lumi to do with your students?" ← ask this early.
-This is critical for safety. Get explicit boundaries, topics Lumi must not engage with, and lines it must never cross. Also ask: what would be the worst thing Lumi could do in your class?
-
-3. PEDAGOGICAL SEQUENCE
-"Walk me through how you structure the learning — what comes first, what builds on what, and why in that order?"
-Get their exact method and its rationale. Socratic? Case-based? Framework → application? How do they sequence content?
-
-4. INTERVENTION TECHNIQUE — FIRST EXAMPLE
-"When a student gives you an answer that's wrong or oversimplified, what do you actually do? Walk me through a specific real example — what the student said and exactly how you responded."
-Get their exact language, step by step. This must be concrete, not theoretical.
-
-5. INTERVENTION TECHNIQUE — SECOND EXAMPLE
-"Can you give me a second example where a different type of student mistake came up — and how you handled that one?"
-Two examples reveal the pattern better than one. Grounds the profile in reality.
-
-6. B+ vs A — CONCRETE MARKERS
-"What separates a B+ piece of work from an A in your class? Be as specific as you possibly can — what would I literally see on the page?"
-Push past "shows deeper understanding." Get concrete markers: what does the A paper do that the B+ paper doesn't?
-
-7. SCOPE BOUNDARIES
-"What topics are explicitly out of bounds for this class — things Lumi should redirect away from rather than engage with?"
-Press hard on this. Also: any topics where they have a specific approach students must follow?
-
-8. AI POLICY & ACADEMIC INTEGRITY
-"What's your policy on AI use? Where's the line between using Lumi for learning and having Lumi do the work?"
-Get their test: how would they know if a student crossed the line?
-
-9. WELCOME MESSAGE (ask this LAST, after all other questions)
-"Last thing — write a short message directly to your students. This will be the very first thing they see when they open Lumi. Tell them what it is, how you want them to use it, and anything else you'd want them to know from you personally."
-
-Show this example for inspiration:
-"Hey — I'm Mr. Harris, and I set up this AI specifically for our Algebra 2 & Trig class. When you're stuck on a problem, don't ask it for the answer. Ask it to walk you through the concept or give you a similar example to work through yourself. It knows our curriculum, it knows how I teach, and it's available at 11pm when I'm not. Use it like you'd use me during office hours. — Mr. Harris"
-
-After each answer, validate briefly (one sentence max) then ask the next question. At the very end, read back a complete summary organized by these 9 areas and ask: "Does this accurately capture how you teach this class?" Give them a chance to correct anything before marking complete.
-
-IMPORTANT — let the teacher know how their Lumi will behave with students:
-When students use this teacher's Lumi, it will act as a study partner and learning tool — never an answer machine. It will:
-- Never give direct answers to homework, essays, or test questions
-- Always guide students to think through problems themselves using Socratic questions
-- Hold students to this teacher's exact standards and catch the mistakes this teacher always catches
-- Sound like this teacher and use their specific explanations and analogies
-- Stay strictly within the curriculum this teacher covers — never teach content they've said is out of scope
-- Follow this teacher's specific rules around help-seeking, formatting, and academic integrity
-- If a student asks for a direct answer, Lumi will warmly redirect: "Let's work through it together — what do you know so far?"
-
-Mention this naturally during the interview so the teacher knows what they're setting up.
-
-After EVERY reply, append this JSON on its own line at the very end — NEVER show it to the teacher, it is stripped before display:
-{"done":false,"teaching_style":"","excellence_criteria":"","grading_philosophy":"","common_mistakes":[],"explanation_methods":"","key_values":"","class_specific_notes":"","teacher_voice":"","key_themes_and_topics":[],"topics_not_covered":[],"rules_and_procedures":"","lumi_dos":[],"lumi_donts":[],"north_star":"","typical_hw_duration_minutes":0,"welcome_message":""}
-
-Rules for the JSON:
-- Fill in fields progressively as you collect information. Keep empty string/array until you have that info.
-- "teacher_voice" should capture HOW this teacher talks — their tone, vocabulary, level of formality, whether they use humor, how direct they are.
-- "key_themes_and_topics" and "topics_not_covered" are JSON arrays of strings.
-- "common_mistakes", "lumi_dos", "lumi_donts" are also JSON arrays of strings.
-- "topics_not_covered" is critical — if the teacher says they don't cover something, always add it here.
-- "north_star" is the teacher's single most important instruction for how Lumi should behave — extract this from their core philosophy.
-- "lumi_donts" is critical — fill this from question 2 (what Lumi should NEVER do).
-- "welcome_message" should be the teacher's EXACT words — do not rephrase, edit, or summarize. Copy it verbatim as they wrote it.
-- Only set "done":true when you have rich, substantive content in ALL fields AND the teacher has confirmed the final summary is accurate.
-- NEVER mention the JSON. NEVER say you are tracking anything.`;
+// ─── TOAST ────────────────────────────────────────────────────────────────────
+function showToast(message, type = '') {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.className = 't-toast show ' + type;
+  setTimeout(() => { toast.classList.remove('show'); }, 3000);
 }
 
-// ─── JSON PARSING ────────────────────────────────────────────────────────────
-function parseTeacherResponse(text) {
-  // Find the last JSON object containing "done" field
-  const idx = text.lastIndexOf('\n{');
-  if (idx !== -1) {
-    const cand = text.slice(idx + 1).trim();
-    try {
-      const p = JSON.parse(cand);
-      if ('done' in p) return { clean: text.slice(0, idx).trim(), data: p };
-    } catch {}
-  }
-  // Fallback: regex
-  const m = text.match(/\n?\{"done"[\s\S]*?\}(?:\s*)$/);
-  if (m) {
-    try {
-      const p = JSON.parse(m[0].trim());
-      if ('done' in p) return { clean: text.slice(0, text.length - m[0].length).trim(), data: p };
-    } catch {}
-  }
-  return { clean: text.trim(), data: null };
-}
-
-function stripTeacherJson(text) {
-  const idx = text.lastIndexOf('\n{');
-  if (idx !== -1) {
-    const cand = text.slice(idx + 1).trim();
-    try { const p = JSON.parse(cand); if ('done' in p) return text.slice(0, idx).trimEnd(); } catch {}
-  }
-  return text;
-}
-
-// ─── MARKDOWN RENDERING ─────────────────────────────────────────────────────
-function fmtText(text) {
-  if (!text) return '';
-  if (typeof marked !== 'undefined') return marked.parse(text, { breaks: true });
-  // Fallback if marked hasn't loaded
-  let s = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  s = s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code>$1</code>');
-  const ps = s.split(/\n\n+/);
-  if (ps.length > 1) return ps.map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`).join('');
-  return `<p>${s.replace(/\n/g,'<br>')}</p>`;
-}
-
-// ─── SUPABASE TEACHER PROFILES ───────────────────────────────────────────────
-async function saveTeacherProfile(data) {
-  if (!tUser || !tCurrentClass) return;
-  const existing = tProfiles[tCurrentClass.course] || {};
-  const merged = { ...existing, ...(data || {}) };
-
-  // Determine status
-  const newStatus = merged.done ? 'complete'
-    : (merged.status || (merged.teaching_style ? 'in_progress' : 'not_started'));
-
-  console.log('[saveTeacherProfile] saving:', tCurrentClass.course, 'status:', newStatus);
-
-  // First try: store everything in individual columns (rich schema)
-  // If that 400s, fall back to minimal columns only
-  const fullRow = {
-    teacher_email: tUser.email,
-    class_name:    tCurrentClass.course,
-    subject:       tCurrentClass.subject,
-    status:        newStatus,
-    teaching_style:        merged.teaching_style        || null,
-    excellence_criteria:   merged.excellence_criteria   || null,
-    grading_philosophy:    merged.grading_philosophy    || null,
-    common_mistakes:       Array.isArray(merged.common_mistakes) ? merged.common_mistakes : null,
-    explanation_methods:   merged.explanation_methods   || null,
-    key_values:            merged.key_values            || null,
-    class_specific_notes:  merged.class_specific_notes  || null,
-    teacher_voice:         merged.teacher_voice         || null,
-    key_themes_and_topics: Array.isArray(merged.key_themes_and_topics) ? merged.key_themes_and_topics : null,
-    topics_not_covered:    Array.isArray(merged.topics_not_covered) ? merged.topics_not_covered : null,
-    rules_and_procedures:  merged.rules_and_procedures  || null,
-    lumi_dos:              Array.isArray(merged.lumi_dos) ? merged.lumi_dos : null,
-    lumi_donts:            Array.isArray(merged.lumi_donts) ? merged.lumi_donts : null,
-    north_star:            merged.north_star            || null,
-    typical_hw_duration_minutes: merged.typical_hw_duration_minutes || null,
-    welcome_message:       merged.welcome_message       || null,
-    updated_at:            new Date().toISOString(),
-  };
-
-  try {
-    const { data: saved, error } = await sb
-      .from('teacher_profiles')
-      .upsert(fullRow, { onConflict: 'teacher_email,class_name' })
-      .select()
-      .single();
-    if (!error && saved) {
-      tProfiles[tCurrentClass.course] = saved;
-      console.log('[saveTeacherProfile] saved OK (full)');
-      return;
-    }
-    if (error) console.warn('[saveTeacherProfile] full save error:', error.message);
-  } catch (err) {
-    console.warn('[saveTeacherProfile] full save caught:', err);
-  }
-
-  // Fallback: minimal columns only — just teacher_email, class_name, status
-  // plus a 'profile' JSONB column if it exists
-  try {
-    const minRow = {
-      teacher_email: tUser.email,
-      class_name:    tCurrentClass.course,
-      status:        newStatus,
-      updated_at:    new Date().toISOString(),
-    };
-    const { data: saved2, error: err2 } = await sb
-      .from('teacher_profiles')
-      .upsert(minRow, { onConflict: 'teacher_email,class_name' })
-      .select()
-      .single();
-    if (!err2 && saved2) {
-      // Store full profile data locally even if DB only has minimal columns
-      tProfiles[tCurrentClass.course] = { ...saved2, ...merged };
-      console.log('[saveTeacherProfile] saved OK (minimal)');
-    }
-    if (err2) console.error('[saveTeacherProfile] minimal save error:', err2.message);
-  } catch (err) {
-    console.error('[saveTeacherProfile] minimal save caught:', err);
-  }
-
-  // Verify the save
-  try {
-    const { data: check } = await sb
-      .from('teacher_profiles')
-      .select('*')
-      .eq('teacher_email', tUser.email)
-      .eq('class_name', tCurrentClass.course);
-    console.log('[saveTeacherProfile] verification:', check);
-  } catch {}
-}
-
-// ─── SUMMARY VIEW ────────────────────────────────────────────────────────────
-function showSummaryView(profile) {
-  const msgsEl = document.getElementById('tMessages');
-  msgsEl.innerHTML = '';
-
-  // Greeting
-  const firstName = tTeacher.name.split(' ')[0];
-  const greet = document.createElement('div');
-  greet.className = 't-msg lumi';
-  greet.innerHTML = `
-    <div class="t-msg-head">
-      <div class="t-msg-avatar">✦</div>
-      <span class="t-msg-name">Lumi</span>
-    </div>
-    <div class="t-msg-bubble">Your ${escHtml(tCurrentClass.course)} profile is all set, ${escHtml(firstName)}! Here's what Lumi will tell your students about your class:</div>
-  `;
-  msgsEl.appendChild(greet);
-  showSummaryCard(profile);
-
-  // Disable input — interview complete
-  document.getElementById('tInput').disabled  = true;
-  document.getElementById('tSendBtn').disabled = true;
-}
-
-function showSummaryCard(profile) {
-  const msgsEl = document.getElementById('tMessages');
-  const card   = document.createElement('div');
-  card.className = 't-summary-card';
-
-  const fields = [
-    { key: 'teaching_style',           label: 'Teaching Style'              },
-    { key: 'excellence_criteria',      label: 'What Excellence Looks Like'  },
-    { key: 'grading_philosophy',       label: 'Grading Philosophy'          },
-    { key: 'common_mistakes',          label: 'Common Mistakes'             },
-    { key: 'explanation_methods',      label: 'How They Explain Things'     },
-    { key: 'key_values',               label: 'What They Care About'        },
-    { key: 'class_specific_notes',     label: 'Class-Specific Notes'        },
-    { key: 'teacher_voice',            label: 'Teacher Voice & Tone'        },
-    { key: 'key_themes_and_topics',    label: 'Key Themes & Topics'         },
-    { key: 'topics_not_covered',       label: 'Topics NOT Covered'          },
-    { key: 'syllabus_overview',        label: 'Syllabus Overview'           },
-    { key: 'rules_and_procedures',     label: 'Rules & Procedures'          },
-    { key: 'assessment_structure',     label: 'Assessment Structure'        },
-    { key: 'formatting_requirements',  label: 'Formatting Requirements'     },
-    { key: 'help_seeking_expectations',label: 'How to Ask for Help'         },
-    { key: 'lumi_dos',                 label: 'Lumi Should Always…'         },
-    { key: 'lumi_donts',               label: 'Lumi Should Never…'          },
-    { key: 'homework_frequency',       label: 'Homework Frequency'          },
-    { key: 'typical_hw_duration_minutes', label: 'Typical HW Time (min)'   },
-    { key: 'quiz_study_duration_minutes', label: 'Quiz Study Time (min)'    },
-    { key: 'test_study_duration_minutes', label: 'Test Study Time (min)'    },
-    { key: 'essay_duration_hours',     label: 'Essay/Project Time (hrs)'    },
-    { key: 'homework_advice',          label: 'Homework Advice'             },
-  ];
-
-  let html = '<h3>✓ Teaching Profile Complete</h3>';
-  fields.forEach(({ key, label }) => {
-    const val = profile[key];
-    if (!val || (Array.isArray(val) && !val.length)) return;
-    const display = Array.isArray(val) ? val.map(v => `• ${v}`).join('\n') : val;
-    html += `<div class="t-summary-field">
-      <div class="t-summary-field-label">${label}</div>
-      <div class="t-summary-field-val">${escHtml(display)}</div>
-    </div>`;
-  });
-  html += `<button class="t-reinterview-btn" onclick="reinterview()">↺ Re-do interview</button>`;
-  card.innerHTML = html;
-  msgsEl.appendChild(card);
-  scrollTBottom();
-}
-
-async function reinterview() {
-  if (!tCurrentClass) return;
-  // Clear the profile for this class
-  tProfiles[tCurrentClass.course] = null;
-  tMessages = [];
-  document.getElementById('tMessages').innerHTML = '';
-  updateBadge(false);
-
-  // Delete from Supabase
-  try {
-    await sb.from('teacher_profiles')
-      .delete()
-      .eq('teacher_email', tUser.email)
-      .eq('class_name', tCurrentClass.course);
-  } catch {}
-
-  document.getElementById('tInput').disabled   = false;
-  document.getElementById('tSendBtn').disabled  = false;
-  updateInputState();
-  await startInterview();
-}
-
-// ─── RENDER HELPERS ──────────────────────────────────────────────────────────
-function createLumiMsgEl() {
-  const el = document.createElement('div');
-  el.className = 't-msg lumi';
-  el.style.animation = 'fadeUp .25s ease';
-  el.innerHTML = `
-    <div class="t-msg-head">
-      <div class="t-msg-avatar">✦</div>
-      <span class="t-msg-name">Lumi</span>
-    </div>
-    <div class="t-msg-bubble"></div>
-  `;
-  return el;
-}
-
-function renderTMsg(role, content) {
-  const msgsEl = document.getElementById('tMessages');
-  const el     = document.createElement('div');
-
-  if (role === 'assistant') {
-    el.className = 't-msg lumi';
-    el.innerHTML = `
-      <div class="t-msg-head">
-        <div class="t-msg-avatar">✦</div>
-        <span class="t-msg-name">Lumi</span>
-      </div>
-      <div class="t-msg-bubble">${escHtml(stripTeacherJson(typeof content === 'string' ? content : ''))}</div>
-    `;
-  } else {
-    el.className = 't-msg user';
-    const text = typeof content === 'string' ? content
-      : (Array.isArray(content) ? (content.find(p => p.type === 'text')?.text || '') : '');
-    el.innerHTML = `<div class="t-msg-bubble">${escHtml(text)}</div>`;
-  }
-
-  // Don't render the kickoff "Hello!" user message
-  if (role === 'user' && typeof content === 'string' && content === 'Hello!') return;
-
-  msgsEl.appendChild(el);
-  scrollTBottom();
-}
-
-function renderTError(msg) {
-  const msgsEl = document.getElementById('tMessages');
-  const el     = document.createElement('div');
-  el.className = 't-msg error';
-  el.innerHTML = `<div class="t-msg-bubble">${escHtml(msg)}</div>`;
-  msgsEl.appendChild(el);
-  scrollTBottom();
-}
-
-function addTyping() {
-  const msgsEl = document.getElementById('tMessages');
-  const el     = document.createElement('div');
-  el.className = 't-msg lumi t-typing';
-  el.innerHTML = `
-    <div class="t-msg-head">
-      <div class="t-msg-avatar">✦</div>
-      <span class="t-msg-name">Lumi</span>
-    </div>
-    <div class="t-msg-bubble">
-      <div class="t-dot"></div><div class="t-dot"></div><div class="t-dot"></div>
-    </div>
-  `;
-  msgsEl.appendChild(el);
-  scrollTBottom();
-  return el;
-}
-
-function scrollTBottom() {
-  const msgsEl = document.getElementById('tMessages');
-  msgsEl.scrollTop = msgsEl.scrollHeight;
-}
-
+// ─── UTILITIES ────────────────────────────────────────────────────────────────
 function escHtml(s) {
   if (!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ─── MESSAGE ANIMATIONS ─────────────────────────────────────────────────────
-const animStyle = document.createElement('style');
-animStyle.textContent = `@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`;
-document.head.appendChild(animStyle);
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ─── STUDENT PROFILE SYSTEM ──────────────────────────────────────────────────
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// ── Data Layer ───────────────────────────────────────────────────────────────
-
-const SP_KEY = 'lumi_student_profiles';
-let spActiveStudent = null; // { classId, blockId, studentId }
-
-function getStudentData() {
-  try {
-    const raw = localStorage.getItem(SP_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  const data = seedStudentData();
-  saveStudentData(data);
-  return data;
+// PDF.js worker
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 }
-
-function saveStudentData(data) {
-  localStorage.setItem(SP_KEY, JSON.stringify(data));
-}
-
-function seedStudentData() {
-  return {
-    classes: [
-      {
-        id: 'english-2', name: 'English 2',
-        blocks: [
-          {
-            id: 'block-a', label: 'Block A',
-            students: [
-              { id: 'alex-chen', name: 'Alex Chen', grade: '10th' },
-              { id: 'emma-morrison', name: 'Emma Morrison', grade: '10th' },
-              { id: 'jake-park', name: 'Jake Park', grade: '10th' }
-            ]
-          },
-          {
-            id: 'block-b', label: 'Block B',
-            students: [
-              { id: 'hadi-hilaly', name: 'Hadi Hilaly', grade: '10th' },
-              { id: 'maya-rodriguez', name: 'Maya Rodriguez', grade: '10th' },
-              { id: 'sam-kim', name: 'Sam Kim', grade: '10th' },
-              { id: 'tara-brooks', name: 'Tara Brooks', grade: '10th' }
-            ]
-          }
-        ]
-      },
-      {
-        id: 'creative-nonfiction', name: 'Creative Nonfiction (H)',
-        blocks: [
-          {
-            id: 'block-a', label: 'Block A',
-            students: [
-              { id: 'lena-ostroff', name: 'Lena Ostroff', grade: '11th' },
-              { id: 'ravi-kapoor', name: 'Ravi Kapoor', grade: '11th' },
-              { id: 'sofia-reyes', name: 'Sofia Reyes', grade: '12th' }
-            ]
-          }
-        ]
-      },
-      {
-        id: 'cafe-society', name: 'Cafe Society',
-        blocks: [
-          {
-            id: 'block-a', label: 'Block A',
-            students: [
-              { id: 'jordan-walsh', name: 'Jordan Walsh', grade: '12th' },
-              { id: 'nia-thompson', name: 'Nia Thompson', grade: '11th' }
-            ]
-          }
-        ]
-      }
-    ],
-    studentProfiles: {
-      'hadi-hilaly': {
-        glance: 'Strong writer who gets stuck on evidence integration. Responds well to sports analogies and benefits from seeing his reasoning challenged before being given answers.',
-        notes: [
-          { id: 'n1', source: 'teacher', text: 'Strong on thesis statements, weaker on evidence integration — always prompt him to tie quotes back to his argument.', createdAt: '2026-04-03', author: 'You' },
-          { id: 'n2', source: 'teacher', text: 'Gets defensive when corrected directly — lead with what\'s working before pointing out issues.', createdAt: '2026-03-28', author: 'You' },
-          { id: 'n3', source: 'lumi', text: 'Responds really well to sports analogies — used a basketball example to explain narrative tension and it clicked.', createdAt: '2026-04-09' },
-          { id: 'n4', source: 'lumi', text: 'Tends to skip the planning step on essays and jump straight to writing. Gentle reminder to outline helps.', createdAt: '2026-04-11' }
-        ],
-        sessions: [
-          { date: '2026-04-11', desc: 'Of Mice and Men essay — thesis + evidence', duration: 35, outcome: 'clicked' },
-          { date: '2026-04-09', desc: 'Practice thesis statements', duration: 22, outcome: 'clicked' },
-          { date: '2026-04-06', desc: 'Symbolism in chapter 4', duration: 18, outcome: 'stuck' }
-        ]
-      },
-      'alex-chen': {
-        glance: 'Quiet but perceptive. Writes concise arguments but needs encouragement to elaborate and add nuance.',
-        notes: [
-          { id: 'n5', source: 'teacher', text: 'Excellent close reader — push him to go beyond observation into interpretation.', createdAt: '2026-04-05', author: 'You' }
-        ],
-        sessions: [
-          { date: '2026-04-10', desc: 'Character analysis essay outline', duration: 28, outcome: 'clicked' }
-        ]
-      },
-      'maya-rodriguez': {
-        glance: 'Creative thinker who sometimes loses focus on the prompt. Benefits from structured frameworks.',
-        notes: [
-          { id: 'n6', source: 'lumi', text: 'Works best when given a clear checklist of what the essay needs before starting.', createdAt: '2026-04-08' }
-        ],
-        sessions: [
-          { date: '2026-04-10', desc: 'Essay structure practice', duration: 25, outcome: 'clicked' },
-          { date: '2026-04-07', desc: 'Free writing exercise', duration: 15, outcome: 'stuck' }
-        ]
-      }
-    }
-  };
-}
-
-function getInitials(name) {
-  return name.split(' ').map(w => w[0]).join('').toUpperCase();
-}
-
-function genNoteId() {
-  return 'n' + Date.now() + Math.random().toString(36).slice(2, 6);
-}
-
-function formatDate(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00');
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return months[d.getMonth()] + ' ' + d.getDate();
-}
-
-function showSpToast(msg) {
-  const t = document.getElementById('spToast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2000);
-}
-
-// ── Sidebar Rendering ────────────────────────────────────────────────────────
-
-let spExpandedClass = null; // currently expanded class id
-
-function renderSpSidebar(expandClassId) {
-  const data = getStudentData();
-  const list = document.getElementById('spClassList');
-  list.innerHTML = '';
-
-  data.classes.forEach(cls => {
-    // Check if teacher setup is complete for this class
-    const profile = tProfiles[cls.name];
-    const status = profile?.status
-      || (profile?.done ? 'complete' : (profile?.teaching_style ? 'in_progress' : 'not_started'));
-    const isComplete = status === 'complete';
-    const isExpanded = (expandClassId === cls.id) || (spExpandedClass === cls.id);
-
-    // Class row
-    const row = document.createElement('div');
-    row.className = 'sp-class-row' + (isExpanded ? ' expanded' : '') + (!isComplete ? ' pending' : '');
-    row.innerHTML = `
-      <span>${escHtml(cls.name)}</span>
-      ${!isComplete ? '<span class="sp-pending-badge">Setup pending</span>' : ''}
-      <span class="sp-arrow">▶</span>
-    `;
-    row.addEventListener('click', () => {
-      if (!isComplete) {
-        // Open setup interview for this class
-        const subject = lookupSubjectForCourse(cls.name);
-        openClassChat({ course: cls.name, subject });
-        return;
-      }
-      if (spExpandedClass === cls.id) {
-        spExpandedClass = null;
-      } else {
-        spExpandedClass = cls.id;
-      }
-      renderSpSidebar();
-    });
-    list.appendChild(row);
-
-    // Block list (only if expanded and complete)
-    if (isExpanded && isComplete) {
-      const blockList = document.createElement('div');
-      blockList.className = 'sp-block-list';
-      blockList.style.display = 'block';
-
-      const hasMultipleBlocks = cls.blocks.length > 1;
-
-      cls.blocks.forEach(block => {
-        // Show block label only if multiple blocks
-        if (hasMultipleBlocks) {
-          const label = document.createElement('div');
-          label.className = 'sp-block-label';
-          label.textContent = block.label + ' · ' + block.students.length + ' students';
-          blockList.appendChild(label);
-        }
-
-        block.students.forEach(student => {
-          const isActive = spActiveStudent &&
-            spActiveStudent.classId === cls.id &&
-            spActiveStudent.blockId === block.id &&
-            spActiveStudent.studentId === student.id;
-
-          const item = document.createElement('div');
-          item.className = 'sp-student-item' + (isActive ? ' active' : '');
-          item.innerHTML = `<div class="sp-avatar">${getInitials(student.name)}</div>${escHtml(student.name)}`;
-          item.addEventListener('click', (e) => {
-            e.stopPropagation();
-            spActiveStudent = { classId: cls.id, blockId: block.id, studentId: student.id };
-            renderSpSidebar();
-            renderStudentProfile(student, cls.name, hasMultipleBlocks ? block.label : null);
-          });
-          blockList.appendChild(item);
-        });
-      });
-
-      list.appendChild(blockList);
-    }
-  });
-}
-
-// ── Profile Rendering ────────────────────────────────────────────────────────
-
-function renderStudentProfile(student, className, blockLabel) {
-  const main = document.getElementById('spMain');
-  const data = getStudentData();
-  const profile = data.studentProfiles[student.id] || { glance: '', notes: [], sessions: [] };
-  const initials = getInitials(student.name);
-  const firstName = student.name.split(' ')[0];
-  const sessionCount = profile.sessions?.length || 0;
-  const lastSession = profile.sessions?.[0];
-  const lastActiveText = lastSession ? formatDate(lastSession.date) : 'No sessions yet';
-  const pronoun = 'them'; // gender-neutral default
-
-  // Breadcrumb
-  let breadcrumb = `<span>${escHtml(className)}</span>`;
-  if (blockLabel) breadcrumb += `<span>${escHtml(blockLabel)}</span>`;
-  breadcrumb += `<span style="color:#2B253F;font-weight:500">${escHtml(student.name)}</span>`;
-
-  // Notes HTML
-  const notesHtml = (profile.notes || []).map(note => `
-    <div class="sp-note" data-note-id="${note.id}">
-      <div class="sp-note-source ${note.source}">${note.source === 'teacher' ? '👩‍🏫' : '✨'}</div>
-      <div class="sp-note-content">
-        <div class="sp-note-text" id="sp-nt-${note.id}">${escHtml(note.text)}</div>
-        <div class="sp-note-meta">${note.source === 'teacher' ? (note.author || 'You') + ' · ' : 'Learned by Lumi · '}${formatDate(note.createdAt)}</div>
-      </div>
-      <div class="sp-note-actions">
-        <button class="sp-icon-btn" title="Edit" onclick="editStudentNote('${student.id}','${note.id}')">✏️</button>
-        <button class="sp-icon-btn" title="Remove" onclick="removeStudentNote('${student.id}','${note.id}')">✕</button>
-      </div>
-    </div>
-  `).join('');
-
-  // Sessions HTML
-  const sessionsHtml = (profile.sessions || []).map(s => `
-    <div class="sp-activity">
-      <div class="sp-activity-date">${formatDate(s.date)}</div>
-      <div class="sp-activity-desc">${escHtml(s.desc)}</div>
-      <div class="sp-activity-duration">${s.duration} min</div>
-      <div class="sp-activity-tag ${s.outcome === 'clicked' ? 'sp-tag-good' : 'sp-tag-stuck'}">${s.outcome === 'clicked' ? 'clicked' : 'got stuck'}</div>
-    </div>
-  `).join('');
-
-  main.innerHTML = `
-    <div class="sp-breadcrumb">${breadcrumb}</div>
-    <div class="sp-header">
-      <div class="sp-header-avatar">${initials}</div>
-      <div class="sp-header-info">
-        <h1>${escHtml(student.name)}</h1>
-        <div class="sp-header-meta">${escHtml(student.grade)} grade · ${sessionCount} session${sessionCount !== 1 ? 's' : ''} with Lumi · Last active ${lastActiveText}</div>
-      </div>
-    </div>
-
-    ${profile.glance ? `
-      <div class="sp-insight">
-        <div class="sp-insight-label">✨ At a glance</div>
-        ${escHtml(profile.glance)}
-      </div>
-    ` : ''}
-
-    <div class="sp-teach">
-      <div class="sp-teach-label">
-        💡 Teach Lumi something about ${escHtml(firstName)}
-        <span class="sp-teach-sub" style="margin-left:auto">Lumi will use this in every session with ${pronoun}</span>
-      </div>
-      <textarea id="spNoteInput" placeholder="e.g. ${escHtml(firstName)} gets frustrated when you give him the answer too quickly — make him show his reasoning first."></textarea>
-      <div class="sp-chips">
-        <button class="sp-chip" onclick="fillSpChip(this)">How they learn best…</button>
-        <button class="sp-chip" onclick="fillSpChip(this)">What to avoid…</button>
-        <button class="sp-chip" onclick="fillSpChip(this)">Strengths to lean into…</button>
-        <button class="sp-chip" onclick="fillSpChip(this)">Things they struggle with…</button>
-      </div>
-      <div class="sp-teach-actions">
-        <button class="sp-btn-secondary" onclick="document.getElementById('spNoteInput').value=''">Cancel</button>
-        <button class="sp-btn-primary" onclick="saveStudentNote('${student.id}')">Save to profile</button>
-      </div>
-    </div>
-
-    <div class="sp-section-title">
-      What Lumi knows about ${escHtml(firstName)}
-      <span class="sp-section-count">${(profile.notes||[]).length} note${(profile.notes||[]).length !== 1 ? 's' : ''}</span>
-    </div>
-    <div id="spNotesList">${notesHtml || '<div style="font-size:13px;color:#8B82A6;padding:12px 0">No notes yet — teach Lumi something about ' + escHtml(firstName) + ' above.</div>'}</div>
-
-    <div class="sp-section-title">
-      Recent sessions
-      <span class="sp-section-count">${sessionCount > 0 ? 'Last 7 days' : 'None'}</span>
-    </div>
-    ${sessionsHtml || '<div style="font-size:13px;color:#8B82A6;padding:12px 0">No sessions yet.</div>'}
-    <div style="height:40px"></div>
-  `;
-
-  // Wire Cmd/Ctrl+Enter to save
-  const textarea = document.getElementById('spNoteInput');
-  if (textarea) {
-    textarea.addEventListener('keydown', (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') saveStudentNote(student.id);
-    });
-  }
-}
-
-// ── Note CRUD ────────────────────────────────────────────────────────────────
-
-function saveStudentNote(studentId) {
-  const textarea = document.getElementById('spNoteInput');
-  const text = textarea?.value.trim();
-  if (!text) return;
-
-  const data = getStudentData();
-  if (!data.studentProfiles[studentId]) {
-    data.studentProfiles[studentId] = { glance: '', notes: [], sessions: [] };
-  }
-
-  const today = new Date().toISOString().slice(0, 10);
-  data.studentProfiles[studentId].notes.unshift({
-    id: genNoteId(),
-    source: 'teacher',
-    text,
-    createdAt: today,
-    author: 'You'
-  });
-  saveStudentData(data);
-
-  // Find the student object to re-render
-  const student = findStudentById(studentId);
-  if (student) {
-    const cls = findClassForStudent(studentId);
-    const block = findBlockForStudent(studentId);
-    const hasMulti = cls && cls.blocks.length > 1;
-    renderStudentProfile(student, cls.name, hasMulti ? block.label : null);
-  }
-
-  showSpToast('Saved to ' + (student?.name.split(' ')[0] || 'student') + '\'s profile ✓');
-}
-
-function removeStudentNote(studentId, noteId) {
-  const data = getStudentData();
-  const profile = data.studentProfiles[studentId];
-  if (!profile) return;
-  profile.notes = profile.notes.filter(n => n.id !== noteId);
-  saveStudentData(data);
-
-  // Re-render
-  const student = findStudentById(studentId);
-  if (student) {
-    const cls = findClassForStudent(studentId);
-    const block = findBlockForStudent(studentId);
-    const hasMulti = cls && cls.blocks.length > 1;
-    renderStudentProfile(student, cls.name, hasMulti ? block.label : null);
-  }
-}
-
-function editStudentNote(studentId, noteId) {
-  const el = document.getElementById('sp-nt-' + noteId);
-  if (!el || el.contentEditable === 'true') return;
-
-  el.contentEditable = 'true';
-  el.focus();
-
-  // Select all text
-  const range = document.createRange();
-  range.selectNodeContents(el);
-  const sel = window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
-
-  // Save on blur or Enter
-  function save() {
-    el.contentEditable = 'false';
-    const newText = el.textContent.trim();
-    if (!newText) { removeStudentNote(studentId, noteId); return; }
-
-    const data = getStudentData();
-    const note = data.studentProfiles[studentId]?.notes.find(n => n.id === noteId);
-    if (note) {
-      note.text = newText;
-      saveStudentData(data);
-    }
-    el.removeEventListener('blur', save);
-  }
-
-  el.addEventListener('blur', save);
-  el.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); }
-    if (e.key === 'Escape') { el.contentEditable = 'false'; /* revert would need re-render */ }
-  });
-}
-
-function fillSpChip(el) {
-  const textarea = document.getElementById('spNoteInput');
-  if (!textarea) return;
-  const prompts = {
-    'How they learn best…': 'They learn best when ',
-    'What to avoid…': 'Avoid ',
-    'Strengths to lean into…': 'Lean into their strength of ',
-    'Things they struggle with…': 'They struggle with '
-  };
-  textarea.value = prompts[el.textContent] || '';
-  textarea.focus();
-}
-
-// ── Lookup Helpers ───────────────────────────────────────────────────────────
-
-function findStudentById(studentId) {
-  const data = getStudentData();
-  for (const cls of data.classes) {
-    for (const block of cls.blocks) {
-      const s = block.students.find(s => s.id === studentId);
-      if (s) return s;
-    }
-  }
-  return null;
-}
-
-function findClassForStudent(studentId) {
-  const data = getStudentData();
-  for (const cls of data.classes) {
-    for (const block of cls.blocks) {
-      if (block.students.some(s => s.id === studentId)) return cls;
-    }
-  }
-  return null;
-}
-
-function findBlockForStudent(studentId) {
-  const data = getStudentData();
-  for (const cls of data.classes) {
-    for (const block of cls.blocks) {
-      if (block.students.some(s => s.id === studentId)) return block;
-    }
-  }
-  return null;
-}
-
-// ── Entry Point ──────────────────────────────────────────────────────────────
-
-function openStudentProfiles(courseName) {
-  const data = getStudentData();
-  const cls = data.classes.find(c => c.name === courseName);
-
-  spExpandedClass = cls ? cls.id : null;
-  spActiveStudent = null;
-
-  showView('profileView');
-  renderSpSidebar(cls?.id);
-
-  // Auto-select first student
-  if (cls && cls.blocks.length && cls.blocks[0].students.length) {
-    const firstBlock = cls.blocks[0];
-    const firstStudent = firstBlock.students[0];
-    spActiveStudent = { classId: cls.id, blockId: firstBlock.id, studentId: firstStudent.id };
-    renderSpSidebar();
-    renderStudentProfile(firstStudent, cls.name, cls.blocks.length > 1 ? firstBlock.label : null);
-  }
-}
-
 </script>
 </body>
 </html>
