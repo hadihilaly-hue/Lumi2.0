@@ -1410,6 +1410,67 @@ function skipTemplate() {
   document.getElementById('templateBanner').classList.remove('show');
 }
 
+// ─── GENERATE SUGGESTED PROMPTS (non-blocking) ──────────────────────────────
+async function generateSuggestedPrompts(courseInfo, syllabusText, teacherEmail, courseName) {
+  const systemPrompt = `Generate 3 short, tappable suggestion prompts that students of this course might click when they open Lumi. Each should be 6-10 words, specific to the course content, and sound like something a student would say. Return ONLY a JSON array of 3 strings, no other text.
+
+Examples of good prompts for a math course: ["Help me factor polynomials", "Quiz me on quadratic equations", "Walk me through a log problem"]
+
+Here's the course info:
+${courseInfo || '(not provided)'}
+
+Here's the syllabus:
+${syllabusText || '(not provided)'}`;
+
+  try {
+    const res = await fetch('https://jtwgxkvfdboxcoynlaij.supabase.co/functions/v1/claude-proxy', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp0d2d4a3ZmZGJveGNveW5sYWlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQyNDc5NDUsImV4cCI6MjA1OTgyMzk0NX0.8hRL7elzXhU0_E1FTKfDfE_TKHv95g6JqvSwK-sDpec',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5',
+        max_tokens: 150,
+        temperature: 0.7,
+        messages: [{ role: 'user', content: 'Generate the 3 prompts now.' }],
+        system: systemPrompt,
+      }),
+    });
+
+    if (!res.ok) throw new Error('API call failed');
+    const json = await res.json();
+    const text = json.content?.[0]?.text || '';
+
+    // Parse JSON array from response
+    const match = text.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error('No JSON array found');
+    const prompts = JSON.parse(match[0]);
+    if (!Array.isArray(prompts) || prompts.length !== 3) throw new Error('Invalid prompt array');
+
+    // Update the profile with generated prompts
+    await sb.from('teacher_profiles')
+      .update({ suggested_prompts: prompts })
+      .eq('teacher_email', teacherEmail)
+      .eq('course_name', courseName);
+
+    console.log('Generated suggested prompts:', prompts);
+  } catch (err) {
+    console.warn('Prompt generation failed, using fallback:', err);
+    const fallback = [
+      "Help me with today's homework",
+      "Quiz me on what we've been learning",
+      "Explain a concept I'm stuck on"
+    ];
+    try {
+      await sb.from('teacher_profiles')
+        .update({ suggested_prompts: fallback })
+        .eq('teacher_email', teacherEmail)
+        .eq('course_name', courseName);
+    } catch { /* ignore secondary failure */ }
+  }
+}
+
 // ─── SAVE PROFILE ────────────────────────────────────────────────────────────
 async function saveTeacherProfile() {
   const btn = document.getElementById('saveProfileBtn');
@@ -1459,6 +1520,9 @@ async function saveTeacherProfile() {
 
     tProfiles[tCurrentClass.course] = data;
     showToast('Profile saved!', 'success');
+
+    // Generate suggested prompts in background (non-blocking)
+    generateSuggestedPrompts(courseInfo, tSyllabusText, tUser.email, tCurrentClass.course);
 
     setTimeout(() => {
       goHome();

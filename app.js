@@ -1034,6 +1034,8 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
     msgInput.disabled = false;
     msgInput.placeholder = 'Say something\u2026';
     $('sendBtn').disabled = false;
+    // Show suggested prompts for new conversations
+    setTimeout(() => renderEmptyState(profile, course), 50);
   } else {
     greeting = `\u26a0\ufe0f ${firstName} hasn't set up their Lumi profile for ${course} yet. Once they complete their setup interview, I'll be able to help you exactly the way ${firstName} teaches. In the meantime, you can use General Chat.`;
     S.tutorCtx.teacherProfile = null;
@@ -1655,6 +1657,77 @@ function showWelcome() {
     if (window.innerWidth <= 768) openSidebar();
     else { SB.expandedSubject = null; renderSidebar(); }
   });
+}
+
+// ─── EMPTY STATE WITH SUGGESTED PROMPTS ──────────────────────────────────────
+function getHomeworkOverridePrompt(course) {
+  const tasks = getHwTasks().filter(t =>
+    !t.isComplete &&
+    t.className === course &&
+    t.dueDate
+  );
+  if (!tasks.length) return null;
+
+  // Sort by due date, get soonest
+  tasks.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const task = tasks[0];
+
+  const today = new Date().toISOString().slice(0, 10);
+  const daysUntilDue = dateDiffDays(today, task.dueDate);
+
+  // Only override if due in next 3 days
+  if (daysUntilDue > 3) return null;
+
+  // Format relative date
+  let relativeDate;
+  if (daysUntilDue <= 0) relativeDate = 'today';
+  else if (daysUntilDue === 1) relativeDate = 'tomorrow';
+  else {
+    const dueDay = new Date(task.dueDate + 'T12:00:00');
+    relativeDate = dueDay.toLocaleDateString('en-US', { weekday: 'long' });
+  }
+
+  return `Help me with ${task.title} (due ${relativeDate})`;
+}
+
+function renderEmptyState(profile, course) {
+  // Get prompts: teacher's custom or fallback
+  let prompts = profile?.suggested_prompts;
+  if (!prompts || !Array.isArray(prompts) || prompts.length < 3) {
+    prompts = [
+      "Help me with today's homework",
+      "Quiz me on what we've been learning",
+      "Explain a concept I'm stuck on"
+    ];
+  }
+
+  // Check for homework override
+  const hwOverride = getHomeworkOverridePrompt(course);
+  if (hwOverride) {
+    prompts = [hwOverride, prompts[1], prompts[2]];
+  }
+
+  const el = document.createElement('div');
+  el.className = 'empty-state-prompts';
+  el.id = 'emptyStatePrompts';
+  el.innerHTML = `
+    <div class="esp-heading">Hi! I'm Lumi — what do you want to work on?</div>
+    <div class="esp-chips">
+      ${prompts.map((p, i) => `<button class="esp-chip" data-index="${i}">${escHtml(p)}</button>`).join('')}
+    </div>
+  `;
+
+  // Wire chip clicks
+  el.querySelectorAll('.esp-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      msgInput.value = chip.textContent;
+      msgInput.focus();
+      autoGrow(msgInput);
+      updateSendBtn();
+    });
+  });
+
+  messagesEl.appendChild(el);
 }
 
 // ─── SCHEDULE SETUP ──────────────────────────────────────────────────────────
@@ -2963,8 +3036,9 @@ function handleFileSelect(file) {
 async function doSend() {
   const text = msgInput.value.trim();
   if (!text && !pendingAttachment) return;
-  // Remove prompt cards on first send
+  // Remove prompt cards and empty state on first send
   const pc = $('generalPromptCards'); if (pc) pc.remove();
+  const esp = $('emptyStatePrompts'); if (esp) esp.remove();
   if (S.busy) return;
   if (!S.ready) { S.ready = true; const w = document.getElementById('welcome'); if (w) w.remove(); }
 
@@ -3730,7 +3804,7 @@ async function getTeacherProfileCached(course, teacherName) {
   if (_profileCache[key]) { _hwProfileCache[key] = _profileCache[key]; return _profileCache[key]; }
   try {
     const { data } = await sb.from('teacher_profiles').select('*')
-      .eq('teacher_email', email).eq('class_name', course).maybeSingle();
+      .eq('teacher_email', email).eq('course_name', course).maybeSingle();
     _hwProfileCache[key] = data || null;
   } catch { _hwProfileCache[key] = null; }
   return _hwProfileCache[key];
