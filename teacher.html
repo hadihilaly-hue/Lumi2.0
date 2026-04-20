@@ -514,6 +514,17 @@ body { overflow: auto; display: block; }
   <div class="wizard-body">
     <!-- STEP 1: Engagement Rules -->
     <div class="wizard-step" data-step="1">
+      <div class="wizard-title-row" style="display:flex;align-items:center;gap:12px;margin-bottom:28px">
+        <label for="titleSelect" style="font-size:14px;font-weight:500;white-space:nowrap">How do your students address you?</label>
+        <select id="titleSelect" required style="padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:14px;cursor:pointer;min-width:100px">
+          <option value="" disabled selected>Select…</option>
+          <option value="Mr.">Mr.</option>
+          <option value="Ms.">Ms.</option>
+          <option value="Mrs.">Mrs.</option>
+          <option value="Mx.">Mx.</option>
+          <option value="Dr.">Dr.</option>
+        </select>
+      </div>
       <h2 class="wizard-question-title">How do you want students to engage with Lumi?</h2>
       <div class="wizard-sub-prompts">
         <span class="wizard-sub-prompt">What's off-limits?</span>
@@ -644,6 +655,14 @@ body { overflow: auto; display: block; }
     <div class="wizard-step" data-step="4">
       <h2 class="wizard-question-title">Review your profile</h2>
       <p style="color:var(--text-muted);margin-bottom:24px">Make sure everything looks good before saving.</p>
+
+      <div class="summary-card">
+        <div class="summary-card-header">
+          <span class="summary-card-label">Title</span>
+          <button class="summary-card-edit" onclick="editField(1)">Edit</button>
+        </div>
+        <div class="summary-card-content" id="summaryTitle"></div>
+      </div>
 
       <div class="summary-card">
         <div class="summary-card-header">
@@ -1125,6 +1144,7 @@ async function openWizard(course, subject) {
 
   // Load existing profile if any
   const profile = tProfiles[course];
+  document.getElementById('titleSelect').value = profile?.title || '';
   document.getElementById('engagementRulesInput').value = profile?.engagement_rules || '';
   document.getElementById('teachingVoiceInput').value = profile?.teaching_voice || '';
   document.getElementById('courseInfoInput').value = profile?.course_info || '';
@@ -1148,6 +1168,12 @@ async function openWizard(course, subject) {
   updateWordCount('engagementRulesInput', 'engagementRulesCount', 'step1NextBtn');
   updateWordCount('teachingVoiceInput', 'teachingVoiceCount', 'step2NextBtn');
   updateWordCount('courseInfoInput', 'courseInfoCount', 'step3NextBtn');
+
+  // Re-check step 1 button when title changes
+  const titleEl = document.getElementById('titleSelect');
+  titleEl.removeEventListener('change', titleEl._titleHandler);
+  titleEl._titleHandler = () => updateWordCount('engagementRulesInput', 'engagementRulesCount', 'step1NextBtn');
+  titleEl.addEventListener('change', titleEl._titleHandler);
 
   // Wire up input listeners
   ['engagementRulesInput', 'teachingVoiceInput', 'courseInfoInput'].forEach(id => {
@@ -1183,6 +1209,7 @@ function showStep(n) {
 
   // Update summary on step 4
   if (n === 4) {
+    document.getElementById('summaryTitle').textContent = document.getElementById('titleSelect').value || '(Not selected)';
     document.getElementById('summaryEngagementRules').textContent = document.getElementById('engagementRulesInput').value || '(Not filled)';
     document.getElementById('summaryTeachingVoice').textContent = document.getElementById('teachingVoiceInput').value || '(Not filled)';
     document.getElementById('summaryCourseInfo').textContent = document.getElementById('courseInfoInput').value || '(Not filled)';
@@ -1220,15 +1247,13 @@ function updateWordCount(inputId, countId, btnId) {
   const btn = document.getElementById(btnId);
 
   countEl.textContent = `${count} / 50 words minimum`;
-  if (count >= 50) {
-    countEl.classList.add('valid');
-    countEl.classList.remove('invalid');
-    btn.disabled = false;
-  } else {
-    countEl.classList.remove('valid');
-    countEl.classList.add('invalid');
-    btn.disabled = true;
-  }
+  const wordsMet = count >= 50;
+  countEl.classList.toggle('valid', wordsMet);
+  countEl.classList.toggle('invalid', !wordsMet);
+
+  // Step 1 also requires title selection
+  const titleOk = btnId !== 'step1NextBtn' || !!document.getElementById('titleSelect').value;
+  btn.disabled = !(wordsMet && titleOk);
 }
 
 // ─── EXAMPLES TOGGLE ─────────────────────────────────────────────────────────
