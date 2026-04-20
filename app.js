@@ -330,14 +330,24 @@ Only include NEWLY learned things. Empty arrays if nothing new.
 NEVER mention the JSON.`;
 }
 
+// Build a student-facing display name: "Mr. Harris" when title exists, else "Richard"
+function teacherDisplayName(fullName, profile) {
+  if (profile?.title) {
+    const lastName = fullName.split(' ').slice(-1)[0];
+    return profile.title + ' ' + lastName;
+  }
+  return fullName.split(' ')[0]; // first name fallback
+}
+
 function buildTutorSystem(subject, course, teacher, teacherProfile) {
   const hasProfile = !!teacherProfile;
   const firstName = teacher.split(' ')[0];
+  const displayName = teacherDisplayName(teacher, teacherProfile);
 
   if (hasProfile) {
     const p = teacherProfile;
 
-    let prompt = `You are Lumi, acting as a 24/7 digital version of ${teacher} for their ${course} class at Menlo School. ${teacher} has given you a deep briefing on how they teach — your job is to help this student exactly the way ${teacher} would.
+    let prompt = `You are Lumi, acting as a 24/7 digital version of ${displayName} for their ${course} class at Menlo School. ${displayName} has given you a deep briefing on how they teach — your job is to help this student exactly the way ${displayName} would. When referring to this teacher, always call them "${displayName}."
 
 Never begin a response with a code block or markdown formatting. Always start with plain conversational text.
 Always complete your full response. If approaching length limits, wrap up your current point concisely rather than stopping mid-thought.
@@ -375,7 +385,7 @@ ALWAYS:
 - Find the single most important weakness and ask exactly ONE question targeting it
 - Push back on reasoning quality, never on conclusions
 - Let students find their own inconsistencies
-- Match ${firstName}'s voice, tone, and teaching style exactly
+- Match ${displayName}'s voice, tone, and teaching style exactly
 
 FRUSTRATION AND TIME PRESSURE:
 When a student expresses frustration or time pressure, acknowledge it in one sentence maximum, then immediately redirect to a single focused question. Never explain at length why you won't give direct answers — just don't give them, and get back to work.
@@ -391,7 +401,7 @@ NEVER mention the JSON.`;
   }
 
   // No profile yet — fallback to generic tutor
-  return `You are tutoring a Menlo School student in ${course} with ${teacher}. Be helpful, specific to this subject, and calibrated to high school level.
+  return `You are tutoring a Menlo School student in ${course} with ${displayName}. Be helpful, specific to this subject, and calibrated to high school level.
 
 Never begin a response with a code block or markdown formatting. Always start with plain conversational text.
 Always complete your full response. If approaching length limits, wrap up concisely rather than stopping mid-thought.
@@ -1015,6 +1025,7 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
   }
   let greeting;
   const firstName = teacher.split(' ')[0];
+  const dName = teacherDisplayName(teacher, profile);
 
   if (profile?.__notReady) {
     greeting = `${firstName} hasn't finished setting up their Lumi profile yet — their interview is still in progress. Check back soon, or try General Chat in the meantime.`;
@@ -1026,10 +1037,10 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
   } else if (profile) {
     S.tutorCtx.teacherProfile = profile;
     if (profile.welcome_message) {
-      renderTeacherNote(teacher, profile.welcome_message);
+      renderTeacherNote(teacher, profile, profile.welcome_message);
       greeting = `I'm ready when you are — ask me anything about ${course}.`;
     } else {
-      greeting = `Hey! You're studying ${course} with ${firstName}. I've learned how ${firstName} teaches and what they look for — ask me anything and I'll help you the way ${firstName} would.`;
+      greeting = `Hey! You're studying ${course} with ${dName}. I've learned how ${dName} teaches and what they look for — ask me anything and I'll help you the way ${dName} would.`;
     }
     msgInput.disabled = false;
     msgInput.placeholder = 'Say something\u2026';
@@ -1423,7 +1434,10 @@ function renderSidebar() {
     sbNav.appendChild(myHd);
 
     schedule.forEach(({ course, teacher }) => {
+      const email = TEACHER_EMAIL_MAP[teacher];
+      const cachedProfile = email ? _profileCache[email + '__' + course] : null;
       const lastName = teacher ? teacher.split(' ').slice(-1)[0] : '';
+      const sidebarName = cachedProfile?.title ? cachedProfile.title + ' ' + lastName : lastName;
       const isActive = SB.activeTeacher &&
         SB.activeTeacher.course === course &&
         SB.activeTeacher.teacher === teacher;
@@ -1437,7 +1451,7 @@ function renderSidebar() {
       name.textContent = course;
       const tch = document.createElement('span');
       tch.className = 'sb-my-class-teacher';
-      tch.textContent = lastName;
+      tch.textContent = sidebarName;
       const profileStatus = _profileStatusCache[course + '::' + teacher];
       const badge = document.createElement('span');
       badge.className = 'sb-profile-badge ' + (profileStatus === 'ready' ? 'ready' : 'pending');
@@ -3226,13 +3240,13 @@ function applyProfile({ values = [], goals = [], interests = [] }) {
 }
 
 // ─── RENDER TEACHER NOTE ────────────────────────────────────────────────────
-function renderTeacherNote(teacher, message) {
-  const firstName = teacher.split(' ')[0];
+function renderTeacherNote(teacher, profile, message) {
+  const dName = teacherDisplayName(teacher, profile);
   const el = document.createElement('div');
   el.className = 'teacher-note';
   const label = document.createElement('div');
   label.className = 'teacher-note-label';
-  label.textContent = `A note from ${firstName}`;
+  label.textContent = `A note from ${dName}`;
   const bubble = document.createElement('div');
   bubble.className = 'teacher-note-bubble';
   bubble.textContent = message;
@@ -3250,7 +3264,7 @@ function renderMsg(role, content, animate, att) {
     const hd = document.createElement('div'); hd.className = 'msg-head';
     const av = document.createElement('div'); av.className = 'msg-avatar'; av.textContent = '✦';
     const nm = document.createElement('span'); nm.className = 'msg-name';
-    nm.textContent = S.tutorCtx ? S.tutorCtx.teacher : 'Lumi';
+    nm.textContent = S.tutorCtx ? teacherDisplayName(S.tutorCtx.teacher, S.tutorCtx.teacherProfile) : 'Lumi';
     hd.append(av, nm); el.appendChild(hd);
     // Speaker button added after bubble is built (needs text) — deferred below
   }
@@ -3903,7 +3917,7 @@ async function updateTimeHint() {
   if (!entry) { $('hwTimeHint').textContent = ''; return; }
   const profile = await getTeacherProfileCached(entry.course, entry.teacher);
   if (profile && profile.typical_hw_duration_minutes) {
-    $('hwTimeHint').textContent = `${entry.teacher.split(' ')[0]} typically assigns ~${profile.typical_hw_duration_minutes} min of homework`;
+    $('hwTimeHint').textContent = `${teacherDisplayName(entry.teacher, profile)} typically assigns ~${profile.typical_hw_duration_minutes} min of homework`;
     $('hwTimeInput').placeholder = profile.typical_hw_duration_minutes;
   } else {
     $('hwTimeHint').textContent = '';
