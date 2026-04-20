@@ -1502,6 +1502,7 @@ async function saveTeacherProfile() {
   btn.disabled = true;
   btn.textContent = 'Saving…';
 
+  const title = document.getElementById('titleSelect').value || null;
   const engagementRules = document.getElementById('engagementRulesInput').value.trim();
   const teachingVoice = document.getElementById('teachingVoiceInput').value.trim();
   const courseInfo = document.getElementById('courseInfoInput').value.trim();
@@ -1528,6 +1529,7 @@ async function saveTeacherProfile() {
       .upsert({
         teacher_email: tUser.email,
         course_name: tCurrentClass.course,
+        title,
         engagement_rules: engagementRules,
         teaching_voice: teachingVoice,
         course_info: courseInfo,
