@@ -307,6 +307,7 @@ function buildCompanionSystem() {
 
 Never begin a response with a code block or markdown formatting. Always start with plain conversational text.
 Always complete your full response. If approaching length limits, wrap up concisely rather than stopping mid-thought.
+When writing any math, always use LaTeX: inline math in $…$ and display math in $$…$$. Never use plain-text math like sqrt(x) or x^2 — always $\\sqrt{x}$ or $x^2$.
 
 ${studentCtx()}
 
@@ -351,6 +352,7 @@ function buildTutorSystem(subject, course, teacher, teacherProfile) {
 
 Never begin a response with a code block or markdown formatting. Always start with plain conversational text.
 Always complete your full response. If approaching length limits, wrap up your current point concisely rather than stopping mid-thought.
+When writing any math, always use LaTeX: inline math in $…$ and display math in $$…$$. Never use plain-text math like sqrt(x) or x^2 — always $\\sqrt{x}$ or $x^2$.
 
 ${studentCtx()}
 
@@ -405,6 +407,7 @@ NEVER mention the JSON.`;
 
 Never begin a response with a code block or markdown formatting. Always start with plain conversational text.
 Always complete your full response. If approaching length limits, wrap up concisely rather than stopping mid-thought.
+When writing any math, always use LaTeX: inline math in $…$ and display math in $$…$$. Never use plain-text math like sqrt(x) or x^2 — always $\\sqrt{x}$ or $x^2$.
 
 ${studentCtx()}
 
@@ -3313,6 +3316,20 @@ function renderMsg(role, content, animate, att) {
 
   el.appendChild(bubble);
   messagesEl.appendChild(el);
+
+  // Render LaTeX math in the message bubble
+  if (typeof renderMathInElement === 'function') {
+    try {
+      renderMathInElement(bubble, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false },
+        ],
+        throwOnError: false,
+      });
+    } catch (e) { console.warn('[KaTeX] render error:', e); }
+  }
+
   if (animate) scrollBottom();
 
   // Add speaker button to Lumi messages after bubble is in the DOM
@@ -3325,13 +3342,27 @@ function renderMsg(role, content, animate, att) {
 
 function fmtText(text) {
   if (!text) return '';
-  if (typeof marked !== 'undefined') return marked.parse(text, { breaks: true });
-  // Fallback if marked hasn't loaded
-  let s = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  s = s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code>$1</code>');
-  const ps = s.split(/\n\n+/);
-  if (ps.length > 1) return ps.map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`).join('');
-  return `<p>${s.replace(/\n/g,'<br>')}</p>`;
+
+  // Protect math blocks from markdown processing (underscores, asterisks, etc.)
+  const mathBlocks = [];
+  let processed = text;
+  // Display math first ($$...$$), then inline ($...$)
+  processed = processed.replace(/\$\$([\s\S]+?)\$\$/g, (m) => { mathBlocks.push(m); return `\x00MATH${mathBlocks.length - 1}\x00`; });
+  processed = processed.replace(/\$([^\$\n]+?)\$/g, (m) => { mathBlocks.push(m); return `\x00MATH${mathBlocks.length - 1}\x00`; });
+
+  let html;
+  if (typeof marked !== 'undefined') {
+    html = marked.parse(processed, { breaks: true });
+  } else {
+    let s = processed.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    s = s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code>$1</code>');
+    const ps = s.split(/\n\n+/);
+    html = ps.length > 1 ? ps.map(p => `<p>${p.replace(/\n/g,'<br>')}</p>`).join('') : `<p>${s.replace(/\n/g,'<br>')}</p>`;
+  }
+
+  // Restore math blocks (may be inside <p>, <code>, etc. — KaTeX auto-render handles that)
+  mathBlocks.forEach((block, i) => { html = html.replace(`\x00MATH${i}\x00`, block); });
+  return html;
 }
 
 function makeTyping() {

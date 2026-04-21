@@ -366,6 +366,8 @@ html.light .inline-confirm{box-shadow:0 8px 28px rgba(0,0,0,.12)}
 .msg-bubble p{margin:0}.msg-bubble p+p{margin-top:9px}
 .msg-bubble strong{font-weight:600}.msg-bubble em{color:var(--text-muted)}
 .msg-bubble code{font-family:'SF Mono',Monaco,'Courier New',monospace;font-size:12px;background:rgba(59,39,120,.06);padding:1px 5px;border-radius:4px;}
+.msg-bubble .katex-display{margin:12px 0;overflow-x:auto;overflow-y:hidden}
+.msg-bubble .katex{font-size:1.05em}
 
 /* typing */
 .typing{display:flex;align-items:center;gap:5px;padding:13px 16px;background:var(--lumi-bg);border:1px solid var(--border);border-radius:var(--radius);border-bottom-left-radius:4px;width:fit-content;}
