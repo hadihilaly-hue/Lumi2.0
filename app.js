@@ -2777,8 +2777,9 @@ function wireVoiceListeners() {
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 function init() {
-  // Theme
-  if (localStorage.getItem('lumi_theme') === 'light') {
+  // Theme — default to light for users who haven't explicitly chosen dark
+  const savedTheme = localStorage.getItem('lumi_theme');
+  if (savedTheme !== 'dark') {
     document.documentElement.classList.add('light');
     themeToggle.checked = true;
   }
