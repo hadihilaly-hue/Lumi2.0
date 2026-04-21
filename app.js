@@ -441,6 +441,51 @@ function syncScheduleToSupabase(schedule) {
     schedule_updated_at: new Date().toISOString(),
   })
     .then(({ error }) => { if (error) console.warn('Schedule sync error:', error); });
+
+  // Upsert enrollment rows so teachers can see their roster and write per-student notes.
+  // Looks up teacher_profile IDs first — skips classes whose teacher hasn't onboarded yet.
+  // TODO: No cleanup for dropped classes — old enrollment rows persist. Handle before shipping.
+  syncEnrollments(schedule);
+}
+
+function syncEnrollments(schedule) {
+  if (!currentUser) return;
+  const pairs = schedule
+    .map(({ course, teacher }) => {
+      const email = TEACHER_EMAIL_MAP[teacher];
+      return email ? { email, course } : null;
+    })
+    .filter(Boolean);
+  if (!pairs.length) return;
+
+  const emails = [...new Set(pairs.map(p => p.email))];
+  sb.from('teacher_profiles')
+    .select('id, teacher_email, course_name')
+    .in('teacher_email', emails)
+    .then(({ data, error }) => {
+      if (error) { console.error('Enrollment sync failed: could not load teacher profiles:', error); return; }
+      // Build lookup: "email__course" → teacher_profile UUID
+      const lookup = {};
+      (data || []).forEach(p => { lookup[p.teacher_email + '__' + p.course_name] = p.id; });
+
+      const rows = pairs
+        .map(({ email, course }) => {
+          const profileId = lookup[email + '__' + course];
+          if (!profileId) return null;
+          return { student_id: currentUser.id, teacher_profile_id: profileId };
+        })
+        .filter(Boolean);
+      if (!rows.length) return;
+
+      sb.from('class_enrollments')
+        .upsert(rows, { onConflict: 'student_id,teacher_profile_id' })
+        .then(({ error: upsertErr }) => {
+          if (upsertErr) console.error('Enrollment sync failed: upsert error:', upsertErr);
+          else console.log('[enrollment] synced', rows.length, 'enrollment(s)');
+        })
+        .catch(err => console.error('Enrollment sync failed:', err));
+    })
+    .catch(err => console.error('Enrollment sync failed:', err));
 }
 
 // ─── CURRICULUM SEARCH ───────────────────────────────────────────────────────

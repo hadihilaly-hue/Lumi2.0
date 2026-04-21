@@ -47,6 +47,19 @@ gives direct answers, only guides reasoning.
 - RLS: teachers manage own rows (matched by auth email), all
   authenticated users can read (so student sessions can fetch profiles)
 
+### Class Enrollments (Supabase: class_enrollments table)
+- Tracks which students are in which classes, with per-student teacher notes
+- Lookup key: (student_id, teacher_profile_id) unique constraint
+- teacher_profile_id is a UUID FK to teacher_profiles(id)
+- teacher_notes: text, nullable — stores running teacher observations
+- Created automatically when a student syncs their schedule (upsert)
+- RLS: students read/insert own rows; teachers read/update rows for
+  their classes (via subquery on teacher_profiles.teacher_email)
+- **Known limitation:** No DELETE policy and no cleanup for dropped
+  classes. If a student removes a class from their schedule, the old
+  enrollment row persists and the teacher still sees that student on
+  their roster. Must be addressed before shipping to Menlo.
+
 ### Other Supabase Tables
 - **profiles** — student user profiles (id, name, grade, values_profile jsonb)
 - **conversations** — chat history (id, user_id, title, messages jsonb,
