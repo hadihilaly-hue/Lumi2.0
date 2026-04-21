@@ -9,8 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css?v=21">
 <script>
-  // Apply saved theme immediately to prevent flash of wrong theme
-  if (localStorage.getItem('lumi_theme') !== 'dark') document.documentElement.classList.add('light');
+  if (localStorage.getItem('lumi-theme') === 'dark') document.documentElement.classList.add('dark-mode');
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>

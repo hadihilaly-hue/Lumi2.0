@@ -2780,12 +2780,10 @@ function wireVoiceListeners() {
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 function init() {
-  // Theme — default to light for users who haven't explicitly chosen dark
-  const savedTheme = localStorage.getItem('lumi_theme');
-  if (savedTheme !== 'dark') {
-    document.documentElement.classList.add('light');
-    themeToggle.checked = true;
-  }
+  // Theme — sync checkbox to match the class that the <head> script may have applied
+  const isDark = document.documentElement.classList.contains('dark-mode');
+  themeToggle.checked = isDark;
+  console.log('[theme] init — saved:', localStorage.getItem('lumi-theme'), 'isDark:', isDark);
 
   // Onboarding + schedule setup
   // Gate on onboarding_complete so a Supabase-restored name doesn't skip the interview
@@ -2845,9 +2843,10 @@ function wireListeners() {
   $('settingsOverlay').addEventListener('click', closeSettings);
 
   themeToggle.addEventListener('change', () => {
-    const light = themeToggle.checked;
-    document.documentElement.classList.toggle('light', light);
-    localStorage.setItem('lumi_theme', light ? 'light' : 'dark');
+    const dark = themeToggle.checked;
+    document.documentElement.classList.toggle('dark-mode', dark);
+    localStorage.setItem('lumi-theme', dark ? 'dark' : 'light');
+    console.log('[theme] toggled — dark:', dark, 'classes:', document.documentElement.className);
   });
 
   $('updateScheduleBtn').addEventListener('click', () => {

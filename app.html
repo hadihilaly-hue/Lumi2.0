@@ -12,8 +12,8 @@
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
 <script>
-  // Apply saved theme immediately to prevent flash of wrong theme
-  if (localStorage.getItem('lumi_theme') !== 'dark') document.documentElement.classList.add('light');
+  // Apply saved theme before first paint to prevent flash
+  if (localStorage.getItem('lumi-theme') === 'dark') document.documentElement.classList.add('dark-mode');
 </script>
 </head>
 <body>
@@ -323,7 +323,7 @@
     <div class="settings-section">
       <div class="settings-section-title">Appearance</div>
       <div class="toggle-row">
-        <span class="toggle-label">Light mode</span>
+        <span class="toggle-label">Dark mode</span>
         <label class="toggle">
           <input type="checkbox" id="themeToggle">
           <div class="toggle-track"></div>
