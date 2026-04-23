@@ -49,16 +49,35 @@ gives direct answers, only guides reasoning.
 
 ### Class Enrollments (Supabase: class_enrollments table)
 - Tracks which students are in which classes, with per-student teacher notes
-- Lookup key: (student_id, teacher_profile_id) unique constraint
-- teacher_profile_id is a UUID FK to teacher_profiles(id)
-- teacher_notes: text, nullable — stores running teacher observations
-- Created automatically when a student syncs their schedule (upsert)
-- RLS: students read/insert own rows; teachers read/update rows for
-  their classes (via subquery on teacher_profiles.teacher_email)
+- Columns:
+  - id (uuid, PK)
+  - student_id (uuid, FK → auth.users)
+  - teacher_profile_id (uuid, FK → teacher_profiles.id)
+  - teacher_notes (text, nullable) — running teacher observations
+  - created_at, updated_at (timestamptz)
+- Unique constraint: (student_id, teacher_profile_id)
+- Classes are identified by teacher_profiles.id — there is no separate
+  classes table. teacher_profiles already has a unique (teacher_email,
+  course_name), so each row IS a class. If a dedicated classes table is
+  ever needed, that is its own refactor, not a drive-by.
+- RLS (4 policies):
+  - student_read_own (SELECT): auth.uid() = student_id
+  - student_insert_own (INSERT): auth.uid() = student_id — required so
+    the student-side upsert from syncEnrollments() can write
+  - teacher_read_class (SELECT): teacher owns the referenced
+    teacher_profiles row (matched by auth email)
+  - teacher_update_class (UPDATE): same ownership check — scoped to
+    teacher_notes edits
+- Enrollment rows are written by syncEnrollments() in app.js, called at
+  the end of syncScheduleToSupabase() after the student finalizes their
+  schedule. It looks up teacher_profiles by (teacher_email, course_name)
+  and only enrolls the student in classes where a matching
+  teacher_profiles row exists. Classes whose teacher hasn't onboarded
+  yet are skipped silently — no error, no user-visible warning.
 - **Known limitation:** No DELETE policy and no cleanup for dropped
   classes. If a student removes a class from their schedule, the old
   enrollment row persists and the teacher still sees that student on
-  their roster. Must be addressed before shipping to Menlo.
+  their roster. Needs handling before pitching to Menlo admin.
 
 ### Other Supabase Tables
 - **profiles** — student user profiles (id, name, grade, values_profile jsonb)
@@ -91,6 +110,25 @@ gives direct answers, only guides reasoning.
 - Fix: system prompt includes "Always complete your full response.
   If approaching length limits, wrap up your current point concisely
   rather than stopping mid-thought."
+
+---
+
+## Roadmap
+
+### Per-student teacher notes (4-commit sequence)
+- ✅ **Commit 1 — schema + enrollment.** class_enrollments table with
+  RLS; syncEnrollments() wired into the student schedule flow.
+- ⬜ **Commit 2 — teacher roster UI + per-student chat.** Teacher-side
+  view of enrolled students; click-through to an individual student's
+  conversation / notes editor.
+- ⬜ **Commit 3 — inject notes into Lumi system prompt.** At student
+  session start, read class_enrollments.teacher_notes for the current
+  (student, teacher_profile) pair and fold it into the system prompt
+  alongside the teacher profile.
+- ⬜ **Commit 4 — teacher-notes-influenced suggested prompts.** The
+  student-facing suggested-prompt generator takes the teacher's notes
+  into account (e.g. if notes say "struggles with proof structure",
+  prompts lean that direction).
 
 ---
 
