@@ -53,9 +53,20 @@ gives direct answers, only guides reasoning.
   - id (uuid, PK)
   - student_id (uuid, FK → auth.users)
   - teacher_profile_id (uuid, FK → teacher_profiles.id)
+  - block (text, nullable) — Menlo section letter A–G. CHECK constraint
+    `class_enrollments_block_check` enforces the range. Nullable only
+    exists so the column could be added before backfill; going forward
+    the UI requires a letter and syncEnrollments skips entries without
+    one.
   - teacher_notes (text, nullable) — running teacher observations
   - created_at, updated_at (timestamptz)
-- Unique constraint: (student_id, teacher_profile_id)
+- Unique constraint: (student_id, teacher_profile_id, block). Block is
+  part of identity because a future teacher roster needs to group
+  students by section, not just by course.
+- Menlo context: classes are scheduled in named blocks A–G (not period
+  numbers). A single teacher often teaches multiple blocks of the same
+  course with identical curriculum — the block letter only identifies
+  which students are in which section.
 - Classes are identified by teacher_profiles.id — there is no separate
   classes table. teacher_profiles already has a unique (teacher_email,
   course_name), so each row IS a class. If a dedicated classes table is
@@ -74,6 +85,16 @@ gives direct answers, only guides reasoning.
   and only enrolls the student in classes where a matching
   teacher_profiles row exists. Classes whose teacher hasn't onboarded
   yet are skipped silently — no error, no user-visible warning.
+  Entries missing a block are also skipped, with a console.warn (belt-
+  and-suspenders — the UI already requires a block per class). Upsert
+  payload is `{student_id, teacher_profile_id, block}`; onConflict
+  targets the 3-column unique constraint. teacher_notes is deliberately
+  NOT in the payload so per-student observations survive every re-sync.
+- Schedule wizard (app.html + `initScheduleSetup` in app.js) has a
+  dedicated block step between teacher selection and study-style: one
+  class at a time, 7 square A–G cards, auto-advance on click, required
+  for every class. The saved schedule entry shape is now
+  `{course, teacher, subject, block}`.
 - **Known limitation:** No DELETE policy and no cleanup for dropped
   classes. If a student removes a class from their schedule, the old
   enrollment row persists and the teacher still sees that student on
@@ -118,9 +139,15 @@ gives direct answers, only guides reasoning.
 ### Per-student teacher notes (4-commit sequence)
 - ✅ **Commit 1 — schema + enrollment.** class_enrollments table with
   RLS; syncEnrollments() wired into the student schedule flow.
-- ⬜ **Commit 2 — teacher roster UI + per-student chat.** Teacher-side
-  view of enrolled students; click-through to an individual student's
-  conversation / notes editor.
+- ✅ **Commit 2a — block column + student block picker.** Added
+  `block` (text, A–G via CHECK) to class_enrollments; unique
+  constraint swapped to (student_id, teacher_profile_id, block);
+  schedule wizard grew a dedicated block step; syncEnrollments now
+  includes block in the upsert payload and warns/skips entries
+  missing one.
+- ⬜ **Commit 2b — teacher roster UI + per-student chat.** Teacher-
+  side view of enrolled students grouped by block; click-through to
+  an individual student's conversation / notes editor.
 - ⬜ **Commit 3 — inject notes into Lumi system prompt.** At student
   session start, read class_enrollments.teacher_notes for the current
   (student, teacher_profile) pair and fold it into the system prompt
