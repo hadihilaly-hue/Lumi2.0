@@ -450,6 +450,7 @@ function syncScheduleToSupabase(schedule) {
 
 function syncEnrollments(schedule) {
   if (!currentUser) return;
+  const studentName = localStorage.getItem('lumi_name') || '';
   const pairs = schedule
     .map(({ course, teacher, block }) => {
       const email = TEACHER_EMAIL_MAP[teacher];
@@ -477,7 +478,7 @@ function syncEnrollments(schedule) {
         .map(({ email, course, block }) => {
           const profileId = lookup[email + '__' + course];
           if (!profileId) return null;
-          return { student_id: currentUser.id, teacher_profile_id: profileId, block };
+          return { student_id: currentUser.id, teacher_profile_id: profileId, block, student_name: studentName };
         })
         .filter(Boolean);
       if (!rows.length) return;
