@@ -765,6 +765,22 @@ body.signin-page{
   color:#fff;box-shadow:0 4px 16px var(--accent-glow);transform:translateY(-2px);
 }
 
+/* block cards (A–G section picker) */
+.sched-block-grid{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.sched-block-card{
+  flex:0 0 64px;width:64px;height:64px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--surface);border:1.5px solid var(--border);
+  border-radius:14px;cursor:pointer;
+  font-size:22px;font-weight:600;color:var(--text);
+  transition:all .2s ease;user-select:none;
+}
+.sched-block-card:hover{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);transform:translateY(-2px)}
+.sched-block-card.selected{
+  background:var(--accent);border-color:var(--accent);
+  color:#fff;box-shadow:0 4px 16px var(--accent-glow);transform:translateY(-2px);
+}
+
 /* confirm list */
 .sched-confirm-list{display:flex;flex-direction:column;gap:8px}
 .sched-confirm-item{

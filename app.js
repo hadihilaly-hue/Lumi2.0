@@ -451,9 +451,14 @@ function syncScheduleToSupabase(schedule) {
 function syncEnrollments(schedule) {
   if (!currentUser) return;
   const pairs = schedule
-    .map(({ course, teacher }) => {
+    .map(({ course, teacher, block }) => {
       const email = TEACHER_EMAIL_MAP[teacher];
-      return email ? { email, course } : null;
+      if (!email) return null;
+      if (!block) {
+        console.warn('[enrollment] skipping class without block:', course);
+        return null;
+      }
+      return { email, course, block };
     })
     .filter(Boolean);
   if (!pairs.length) return;
@@ -469,16 +474,16 @@ function syncEnrollments(schedule) {
       (data || []).forEach(p => { lookup[p.teacher_email + '__' + p.course_name] = p.id; });
 
       const rows = pairs
-        .map(({ email, course }) => {
+        .map(({ email, course, block }) => {
           const profileId = lookup[email + '__' + course];
           if (!profileId) return null;
-          return { student_id: currentUser.id, teacher_profile_id: profileId };
+          return { student_id: currentUser.id, teacher_profile_id: profileId, block };
         })
         .filter(Boolean);
       if (!rows.length) return;
 
       sb.from('class_enrollments')
-        .upsert(rows, { onConflict: 'student_id,teacher_profile_id' })
+        .upsert(rows, { onConflict: 'student_id,teacher_profile_id,block' })
         .then(({ error: upsertErr }) => {
           if (upsertErr) console.error('Enrollment sync failed: upsert error:', upsertErr);
           else console.log('[enrollment] synced', rows.length, 'enrollment(s)');
@@ -1877,11 +1882,16 @@ function initScheduleSetup(onDone, prefill = []) {
   let chosenGrade       = localStorage.getItem('lumi_grade') || null;
   const selectedClasses = new Set(prefill.map(p => p.course));
   const teacherChoices  = {};
-  prefill.forEach(p => { teacherChoices[p.course] = p.teacher; });
+  const blockChoices    = {};
+  prefill.forEach(p => {
+    teacherChoices[p.course] = p.teacher;
+    if (p.block) blockChoices[p.course] = p.block;
+  });
   let teacherIdx = 0;
+  let blockIdx = 0;
 
-  // Steps: 0=grade, 1=classes, 2=teachers, 3=study-style, 4=confirm
-  const stepEls = [$('ssStep1'), $('ssStep2'), $('ssStep3'), $('ssStep4'), $('ssStep5')];
+  // Steps: 0=grade, 1=classes, 2=teachers, 3=block, 4=study-style, 5=confirm
+  const stepEls = [$('ssStep1'), $('ssStep2'), $('ssStep3'), $('ssStepBlock'), $('ssStep4'), $('ssStep5')];
 
   function setStep(n) {
     stepEls.forEach((s, i) => s.classList.toggle('active', i === n));
@@ -1906,7 +1916,7 @@ function initScheduleSetup(onDone, prefill = []) {
       // Remove any previously selected classes that aren't in new grade
       const allowed = getCoursesForGrade(chosenGrade);
       const allAllowed = Object.values(allowed).flatMap(c => Object.keys(c));
-      [...selectedClasses].forEach(c => { if (!allAllowed.includes(c)) { selectedClasses.delete(c); delete teacherChoices[c]; } });
+      [...selectedClasses].forEach(c => { if (!allAllowed.includes(c)) { selectedClasses.delete(c); delete teacherChoices[c]; delete blockChoices[c]; } });
       // Auto-advance after brief highlight
       setTimeout(() => { buildClassGrid(''); setStep(1); }, 180);
     });
@@ -1921,6 +1931,7 @@ function initScheduleSetup(onDone, prefill = []) {
       if (selectedClasses.has(course)) {
         selectedClasses.delete(course);
         delete teacherChoices[course];
+        delete blockChoices[course];
         pill.classList.remove('selected');
       } else {
         selectedClasses.add(course);
@@ -2047,7 +2058,8 @@ function initScheduleSetup(onDone, prefill = []) {
   function showTeacherStep() {
     const arr = getSelectedArray();
     if (teacherIdx >= arr.length) {
-      showStyleStep();
+      blockIdx = 0;
+      showBlockStep();
       setStep(3);
       return;
     }
@@ -2096,12 +2108,55 @@ function initScheduleSetup(onDone, prefill = []) {
     }
   });
 
-  // ── Step 4: Confirm ───────────────────────────────────────────────────────
+  // ── Step 4: Block (A–G section) ───────────────────────────────────────────
+  function showBlockStep() {
+    const arr = getSelectedArray();
+    if (blockIdx >= arr.length) {
+      showStyleStep();
+      setStep(4);
+      return;
+    }
+    const course = arr[blockIdx];
+    const teacher = teacherChoices[course] || '';
+    $('ssBlockProg').textContent = `${course} — ${blockIdx + 1} of ${arr.length} classes`;
+    $('ssBlockCourseName').textContent = course;
+    $('ssBlockTeacherName').textContent = teacher.split(' ').slice(-1)[0];
+
+    const grid = $('ssBlockGrid');
+    grid.innerHTML = '';
+    ['A','B','C','D','E','F','G'].forEach(letter => {
+      const card = document.createElement('div');
+      card.className = 'sched-block-card' + (blockChoices[course] === letter ? ' selected' : '');
+      card.textContent = letter;
+      card.addEventListener('click', () => {
+        grid.querySelectorAll('.sched-block-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        blockChoices[course] = letter;
+        setTimeout(() => { blockIdx++; showBlockStep(); }, 200);
+      });
+      grid.appendChild(card);
+    });
+  }
+
+  $('ssStepBlockBack').addEventListener('click', () => {
+    if (blockIdx === 0) {
+      teacherIdx = Math.max(0, getSelectedArray().length - 1);
+      showTeacherStep();
+      setStep(2);
+    } else {
+      blockIdx--;
+      showBlockStep();
+    }
+  });
+
+  // ── Step 5: Confirm ───────────────────────────────────────────────────────
   function buildConfirmList() {
     const list = $('ssConfirmList');
     list.innerHTML = '';
     getSelectedArray().forEach(course => {
       const teacher = teacherChoices[course] || '—';
+      const block = blockChoices[course] || '';
+      const lastName = teacher.split(' ').slice(-1)[0];
       const item = document.createElement('div');
       item.className = 'sched-confirm-item';
       const c = document.createElement('span');
@@ -2109,7 +2164,7 @@ function initScheduleSetup(onDone, prefill = []) {
       c.textContent = course;
       const t = document.createElement('span');
       t.className = 'sched-confirm-teacher';
-      t.textContent = teacher.split(' ').slice(-1)[0]; // last name
+      t.textContent = block ? `${lastName} · ${block}` : lastName;
       item.appendChild(c);
       item.appendChild(t);
       list.appendChild(item);
@@ -2117,9 +2172,9 @@ function initScheduleSetup(onDone, prefill = []) {
   }
 
   $('ssStep4Back').addEventListener('click', () => {
-    teacherIdx = Math.max(0, getSelectedArray().length - 1);
-    showTeacherStep();
-    setStep(2);
+    blockIdx = Math.max(0, getSelectedArray().length - 1);
+    showBlockStep();
+    setStep(3);
   });
 
   // ── Step 4: Study Style ──────────────────────────────────
@@ -2176,18 +2231,23 @@ function initScheduleSetup(onDone, prefill = []) {
 
   $('ssStep4Next').addEventListener('click', () => {
     buildConfirmList();
-    setStep(4);
+    setStep(5);
   });
 
   $('ssStep5Back').addEventListener('click', () => {
-    setStep(3);
+    setStep(4);
   });
 
   $('ssStep5Done').addEventListener('click', () => {
     const schedule = getSelectedArray().map(course => {
       const subject = Object.entries(MENLO_CURRICULUM)
         .find(([, courses]) => courses[course])?.[0] || '';
-      return { course, teacher: teacherChoices[course] || '', subject };
+      return {
+        course,
+        teacher: teacherChoices[course] || '',
+        subject,
+        block: blockChoices[course] || '',
+      };
     });
     saveScheduleLocal(schedule);
     if (chosenGrade) localStorage.setItem('lumi_grade', chosenGrade);
