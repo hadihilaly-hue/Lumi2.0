@@ -128,10 +128,9 @@ function selectRole(role) {
     try {
       const base       = window.location.href.replace(/\/[^/]*$/, '/');
       const redirectTo = base + (selectedRole === 'teacher' ? 'teacher.html' : 'app.html');
-      // TEMPORARY: testing bypass — REMOVE BEFORE PRODUCTION (was options: { redirectTo, queryParams: { hd: 'menloschool.org' } })
       const { error }  = await sb.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo },
+        options: { redirectTo, queryParams: { hd: 'menloschool.org' } },
       });
       if (error) throw error;
     } catch (err) {

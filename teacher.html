@@ -902,7 +902,8 @@ const MENLO_CURRICULUM = {
     "Sultans, Shahs, and Sovereigns": ["Sabahat Adil"],
     "Humanities I: Renaissances": ["Rebecca Gertmenian"],
     "Humanities II: Self-Portraits": ["Rebecca Gertmenian"],
-    "IP Capstone Seminar (H)": ["Peter Brown","Matthew Nelson"]
+    "IP Capstone Seminar (H)": ["Peter Brown","Matthew Nelson"],
+    "Democratic Backsliding (Test Course)": ["Test Teacher"]
   },
   "Math": {
     "Integrated Geometry & Algebra": ["Christine Walters"],
@@ -973,10 +974,6 @@ const MENLO_CURRICULUM = {
     "Latin 3": ["Jennifer Jordt"],
     "Latin 4": ["Jennifer Jordt"],
     "Advanced Latin (H)": ["Tom Garvey","Jennifer Jordt"]
-  },
-  // TEMPORARY: testing — REMOVE BEFORE PRODUCTION
-  "Testing": {
-    "Test Class": ["Test Teacher"]
   }
 };
 
@@ -1047,8 +1044,7 @@ const TEACHER_EMAIL_MAP = {
   "Mingjung Chen": "mchen@menloschool.org",
   "Jennifer Jordt": "jjordt@menloschool.org",
   "Richard Harris": "rharris@menloschool.org",
-  // TEMPORARY: testing — REMOVE BEFORE PRODUCTION
-  "Test Teacher": "hadi@hilaly.com",
+  "Test Teacher": "hadi.hilaly@menloschool.org",
 };
 
 // Build TEACHER_DATABASE keyed by email
@@ -1133,10 +1129,9 @@ function wireSigninBtn() {
     try {
       const base = window.location.href.replace(/\/[^/]*$/, '/');
       const redirectTo = base + 'teacher.html';
-      // TEMPORARY: testing bypass — REMOVE BEFORE PRODUCTION (was options: { redirectTo, queryParams: { hd: 'menloschool.org' } })
       const { error } = await sb.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo },
+        options: { redirectTo, queryParams: { hd: 'menloschool.org' } },
       });
       if (error) throw error;
     } catch (err) {
