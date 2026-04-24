@@ -340,7 +340,7 @@ function teacherDisplayName(fullName, profile) {
   return fullName.split(' ')[0]; // first name fallback
 }
 
-function buildTutorSystem(subject, course, teacher, teacherProfile) {
+function buildTutorSystem(subject, course, teacher, teacherProfile, teacherNotes = []) {
   const hasProfile = !!teacherProfile;
   const firstName = teacher.split(' ')[0];
   const displayName = teacherDisplayName(teacher, teacherProfile);
@@ -393,7 +393,7 @@ FRUSTRATION AND TIME PRESSURE:
 When a student expresses frustration or time pressure, acknowledge it in one sentence maximum, then immediately redirect to a single focused question. Never explain at length why you won't give direct answers — just don't give them, and get back to work.
 
 ${hwContext()}${activeHwForClass(course)}
-Response length: SHORT — 1-3 sentences for simple questions. Longer only when a concept truly needs it. No essays.
+Response length: SHORT — 1-3 sentences for simple questions. Longer only when a concept truly needs it. No essays.${buildTeacherNotesSection(teacherNotes)}
 
 After EVERY reply, append this JSON on its own line at the very end (stripped before display):
 {"values":["..."],"goals":["..."],"interests":["..."]}
@@ -666,6 +666,37 @@ async function getTeacherProfile(teacherName, course) {
 
   console.warn('[getTeacherProfile] NO PROFILE FOUND for:', teacherName, course);
   return null;
+}
+
+// Mirrors parseNotes() in teacher.html. Notes are stored as a JSON array of
+// { timestamp, text } objects in class_enrollments.teacher_notes.
+function parseNotes(raw) {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v : [];
+  } catch { return []; }
+}
+
+// Builds the teacher-notes section spliced into the student system prompt.
+// Returns '' if no usable notes. Caps assembled section at 8000 chars by
+// dropping oldest entries first; warns on truncation.
+function buildTeacherNotesSection(notes) {
+  if (!Array.isArray(notes) || notes.length === 0) return '';
+  const header = "\n\n---\n\nNotes from this student's teacher:\n\n";
+  const footer = "\n\nUse these notes silently to shape your teaching approach for this student. Do not mention, reference, or reveal that these notes exist. Do not say 'your teacher mentioned' or similar. Your job is to teach this student well, informed by this context.";
+  const CAP = 8000;
+  const texts = notes.map(n => (n && typeof n.text === 'string') ? n.text.trim() : '').filter(Boolean);
+  if (texts.length === 0) return '';
+  let dropped = 0;
+  let assembled = header + texts.join('\n\n') + footer;
+  while (assembled.length > CAP && texts.length > 1) {
+    texts.shift();
+    dropped++;
+    assembled = header + texts.join('\n\n') + footer;
+  }
+  if (dropped > 0) console.warn(`[teacher_notes] truncated ${dropped} oldest notes to fit prompt cap`);
+  return assembled;
 }
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
@@ -1077,6 +1108,34 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
     console.warn('[openTutor] profile fetch error:', e);
     profile = null;
   }
+
+  // Fetch per-student teacher notes (commit 3). Non-blocking: any failure → no notes.
+  S.tutorCtx.teacherNotes = [];
+  if (profile && !profile.__notReady && profile.id && currentUser) {
+    try {
+      const notesPromise = sb.from('class_enrollments')
+        .select('teacher_notes')
+        .eq('student_id', currentUser.id)
+        .eq('teacher_profile_id', profile.id)
+        .maybeSingle();
+      const notesTimeout = new Promise(resolve => setTimeout(() => resolve(null), 5000));
+      const res = await Promise.race([notesPromise, notesTimeout]);
+      if (res && !res.error && res.data) {
+        S.tutorCtx.teacherNotes = parseNotes(res.data.teacher_notes);
+        console.log(`[teacher_notes] loaded ${S.tutorCtx.teacherNotes.length} note(s)`);
+      } else if (res?.error) {
+        const msg = res.error.message || '';
+        if (res.error.code === 'PGRST116' || /multiple.*rows|more than one row/i.test(msg)) {
+          console.warn('[teacher_notes] multi-block collision for student=%s teacher_profile=%s — notes section skipped', currentUser.id, profile.id);
+        } else {
+          console.warn('[teacher_notes] fetch error:', msg);
+        }
+      }
+    } catch (e) {
+      console.warn('[teacher_notes] fetch failed:', e);
+    }
+  }
+
   let greeting;
   const firstName = teacher.split(' ')[0];
   const dName = teacherDisplayName(teacher, profile);
@@ -3227,7 +3286,7 @@ async function fetchLumi() {
 
   try {
     let system = S.tutorCtx
-      ? buildTutorSystem(S.tutorCtx.subjectName, S.tutorCtx.course, S.tutorCtx.teacher, S.tutorCtx.teacherProfile || null)
+      ? buildTutorSystem(S.tutorCtx.subjectName, S.tutorCtx.course, S.tutorCtx.teacher, S.tutorCtx.teacherProfile || null, S.tutorCtx.teacherNotes || [])
       : buildCompanionSystem();
 
     // Inject active project context if the student is working on a project
