@@ -40,10 +40,12 @@ gives direct answers, only guides reasoning.
 ### Teacher Profile Object (stored in Supabase: teacher_profiles table)
 - Lookup key: teacher_email + class_name (unique constraint on combo)
 - Same teacher can have multiple rows, one per class they teach
-- Fields: teacher_email, class_name, subject, done, teaching_style,
+- Fields: teacher_email, class_name, subject, title (honorific — Mr./
+  Mrs./Ms./Mx./Dr., written by the onboarding wizard; added in
+  20250420_teacher_title.sql, do not re-add), done, teaching_style,
   excellence_criteria, grading_philosophy, common_mistakes (jsonb),
-  explanation_methods, key_values, class_specific_notes, teacher_voice,
-  messages_json (jsonb), created_at, updated_at
+  explanation_methods, key_values, class_specific_notes,
+  teacher_voice, messages_json (jsonb), created_at, updated_at
 - RLS: teachers manage own rows (matched by auth email), all
   authenticated users can read (so student sessions can fetch profiles)
 
@@ -71,14 +73,26 @@ gives direct answers, only guides reasoning.
   classes table. teacher_profiles already has a unique (teacher_email,
   course_name), so each row IS a class. If a dedicated classes table is
   ever needed, that is its own refactor, not a drive-by.
-- RLS (4 policies):
+- RLS (5 policies):
   - student_read_own (SELECT): auth.uid() = student_id
   - student_insert_own (INSERT): auth.uid() = student_id — required so
     the student-side upsert from syncEnrollments() can write
+  - student_update_own (UPDATE): auth.uid() = student_id — required
+    because syncEnrollments() upserts on the (student_id,
+    teacher_profile_id, block) unique constraint; re-saving a schedule
+    converts the conflicting insert into an UPDATE, which fails with
+    403 without this policy. Broad on purpose; teacher_notes is
+    guarded by a trigger, not by narrowing this policy.
   - teacher_read_class (SELECT): teacher owns the referenced
     teacher_profiles row (matched by auth email)
   - teacher_update_class (UPDATE): same ownership check — scoped to
     teacher_notes edits
+- Trigger: `protect_teacher_notes_trigger` (BEFORE UPDATE) rejects any
+  update that changes teacher_notes unless the caller's email matches
+  the teacher_profiles.teacher_email for the linked class. This is the
+  surgical guard that keeps student_update_own from becoming a write
+  path into teacher_notes. Defined in
+  20260424_student_update_policy_and_notes_protection.sql.
 - Enrollment rows are written by syncEnrollments() in app.js, called at
   the end of syncScheduleToSupabase() after the student finalizes their
   schedule. It looks up teacher_profiles by (teacher_email, course_name)
@@ -171,6 +185,27 @@ gives direct answers, only guides reasoning.
 - Do not silently fall back to generic tutor behavior when no profile exists
 - Do not rebuild the system prompt mid-conversation
 - Do not ask teachers administrative questions during onboarding
+
+---
+
+## Learnings
+- **Manual SQL hacks during testing must be captured as migrations
+  before committing the feature.** Commit 2b testing hit two schema
+  gaps that were patched directly against the deployed Supabase to
+  unblock work:
+  - **teacher_profiles.title** — the migration file already existed
+    (20250420_teacher_title.sql) but had never been applied to the
+    deployed project, so onboarding failed with "Could not find the
+    'title' column". Applied by hand. No new migration was needed;
+    the fix was just running the existing one.
+  - **class_enrollments student_update_own policy +
+    protect_teacher_notes trigger** — these had no migration file at
+    all. Applied by hand, then back-ported as
+    20260424_student_update_policy_and_notes_protection.sql.
+  Rule: if you run ad-hoc SQL against the deployed DB, either confirm
+  an existing migration covers it (and apply that migration) or write
+  a new migration in the same session. Do not ship the feature commit
+  until the migrations directory matches what's deployed.
 
 ---
 
