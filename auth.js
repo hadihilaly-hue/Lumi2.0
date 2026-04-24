@@ -8,8 +8,11 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
+// TEMPORARY: testing bypass for hadi@hilaly.com — REMOVE BEFORE PRODUCTION
 function isMenloEmail(email) {
-  return email && email.toLowerCase().endsWith('@menloschool.org');
+  if (!email) return false;
+  const e = email.toLowerCase();
+  return e.endsWith('@menloschool.org') || e === 'hadi@hilaly.com';
 }
 
 async function doSignOut() {

@@ -209,6 +209,10 @@ const MENLO_CURRICULUM = {
     "Latin 3": ["Jennifer Jordt"],
     "Latin 4": ["Jennifer Jordt"],
     "Advanced Latin (H)": ["Tom Garvey","Jennifer Jordt"]
+  },
+  // TEMPORARY: testing — REMOVE BEFORE PRODUCTION
+  "Testing": {
+    "Test Class": ["Test Teacher"]
   }
 };
 
@@ -219,7 +223,9 @@ const SUBJECT_IDS = {
   "Computer Science": "cs",
   "Science": "science",
   "Applied Science & Engineering": "applied",
-  "World Language": "language"
+  "World Language": "language",
+  // TEMPORARY: testing — REMOVE BEFORE PRODUCTION
+  "Testing": "testing"
 };
 const SUBJECTS = Object.entries(MENLO_CURRICULUM).map(([name, courses]) => ({
   id: SUBJECT_IDS[name] || name.toLowerCase().replace(/\s+/g,'-'),
@@ -587,7 +593,8 @@ const TEACHER_EMAIL_MAP = {
   "Mingjung Chen":          "mchen@menloschool.org",
   "Jennifer Jordt":         "jjordt@menloschool.org",
   "Richard Harris":         "rharris@menloschool.org",
-  "Test Teacher":            "hadi.hilaly@menloschool.org",
+  // TEMPORARY: testing — REMOVE BEFORE PRODUCTION
+  "Test Teacher":           "hadi@hilaly.com",
 };
 
 // ── Teacher profile system — single source of truth: Supabase ──
