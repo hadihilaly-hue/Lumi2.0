@@ -130,6 +130,47 @@ gives direct answers, only guides reasoning.
 - If no profile found: show student "This teacher hasn't set up their
   Lumi profile yet" — NEVER silently fall back to generic behavior
 
+### Per-student teacher notes injection (commit 3)
+- `buildTutorSystem(subject, course, teacher, teacherProfile,
+  teacherNotes = [])` in app.js takes notes as a 5th parameter
+  (defaults to `[]`). On the profile branch, the assembled notes
+  section is spliced between the "Response length: SHORT" line and
+  the "After EVERY reply, append this JSON" rule — `${buildTeacher
+  NotesSection(teacherNotes)}` is concatenated to the SHORT line so
+  it lands inside the prompt body, not after the JSON instruction.
+- The no-profile fallback branch is unchanged: notes are not queried
+  and not injected when there is no teacher_profile_id. There is
+  nowhere to scope a class_enrollments lookup without a profile.id.
+- `finishOpenTutor()` in app.js fetches teacher_notes from
+  class_enrollments scoped to (currentUser.id, profile.id) using
+  `.maybeSingle()`, wrapped in `Promise.race` against a 5s timeout
+  so the chat open never hangs on a slow query. Result is stored on
+  `S.tutorCtx.teacherNotes` and read by buildTutorSystem when the
+  prompt is built.
+- All failure modes silently produce no notes section: timeout
+  (resolves to null), generic error, and the multi-block collision
+  case where a student is enrolled in two blocks of the same class
+  (Supabase returns PGRST116 / "multiple rows"). Each path leaves
+  `S.tutorCtx.teacherNotes = []` and logs a console.warn for
+  developers; the student sees no error.
+- Helpers (both in app.js):
+  - `parseNotes(raw)` — graceful JSON parse; returns `[]` on null
+    or malformed input. Mirrors the parseNotes() in teacher.html
+    intentionally — the read side and write side must agree on the
+    `[{ timestamp, text }, ...]` shape.
+  - `buildTeacherNotesSection(notes)` — assembles header + joined
+    note texts + footer. Caps the assembled section at 8000 chars
+    by dropping oldest entries first (`texts.shift()` in a loop)
+    and emits `console.warn` reporting the dropped count when
+    truncation occurs.
+- The footer of the notes section explicitly instructs Lumi to use
+  the notes silently and never reference them to the student: "Use
+  these notes silently to shape your teaching approach for this
+  student. Do not mention, reference, or reveal that these notes
+  exist." This is part of the prompt, not a code-level guardrail —
+  if a future edit weakens or removes it, Lumi may start leaking
+  notes back to students.
+
 ---
 
 ## Known Bugs (track status here)
@@ -159,17 +200,48 @@ gives direct answers, only guides reasoning.
   schedule wizard grew a dedicated block step; syncEnrollments now
   includes block in the upsert payload and warns/skips entries
   missing one.
-- ⬜ **Commit 2b — teacher roster UI + per-student chat.** Teacher-
+- ✅ **Commit 2b — teacher roster UI + per-student chat.** Teacher-
   side view of enrolled students grouped by block; click-through to
   an individual student's conversation / notes editor.
-- ⬜ **Commit 3 — inject notes into Lumi system prompt.** At student
+- ✅ **Commit 3 — inject notes into Lumi system prompt.** At student
   session start, read class_enrollments.teacher_notes for the current
   (student, teacher_profile) pair and fold it into the system prompt
-  alongside the teacher profile.
+  alongside the teacher profile. See "Per-student teacher notes
+  injection" under System Prompt Architecture for the splice point,
+  failure modes, helpers, and silent-use instruction.
 - ⬜ **Commit 4 — teacher-notes-influenced suggested prompts.** The
   student-facing suggested-prompt generator takes the teacher's notes
   into account (e.g. if notes say "struggles with proof structure",
   prompts lean that direction).
+
+### Roadmap: Post-commit-4 feature ideas
+
+> These features emerged during commit 3 design discussions. They are
+> deliberately deferred until commits 3 and 4 are complete and Mr.
+> Harris (or other real teachers) have tested the base feature. Real
+> user signal should validate (or kill) these before we invest in
+> building them.
+
+1. **Student-facing reflection tool.** Students can ask Lumi "what
+   have I been struggling with?" or "what should I review for finals?"
+   Lumi summarizes based on their conversation history and
+   teacher_notes. Useful for self-directed study and finals prep.
+   Open questions: how far back does Lumi look? do teachers see this
+   too?
+
+2. **Teacher-facing class-level analytics.** Teachers open a class/
+   block-level chat (not per-student) and ask aggregate questions,
+   e.g. "What are Block B students struggling with this week?" Lumi
+   reads across all enrollment rows for that block plus their linked
+   conversation histories. Requires new RLS thinking: teachers
+   reading aggregate data across students. Requires new data capture:
+   tagging student chat interactions with topics/concepts.
+
+3. **Pattern detection in student help requests.** Teachers see what
+   topics students are most commonly asking Lumi for help with —
+   could surface as "3 students asked about factoring this week —
+   maybe reteach?" Requires: student conversation classification,
+   aggregation across blocks, a dashboard UI for teachers.
 
 ---
 
@@ -206,6 +278,28 @@ gives direct answers, only guides reasoning.
   an existing migration covers it (and apply that migration) or write
   a new migration in the same session. Do not ship the feature commit
   until the migrations directory matches what's deployed.
+
+- **Seeding teacher_notes for read-side testing requires bypassing
+  the protect_teacher_notes trigger.** When testing commit 3, you
+  cannot just `UPDATE class_enrollments SET teacher_notes = '...'`
+  from the Supabase SQL Editor as the postgres role —
+  protect_teacher_notes_trigger correctly rejects any UPDATE that
+  changes teacher_notes unless the caller's email matches the
+  linked teacher_profiles.teacher_email. The postgres role has no
+  matching email, so the seed update fails. This is the trigger
+  doing its job, not a bug. Workaround: wrap the seed in a single
+  SQL block that disables the trigger, runs the update, and
+  re-enables it:
+
+  ```sql
+  ALTER TABLE class_enrollments DISABLE TRIGGER protect_teacher_notes_trigger;
+  UPDATE class_enrollments SET teacher_notes = '...' WHERE id = '...';
+  ALTER TABLE class_enrollments ENABLE TRIGGER protect_teacher_notes_trigger;
+  ```
+
+  Always re-enable inside the same block — running the lines
+  separately leaves a window where the table is unprotected, and a
+  failed UPDATE in the middle would leave the trigger off entirely.
 
 ---
 
