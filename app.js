@@ -644,7 +644,28 @@ async function getTeacherProfile(teacherName, course) {
       const { data, error } = result;
       if (!error && data) {
         console.log('[getTeacherProfile] Supabase hit, done:', data.done);
-        _profileCache[cacheKey] = data; // update cache
+        // Q4: fetch teacher_work_samples rows for this profile (3s budget,
+        // never blocks profile usage). Stored as data.workSamples keyed by
+        // tier — descriptions live here, images are loaded separately by
+        // loadWorkSampleImages() at chat-open time.
+        data.workSamples = {};
+        if (data.id) {
+          try {
+            const sQuery = sb.from('teacher_work_samples')
+              .select('*')
+              .eq('teacher_profile_id', data.id);
+            const sTimeout = new Promise(resolve => setTimeout(() => resolve(null), 3000));
+            const sRes = await Promise.race([sQuery, sTimeout]);
+            if (sRes && !sRes.error && Array.isArray(sRes.data)) {
+              sRes.data.forEach(r => { data.workSamples[r.tier] = r; });
+            } else if (sRes?.error) {
+              console.warn('[getTeacherProfile] work_samples error:', sRes.error.message);
+            }
+          } catch (e) {
+            console.warn('[getTeacherProfile] work_samples fetch failed:', e);
+          }
+        }
+        _profileCache[cacheKey] = data; // update cache (incl. workSamples)
         if (!data.done) return { __notReady: true };
         return data;
       }
@@ -697,6 +718,81 @@ function buildTeacherNotesSection(notes) {
   }
   if (dropped > 0) console.warn(`[teacher_notes] truncated ${dropped} oldest notes to fit prompt cap`);
   return assembled;
+}
+
+// ─── WORK SAMPLES (Q4) ───────────────────────────────────────────────────────
+// Reads profile.workSamples (raw rows from teacher_work_samples), generates
+// signed URLs in one batch, fetches each image as base64. Returns a
+// consolidated `{ tier: { description, images: [{base64, mediaType}] } }`
+// shape ready for buildTutorSystem and buildApiMessages.
+//
+// Returns null on ANY shortfall — missing tier, no photos, no description,
+// signed-URL failure, fetch failure. The "all 3 tiers required" gate. Both
+// gates downstream check this same single return value.
+async function loadWorkSampleImages(profile) {
+  const ws = profile && profile.workSamples;
+  const tiers = ['progressing','proficient','exemplary'];
+  if (!ws) return null;
+  for (const tier of tiers) {
+    const row = ws[tier];
+    if (!row || !Array.isArray(row.photo_paths) || row.photo_paths.length === 0) return null;
+    if (!(row.description || '').trim()) return null;
+  }
+
+  const allPaths = tiers.flatMap(tier => ws[tier].photo_paths.map(path => ({ tier, path })));
+
+  let signedRes;
+  try {
+    signedRes = await sb.storage.from('work-samples')
+      .createSignedUrls(allPaths.map(p => p.path), 3600);
+  } catch (e) {
+    console.warn('[work_samples] signed URL batch threw:', e);
+    return null;
+  }
+  if (!signedRes || signedRes.error || !Array.isArray(signedRes.data)) {
+    console.warn('[work_samples] signed URL error:', signedRes && signedRes.error);
+    return null;
+  }
+
+  let imageBlobs;
+  try {
+    imageBlobs = await Promise.all(signedRes.data.map(async (entry, i) => {
+      const meta = allPaths[i];
+      if (!entry || !entry.signedUrl) throw new Error('missing signed URL for ' + (meta && meta.path));
+      const res = await fetch(entry.signedUrl);
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + meta.path);
+      const blob = await res.blob();
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const r = reader.result || '';
+          const idx = r.indexOf(',');
+          resolve(idx >= 0 ? r.slice(idx + 1) : r);
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
+      let mediaType = blob.type;
+      if (!/^image\/(jpeg|png|webp|gif)$/i.test(mediaType)) {
+        const ext = (meta.path.split('.').pop() || '').toLowerCase();
+        mediaType = ext === 'png' ? 'image/png'
+                  : ext === 'webp' ? 'image/webp'
+                  : 'image/jpeg';
+      }
+      return { tier: meta.tier, base64, mediaType };
+    }));
+  } catch (e) {
+    console.warn('[work_samples] image fetch failed:', e);
+    return null;
+  }
+
+  const result = {};
+  tiers.forEach(tier => { result[tier] = { description: ws[tier].description.trim(), images: [] }; });
+  imageBlobs.forEach(item => { result[item.tier].images.push({ base64: item.base64, mediaType: item.mediaType }); });
+
+  // Final integrity: every tier must have at least one image now.
+  if (tiers.some(tier => result[tier].images.length === 0)) return null;
+  return result;
 }
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
@@ -1133,6 +1229,25 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
       }
     } catch (e) {
       console.warn('[teacher_notes] fetch failed:', e);
+    }
+  }
+
+  // Q4: load graded work-sample images. Single-source-of-truth gate —
+  // partial states resolve to null; both buildTutorSystem and
+  // buildApiMessages key off this object. Wrapped against an 8s timeout
+  // (heavier than notes' 5s because of multiple image fetches).
+  S.tutorCtx.workSamples = null;
+  if (profile && !profile.__notReady && profile.workSamples) {
+    const wsStart = Date.now();
+    try {
+      const wsPromise = loadWorkSampleImages(profile);
+      const wsTimeout = new Promise(resolve => setTimeout(() => resolve(null), 8000));
+      S.tutorCtx.workSamples = await Promise.race([wsPromise, wsTimeout]);
+      const ms = Date.now() - wsStart;
+      console.log(`[work_samples] loaded in ${ms}ms; mode=${S.tutorCtx.workSamples ? 'with' : 'without'} samples`);
+    } catch (e) {
+      console.warn('[work_samples] load failed:', e);
+      S.tutorCtx.workSamples = null;
     }
   }
 
