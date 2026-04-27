@@ -12,6 +12,7 @@
   if (localStorage.getItem('lumi-theme') === 'dark') document.documentElement.classList.add('dark-mode');
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js" defer></script>
 <style>
 /* ─── TEACHER PORTAL OVERRIDES ─────────────────────────────── */
 body { overflow: auto; display: block; }
@@ -327,6 +328,74 @@ body { overflow: auto; display: block; }
 .syllabus-upload-area.has-file .syllabus-file-name { display: block; }
 #syllabusFileInput { display: none; }
 
+/* ─── WORK SAMPLES (Q4) ────────────────────────────────────── */
+.wizard-ferpa-callout {
+  background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.3);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 24px;
+  font-size: 13px; color: var(--text); line-height: 1.55;
+}
+.wizard-subhead {
+  font-size: 14px; color: var(--text-muted); line-height: 1.6;
+  margin-bottom: 24px;
+}
+.tier-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 18px; margin-bottom: 16px;
+}
+.tier-card.invalid { border-color: rgba(239,68,68,.4); }
+.tier-heading {
+  font-size: 15px; font-weight: 600; margin-bottom: 4px;
+}
+.tier-desc {
+  font-size: 12px; color: var(--text-muted); margin-bottom: 14px;
+}
+.tier-thumbs {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
+  min-height: 0;
+}
+.tier-thumbs:empty { margin-bottom: 0; }
+.tier-thumb {
+  position: relative; width: 80px; height: 80px;
+  border-radius: 8px; overflow: hidden; border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.tier-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tier-thumb .tier-thumb-x {
+  position: absolute; top: 4px; right: 4px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(0,0,0,.7); color: #fff; border: none;
+  font-size: 14px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.tier-thumb .tier-thumb-x:hover { background: #ef4444; }
+.tier-add-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; font-size: 13px; color: var(--text-muted);
+  cursor: pointer; font-family: inherit; transition: all .15s;
+  margin-bottom: 12px;
+}
+.tier-add-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.tier-add-btn:disabled { opacity: .4; cursor: not-allowed; }
+.tier-add-count {
+  font-size: 11px; color: var(--text-faint); margin-left: 6px;
+}
+.tier-input-file { display: none; }
+.tier-textarea {
+  width: 100%; min-height: 80px; padding: 12px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; font-family: inherit; font-size: 13px;
+  color: var(--text); resize: vertical; outline: none; line-height: 1.55;
+  transition: border-color .15s;
+}
+.tier-textarea:focus { border-color: var(--accent); }
+.tier-textarea::placeholder { color: var(--text-muted); }
+.tier-converting {
+  display: none; font-size: 12px; color: var(--text-muted);
+  margin-top: 8px;
+}
+.tier-converting.active { display: block; }
+
 /* ─── TEMPLATE BANNER ─────────────────────────────────────── */
 .template-banner {
   display: none; background: rgba(123,105,245,.08);
@@ -638,7 +707,8 @@ body { overflow: auto; display: block; }
       <div class="wizard-step-dot" data-step="2"></div>
       <div class="wizard-step-dot" data-step="3"></div>
       <div class="wizard-step-dot" data-step="4"></div>
-      <span class="wizard-step-label" id="wizardStepLabel">Step 1 of 4</span>
+      <div class="wizard-step-dot" data-step="5"></div>
+      <span class="wizard-step-label" id="wizardStepLabel">Step 1 of 5</span>
     </div>
   </div>
 
@@ -778,12 +848,62 @@ body { overflow: auto; display: block; }
       <div class="wizard-word-count" id="courseInfoCount">0 / 50 words minimum</div>
       <div class="wizard-nav">
         <button class="wizard-prev-btn" onclick="prevStep()">Back</button>
-        <button class="wizard-next-btn" id="step3NextBtn" onclick="nextStep()" disabled>Review & Save</button>
+        <button class="wizard-next-btn" id="step3NextBtn" onclick="nextStep()" disabled>Continue</button>
       </div>
     </div>
 
-    <!-- STEP 4: Summary -->
+    <!-- STEP 4: Graded Work Samples -->
     <div class="wizard-step" data-step="4">
+      <div class="wizard-ferpa-callout">
+        <strong>Before uploading:</strong> please cover or blur student names and any identifying info. Lumi only needs to see your feedback comments and your grading style — not who they were written for. A black marker, sticky note, or quick photo edit works fine.
+      </div>
+      <h2 class="wizard-question-title">Show me how you grade</h2>
+      <p class="wizard-subhead">Upload examples of student work you've graded at three performance levels. Lumi will use these as evidence of your authentic feedback voice — your tone, the kinds of comments you write, and how detailed you get.</p>
+
+      <div class="tier-card" data-tier="progressing">
+        <div class="tier-heading">Progressing</div>
+        <div class="tier-desc">Students still developing the skill</div>
+        <div class="tier-thumbs" id="tierThumbs-progressing"></div>
+        <button type="button" class="tier-add-btn" id="tierAddBtn-progressing" onclick="document.getElementById('tierFiles-progressing').click()">
+          + Add photos<span class="tier-add-count" id="tierCount-progressing">(0/3)</span>
+        </button>
+        <input type="file" id="tierFiles-progressing" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('progressing', event)">
+        <div class="tier-converting" id="tierConverting-progressing">Converting HEIC photo…</div>
+        <textarea class="tier-textarea" id="tierDesc-progressing" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
+      </div>
+
+      <div class="tier-card" data-tier="proficient">
+        <div class="tier-heading">Proficient</div>
+        <div class="tier-desc">Students meeting expectations</div>
+        <div class="tier-thumbs" id="tierThumbs-proficient"></div>
+        <button type="button" class="tier-add-btn" id="tierAddBtn-proficient" onclick="document.getElementById('tierFiles-proficient').click()">
+          + Add photos<span class="tier-add-count" id="tierCount-proficient">(0/3)</span>
+        </button>
+        <input type="file" id="tierFiles-proficient" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('proficient', event)">
+        <div class="tier-converting" id="tierConverting-proficient">Converting HEIC photo…</div>
+        <textarea class="tier-textarea" id="tierDesc-proficient" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
+      </div>
+
+      <div class="tier-card" data-tier="exemplary">
+        <div class="tier-heading">Exemplary</div>
+        <div class="tier-desc">Students exceeding expectations</div>
+        <div class="tier-thumbs" id="tierThumbs-exemplary"></div>
+        <button type="button" class="tier-add-btn" id="tierAddBtn-exemplary" onclick="document.getElementById('tierFiles-exemplary').click()">
+          + Add photos<span class="tier-add-count" id="tierCount-exemplary">(0/3)</span>
+        </button>
+        <input type="file" id="tierFiles-exemplary" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('exemplary', event)">
+        <div class="tier-converting" id="tierConverting-exemplary">Converting HEIC photo…</div>
+        <textarea class="tier-textarea" id="tierDesc-exemplary" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
+      </div>
+
+      <div class="wizard-nav">
+        <button class="wizard-prev-btn" onclick="prevStep()">Back</button>
+        <button class="wizard-next-btn" id="step4NextBtn" onclick="nextStep()" disabled>Review & Save</button>
+      </div>
+    </div>
+
+    <!-- STEP 5: Summary -->
+    <div class="wizard-step" data-step="5">
       <h2 class="wizard-question-title">Review your profile</h2>
       <p style="color:var(--text-muted);margin-bottom:24px">Make sure everything looks good before saving.</p>
 
@@ -817,6 +937,14 @@ body { overflow: auto; display: block; }
           <button class="summary-card-edit" onclick="editField(3)">Edit</button>
         </div>
         <div class="summary-card-content" id="summaryCourseInfo"></div>
+      </div>
+
+      <div class="summary-card">
+        <div class="summary-card-header">
+          <span class="summary-card-label">Graded Work Samples</span>
+          <button class="summary-card-edit" onclick="editField(4)">Edit</button>
+        </div>
+        <div class="summary-card-content" id="summaryWorkSamples"></div>
       </div>
 
       <div id="summarySyllabusCard" class="summary-card" style="display:none">
@@ -1088,6 +1216,24 @@ let tCurrentEnrollmentId = null;
 let tCurrentRoster = { profileId: null, block: null };
 let tExpandedCourse = null;
 
+// Q4 work-samples state. Re-initialized in openWizard().
+// `photos`        — newly-picked File objects awaiting upload at save time.
+// `description`   — textarea contents.
+// `existingPaths` — Storage paths of already-uploaded photos kept across an edit.
+let tWorkSamples = {
+  progressing: { photos: [], description: '', existingPaths: [] },
+  proficient:  { photos: [], description: '', existingPaths: [] },
+  exemplary:   { photos: [], description: '', existingPaths: [] },
+};
+// Per-profile cache of work-samples rows from teacher_work_samples,
+// populated by loadAllTeacherProfiles() (Phase 4). Keyed by
+// teacher_profile_id, then tier. Used to drive the banner and to seed
+// tWorkSamples on edit.
+let tSamplesByProfile = {};
+// Snapshot of the current course's existing samples (set when wizard
+// opens for an edit) so the save handler can detect deleted paths.
+let tExistingSamplesByTier = {};
+
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
 function showView(name) {
   ['authLoading','signinView','unknownView','homeView','wizardView','rosterView','noteChatView'].forEach(id => {
@@ -1269,12 +1415,19 @@ function goHome() {
 }
 
 // ─── WIZARD ────────────────────────────────────────────────────────────────────
-async function openWizard(course, subject) {
+async function openWizard(course, subject, opts) {
+  opts = opts || {};
   tCurrentClass = { course, subject };
   tCurrentStep = 1;
   tSyllabusFile = null;
   tSyllabusText = '';
   tTemplateData = null;
+  tWorkSamples = {
+    progressing: { photos: [], description: '', existingPaths: [] },
+    proficient:  { photos: [], description: '', existingPaths: [] },
+    exemplary:   { photos: [], description: '', existingPaths: [] },
+  };
+  tExistingSamplesByTier = {};
 
   document.getElementById('wizardClassName').textContent = course;
   document.getElementById('wizardClassSubject').textContent = subject;
@@ -1285,6 +1438,18 @@ async function openWizard(course, subject) {
   document.getElementById('engagementRulesInput').value = profile?.engagement_rules || '';
   document.getElementById('teachingVoiceInput').value = profile?.teaching_voice || '';
   document.getElementById('courseInfoInput').value = profile?.course_info || '';
+
+  // Edit-flow seed for work samples (Phase 4 populates tSamplesByProfile).
+  // Do this BEFORE showStep so renderTierUI has data to render.
+  const existingForProfile = profile?.id ? (tSamplesByProfile[profile.id] || {}) : {};
+  ['progressing','proficient','exemplary'].forEach(tier => {
+    const row = existingForProfile[tier];
+    if (row) {
+      tWorkSamples[tier].existingPaths = Array.isArray(row.photo_paths) ? [...row.photo_paths] : [];
+      tWorkSamples[tier].description = row.description || '';
+      tExistingSamplesByTier[tier] = { photo_paths: [...(row.photo_paths || [])] };
+    }
+  });
 
   if (profile?.syllabus_file_path) {
     tSyllabusFile = { name: profile.syllabus_file_path.split('/').pop() };
@@ -1326,7 +1491,16 @@ async function openWizard(course, subject) {
     el.addEventListener('input', handler);
   });
 
-  showStep(1);
+  // Wire tier description textareas
+  ['progressing','proficient','exemplary'].forEach(tier => {
+    const el = document.getElementById('tierDesc-' + tier);
+    el.removeEventListener('input', el._descHandler);
+    const handler = () => { tWorkSamples[tier].description = el.value; validateStep4(); };
+    el._descHandler = handler;
+    el.addEventListener('input', handler);
+  });
+
+  showStep(opts.jumpToStep || 1);
   showView('wizardView');
 }
 
@@ -1342,14 +1516,26 @@ function showStep(n) {
     else if (step < n) dot.classList.add('completed');
   });
 
-  document.getElementById('wizardStepLabel').textContent = `Step ${n} of 4`;
+  document.getElementById('wizardStepLabel').textContent = `Step ${n} of 5`;
 
-  // Update summary on step 4
+  // Re-render Step 4 (work samples) when entering it — handles edit-flow
+  // pre-population and ensures thumbs/counts/validation are fresh.
   if (n === 4) {
+    ['progressing','proficient','exemplary'].forEach(tier => {
+      renderTierUI(tier);
+      const ta = document.getElementById('tierDesc-' + tier);
+      ta.value = tWorkSamples[tier].description || '';
+    });
+    validateStep4();
+  }
+
+  // Update summary on step 5
+  if (n === 5) {
     document.getElementById('summaryTitle').textContent = document.getElementById('titleSelect').value || '(Not selected)';
     document.getElementById('summaryEngagementRules').textContent = document.getElementById('engagementRulesInput').value || '(Not filled)';
     document.getElementById('summaryTeachingVoice').textContent = document.getElementById('teachingVoiceInput').value || '(Not filled)';
     document.getElementById('summaryCourseInfo').textContent = document.getElementById('courseInfoInput').value || '(Not filled)';
+    updateWorkSamplesSummary();
 
     if (tSyllabusFile) {
       document.getElementById('summarySyllabusCard').style.display = 'block';
@@ -1361,7 +1547,8 @@ function showStep(n) {
 }
 
 function nextStep() {
-  if (tCurrentStep < 4) showStep(tCurrentStep + 1);
+  if (tCurrentStep === 4 && !validateStep4()) return;
+  if (tCurrentStep < 5) showStep(tCurrentStep + 1);
 }
 
 function prevStep() {
@@ -1391,6 +1578,139 @@ function updateWordCount(inputId, countId, btnId) {
   // Step 1 also requires title selection
   const titleOk = btnId !== 'step1NextBtn' || !!document.getElementById('titleSelect').value;
   btn.disabled = !(wordsMet && titleOk);
+}
+
+// ─── WORK SAMPLES (Q4) ───────────────────────────────────────────────────────
+async function handleSampleFiles(tier, event) {
+  const files = Array.from(event.target.files || []);
+  event.target.value = ''; // allow re-picking the same file later
+  if (!files.length) return;
+
+  const slot = tWorkSamples[tier];
+  const cap = 3;
+  let remaining = cap - (slot.existingPaths.length + slot.photos.length);
+  if (remaining <= 0) {
+    showToast(`Already have 3/3 photos for ${tier}.`, 'error');
+    return;
+  }
+
+  const conv = document.getElementById('tierConverting-' + tier);
+  for (const file of files) {
+    if (remaining <= 0) {
+      showToast(`Cap of 3 photos reached for ${tier}; remaining files skipped.`, 'error');
+      break;
+    }
+    let f = file;
+    const isHeic = /heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
+    if (isHeic) {
+      if (typeof heic2any !== 'function') {
+        showToast('HEIC support is still loading — please try again in a moment.', 'error');
+        continue;
+      }
+      conv.classList.add('active');
+      try {
+        const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+        const out = Array.isArray(blob) ? blob[0] : blob;
+        f = new File([out], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+      } catch (err) {
+        console.warn('HEIC conversion failed:', err);
+        showToast('Could not convert HEIC photo — please try a JPEG/PNG.', 'error');
+        conv.classList.remove('active');
+        continue;
+      }
+      conv.classList.remove('active');
+    }
+    if (!/^image\/(jpe?g|png|webp)$/i.test(f.type)) {
+      showToast(`Skipped ${f.name}: only JPEG/PNG/WebP are supported.`, 'error');
+      continue;
+    }
+    slot.photos.push(f);
+    remaining--;
+  }
+  renderTierUI(tier);
+  validateStep4();
+}
+
+function removeSamplePhoto(tier, kind, idx) {
+  const slot = tWorkSamples[tier];
+  if (kind === 'new') {
+    slot.photos.splice(idx, 1);
+  } else if (kind === 'existing') {
+    slot.existingPaths.splice(idx, 1);
+    if (slot.existingThumbUrls) slot.existingThumbUrls.splice(idx, 1);
+  }
+  renderTierUI(tier);
+  validateStep4();
+}
+
+function renderTierUI(tier) {
+  const container = document.getElementById('tierThumbs-' + tier);
+  if (!container) return;
+  const slot = tWorkSamples[tier];
+  container.innerHTML = '';
+  (slot.existingPaths || []).forEach((path, i) => {
+    const url = (slot.existingThumbUrls && slot.existingThumbUrls[i]) || '';
+    container.appendChild(makeThumb(url, () => removeSamplePhoto(tier, 'existing', i)));
+  });
+  slot.photos.forEach((file, i) => {
+    const url = URL.createObjectURL(file);
+    container.appendChild(makeThumb(url, () => removeSamplePhoto(tier, 'new', i)));
+  });
+  const total = slot.existingPaths.length + slot.photos.length;
+  const countEl = document.getElementById('tierCount-' + tier);
+  if (countEl) countEl.textContent = `(${total}/3)`;
+  const addBtn = document.getElementById('tierAddBtn-' + tier);
+  if (addBtn) addBtn.disabled = total >= 3;
+}
+
+function makeThumb(url, onRemove) {
+  const div = document.createElement('div');
+  div.className = 'tier-thumb';
+  if (url) {
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = '';
+    div.appendChild(img);
+  }
+  const x = document.createElement('button');
+  x.type = 'button';
+  x.className = 'tier-thumb-x';
+  x.setAttribute('aria-label', 'Remove photo');
+  x.textContent = '×';
+  x.addEventListener('click', onRemove);
+  div.appendChild(x);
+  return div;
+}
+
+function validateStep4() {
+  const tiers = ['progressing','proficient','exemplary'];
+  let ok = true;
+  tiers.forEach(tier => {
+    const slot = tWorkSamples[tier];
+    const count = slot.existingPaths.length + slot.photos.length;
+    const hasDesc = (slot.description || '').trim().length > 0;
+    const tierOk = count >= 1 && hasDesc;
+    const card = document.querySelector(`.tier-card[data-tier="${tier}"]`);
+    if (card) card.classList.toggle('invalid', !tierOk);
+    if (!tierOk) ok = false;
+  });
+  const btn = document.getElementById('step4NextBtn');
+  if (btn) btn.disabled = !ok;
+  return ok;
+}
+
+function updateWorkSamplesSummary() {
+  const target = document.getElementById('summaryWorkSamples');
+  if (!target) return;
+  const tiers = ['progressing','proficient','exemplary'];
+  target.innerHTML = tiers.map(tier => {
+    const slot = tWorkSamples[tier];
+    const count = slot.existingPaths.length + slot.photos.length;
+    const desc = (slot.description || '').trim();
+    const short = desc.length > 200 ? desc.slice(0, 200) + '…' : desc;
+    const safe = short.replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+    return `<div style="margin-bottom:8px"><strong style="text-transform:capitalize">${tier}</strong>: ${count} photo${count===1?'':'s'} — ${safe || '<em style="color:var(--text-faint)">no description</em>'}</div>`;
+  }).join('');
 }
 
 // ─── EXAMPLES TOGGLE ─────────────────────────────────────────────────────────
