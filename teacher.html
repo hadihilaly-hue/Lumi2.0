@@ -2002,6 +2002,69 @@ async function saveTeacherProfile() {
 
     if (error) throw error;
 
+    // Q4: upload work-sample photos and upsert teacher_work_samples (one row per tier).
+    // Per-tier failures are tolerated — successful tiers are persisted and the
+    // failing tier(s) can be retried without re-uploading what's already in.
+    const profileId = data.id;
+    const tiers = ['progressing','proficient','exemplary'];
+    const failedTiers = [];
+
+    for (const tier of tiers) {
+      const local = tWorkSamples[tier];
+      try {
+        if (local.photos.length) {
+          const newPaths = await Promise.all(local.photos.map(async (file) => {
+            const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const path = `${tUser.email}/${tCurrentClass.course}/${tier}/${Date.now()}_${cleanName}`;
+            const { error: upErr } = await sb.storage.from('work-samples').upload(path, file);
+            if (upErr) throw upErr;
+            return path;
+          }));
+          // Promote successful uploads into existingPaths so a retry skips them.
+          local.existingPaths = [...local.existingPaths, ...newPaths];
+          local.photos = [];
+        }
+
+        const finalPaths = [...local.existingPaths];
+
+        // Detect deletes: paths from the old DB row not in finalPaths.
+        const oldPaths = (tExistingSamplesByTier[tier]?.photo_paths) || [];
+        const toDelete = oldPaths.filter(p => !finalPaths.includes(p));
+        if (toDelete.length) {
+          const { error: delErr } = await sb.storage.from('work-samples').remove(toDelete);
+          if (delErr) console.warn(`[Q4] delete failed for ${tier}:`, delErr);
+        }
+
+        const { error: rowErr } = await sb.from('teacher_work_samples').upsert({
+          teacher_profile_id: profileId,
+          tier,
+          description: local.description.trim(),
+          photo_paths: finalPaths,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'teacher_profile_id,tier' });
+        if (rowErr) throw rowErr;
+
+        // Mirror DB snapshot for next-edit delete-detection.
+        tExistingSamplesByTier[tier] = { photo_paths: [...finalPaths] };
+        (tSamplesByProfile[profileId] ||= {})[tier] = {
+          teacher_profile_id: profileId, tier,
+          description: local.description.trim(),
+          photo_paths: [...finalPaths],
+        };
+      } catch (e) {
+        console.warn(`[Q4] tier ${tier} failed:`, e);
+        failedTiers.push(tier);
+      }
+    }
+
+    if (failedTiers.length) {
+      showToast(`Saved profile, but ${failedTiers.join(', ')} sample upload failed. Click Save again to retry.`, 'error');
+      btn.disabled = false;
+      btn.textContent = 'Save and Finish';
+      tProfiles[tCurrentClass.course] = data; // profile itself did save; reflect that
+      return;
+    }
+
     tProfiles[tCurrentClass.course] = data;
     showToast('Profile saved!', 'success');
 
