@@ -1158,6 +1158,7 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
     msgInput.disabled = false;
     msgInput.placeholder = 'Say something\u2026';
     $('sendBtn').disabled = false;
+    await prepareSuggestedPrompts();
     // Show suggested prompts for new conversations
     setTimeout(() => renderEmptyState(profile, course), 50);
   } else {
@@ -1817,21 +1818,127 @@ function getHomeworkOverridePrompt(course) {
   return `Help me with ${task.title} (due ${relativeDate})`;
 }
 
+// Class-agnostic fallback chips. Used when the student has no teacher_notes
+// or when influenced generation fails. Voice-neutral, no deficit framing.
+const STATIC_FALLBACK_PROMPTS = [
+  "Help me with today's homework",
+  "Give me practice problems to work through",
+  "Review what I've got so far",
+  "Explain a concept I'm stuck on",
+  "Quiz me on what we've been learning",
+  "Walk me through a worked example",
+  "Help me prep for an upcoming test",
+  "Take me deeper on something we covered",
+  "Push me with a harder version of this",
+];
+
+function getFallbackPrompts() {
+  const pool = [...STATIC_FALLBACK_PROMPTS];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, 3);
+}
+
+// Calls Haiku to generate 3 chips subtly influenced by teacher notes.
+// Throws on any failure (timeout, bad shape, name leak, etc.) — caller falls back.
+async function generateInfluencedPrompts(notesText, courseName) {
+  const system = `You generate exactly 3 starter prompt suggestions that will appear as quick-tap chips above a student's chat with their AI tutor.
+
+You will receive course context and confidential teacher notes about the student. Use the notes to subtly steer 2 of the 3 chips toward relevant topics. NEVER quote, paraphrase, or reveal the notes — they are private to the teacher.
+
+Return EXACTLY a JSON array of 3 strings, in this order:
+1. A generic study chip (e.g., "Help me with my homework", "Quiz me on what we've been learning"). Topic-agnostic.
+2. A neutral topic-related chip framed as an offer (e.g., "Want to try some factoring practice?").
+3. A curiosity-framed topic-related chip (e.g., "What's a clean way to factor quadratics?").
+
+Hard rules:
+- NO deficit language. Never "you're struggling with", "to help with your weak area", "since you have trouble", "I'm bad at", "I keep failing".
+- Each chip ≤ 60 characters.
+- Sound like something a confident, curious student would type.
+- If the notes are vague or don't suggest a topic, return 3 generic chips instead (do not invent a topic).
+
+Output ONLY the JSON array. No prose, no code fences, no explanation.`;
+
+  const userMsg = `Course: ${courseName}\n\nTeacher notes:\n${notesText}\n\nReturn the JSON array now.`;
+
+  const callPromise = fetchClaudeProxy({
+    model: 'claude-haiku-4-5',
+    max_tokens: 200,
+    temperature: 0.7,
+    system,
+    messages: [{ role: 'user', content: userMsg }],
+  });
+  const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000));
+  const res = await Promise.race([callPromise, timeoutPromise]);
+
+  if (!res.ok) throw new Error('proxy ' + res.status);
+  const data = await res.json();
+  const text = data.content?.[0]?.text || '';
+
+  const match = text.match(/\[[\s\S]*\]/);
+  if (!match) throw new Error('no JSON array in response');
+  const chips = JSON.parse(match[0]);
+  if (!Array.isArray(chips) || chips.length !== 3) throw new Error('not array of 3');
+  if (!chips.every(c => typeof c === 'string' && c.length > 0 && c.length <= 80)) {
+    throw new Error('chip shape invalid');
+  }
+  // Defense-in-depth: reject if any chip leaks the student's name or email
+  const studentName = (currentUser?.user_metadata?.full_name || '').trim();
+  const studentEmail = (currentUser?.email || '').trim();
+  const lowered = chips.map(c => c.toLowerCase());
+  if (studentName && lowered.some(c => c.includes(studentName.toLowerCase()))) {
+    throw new Error('chip leaked student name');
+  }
+  if (studentEmail && lowered.some(c => c.includes(studentEmail.toLowerCase()))) {
+    throw new Error('chip leaked student email');
+  }
+  return chips;
+}
+
+// Orchestrator. Reads S.tutorCtx.teacherNotes; tries influenced generation when
+// notes exist, falls back to random static prompts otherwise (or on any failure).
+// Caches result on S.tutorCtx.suggestedPrompts (JS memory only — never persisted).
+async function prepareSuggestedPrompts() {
+  const ctx = S.tutorCtx;
+  if (!ctx) return;
+  const notes = ctx.teacherNotes || [];
+  const courseName = ctx.course || '';
+  if (notes.length > 0) {
+    try {
+      const notesText = notes.map(n => n.text || '').filter(Boolean).join('\n\n');
+      if (notesText) {
+        const chips = await generateInfluencedPrompts(notesText, courseName);
+        ctx.suggestedPrompts = chips;
+        console.log('[suggested_prompts] mode=influenced count=' + chips.length);
+        return;
+      }
+    } catch (e) {
+      console.warn('[suggested_prompts] influenced generation failed, falling back:', e?.message || e);
+    }
+  }
+  ctx.suggestedPrompts = getFallbackPrompts();
+  console.log('[suggested_prompts] mode=fallback count=' + ctx.suggestedPrompts.length);
+}
+
 function renderEmptyState(profile, course) {
-  // Get prompts: teacher's custom or fallback
-  let prompts = profile?.suggested_prompts;
-  if (!prompts || !Array.isArray(prompts) || prompts.length < 3) {
-    prompts = [
-      "Help me with today's homework",
-      "Quiz me on what we've been learning",
-      "Explain a concept I'm stuck on"
-    ];
+  // Source: chips prepared in finishOpenTutor (influenced or fallback).
+  // Defensive fallback if renderEmptyState is somehow called outside that flow.
+  let prompts = (S.tutorCtx?.suggestedPrompts && S.tutorCtx.suggestedPrompts.length === 3)
+    ? [...S.tutorCtx.suggestedPrompts]
+    : getFallbackPrompts();
+
+  // Fisher–Yates shuffle so influenced chips don't always land in the same slots.
+  for (let i = prompts.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [prompts[i], prompts[j]] = [prompts[j], prompts[i]];
   }
 
-  // Check for homework override
+  // Homework override: if a task is due in the next 3 days, replace position 0.
   const hwOverride = getHomeworkOverridePrompt(course);
   if (hwOverride) {
-    prompts = [hwOverride, prompts[1], prompts[2]];
+    prompts[0] = hwOverride;
   }
 
   const el = document.createElement('div');
