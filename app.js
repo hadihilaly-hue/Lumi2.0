@@ -340,10 +340,20 @@ function teacherDisplayName(fullName, profile) {
   return fullName.split(' ')[0]; // first name fallback
 }
 
-function buildTutorSystem(subject, course, teacher, teacherProfile, teacherNotes = []) {
+function buildTutorSystem(subject, course, teacher, teacherProfile, teacherNotes = [], workSamples = null) {
   const hasProfile = !!teacherProfile;
   const firstName = teacher.split(' ')[0];
   const displayName = teacherDisplayName(teacher, teacherProfile);
+
+  // Q4: single boolean drives both this section AND buildApiMessages's
+  // synthetic-exchange decision. False if any tier is missing description
+  // OR loaded images. When false, ZERO bytes of work-samples wiring land
+  // in the prompt (no header, no placeholder) — the prompt is byte-
+  // identical to the pre-Q4 prompt for that concern.
+  const ws = workSamples;
+  const tiersAll = ['progressing','proficient','exemplary'];
+  const hasAllTiers = !!ws
+    && tiersAll.every(t => ws[t] && (ws[t].description || '').trim() && Array.isArray(ws[t].images) && ws[t].images.length > 0);
 
   if (hasProfile) {
     const p = teacherProfile;
@@ -370,6 +380,26 @@ ${p.course_info || '(No course info)'}`;
       prompt += `\n\n═══ COURSE SYLLABUS ═══\n${p.syllabus_text}`;
     }
 
+    // Q4: graded work-samples section. Gated on hasAllTiers — partial
+    // states emit zero bytes here (and buildApiMessages also skips the
+    // synthetic exchange in that case, so the "actual photos appear in
+    // the conversation above" claim is never made without backing).
+    if (hasAllTiers) {
+      prompt += `
+
+═══ HOW ${firstName.toUpperCase()} GIVES FEEDBACK ═══
+${displayName} has shared real examples of how they grade student work at three levels. The actual photos appear in the conversation above as evidence — study them carefully, especially their tone, word choice, comment length, and what they choose to flag vs. let pass. When you give feedback to this student, match how ${displayName} writes.
+
+PROGRESSING-level (students still developing the skill):
+${ws.progressing.description}
+
+PROFICIENT-level (students meeting expectations):
+${ws.proficient.description}
+
+EXEMPLARY-level (students exceeding expectations):
+${ws.exemplary.description}`;
+    }
+
     prompt += `
 
 ═══ STUDENT MODE RULES — FOLLOW THESE AT ALL TIMES ═══
@@ -388,6 +418,8 @@ ALWAYS:
 - Push back on reasoning quality, never on conclusions
 - Let students find their own inconsistencies
 - Match ${displayName}'s voice, tone, and teaching style exactly
+- When you have multiple feedback points, deliver ONE AT A TIME. List them as headlines first, then expand only the first one.
+- If the student asks for everything at once, gently push back: "Let's tackle these one at a time so each one actually sticks. Start with [first point] — what would you change?" Wait for them to attempt a revision OR explain the point in their own words before moving to the next one.
 
 FRUSTRATION AND TIME PRESSURE:
 When a student expresses frustration or time pressure, acknowledge it in one sentence maximum, then immediately redirect to a single focused question. Never explain at length why you won't give direct answers — just don't give them, and get back to work.
@@ -3499,6 +3531,42 @@ async function generateTitle(convId, firstUserMsg) {
   } catch { /* non-critical */ }
 }
 
+// Q4: returns the messages array to send to Claude. If work-samples images
+// are loaded for this session, prepends a synthetic user/assistant exchange
+// that puts the images into the conversation as evidence. S.messages is
+// NEVER mutated — this keeps the chat UI clean and persistence honest.
+//
+// Same gate as buildTutorSystem.hasAllTiers — null/empty/partial returns
+// S.messages unchanged. Cache-control marker on the last image keeps the
+// whole batch warm across turns of one session.
+function buildApiMessages(S) {
+  const ws = S && S.tutorCtx && S.tutorCtx.workSamples;
+  const tiers = ['progressing','proficient','exemplary'];
+  const ok = !!ws && tiers.every(t => ws[t] && Array.isArray(ws[t].images) && ws[t].images.length > 0);
+  if (!ok) return S.messages;
+
+  const tierLabel = { progressing: 'PROGRESSING-level samples:', proficient: 'PROFICIENT-level samples:', exemplary: 'EXEMPLARY-level samples:' };
+  const userBlocks = [
+    { type: 'text', text: 'Here are examples of how I grade student work, organized by performance level. Use these as evidence of my authentic feedback voice.' },
+  ];
+  tiers.forEach(tier => {
+    userBlocks.push({ type: 'text', text: tierLabel[tier] });
+    ws[tier].images.forEach(img => {
+      userBlocks.push({ type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.base64 } });
+    });
+  });
+  // cache_control on the LAST image content block keeps the whole image
+  // batch warm across turns of one session.
+  const last = userBlocks[userBlocks.length - 1];
+  if (last) userBlocks[userBlocks.length - 1] = { ...last, cache_control: { type: 'ephemeral' } };
+
+  const synthetic = [
+    { role: 'user', content: userBlocks },
+    { role: 'assistant', content: "Got it. I've studied your feedback across all three levels and I'll match your tone, word choice, and comment style when I give feedback to your students." },
+  ];
+  return [...synthetic, ...S.messages];
+}
+
 // ─── FETCH LUMI RESPONSE ─────────────────────────────────────────────────────
 async function fetchLumi() {
   S.busy = true; updateSendBtn();
@@ -3508,7 +3576,7 @@ async function fetchLumi() {
 
   try {
     let system = S.tutorCtx
-      ? buildTutorSystem(S.tutorCtx.subjectName, S.tutorCtx.course, S.tutorCtx.teacher, S.tutorCtx.teacherProfile || null, S.tutorCtx.teacherNotes || [])
+      ? buildTutorSystem(S.tutorCtx.subjectName, S.tutorCtx.course, S.tutorCtx.teacher, S.tutorCtx.teacherProfile || null, S.tutorCtx.teacherNotes || [], S.tutorCtx.workSamples || null)
       : buildCompanionSystem();
 
     // Inject active project context if the student is working on a project
@@ -3530,7 +3598,7 @@ If they uploaded a rubric or project instructions it will be attached to their f
 Remember: help them THINK through the project, never do it for them. Ask guiding questions, help them brainstorm, review their work, but the thinking must be theirs.`;
       }
     }
-    const { clean, data } = await callAPI(S.messages, system);
+    const { clean, data } = await callAPI(buildApiMessages(S), system);
     typing.remove();
     S.messages.push({ role: 'assistant', content: clean });
     S.exchangeCount++;
