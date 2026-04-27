@@ -1342,9 +1342,40 @@ async function loadAllTeacherProfiles() {
     if (error || !data) return;
     tProfiles = {};
     data.forEach(row => { tProfiles[row.course_name] = row; });
+
+    // Q4: also load any work-samples rows so we can flag profiles that
+    // are still missing tiers and seed the wizard for edits.
+    tSamplesByProfile = {};
+    const profileIds = data.map(p => p.id).filter(Boolean);
+    if (profileIds.length) {
+      const { data: sampleRows, error: sErr } = await sb
+        .from('teacher_work_samples')
+        .select('*')
+        .in('teacher_profile_id', profileIds);
+      if (sErr) {
+        console.warn('Could not load work samples:', sErr);
+      } else {
+        (sampleRows || []).forEach(r => {
+          (tSamplesByProfile[r.teacher_profile_id] ||= {})[r.tier] = r;
+        });
+      }
+    }
   } catch (err) {
     console.warn('Could not load teacher profiles:', err);
   }
+}
+
+// Returns true iff all three tiers exist for this profile id with ≥1 photo
+// and a non-empty description. Drives the home-card banner.
+function hasAllWorkSampleTiers(profileId) {
+  if (!profileId) return false;
+  const byTier = tSamplesByProfile[profileId];
+  if (!byTier) return false;
+  return ['progressing','proficient','exemplary'].every(tier => {
+    const r = byTier[tier];
+    return r && Array.isArray(r.photo_paths) && r.photo_paths.length > 0
+        && (r.description || '').trim().length > 0;
+  });
 }
 
 function lookupSubjectForCourse(courseName) {
@@ -1390,6 +1421,12 @@ function renderClassCards() {
 
     const previewText = profile?.engagement_rules || profile?.teaching_voice || '';
 
+    // Q4: if a "complete" profile is still missing any of the 3 work-sample
+    // tiers, surface a banner inside the card and offer a click-through that
+    // jumps directly to Step 4. The profile itself stays usable in the
+    // meantime — we don't reset done.
+    const needsSamples = status === 'complete' && !hasAllWorkSampleTiers(profile?.id);
+
     const card = document.createElement('div');
     card.className = 't-card';
     card.style.borderLeft = '3px solid ' + (status === 'complete' ? '#34d399' : '#9CA3AF');
@@ -1402,9 +1439,18 @@ function renderClassCards() {
       </div>
       ${previewText ? `<div class="t-card-preview">${escHtml(previewText)}</div>` : ''}
       ${status === 'complete' ? `<div style="font-size:10px;color:#34d399;font-weight:600;margin-top:4px">✓ Setup complete</div>` : ''}
+      ${needsSamples ? `
+        <div data-add-samples="1" style="margin-top:10px;padding:10px 12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;cursor:pointer">
+          <div style="font-size:12px;font-weight:600;color:#F59E0B;margin-bottom:4px">⚡ New step added</div>
+          <div style="font-size:12px;color:var(--text);line-height:1.5">Please add a few graded work samples so Lumi can match your feedback voice.</div>
+          <div style="font-size:11px;color:#F59E0B;font-weight:600;margin-top:6px">Add samples →</div>
+        </div>` : ''}
       <div style="margin-top:8px;font-size:12px;font-weight:600;color:var(--accent)">${escHtml(btnLabel)} →</div>
     `;
-    card.addEventListener('click', () => openWizard(course, subject));
+    card.addEventListener('click', (e) => {
+      const jumpEl = e.target.closest('[data-add-samples]');
+      openWizard(course, subject, jumpEl ? { jumpToStep: 4 } : {});
+    });
     grid.appendChild(card);
   });
 }
@@ -1439,8 +1485,8 @@ async function openWizard(course, subject, opts) {
   document.getElementById('teachingVoiceInput').value = profile?.teaching_voice || '';
   document.getElementById('courseInfoInput').value = profile?.course_info || '';
 
-  // Edit-flow seed for work samples (Phase 4 populates tSamplesByProfile).
-  // Do this BEFORE showStep so renderTierUI has data to render.
+  // Edit-flow seed for work samples. tSamplesByProfile is populated by
+  // loadAllTeacherProfiles. Done BEFORE showStep so renderTierUI has data.
   const existingForProfile = profile?.id ? (tSamplesByProfile[profile.id] || {}) : {};
   ['progressing','proficient','exemplary'].forEach(tier => {
     const row = existingForProfile[tier];
@@ -1450,6 +1496,34 @@ async function openWizard(course, subject, opts) {
       tExistingSamplesByTier[tier] = { photo_paths: [...(row.photo_paths || [])] };
     }
   });
+
+  // Fire-and-forget signed-URL fetch for thumbnails. We don't await here
+  // because Step 4 isn't visible yet; the URLs land before the user gets
+  // there in the typical flow. If they jump to Step 4 immediately the
+  // thumbs may flash in late — acceptable for an edit-flow.
+  const allPaths = ['progressing','proficient','exemplary']
+    .flatMap(tier => tWorkSamples[tier].existingPaths.map(path => ({ tier, path })));
+  if (allPaths.length) {
+    sb.storage.from('work-samples')
+      .createSignedUrls(allPaths.map(p => p.path), 3600)
+      .then(({ data, error }) => {
+        if (error || !data) { console.warn('signed URL batch failed:', error); return; }
+        // Group results back by tier in path order.
+        ['progressing','proficient','exemplary'].forEach(tier => {
+          tWorkSamples[tier].existingThumbUrls = [];
+        });
+        data.forEach((entry, i) => {
+          const meta = allPaths[i];
+          if (!meta) return;
+          tWorkSamples[meta.tier].existingThumbUrls.push(entry.signedUrl || '');
+        });
+        // Re-render if Step 4 is currently visible.
+        if (tCurrentStep === 4) {
+          ['progressing','proficient','exemplary'].forEach(renderTierUI);
+        }
+      })
+      .catch(err => console.warn('signed URL fetch error:', err));
+  }
 
   if (profile?.syllabus_file_path) {
     tSyllabusFile = { name: profile.syllabus_file_path.split('/').pop() };
