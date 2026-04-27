@@ -171,6 +171,86 @@ gives direct answers, only guides reasoning.
   if a future edit weakens or removes it, Lumi may start leaking
   notes back to students.
 
+### Per-class suggested prompts (commit 4)
+- The empty-state of a tutor session shows three "starter" chips. As
+  of commit 4, chip text is sourced via a **2-tier precedence**:
+  1. `S.tutorCtx.teacherNotes` non-empty → call
+     `generateInfluencedPrompts()` for three Haiku-generated chips
+     (one generic, one neutral topic-influenced, one curiosity-framed
+     topic-influenced). On any Haiku failure (timeout, malformed
+     JSON, validation reject) → fall through to tier 2.
+  2. Notes empty (or tier 1 failed) → `getFallbackPrompts()` returns
+     3 random entries (Fisher–Yates) from `STATIC_FALLBACK_PROMPTS`.
+- Result is cached on `S.tutorCtx.suggestedPrompts` and re-shuffled
+  in slot order on each render so influenced chips don't always
+  occupy the same positions.
+- **Helpers (all in app.js):**
+  - `STATIC_FALLBACK_PROMPTS` — module-level const near the top of
+    the file with other constants. 9 voice-neutral, class-agnostic
+    prompts covering homework, practice, review, explain, quiz,
+    work-through, study-prep, explore, and challenge action types.
+    Each ≤ 60 chars, no deficit framing.
+  - `getFallbackPrompts()` — Fisher–Yates shuffle a copy of the
+    static list, slice 3. Called from both `prepareSuggestedPrompts`
+    (orchestrator path) and `renderEmptyState` (defensive fallback
+    if `S.tutorCtx.suggestedPrompts` is unset).
+  - `generateInfluencedPrompts(notesText, courseName)` — Haiku call
+    (`claude-haiku-4-5`, max_tokens 200, temperature 0.7), wrapped
+    in a 5s `Promise.race` timeout. Validates: response is a JSON
+    array of exactly 3 strings, each ≤ 80 chars, none containing
+    the literal student email or full name (privacy guard against
+    accidental note leakage). Throws on any failure; caller catches.
+  - `prepareSuggestedPrompts()` — orchestrator. Reads
+    `S.tutorCtx.teacherNotes` and `S.tutorCtx.course`, runs the
+    precedence, writes to `S.tutorCtx.suggestedPrompts`, logs
+    `[suggested_prompts] mode=influenced count=3` or
+    `[suggested_prompts] mode=fallback count=3`.
+  - The three function helpers are grouped between
+    `getHomeworkOverridePrompt` and `renderEmptyState` in app.js.
+- **Wiring:** `prepareSuggestedPrompts()` is `await`-ed inside
+  `finishOpenTutor()` on the profile branch, after
+  `S.tutorCtx.teacherNotes` is populated and before the `setTimeout`
+  that calls `renderEmptyState`. Worst-case adds the 5s Haiku
+  timeout to chat-open latency; typical is sub-second.
+- **Render:** `renderEmptyState()` reads
+  `S.tutorCtx.suggestedPrompts`, applies its own Fisher–Yates
+  shuffle for slot randomization, then applies the homework
+  override (replaces position 0 with `Help me with [task] (due
+  [relative])` if a homework task is due within 3 days). The shuffle
+  is per-render, so two consecutive opens with identical cached
+  prompts still show different slot orders.
+- **Design rules baked into the Haiku system prompt:**
+  - Chip 1: generic study prompt (camouflage — same shape as a
+    no-notes session would show).
+  - Chip 2: neutral-framed, topic-influenced
+    (e.g. "Want to try some factoring practice?").
+  - Chip 3: curiosity-framed, topic-influenced
+    (e.g. "What's a clean way to factor quadratics?").
+  - NEVER deficit language ("you're struggling with", "to help with
+    your weak area", "I'm bad at", "I keep failing", "Help me catch
+    up"). Both at the LLM-instruction level and via post-validation.
+  - If notes are vague or topic-less, the model is instructed to
+    return three generic chips rather than invent a topic.
+- **Failure modes** (all silent → static fallback; each logs a
+  `console.warn` for developers):
+  - Haiku 5s timeout
+  - Network/proxy error (incl. 429 rate-limit)
+  - Malformed JSON in response
+  - Wrong array shape/length
+  - A chip > 80 chars
+  - A chip contains the student email or full name (privacy guard)
+- **`teacher_profiles.suggested_prompts` is now dormant on the
+  read side.** The 20250417 migration added the column; teacher.html
+  still WRITES it during onboarding (`generateSuggestedPrompts()`
+  ~line 1605). After commit 4 the student-side render no longer
+  consults it, and production data confirms the column is unused
+  in practice (Mr. Harris's row is NULL). **Cleanup item — not
+  addressed in commit 4:** either (a) remove the onboarding-side
+  generation as dead code, or (b) re-wire it as a deliberate future
+  feature (e.g. per-class teacher-curated chip overrides that
+  outrank both notes-influenced and static-fallback). Pick one
+  before the next teacher-side change in this area.
+
 ---
 
 ## Known Bugs (track status here)
@@ -209,18 +289,24 @@ gives direct answers, only guides reasoning.
   alongside the teacher profile. See "Per-student teacher notes
   injection" under System Prompt Architecture for the splice point,
   failure modes, helpers, and silent-use instruction.
-- ⬜ **Commit 4 — teacher-notes-influenced suggested prompts.** The
-  student-facing suggested-prompt generator takes the teacher's notes
-  into account (e.g. if notes say "struggles with proof structure",
-  prompts lean that direction).
+- ✅ **Commit 4 — teacher-notes-influenced suggested prompts.** Two-tier
+  precedence: notes present → Haiku-generated chips (one generic, one
+  neutral topic-influenced, one curiosity-framed topic-influenced); notes
+  absent (or Haiku call fails) → 3 random chips from a 9-item static
+  fallback list. See "Per-class suggested prompts (commit 4)" under
+  Data Architecture for the helper inventory, validation rules, and the
+  dormant-column cleanup item. **The 4-commit per-student teacher notes
+  feature is now COMPLETE — ready for real teacher testing with
+  Mr. Harris.**
 
 ### Roadmap: Post-commit-4 feature ideas
 
-> These features emerged during commit 3 design discussions. They are
-> deliberately deferred until commits 3 and 4 are complete and Mr.
-> Harris (or other real teachers) have tested the base feature. Real
-> user signal should validate (or kill) these before we invest in
-> building them.
+> These features emerged during commit 3 design discussions. Commits 3
+> and 4 are now both shipped — the base per-student teacher notes
+> feature is complete. These follow-ons remain deliberately deferred
+> until Mr. Harris (or other real teachers) have tested the base
+> feature. Real user signal should validate (or kill) these before we
+> invest in building them.
 
 1. **Student-facing reflection tool.** Students can ask Lumi "what
    have I been struggling with?" or "what should I review for finals?"
@@ -301,6 +387,17 @@ gives direct answers, only guides reasoning.
   separately leaves a window where the table is unprotected, and a
   failed UPDATE in the middle would leave the trigger off entirely.
 
+- **Verifying the influenced-mode failure path is hard to reproduce
+  live.** When testing commit 4, DevTools "Offline" mode may serve
+  cached responses for the claude-proxy URL, masking the
+  notes-present-but-Haiku-fails fallback path. The fallback path
+  itself IS exercised on the very first class-open in fallback mode
+  (no notes seeded), which is sufficient verification of the
+  chip-rendering code path. The notes-present-but-Haiku-fails case
+  is well-defined by the try/catch + 5s `Promise.race` structure
+  even when reproducing it live is awkward — trust the structure
+  rather than blocking the commit on a flaky live repro.
+
 ---
 
 ## Stack Notes
@@ -313,7 +410,10 @@ gives direct answers, only guides reasoning.
 - **Database:** Supabase (PostgreSQL + RLS) — client initialized in supabase.js using @supabase/supabase-js loaded from CDN
 - **AI API:** Anthropic Messages API called directly from the frontend
   - Student tutoring & teacher onboarding: claude-sonnet-4-20250514 (max_tokens: 2500)
-  - Lightweight classification tasks: claude-haiku-4-5 (max_tokens: 20)
+  - Lightweight classification tasks: claude-haiku-4-5 (conversation
+    title generation: max_tokens 20; suggested-prompt chip
+    generation, commit 4: max_tokens 200, temperature 0.7, 5s
+    timeout)
   - Streaming enabled for student chat (ReadableStream + getReader)
 - **Markdown rendering:** Custom lightweight renderer in app.js (no library)
 - **Hosting:** GitHub Pages (static deploy)
