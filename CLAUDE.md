@@ -12,16 +12,22 @@ gives direct answers, only guides reasoning.
 ## Two Modes
 
 ### MODE 1: TEACHER ONBOARDING
-- Lumi interviews the teacher in 8 questions max
-- One question per turn, no exceptions
-- Minimal validation before each question (one sentence max)
-- Prioritize behavioral questions over content questions
-- Never ask administrative questions (late work, extensions, etc.)
-- Question priority: core learning goals → absolute Lumi boundaries
-  → pedagogical sequence → intervention technique (example 1) →
-  intervention technique (example 2) → B+ vs A criteria → out of
-  scope topics → AI/academic integrity policy
-- Stores output as a teacher profile object in Supabase
+- Static multi-step wizard in teacher.html (replaced the original AI
+  interview in commit f906bba). Steps:
+  1. Title dropdown (Mr./Ms./Mrs./Mx./Dr.) + engagement-rules textarea
+     ("How do you want students to engage with Lumi?")
+  2. Teaching-voice textarea ("What does your teaching voice sound
+     like?")
+  3. Course-info textarea ("What do students need to know about your
+     course?") + optional syllabus PDF upload (text extracted via
+     pdf.js, stored in syllabus_text)
+  4. Review summary cards with Edit buttons + share-course-info
+     checkbox + Save
+- Each free-text step requires a 50-word minimum before Continue is
+  enabled
+- Stores answers as flat TEXT columns on teacher_profiles (not JSONB);
+  syllabus PDF goes to the `syllabi` Storage bucket. See "Teacher
+  Profile Object" under Data Architecture for the full column list.
 
 ### MODE 2: STUDENT MODE
 - Loads the selected teacher's profile from Supabase
@@ -119,6 +125,13 @@ gives direct answers, only guides reasoning.
 - **conversations** — chat history (id, user_id, title, messages jsonb,
   teacher, course, created_at, updated_at)
 - Both have RLS scoped to auth.uid()
+
+### Storage bucket inventory
+- **`syllabi`** — teacher syllabus PDFs. Created via Supabase dashboard;
+  no SQL definition or bucket-level RLS in any migration (gap to close
+  if it ever bites). Path convention `{teacher_email}/{course_name}/
+  {timestamp}_{filename}.pdf`. Written from `saveTeacherProfile()` in
+  teacher.html.
 
 ### System Prompt Architecture
 - Built dynamically from teacher profile object at session start
@@ -408,13 +421,22 @@ gives direct answers, only guides reasoning.
 - **Styling:** style.css (primary, ~75 KB) + styles.css (~18 KB); Inter font via Google Fonts
 - **Auth:** Supabase Auth with Google OAuth (implicit flow), restricted to @menloschool.org emails
 - **Database:** Supabase (PostgreSQL + RLS) — client initialized in supabase.js using @supabase/supabase-js loaded from CDN
-- **AI API:** Anthropic Messages API called directly from the frontend
+- **AI API:** Anthropic Messages API via Supabase Edge Function proxy
+  at `supabase/functions/claude-proxy/index.ts` (migrated in commit
+  22a3dd5). The proxy validates JWT auth, enforces a 2500 max_tokens
+  ceiling, restricts to an ALLOWED_MODELS whitelist, applies per-user
+  daily rate limits (500/day teachers, 100/day students), logs token
+  usage to `api_usage`, then relays the body to Anthropic without
+  modifying system prompts or messages. Image content blocks are
+  passed through unchanged.
   - Student tutoring & teacher onboarding: claude-sonnet-4-20250514 (max_tokens: 2500)
   - Lightweight classification tasks: claude-haiku-4-5 (conversation
     title generation: max_tokens 20; suggested-prompt chip
     generation, commit 4: max_tokens 200, temperature 0.7, 5s
     timeout)
   - Streaming enabled for student chat (ReadableStream + getReader)
+  - The older `netlify/functions/anthropic.mjs` is dead code awaiting
+    a separate cleanup commit — do not call it.
 - **Markdown rendering:** Custom lightweight renderer in app.js (no library)
 - **Hosting:** GitHub Pages (static deploy)
 - **Schema:** See supabase_setup.sql for full table definitions and RLS policies
