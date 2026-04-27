@@ -21,13 +21,23 @@ gives direct answers, only guides reasoning.
   3. Course-info textarea ("What do students need to know about your
      course?") + optional syllabus PDF upload (text extracted via
      pdf.js, stored in syllabus_text)
-  4. Review summary cards with Edit buttons + share-course-info
+  4. Graded work samples — three tiers (progressing / proficient /
+     exemplary). Per tier: up to 3 photos + a description of what the
+     teacher looks for at that level. HEIC photos are converted to
+     JPEG client-side via heic2any before upload. See "teacher_work_
+     samples" under Data Architecture and the "Q4 graded work samples"
+     entry under Roadmap → Implemented.
+  5. Review summary cards with Edit buttons + share-course-info
      checkbox + Save
 - Each free-text step requires a 50-word minimum before Continue is
-  enabled
-- Stores answers as flat TEXT columns on teacher_profiles (not JSONB);
-  syllabus PDF goes to the `syllabi` Storage bucket. See "Teacher
-  Profile Object" under Data Architecture for the full column list.
+  enabled. Step 4 requires ≥1 photo and a non-empty description for
+  every tier before Continue is enabled.
+- Stores text answers as flat TEXT columns on teacher_profiles
+  (not JSONB); syllabus PDF goes to the `syllabi` Storage bucket;
+  work-sample photos go to the `work-samples` bucket; per-tier
+  photo paths + description rows live in teacher_work_samples (one
+  row per tier per teacher_profile_id). See Data Architecture and
+  the Storage bucket inventory for the full picture.
 
 ### MODE 2: STUDENT MODE
 - Loads the selected teacher's profile from Supabase
@@ -126,12 +136,42 @@ gives direct answers, only guides reasoning.
   teacher, course, created_at, updated_at)
 - Both have RLS scoped to auth.uid()
 
+### teacher_work_samples (Q4)
+- Stores per-tier graded student-work photos + descriptions, one row
+  per (teacher_profile_id, tier). Tier is constrained to
+  `progressing | proficient | exemplary`.
+- Columns: id, created_at, updated_at, teacher_profile_id (UUID FK
+  → teacher_profiles, ON DELETE CASCADE), tier, description (TEXT
+  NOT NULL), photo_paths (TEXT[] of paths inside the work-samples
+  bucket).
+- UNIQUE (teacher_profile_id, tier) — exactly 3 rows max per teacher
+  profile.
+- RLS mirrors teacher_profiles ownership: any authenticated user can
+  SELECT (students need it at feedback time); INSERT/UPDATE/DELETE
+  require the JWT email to match the linked teacher_profiles.teacher
+  _email via a JOIN check. Defined in
+  20260427_teacher_work_samples.sql.
+- Writes happen in teacher.html `saveTeacherProfile()` after the
+  teacher_profiles upsert returns the row id. Reads happen in
+  app.js `getTeacherProfile()` and are converted to base64 images
+  by `loadWorkSampleImages()` at chat-open.
+
 ### Storage bucket inventory
 - **`syllabi`** — teacher syllabus PDFs. Created via Supabase dashboard;
   no SQL definition or bucket-level RLS in any migration (gap to close
   if it ever bites). Path convention `{teacher_email}/{course_name}/
   {timestamp}_{filename}.pdf`. Written from `saveTeacherProfile()` in
   teacher.html.
+- **`work-samples`** (Q4) — graded student-work photos. Defined in
+  SQL by 20260427_teacher_work_samples.sql, NOT via dashboard.
+  Private, 10MB per file, allowed_mime_types restricted to
+  JPEG/PNG/WebP. HEIC is intentionally excluded because Claude's
+  vision API doesn't accept it; teacher.html converts HEIC → JPEG
+  client-side via the heic2any CDN script before upload. Storage
+  policies on storage.objects use the standard
+  `(storage.foldername(name))[1] = auth.jwt() ->> 'email'` owner
+  pattern. Path convention
+  `{teacher_email}/{course_name}/{tier}/{timestamp}_{filename}`.
 
 ### System Prompt Architecture
 - Built dynamically from teacher profile object at session start
@@ -311,6 +351,57 @@ gives direct answers, only guides reasoning.
   dormant-column cleanup item. **The 4-commit per-student teacher notes
   feature is now COMPLETE — ready for real teacher testing with
   Mr. Harris.**
+
+### Q4 graded work samples + one-piece feedback rule (✅ shipped)
+- **What it is.** Onboarding gained a 5th step (now Step 4, with the
+  review pushed to Step 5) where teachers upload up to 3 photos per
+  performance tier — progressing / proficient / exemplary — plus a
+  description of what they look for at that level. At student-feedback
+  time, those photos are sent to Claude as vision input and the
+  descriptions are spliced into the system prompt so Lumi's feedback
+  voice mimics the teacher's actual graded comments.
+- **Schema + bucket.** New table `teacher_work_samples` (one row per
+  tier, FK to teacher_profiles, ON DELETE CASCADE) and a new private
+  Storage bucket `work-samples` (10MB cap, JPEG/PNG/WebP only — HEIC
+  excluded because Claude's vision API doesn't accept it; teacher.html
+  converts HEIC → JPEG client-side via the heic2any CDN script before
+  upload). Defined in `supabase/migrations/20260427_teacher_work_samples.sql`.
+- **Banner for existing teachers.** Profiles that are `done: true` but
+  missing one or more tiers show a yellow callout inside the home-card
+  saying "New step added — please add a few graded work samples".
+  Banner click opens the wizard at `{ jumpToStep: 4 }`. The `done` flag
+  stays true so students aren't blocked while the teacher fills the
+  gap.
+- **Single-source-of-truth gate.** `loadWorkSampleImages()` in app.js
+  returns null on any shortfall — missing tier, no photos, no
+  description, signed-URL failure, fetch failure. The result lives at
+  `S.tutorCtx.workSamples`. Both `buildTutorSystem()` (description
+  block) and `buildApiMessages()` (synthetic image-prepend exchange)
+  read this same object and share a `hasAllTiers` check that is true
+  iff every tier has loaded images AND a non-empty description. When
+  it's false, ZERO bytes of work-samples wiring land in the prompt
+  AND the synthetic exchange is skipped — the result is byte-identical
+  to the pre-Q4 prompt + message array for that concern.
+- **Synthetic exchange is NOT in S.messages.** `buildApiMessages(S)`
+  builds it lazily inside fetchLumi's call to callAPI; S.messages
+  itself is never mutated, so the chat UI stays clean and reloaded
+  conversations don't grow phantom messages. cache_control: ephemeral
+  on the last image keeps the image batch warm across turns.
+- **Feature B (one-piece feedback).** Two new ALWAYS bullets in
+  STUDENT MODE RULES instruct Lumi to deliver feedback one point at
+  a time and to push back warmly when the student asks for everything
+  at once. These are universal (not gated on workSamples) — every
+  profile-branch prompt gets them.
+- **Cleanup items left untouched (do not bundle into Q4 follow-ups).**
+  - `netlify/functions/anthropic.mjs` is dead since the Supabase
+    Edge Function migration in commit 22a3dd5 — remove in its own
+    cleanup commit.
+  - The `syllabi` bucket has no SQL definition; it lives in dashboard
+    state only. Worth back-filling a no-op migration so it's visible
+    to anyone reading `supabase/migrations/`.
+  - `teacher_profiles.suggested_prompts` is still write-only on the
+    teacher side (per the commit-4 cleanup note in Data Architecture).
+    Q4 did NOT re-wire it.
 
 ### Roadmap: Post-commit-4 feature ideas
 
