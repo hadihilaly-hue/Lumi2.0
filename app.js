@@ -2956,8 +2956,22 @@ function checkSemesterBanner() {
 
 // ─── VOICE / SPEECH ───────────────────────────────────────────────────────────
 let _recognition     = null;
-let _voiceMode       = localStorage.getItem('lumi_voice_mode') === 'true';
-let _muteTts         = localStorage.getItem('lumi_mute_tts')   === 'true';
+// MIGRATION (pre-MVP polish bundle): single voice setting replaces
+// the old `lumi_voice_mode` + `lumi_mute_tts` boolean pair.
+//   lumi_mute_tts === 'true'                   → 'off'
+//   lumi_voice_mode === 'true' (and not muted) → 'full'
+//   otherwise                                  → 'hear'
+function _readVoiceSetting() {
+  const stored = localStorage.getItem('lumi_voice_setting');
+  if (stored === 'off' || stored === 'hear' || stored === 'full') return stored;
+  const oldMute  = localStorage.getItem('lumi_mute_tts')   === 'true';
+  const oldVoice = localStorage.getItem('lumi_voice_mode') === 'true';
+  const migrated = oldMute ? 'off' : (oldVoice ? 'full' : 'hear');
+  localStorage.setItem('lumi_voice_setting', migrated);
+  return migrated;
+}
+let _voiceSetting    = _readVoiceSetting();
+let _voiceMode       = _voiceSetting === 'full';   // derived flag for existing call sites
 let _isRecording     = false;
 let _lastWasVoice    = false;
 let _silenceTimer    = null;   // 2.5s silence → auto-stop
@@ -3089,7 +3103,7 @@ function _voiceConfirmCancel() {
 
 // Speak a Lumi response aloud
 function speakResponse(text) {
-  if (_muteTts || !text || !window.speechSynthesis) return;
+  if (_voiceSetting === 'off' || !text || !window.speechSynthesis) return;
   speechSynthesis.cancel();
 
   // Strip markdown/HTML so it reads cleanly
@@ -3168,31 +3182,33 @@ function wireVoiceListeners() {
   if (confirmRerecord) confirmRerecord.addEventListener('click', _voiceConfirmRerecord);
   if (confirmCancel)   confirmCancel.addEventListener('click', _voiceConfirmCancel);
 
-  // Voice Mode toggle
-  const vmToggle = $('voiceModeToggle');
-  if (vmToggle) {
-    vmToggle.checked = _voiceMode;
-    vmToggle.addEventListener('change', () => {
-      _voiceMode = vmToggle.checked;
-      localStorage.setItem('lumi_voice_mode', _voiceMode);
+  // Voice mode segmented control (Off / Hear Lumi / Voice mode)
+  const segControl = $('voiceModeSelect');
+  if (segControl) {
+    const setActive = (val) => {
+      segControl.querySelectorAll('.seg-opt').forEach(b => {
+        const a = b.dataset.value === val;
+        b.classList.toggle('active', a);
+        b.setAttribute('aria-checked', a ? 'true' : 'false');
+      });
+    };
+    setActive(_voiceSetting);
+    segControl.addEventListener('click', (e) => {
+      const btn = e.target.closest('.seg-opt');
+      if (!btn) return;
+      const newValue = btn.dataset.value;
+      if (newValue === _voiceSetting) return;
+      _voiceSetting = newValue;
+      _voiceMode = (_voiceSetting === 'full');
+      localStorage.setItem('lumi_voice_setting', _voiceSetting);
+      setActive(_voiceSetting);
       document.body.classList.toggle('voice-mode-on', _voiceMode);
       if (_voiceMode) {
         _startRecording();
       } else {
         _stopRecording();
-        speechSynthesis.cancel();
+        if (_voiceSetting === 'off') speechSynthesis.cancel();
       }
-    });
-  }
-
-  // Mute TTS toggle
-  const muteToggle = $('muteTtsToggle');
-  if (muteToggle) {
-    muteToggle.checked = _muteTts;
-    muteToggle.addEventListener('change', () => {
-      _muteTts = muteToggle.checked;
-      localStorage.setItem('lumi_mute_tts', _muteTts);
-      if (_muteTts) speechSynthesis.cancel();
     });
   }
 }
@@ -3605,7 +3621,7 @@ Remember: help them THINK through the project, never do it for them. Ask guiding
     saveCurrentConv();
     renderMsg('lumi', clean, true);
     // Speak aloud if voice was used OR voice mode is on
-    if (_lastWasVoice || _voiceMode) { speakResponse(clean); _lastWasVoice = false; }
+    if (_voiceSetting !== 'off') { speakResponse(clean); _lastWasVoice = false; }
     renderSidebar();
     if (data) applyProfile(data);
     if (S.exchangeCount === 1) {

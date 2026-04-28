@@ -6,7 +6,7 @@
 <title>Lumi — Menlo School</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css?v=21">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous"></script>
@@ -20,7 +20,6 @@
 
 <!-- Auth loading screen — hidden as soon as session check completes -->
 <div class="auth-loading" id="authLoading">
-  <div class="auth-loading-orb">✦</div>
   <div class="auth-loading-text">Loading Lumi…</div>
 </div>
 
@@ -30,7 +29,6 @@
   <!-- Conversational chat onboarding -->
   <div class="ob-chat-wrap" id="obChatWrap" style="display:none">
     <div class="ob-chat-header">
-      <div class="ob-logo-mark ob-chat-orb">✦</div>
       <span class="ob-chat-title">Lumi</span>
       <span class="ob-chat-subtitle">Menlo School</span>
     </div>
@@ -53,7 +51,6 @@
   <!-- Header (always visible) -->
   <div class="sched-header">
     <div class="sched-logo-wrap">
-      <div class="sched-logo-mark">✦</div>
       <span class="sched-logo-name">Lumi</span>
     </div>
     <div class="sched-dots" id="schedDots">
@@ -186,7 +183,6 @@
 
     <!-- Logo -->
     <div class="sb-logo">
-      <div class="logo-mark">✦</div>
       <div>
         <div class="sb-logo-name">Lumi</div>
         <div class="sb-logo-school">Menlo School</div>
@@ -239,7 +235,6 @@
       <svg viewBox="0 0 24 24" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     </button>
     <div class="mob-logo">
-      <div class="mob-logo-mark">✦</div>
       <span class="mob-logo-name">Lumi</span>
     </div>
     <div style="width:34px"></div>
@@ -277,9 +272,18 @@
           <span class="voice-confirm-transcript" id="voiceConfirmText"></span>
         </div>
         <div class="voice-confirm-actions">
-          <button class="voice-confirm-btn send" id="voiceConfirmSend">✓ Send</button>
-          <button class="voice-confirm-btn rerecord" id="voiceConfirmRerecord">↺ Re-record</button>
-          <button class="voice-confirm-btn cancel" id="voiceConfirmCancel">✕ Cancel</button>
+          <button class="voice-confirm-btn send" id="voiceConfirmSend" aria-label="Send recording">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Send
+          </button>
+          <button class="voice-confirm-btn rerecord" id="voiceConfirmRerecord" aria-label="Re-record">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            Re-record
+          </button>
+          <button class="voice-confirm-btn cancel" id="voiceConfirmCancel" aria-label="Cancel recording">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Cancel
+          </button>
         </div>
       </div>
       <div class="input-area">
@@ -363,24 +367,11 @@
     <!-- Voice -->
     <div class="settings-section">
       <div class="settings-section-title">Voice</div>
-      <div class="toggle-row">
-        <span class="toggle-label">Voice Mode</span>
-        <label class="toggle">
-          <input type="checkbox" id="voiceModeToggle">
-          <div class="toggle-track"></div>
-          <div class="toggle-thumb"></div>
-        </label>
+      <div class="seg-control" id="voiceModeSelect" role="radiogroup" aria-label="Voice mode">
+        <button class="seg-opt" data-value="off"  type="button" role="radio" aria-checked="false">Off</button>
+        <button class="seg-opt" data-value="hear" type="button" role="radio" aria-checked="false">Hear Lumi</button>
+        <button class="seg-opt" data-value="full" type="button" role="radio" aria-checked="false">Voice mode</button>
       </div>
-      <div class="settings-hint" style="margin-bottom:10px">Mic stays active and Lumi speaks back automatically.</div>
-      <div class="toggle-row">
-        <span class="toggle-label">Mute Lumi's voice</span>
-        <label class="toggle">
-          <input type="checkbox" id="muteTtsToggle">
-          <div class="toggle-track"></div>
-          <div class="toggle-thumb"></div>
-        </label>
-      </div>
-      <div class="settings-hint">Lumi won't speak aloud. Click 🔊 on any message to hear it.</div>
     </div>
 
     <!-- Memory -->
