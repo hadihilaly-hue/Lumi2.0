@@ -1319,17 +1319,15 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
     console.warn('[openTutor] profile not ready for:', teacher, course);
   } else if (profile) {
     S.tutorCtx.teacherProfile = profile;
-    if (profile.welcome_message) {
-      renderTeacherNote(teacher, profile, profile.welcome_message);
-      greeting = `I'm ready when you are — ask me anything about ${course}.`;
-    } else {
-      greeting = `Hey! You're studying ${course} with ${dName}. I've learned how ${dName} teaches and what they look for — ask me anything and I'll help you the way ${dName} would.`;
-    }
+    // Pinned welcome card replaces the auto-intro chat greeting at the top of
+    // every new thread. Phase 5b adds the welcome_message column on
+    // teacher_profiles; until then renderPinnedWelcome falls back to a
+    // class-agnostic placeholder body.
+    renderPinnedWelcome(teacher, profile, course);
     msgInput.disabled = false;
     msgInput.placeholder = 'Say something\u2026';
     $('sendBtn').disabled = false;
     await prepareSuggestedPrompts();
-    // Show suggested prompts for new conversations
     setTimeout(() => renderEmptyState(profile, course), 50);
   } else {
     greeting = `\u26a0\ufe0f ${firstName} hasn't set up their Lumi profile for ${course} yet. Once they complete their setup interview, I'll be able to help you exactly the way ${firstName} teaches. In the meantime, you can use General Chat.`;
@@ -1339,8 +1337,10 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
     $('sendBtn').disabled = true;
     console.error('[openTutor] NO PROFILE for:', teacher, course, '\u2014 student sees warning');
   }
-  S.messages.push({ role: 'assistant', content: greeting });
-  renderMsg('lumi', greeting, true);
+  if (greeting) {
+    S.messages.push({ role: 'assistant', content: greeting });
+    renderMsg('lumi', greeting, true);
+  }
   // Add "Open General Chat" button for pending/missing profiles
   if (!profile || profile.__notReady) {
     const btnWrap = document.createElement('div');
@@ -3776,18 +3776,54 @@ function applyProfile({ values = [], goals = [], interests = [] }) {
 }
 
 // ─── RENDER TEACHER NOTE ────────────────────────────────────────────────────
-function renderTeacherNote(teacher, profile, message) {
+// Pinned welcome card — sits at the top of every new tutor thread.
+// Replaces the legacy renderTeacherNote + the auto-intro chat greeting.
+// Reads profile.welcome_message when present (Phase 5b ships the column);
+// falls back to a class-agnostic placeholder until then. Card is NOT a chat
+// message: it's not pushed to S.messages, so it doesn't roundtrip through
+// saveCurrentConv / loadConv — which is intentional. Continued threads
+// (loaded from sidebar) re-enter via loadConv and never see this card,
+// matching the design's "only at the start of new threads" rule.
+function renderPinnedWelcome(teacher, profile, course) {
+  if (!teacher || !profile) return;
+
+  const initials = teacherInitials(teacher);
   const dName = teacherDisplayName(teacher, profile);
-  const el = document.createElement('div');
-  el.className = 'teacher-note';
-  const label = document.createElement('div');
-  label.className = 'teacher-note-label';
-  label.textContent = `A note from ${dName}`;
-  const bubble = document.createElement('div');
-  bubble.className = 'teacher-note-bubble';
-  bubble.textContent = message;
-  el.append(label, bubble);
-  messagesEl.appendChild(el);
+  const tagName = dName.toUpperCase();
+  const lastName = teacher.split(' ').slice(-1)[0] || '';
+  const lastInitial = lastName[0] || '';
+  const signoff = profile?.title
+    ? `— ${profile.title} ${lastInitial}.`
+    : `— ${initials}`;
+
+  // Phase 5b will pipe profile.welcome_message in here. Until then, use a
+  // class-agnostic placeholder so the card has real-feeling content.
+  const bodyHtml = profile.welcome_message
+    ? escHtml(profile.welcome_message)
+        .split(/\n\n+/)
+        .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+        .join('')
+    : `<p>Hey — welcome to ${escHtml(course)}. A few things up front: I won't give you the answers, but I'll help you find them. When you're stuck, tell me what you've already tried — that's where the real learning happens.</p><p>If you're working on an assignment, paste a draft (even a rough one). We'll work from there.</p>`;
+
+  const card = document.createElement('div');
+  card.className = 'pinned-welcome';
+  card.innerHTML = `
+    <div class="pw-tape" aria-hidden="true"></div>
+    <div class="pw-head">
+      <div class="pw-avatar">${escHtml(initials)}</div>
+      <div class="pw-head-text">
+        <div class="pw-head-row">
+          <span class="pw-name">${escHtml(dName)}</span>
+          <span class="pw-tag">FROM ${escHtml(tagName)} · WRITTEN DURING SETUP</span>
+        </div>
+        <div class="pw-subline">Pinned to every new thread · they wrote this themselves, not AI</div>
+      </div>
+    </div>
+    <div class="pw-divider"></div>
+    <div class="pw-body">${bodyHtml}</div>
+    <div class="pw-signoff">${escHtml(signoff)}</div>
+  `;
+  messagesEl.appendChild(card);
 }
 
 // ─── RENDER MESSAGE ──────────────────────────────────────────────────────────
