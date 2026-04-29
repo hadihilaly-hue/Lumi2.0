@@ -1,18 +1,26 @@
 /* ─── THEME ───────────────────────────────────────────────── */
 :root {
-  /* Purple theme palette (light — default) */
-  --color-bg-main:       #f7f5ff;
-  --color-bg-sidebar:    #ede8f8;
-  --color-bg-card:       #ffffff;
-  --color-bg-hover:      #e4dcf4;
-  --color-bg-notice:     #f0ebff;
-  --color-border:        #ddd5f0;
-  --color-accent-dark:   #3b2778;
-  --color-accent-mid:    #7c5cbf;
-  --color-accent-light:  #e4dcf4;
-  --color-text-primary:  #1e1830;
-  --color-text-secondary:#6a5e8a;
-  --color-text-muted:    #b8aed0;
+  /* Cream / navy / orange palette (light — default) */
+  --color-bg-main:       #F2ECE0;
+  --color-bg-sidebar:    #EFE9DC;
+  --color-bg-card:       #FAF6EE;
+  --color-bg-hover:      #E8E1D2;
+  --color-bg-notice:     #F7F1E4;
+  --color-border:        #DFD7C7;
+  --color-accent-dark:   #162342;
+  --color-accent-mid:    #1D2D4F;
+  --color-accent-light:  #E8E1D2;
+  --color-text-primary:  #1D2D4F;
+  --color-text-secondary:#7B7466;
+  --color-text-muted:    #B0A99A;
+
+  /* Warm accent — used sparingly: welcome-card tape, principle tag,
+     "FROM TEACHER · WRITTEN DURING SETUP" labels. Never body text. */
+  --color-warm-mid:      #C76D3D;
+  --color-warm-soft:     rgba(199,109,61,.14);
+
+  /* Inline link blue — prose links inside Lumi messages, code keywords */
+  --color-link:          #3D6AAB;
 
   /* Mapped variables (resolve to --color-* so dark-mode flips them) */
   --bg:          var(--color-bg-main);
@@ -24,38 +32,50 @@
   --text-muted:  var(--color-text-secondary);
   --text-faint:  var(--color-text-muted);
   --accent:      var(--color-accent-mid);
-  --accent-soft: rgba(124,92,191,.1);
-  --accent-glow: rgba(124,92,191,.2);
-  --user-bg:     linear-gradient(135deg,#7c5cbf,#9b7dd4);
+  --accent-soft: rgba(29,45,79,.08);
+  --accent-glow: rgba(29,45,79,.16);
+  --warm:        var(--color-warm-mid);
+  --warm-soft:   var(--color-warm-soft);
+  --link:        var(--color-link);
+  --user-bg:     var(--color-bg-card);
   --lumi-bg:     var(--color-bg-notice);
   --radius:      16px;
   --radius-sm:   10px;
-  --shadow:      0 4px 24px rgba(0,0,0,.08);
+  --shadow:      0 4px 24px rgba(0,0,0,.06);
+
+  /* Typography */
+  --font-sans:   'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  --font-serif:  'Source Serif 4','Source Serif Pro',Georgia,serif;
+  --font-mono:   'SF Mono',Monaco,'Courier New',monospace;
 }
 
 :root.dark-mode {
-  /* Dark palette — off-black backgrounds, off-white text */
-  --color-bg-main:       #121016;
-  --color-bg-sidebar:    #16131e;
-  --color-bg-card:       #1c1926;
-  --color-bg-hover:      #262234;
-  --color-bg-notice:     #1e1a2c;
-  --color-border:        #2e2942;
-  --color-accent-dark:   #c4b5fc;
-  --color-accent-mid:    #a78bfa;
-  --color-accent-light:  #2a2340;
-  --color-text-primary:  #e8e4f0;
-  --color-text-secondary:#9a90b0;
-  --color-text-muted:    #5e5578;
+  /* Dark palette — deep navy bg, cream text, warm accent unchanged */
+  --color-bg-main:       #1A1F2C;
+  --color-bg-sidebar:    #161A26;
+  --color-bg-card:       #232838;
+  --color-bg-hover:      #2A3045;
+  --color-bg-notice:     #232A3F;
+  --color-border:        #2F354A;
+  --color-accent-dark:   #D4DCEC;
+  --color-accent-mid:    #C5D2E8;
+  --color-accent-light:  #2A3045;
+  --color-text-primary:  #EFEAE0;
+  --color-text-secondary:#9A9387;
+  --color-text-muted:    #5E594E;
+
+  --color-warm-mid:      #D08964;
+  --color-warm-soft:     rgba(208,137,100,.18);
+  --color-link:          #8AB0E2;
 
   /* Override literals that don't auto-resolve through var() */
-  --accent-soft: rgba(167,139,250,.12);
-  --accent-glow: rgba(167,139,250,.25);
-  --user-bg:     linear-gradient(135deg,#6d4eaf,#8b6ec7);
+  --accent-soft: rgba(197,210,232,.10);
+  --accent-glow: rgba(197,210,232,.20);
+  --user-bg:     var(--color-bg-card);
   --shadow:      0 4px 24px rgba(0,0,0,.35);
 }
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+html,body{height:100%;font-family:var(--font-sans);background:var(--bg);color:var(--text);overflow:hidden}
 body{display:flex;height:100vh}
 
 /* ─── SIDEBAR ─────────────────────────────────────────────── */
@@ -88,11 +108,11 @@ body{display:flex;height:100vh}
 .sb-new{
   display:flex;align-items:center;gap:7px;width:100%;
   padding:8px 12px;margin-bottom:10px;
-  background:var(--accent-soft);border:1px solid rgba(124,92,191,.15);
+  background:var(--accent-soft);border:1px solid var(--accent-glow);
   border-radius:var(--radius-sm);color:var(--accent);
   font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer;transition:all .2s;
 }
-.sb-new:hover{background:rgba(124,92,191,.15);border-color:var(--accent)}
+.sb-new:hover{background:var(--accent-glow);border-color:var(--accent)}
 .sb-new svg{width:13px;height:13px;stroke:currentColor;fill:none;flex-shrink:0}
 
 /* search */
