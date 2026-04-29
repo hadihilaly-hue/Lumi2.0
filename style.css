@@ -102,17 +102,17 @@ body{display:flex;height:100vh}
 }
 @keyframes lumiBreathe{0%,100%{box-shadow:0 0 10px var(--accent-glow)}50%{box-shadow:0 0 22px var(--accent-glow)}}
 .sb-logo-name{font-size:15px;font-weight:600;letter-spacing:-.3px}
-.sb-logo-school{font-size:10px;color:var(--text-muted);font-weight:400;margin-top:1px}
+.sb-logo-school{font-size:9.5px;color:var(--text-muted);font-weight:500;margin-top:2px;text-transform:uppercase;letter-spacing:.8px;}
 
 /* new chat */
 .sb-new{
   display:flex;align-items:center;gap:7px;width:100%;
-  padding:8px 12px;margin-bottom:10px;
-  background:var(--accent-soft);border:1px solid var(--accent-glow);
-  border-radius:var(--radius-sm);color:var(--accent);
+  padding:9px 12px;margin-bottom:10px;
+  background:var(--accent);border:1px solid var(--accent);
+  border-radius:var(--radius-sm);color:var(--surface);
   font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer;transition:all .2s;
 }
-.sb-new:hover{background:var(--accent-glow);border-color:var(--accent)}
+.sb-new:hover{background:var(--color-accent-dark);border-color:var(--color-accent-dark)}
 .sb-new svg{width:13px;height:13px;stroke:currentColor;fill:none;flex-shrink:0}
 
 /* search */
@@ -895,16 +895,12 @@ body.signin-page{
 .voice-confirm-btn.cancel:hover{background:rgba(239,68,68,.08);color:#ef4444;border-color:rgba(239,68,68,.25)}
 
 /* ─── MY CLASSES SIDEBAR ─────────────────────────────────── */
-.sb-my-classes-hd{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;padding:8px 8px 4px;}
-.sb-star-hd{color:#f59e0b;font-size:11px;line-height:1}
-.sb-my-class-item{display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--text);transition:all .15s;min-height:34px;}
+.sb-my-class-item{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:8px 26px 9px 10px;border-radius:8px;cursor:pointer;color:var(--text);transition:all .15s;min-height:44px;position:relative;}
 .sb-my-class-item:hover{background:var(--surface-2);color:var(--text)}
 .sb-my-class-item.active{background:var(--accent-soft);color:var(--accent)}
-.sb-my-class-star{font-size:12px;flex-shrink:0;color:#f59e0b;line-height:1}
-.sb-my-class-item.active .sb-my-class-star{color:var(--accent)}
-.sb-my-class-name{flex:1;white-space:normal;line-height:1.3;font-weight:500}
-.sb-my-class-teacher{font-size:11px;color:var(--text-muted);flex-shrink:0}
-.sb-my-class-item.active .sb-my-class-teacher{color:var(--accent);opacity:.7}
+.sb-my-class-name{font-size:13px;font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+.sb-my-class-teacher{font-size:11px;color:var(--text-muted);line-height:1.3;margin-top:2px;}
+.sb-my-class-item.active .sb-my-class-teacher{color:var(--accent);opacity:.75}
 .sb-add-class{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:12px;color:var(--text-muted);transition:all .15s;margin-top:2px;}
 .sb-add-class:hover{background:var(--surface-2);color:var(--accent)}
 /* All Classes — styled as a real button */
@@ -1232,7 +1228,7 @@ body.signin-page{
 .intro-cta:active{transform:scale(.97)}
 
 /* ─── PROFILE STATUS BADGES (dot with tooltip) ─────────── */
-.sb-profile-badge{width:8px;height:8px;border-radius:50%;margin-left:auto;flex-shrink:0;position:relative}
+.sb-profile-badge{width:8px;height:8px;border-radius:50%;position:absolute;right:10px;top:50%;transform:translateY(-50%);flex-shrink:0;}
 .sb-profile-badge.ready{background:#16a34a}
 .sb-profile-badge.pending{background:#d97706}
 .sb-profile-badge::after{content:attr(data-tip);position:absolute;right:calc(100% + 6px);top:50%;transform:translateY(-50%);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:10px;white-space:nowrap;color:var(--text-muted);opacity:0;pointer-events:none;transition:opacity .15s;z-index:10}
