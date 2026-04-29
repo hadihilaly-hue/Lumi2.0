@@ -1,5 +1,21 @@
 # LUMI — PROJECT ARCHITECTURE REFERENCE
 
+## Next session priorities
+
+> **TODO (next session — not part of redesign):** Voice-mode TTS is
+> auto-playing on Mr. Harris's replies without the student clicking the
+> speaker icon. Required behavior: TTS must be opt-in only — audio only
+> plays when the student taps the speaker icon next to a specific
+> message. Investigate (a) whether the speech-synthesis API is being
+> triggered unconditionally in `renderMsg()` or `fetchLumi()`, (b)
+> whether there's a localStorage flag (`_voiceSetting` etc.) controlling
+> this that's defaulting to "on", (c) whether the recent voice-mode UI
+> polish commit `8400da5` accidentally removed an opt-in gate. Fix
+> should land before any real student tester (Mr. Harris's class) hits
+> the app — surprise audio in a quiet study environment is a real
+> problem. Surfaced after the visual refresh shipped end-to-end on
+> 2026-04-29.
+
 ## What Lumi Is
 Lumi is an AI-powered edtech tool that replicates a specific teacher's
 teaching style for 24/7 student support. Teachers onboard themselves
