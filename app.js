@@ -2094,25 +2094,66 @@ function renderEmptyState(profile, course) {
     prompts[0] = hwOverride;
   }
 
+  // Skip the "Welcome back" greeting when the teacher's pinned welcome
+  // card is already going to address the student — avoids double-greeting.
+  const hasPinnedWelcome = !!profile?.welcome_message;
+  const studentName = getStudentName();
+  const showGreeting = !hasPinnedWelcome && studentName !== 'there';
+
+  // "Where you left off" — most recent prior conv for this (course, teacher),
+  // excluding the just-opened empty thread. Falls through silently if none.
+  const teacher = S.tutorCtx?.teacher;
+  const convs = getConvs();
+  const priorConv = Object.values(convs)
+    .filter(c => c.id !== S.currentId
+      && c.tutorCtx?.course === course
+      && c.tutorCtx?.teacher === teacher
+      && (c.title || c.preview))
+    .sort((a, b) => (b.ts || 0) - (a.ts || 0))[0] || null;
+
+  // Card category tags — fixed slot mapping per design (visual only,
+  // not derived from prompt content).
+  const TAGS = ['STUDY', 'FEEDBACK', 'CONCEPT'];
+
   const el = document.createElement('div');
   el.className = 'empty-state-prompts';
   el.id = 'emptyStatePrompts';
   el.innerHTML = `
-    <div class="esp-heading">Hi! I'm Lumi — what do you want to work on?</div>
-    <div class="esp-chips">
-      ${prompts.map((p, i) => `<button class="esp-chip" data-index="${i}">${escHtml(p)}</button>`).join('')}
+    ${showGreeting ? `<div class="esp-greeting">Welcome back, ${escHtml(studentName)}.</div>` : ''}
+    <div class="esp-divider"><span>Your conversation will start below</span></div>
+    <div class="esp-cards">
+      ${prompts.map((p, i) => `
+        <button class="esp-card" data-index="${i}">
+          <div class="esp-card-tag">${TAGS[i] || ''}</div>
+          <div class="esp-card-text">${escHtml(p)}</div>
+        </button>`).join('')}
     </div>
+    ${priorConv ? `
+      <button class="esp-resume">
+        <span class="esp-resume-label">Where you left off</span>
+        <span class="esp-resume-title">${escHtml(priorConv.title || priorConv.preview || 'Previous conversation')}</span>
+        <span class="esp-resume-arrow">→</span>
+      </button>` : ''}
   `;
 
-  // Wire chip clicks
-  el.querySelectorAll('.esp-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      msgInput.value = chip.textContent;
+  // Wire card clicks
+  el.querySelectorAll('.esp-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const idx = parseInt(card.dataset.index, 10);
+      msgInput.value = prompts[idx];
       msgInput.focus();
       autoGrow(msgInput);
       updateSendBtn();
     });
   });
+
+  // Wire "Where you left off" click — loadConv handles state + render.
+  if (priorConv) {
+    const resumeBtn = el.querySelector('.esp-resume');
+    if (resumeBtn) {
+      resumeBtn.addEventListener('click', () => loadConv(priorConv.id));
+    }
+  }
 
   messagesEl.appendChild(el);
 }
