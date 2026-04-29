@@ -1325,7 +1325,7 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
     // class-agnostic placeholder body.
     renderPinnedWelcome(teacher, profile, course);
     msgInput.disabled = false;
-    msgInput.placeholder = 'Say something\u2026';
+    msgInput.placeholder = `Say something to ${dName}\u2026`;
     $('sendBtn').disabled = false;
     await prepareSuggestedPrompts();
     setTimeout(() => renderEmptyState(profile, course), 50);
@@ -3909,10 +3909,9 @@ function renderMsg(role, content, animate, att) {
       : (Array.isArray(content) ? content.filter(p => p.type === 'text').map(p => p.text).join(' ') : '');
     if (plainText) _addSpeakerBtn(el, plainText);
 
-    // Feedback row: thumbs up/down (visual stubs) + copy (functional) + label.
-    const teacherDName = S.tutorCtx
-      ? teacherDisplayName(S.tutorCtx.teacher, S.tutorCtx.teacherProfile)
-      : 'Lumi';
+    // Feedback row: thumbs up/down (visual stubs) + copy (functional).
+    // Phase 6 sweep dropped the trailing label — design intent was buttons
+    // alone; the "How would X rate this?" copy was ambiguous.
     const fbRow = document.createElement('div');
     fbRow.className = 'msg-feedback';
     fbRow.innerHTML = `
@@ -3925,10 +3924,6 @@ function renderMsg(role, content, animate, att) {
       <button class="msg-fb-btn" data-action="copy" aria-label="Copy">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
       </button>
-      <!-- TODO (Phase 6 sweep): this label is ambiguous; the design intent was
-           buttons alone. Either drop the span entirely or reword to "Was this
-           helpful?" so the action is unambiguous. -->
-      <span class="msg-fb-label">How would ${escHtml(teacherDName)} rate this?</span>
     `;
     fbRow.querySelectorAll('.msg-fb-btn').forEach(btn => {
       btn.addEventListener('click', () => {

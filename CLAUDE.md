@@ -21,17 +21,21 @@ gives direct answers, only guides reasoning.
   3. Course-info textarea ("What do students need to know about your
      course?") + optional syllabus PDF upload (text extracted via
      pdf.js, stored in syllabus_text)
-  4. Graded work samples — three tiers (progressing / proficient /
+  4. Welcome message textarea (Phase 5b) — pinned to the top of every
+     new student thread. Stored as `welcome_message TEXT` on
+     teacher_profiles. Soft 600-char counter, hard 80-char min.
+  5. Graded work samples — three tiers (progressing / proficient /
      exemplary). Per tier: up to 3 photos + a description of what the
      teacher looks for at that level. HEIC photos are converted to
      JPEG client-side via heic2any before upload. See "teacher_work_
      samples" under Data Architecture and the "Q4 graded work samples"
      entry under Roadmap → Implemented.
-  5. Review summary cards with Edit buttons + share-course-info
+  6. Review summary cards with Edit buttons + share-course-info
      checkbox + Save
-- Each free-text step requires a 50-word minimum before Continue is
-  enabled. Step 4 requires ≥1 photo and a non-empty description for
-  every tier before Continue is enabled.
+- Steps 1–3 each require a 50-word minimum before Continue is enabled.
+  Step 4 (welcome message) requires 80 characters minimum, soft-limited
+  at 600 (counter color-shifts past 600 but never blocks). Step 5 (work
+  samples) requires ≥1 photo and a non-empty description for every tier.
 - Stores text answers as flat TEXT columns on teacher_profiles
   (not JSONB); syllabus PDF goes to the `syllabi` Storage bucket;
   work-sample photos go to the `work-samples` bucket; per-tier
@@ -61,7 +65,9 @@ gives direct answers, only guides reasoning.
   20250420_teacher_title.sql, do not re-add), done, teaching_style,
   excellence_criteria, grading_philosophy, common_mistakes (jsonb),
   explanation_methods, key_values, class_specific_notes,
-  teacher_voice, messages_json (jsonb), created_at, updated_at
+  teacher_voice, welcome_message (Phase 5b — pinned welcome card body,
+  added in 20260429_teacher_welcome_message.sql, nullable), messages_json
+  (jsonb), created_at, updated_at
 - RLS: teachers manage own rows (matched by auth email), all
   authenticated users can read (so student sessions can fetch profiles)
 
@@ -402,6 +408,72 @@ gives direct answers, only guides reasoning.
   - `teacher_profiles.suggested_prompts` is still write-only on the
     teacher side (per the commit-4 cleanup note in Data Architecture).
     Q4 did NOT re-wire it.
+
+### Visual refresh — cream/navy/orange palette (✅ shipped April 2026)
+- **What it is.** End-to-end visual refresh of the student-facing app.
+  Replaced the purple palette with a warm cream/navy/orange editorial
+  treatment, swapped sans-serif chat bubbles for serif Lumi prose with
+  no chrome, added a pinned welcome card at the top of every new
+  thread, and gave teachers a wizard step to write their own welcome
+  message. Seven commits, no functional regressions.
+- **Phases shipped.**
+  - Phase 1 — cream/navy/orange CSS tokens + serif typography token.
+  - Phase 2a/2b — sidebar restructure: Today section, My Classes with
+    teacher subtext, Lumi serif wordmark, navy New chat button, user
+    card with grade subtitle.
+  - Phase 3 — empty-state home view: Welcome back greeting (conditional
+    on no pinned welcome), 3 starter cards with STUDY/FEEDBACK/CONCEPT
+    tags, "Where you left off" resume row, dashed dividers.
+  - Phase 4 — chat shell: Lumi messages drop bubble chrome and pick up
+    `--font-serif`; user bubble color bug fix (`#fff` → `var(--text)`,
+    a Phase-1-introduced regression that went unnoticed for several
+    commits); initials avatar; text-based "is thinking · reading your
+    packet" pill; thumbs/copy feedback row (copy is functional, thumbs
+    are visual stubs).
+  - Phase 5a — pinned welcome card with orange washi-tape graphic,
+    initials avatar, "FROM TEACHER · WRITTEN DURING SETUP" tag, dashed
+    divider, serif body, italic signoff. Card is NOT pushed to
+    S.messages — only renders for new threads, never for loadConv'd
+    continued threads.
+  - Phase 5b — `welcome_message TEXT` column on teacher_profiles
+    (nullable; existing rows fall back to "Welcome to {course}. Ask me
+    anything!"). New Step 4 in the onboarding wizard with banner
+    callout for `done` profiles missing a welcome message.
+  - Phase 6 — input-bar polish, feedback-label drop, purple-residue
+    grep + tokenisation, switch from static `?v=N` to dynamic
+    `?t=Date.now()` cache-busting (see Stack Notes).
+- **Cache-busting convention (Phase 6).** All HTML pages that load
+  `style.css` now use the same dynamic pattern app.js has used since
+  the start: `<script>document.write('<link rel="stylesheet"
+  href="style.css?t=' + Date.now() + '">');</script>`. Every page
+  load gets a fresh URL so browsers can't serve cached CSS. The static
+  `?v=N` pattern caused a Phase-4 cache-stale incident that cost a
+  full debugging cycle — the dynamic pattern eliminates that risk.
+  Trade-off: zero browser-side caching of CSS. Acceptable for a
+  single-file CSS app at this scale.
+  - **Low-priority follow-up:** `document.write` is quietly deprecated
+    and may break in a future browser version or under a strict-mode
+    iframe. Works in all production browsers today; if/when warnings
+    surface, migrate to the `document.createElement('link')` +
+    `appendChild` pattern (synchronous enough during head parsing to
+    avoid FOUC in practice). No action needed today.
+- **Deferred items (real-user signal needed before building).**
+  - **Inline pedagogy moment indicator.** The intro slide carries the
+    three pedagogy principles; the design also showed a per-message
+    "HOW MR. HARRIS TEACHES · principle 01" tag inline in the chat.
+    Implementing that would require either (a) Lumi tagging its own
+    turns (system-prompt change, conflicts with current pedagogy
+    guardrails) or (b) heuristic client-side classification (fragile).
+    Held until a teacher asks for it.
+  - **Thinking-state phrasing rotation.** Today the typing indicator
+    has two phrasings ("is thinking" / "is thinking · reading your
+    packet"). A richer rotation tied to actual conversation context
+    (e.g. "cross-checking against doc 3", topic-aware variants for
+    the active project / homework task) is sketched in the inline
+    TODO at `app.js` makeTyping().
+  - **DOM id rename `sbUserEmail` → `sbUserSubtitle`.** Phase 2b
+    swapped the rendered content from email to "11th · Menlo" but
+    kept the legacy id. Naming-only cleanup; no behaviour change.
 
 ### Roadmap: Post-commit-4 feature ideas
 
