@@ -3023,6 +3023,13 @@ let _recognition     = null;
 //   lumi_mute_tts === 'true'                   → 'off'
 //   lumi_voice_mode === 'true' (and not muted) → 'full'
 //   otherwise                                  → 'hear'
+//
+// TODO (cleanup): the voice-setting migration and the segmented control
+// in settings are now vestigial. After the TTS auto-play removal,
+// _voiceSetting reads/writes affect nothing — manual speaker clicks
+// always play, and there's no auto-play path. When anyone next touches
+// voice-mode code, simplify to a single boolean (or remove the setting
+// entirely) and remove the segmented control from the settings UI.
 function _readVoiceSetting() {
   const stored = localStorage.getItem('lumi_voice_setting');
   if (stored === 'off' || stored === 'hear' || stored === 'full') return stored;
@@ -3165,7 +3172,10 @@ function _voiceConfirmCancel() {
 
 // Speak a Lumi response aloud
 function speakResponse(text) {
-  if (_voiceSetting === 'off' || !text || !window.speechSynthesis) return;
+  // No _voiceSetting gate: this function is now only reached via a
+  // student clicking the speaker icon. Manual clicks always play,
+  // regardless of any global voice-mode toggle state.
+  if (!text || !window.speechSynthesis) return;
   speechSynthesis.cancel();
 
   // Strip markdown/HTML so it reads cleanly
@@ -3682,8 +3692,11 @@ Remember: help them THINK through the project, never do it for them. Ask guiding
     S.exchangeCount++;
     saveCurrentConv();
     renderMsg('lumi', clean, true);
-    // Speak aloud if voice was used OR voice mode is on
-    if (_voiceSetting !== 'off') { speakResponse(clean); _lastWasVoice = false; }
+    // TTS is opt-in per message via the speaker icon next to each Lumi
+    // message — no auto-play. The previous `_voiceSetting !== 'off'`
+    // auto-trigger here defaulted everyone to "hear" mode and surprised
+    // students with audio they hadn't asked for. See _readVoiceSetting
+    // TODO above for the broader cleanup.
     renderSidebar();
     if (data) applyProfile(data);
     if (S.exchangeCount === 1) {
