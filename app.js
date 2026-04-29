@@ -346,7 +346,10 @@ function teacherDisplayName(fullName, profile) {
     const lastName = fullName.split(' ').slice(-1)[0];
     return profile.title + ' ' + lastName;
   }
-  return fullName.split(' ')[0]; // first name fallback
+  // Last-name fallback when title isn't set on the row (older profiles
+  // pre-dating the title column, or in-progress onboarding). More formal
+  // than first-name and gender-neutral.
+  return fullName.split(' ').slice(-1)[0];
 }
 
 function buildTutorSystem(subject, course, teacher, teacherProfile, teacherNotes = [], workSamples = null) {
@@ -1692,7 +1695,60 @@ function renderSidebar() {
 
   const schedule = getSchedule();
 
-  // Homework section — always visible when schedule is set
+  // My Classes — first so the most-clicked nav lives above the fold.
+  // Homework/Projects and Today follow below.
+  if (schedule.length > 0) {
+    const myHd = document.createElement('div');
+    myHd.className = 'sb-section-label';
+    myHd.textContent = 'My Classes';
+    sbNav.appendChild(myHd);
+
+    schedule.forEach(({ course, teacher }) => {
+      const email = TEACHER_EMAIL_MAP[teacher];
+      const cachedProfile = email ? _profileCache[email + '__' + course] : null;
+      const lastName = teacher ? teacher.split(' ').slice(-1)[0] : '';
+      const sidebarName = cachedProfile?.title ? cachedProfile.title + ' ' + lastName : lastName;
+      const isActive = SB.activeTeacher &&
+        SB.activeTeacher.course === course &&
+        SB.activeTeacher.teacher === teacher;
+      const item = document.createElement('div');
+      item.className = 'sb-my-class-item' + (isActive ? ' active' : '');
+      const name = document.createElement('span');
+      name.className = 'sb-my-class-name';
+      name.textContent = course;
+      const tch = document.createElement('span');
+      tch.className = 'sb-my-class-teacher';
+      tch.textContent = sidebarName;
+      const profileStatus = _profileStatusCache[course + '::' + teacher];
+      const badge = document.createElement('span');
+      badge.className = 'sb-profile-badge ' + (profileStatus === 'ready' ? 'ready' : 'pending');
+      badge.textContent = '';
+      badge.dataset.tip = profileStatus === 'ready' ? 'Profile ready' : 'Profile pending';
+      item.appendChild(name);
+      item.appendChild(tch);
+      item.appendChild(badge);
+      item.addEventListener('click', () => {
+        const { subjectId } = lookupSubjectForCourse(course);
+        openTutor(subjectId, course, teacher);
+        closeSidebar();
+      });
+      sbNav.appendChild(item);
+    });
+
+    const addBtn = document.createElement('div');
+    addBtn.className = 'sb-add-class';
+    addBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add a class`;
+    addBtn.addEventListener('click', () => {
+      initScheduleSetup(() => { renderSidebar(); }, getSchedule());
+    });
+    sbNav.appendChild(addBtn);
+
+    const divMid = document.createElement('div');
+    divMid.className = 'sb-divider';
+    sbNav.appendChild(divMid);
+  }
+
+  // Homework + Projects (rendered together by renderHwSidebar).
   if (schedule.length > 0) {
     renderHwSidebar(sbNav);
   }
@@ -1752,58 +1808,6 @@ function renderSidebar() {
     empty.className = 'sb-empty';
     empty.textContent = 'No conversations yet';
     sbNav.appendChild(empty);
-  }
-
-  // My Classes section — always pinned, visible even during search
-  if (schedule.length > 0) {
-    const myHd = document.createElement('div');
-    myHd.className = 'sb-section-label';
-    myHd.textContent = 'My Classes';
-    sbNav.appendChild(myHd);
-
-    schedule.forEach(({ course, teacher }) => {
-      const email = TEACHER_EMAIL_MAP[teacher];
-      const cachedProfile = email ? _profileCache[email + '__' + course] : null;
-      const lastName = teacher ? teacher.split(' ').slice(-1)[0] : '';
-      const sidebarName = cachedProfile?.title ? cachedProfile.title + ' ' + lastName : lastName;
-      const isActive = SB.activeTeacher &&
-        SB.activeTeacher.course === course &&
-        SB.activeTeacher.teacher === teacher;
-      const item = document.createElement('div');
-      item.className = 'sb-my-class-item' + (isActive ? ' active' : '');
-      const name = document.createElement('span');
-      name.className = 'sb-my-class-name';
-      name.textContent = course;
-      const tch = document.createElement('span');
-      tch.className = 'sb-my-class-teacher';
-      tch.textContent = sidebarName;
-      const profileStatus = _profileStatusCache[course + '::' + teacher];
-      const badge = document.createElement('span');
-      badge.className = 'sb-profile-badge ' + (profileStatus === 'ready' ? 'ready' : 'pending');
-      badge.textContent = '';
-      badge.dataset.tip = profileStatus === 'ready' ? 'Profile ready' : 'Profile pending';
-      item.appendChild(name);
-      item.appendChild(tch);
-      item.appendChild(badge);
-      item.addEventListener('click', () => {
-        const { subjectId } = lookupSubjectForCourse(course);
-        openTutor(subjectId, course, teacher);
-        closeSidebar();
-      });
-      sbNav.appendChild(item);
-    });
-
-    const addBtn = document.createElement('div');
-    addBtn.className = 'sb-add-class';
-    addBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add a class`;
-    addBtn.addEventListener('click', () => {
-      initScheduleSetup(() => { renderSidebar(); }, getSchedule());
-    });
-    sbNav.appendChild(addBtn);
-
-    const divMid = document.createElement('div');
-    divMid.className = 'sb-divider';
-    sbNav.appendChild(divMid);
   }
 
   // General Chat button
