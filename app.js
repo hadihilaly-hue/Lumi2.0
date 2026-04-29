@@ -32,7 +32,7 @@ let currentUser = null;
   } else { avatarEl.textContent = initials; }
 
   document.getElementById('sbUserName').textContent  = fullName;
-  document.getElementById('sbUserEmail').textContent = email;
+  setSidebarUserSubtitle();
   const sbAvatarEl = document.getElementById('sbUserAvatar');
   if (meta.avatar_url) {
     const img2 = document.createElement('img'); img2.src = meta.avatar_url; img2.alt = '';
@@ -234,6 +234,15 @@ function getTeachers(subjectName, course) {
 // ─── SYSTEM PROMPTS ───────────────────────────────────────────────────────────
 function getStudentName() { return localStorage.getItem('lumi_name') || 'there'; }
 function getStudentGrade() { return localStorage.getItem('lumi_grade') || null; }
+
+// Sidebar user-card subtitle: "11th · Menlo" if grade is known, else "Menlo".
+// Called at initial auth and after Supabase profile load (covers fresh-device case).
+function setSidebarUserSubtitle() {
+  const grade = localStorage.getItem('lumi_grade');
+  const subtitle = grade ? `${grade}th · Menlo` : 'Menlo';
+  const el = document.getElementById('sbUserEmail');
+  if (el) el.textContent = subtitle;
+}
 function studentCtx() {
   const name       = localStorage.getItem('lumi_name');
   const grade      = localStorage.getItem('lumi_grade');
@@ -1041,6 +1050,7 @@ async function loadProfileFromSupabase() {
     // Always restore name/grade (overwrite if Supabase is newer)
     if (!hasName && data.name)  localStorage.setItem('lumi_name',  data.name);
     if (!hasName && data.grade) localStorage.setItem('lumi_grade', data.grade);
+    setSidebarUserSubtitle();
     if (data.schedule?.length && !localStorage.getItem('lumi_schedule'))
       localStorage.setItem('lumi_schedule', JSON.stringify(data.schedule));
     // Seed global values/goals/interests from profile (loaded conv will override for current session)
@@ -2561,6 +2571,7 @@ function initScheduleSetup(onDone, prefill = []) {
     });
     saveScheduleLocal(schedule);
     if (chosenGrade) localStorage.setItem('lumi_grade', chosenGrade);
+    setSidebarUserSubtitle();
     saveStudyStyle(chosenStyle);
     syncScheduleToSupabase(schedule);
     syncStudyStyleToSupabase(chosenStyle);

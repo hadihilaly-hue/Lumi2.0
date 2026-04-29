@@ -101,7 +101,7 @@ body{display:flex;height:100vh}
   animation:lumiBreathe 3s ease-in-out infinite;
 }
 @keyframes lumiBreathe{0%,100%{box-shadow:0 0 10px var(--accent-glow)}50%{box-shadow:0 0 22px var(--accent-glow)}}
-.sb-logo-name{font-size:15px;font-weight:600;letter-spacing:-.3px}
+.sb-logo-name{font-family:var(--font-serif);font-size:17px;font-weight:600;letter-spacing:-.3px;color:var(--text)}
 .sb-logo-school{font-size:9.5px;color:var(--text-muted);font-weight:500;margin-top:2px;text-transform:uppercase;letter-spacing:.8px;}
 
 /* new chat */
