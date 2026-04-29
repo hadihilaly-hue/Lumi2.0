@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=23">
+<link rel="stylesheet" href="style.css?v=24">
 <script>
   if (localStorage.getItem('lumi-theme') === 'dark') document.documentElement.classList.add('dark-mode');
 </script>
@@ -706,7 +706,8 @@ body { overflow: auto; display: block; }
       <div class="wizard-step-dot" data-step="3"></div>
       <div class="wizard-step-dot" data-step="4"></div>
       <div class="wizard-step-dot" data-step="5"></div>
-      <span class="wizard-step-label" id="wizardStepLabel">Step 1 of 5</span>
+      <div class="wizard-step-dot" data-step="6"></div>
+      <span class="wizard-step-label" id="wizardStepLabel">Step 1 of 6</span>
     </div>
   </div>
 
@@ -850,8 +851,39 @@ body { overflow: auto; display: block; }
       </div>
     </div>
 
-    <!-- STEP 4: Graded Work Samples -->
+    <!-- STEP 4: Welcome Message -->
     <div class="wizard-step" data-step="4">
+      <h2 class="wizard-question-title">What's the first thing every student should read?</h2>
+      <p class="wizard-subhead">Pinned to the top of every new thread in your class. The student sees it before they ask their first question. Write it the way you'd say it.</p>
+      <button class="wizard-examples-toggle" onclick="toggleExamples(this)">
+        <span>Show examples</span>
+        <span class="arrow">▼</span>
+      </button>
+      <div class="wizard-examples">
+        <div class="wizard-example">
+          <div class="wizard-example-label">History Example</div>
+          <div class="wizard-example-text">"Hey — welcome to US History. A few things up front: I won't give you the answers, but I will help you find them. When you're stuck, tell me what you've already tried. And if you're prepping for a DBQ, paste your draft — even a rough one. We'll work from there."</div>
+        </div>
+        <div class="wizard-example">
+          <div class="wizard-example-label">Math Example</div>
+          <div class="wizard-example-text">"Show your work — every step, even the obvious ones. I'll know where the mistake came from, and so will you. If you're stuck, tell me what you tried that broke down. Don't paste the answer key."</div>
+        </div>
+      </div>
+      <div class="wizard-textarea-wrap">
+        <textarea class="wizard-textarea" id="welcomeMessageInput" placeholder="Hey — welcome to your class…"></textarea>
+        <button class="wizard-mic-btn" onclick="toggleMic('welcomeMessageInput')">
+          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
+      </div>
+      <div class="wizard-word-count" id="welcomeMessageCount">0 / 600 characters</div>
+      <div class="wizard-nav">
+        <button class="wizard-prev-btn" onclick="prevStep()">Back</button>
+        <button class="wizard-next-btn" id="step4NextBtn" onclick="nextStep()" disabled>Continue</button>
+      </div>
+    </div>
+
+    <!-- STEP 5: Graded Work Samples -->
+    <div class="wizard-step" data-step="5">
       <div class="wizard-ferpa-callout">
         <strong>Before uploading:</strong> please cover or blur student names and any identifying info. Lumi only needs to see your feedback comments and your grading style — not who they were written for. A black marker, sticky note, or quick photo edit works fine.
       </div>
@@ -896,12 +928,12 @@ body { overflow: auto; display: block; }
 
       <div class="wizard-nav">
         <button class="wizard-prev-btn" onclick="prevStep()">Back</button>
-        <button class="wizard-next-btn" id="step4NextBtn" onclick="nextStep()" disabled>Review & Save</button>
+        <button class="wizard-next-btn" id="step5NextBtn" onclick="nextStep()" disabled>Review & Save</button>
       </div>
     </div>
 
-    <!-- STEP 5: Summary -->
-    <div class="wizard-step" data-step="5">
+    <!-- STEP 6: Summary -->
+    <div class="wizard-step" data-step="6">
       <h2 class="wizard-question-title">Review your profile</h2>
       <p style="color:var(--text-muted);margin-bottom:24px">Make sure everything looks good before saving.</p>
 
@@ -939,8 +971,16 @@ body { overflow: auto; display: block; }
 
       <div class="summary-card">
         <div class="summary-card-header">
-          <span class="summary-card-label">Graded Work Samples</span>
+          <span class="summary-card-label">Welcome Message</span>
           <button class="summary-card-edit" onclick="editField(4)">Edit</button>
+        </div>
+        <div class="summary-card-content" id="summaryWelcomeMessage"></div>
+      </div>
+
+      <div class="summary-card">
+        <div class="summary-card-header">
+          <span class="summary-card-label">Graded Work Samples</span>
+          <button class="summary-card-edit" onclick="editField(5)">Edit</button>
         </div>
         <div class="summary-card-content" id="summaryWorkSamples"></div>
       </div>
@@ -1421,9 +1461,11 @@ function renderClassCards() {
 
     // Q4: if a "complete" profile is still missing any of the 3 work-sample
     // tiers, surface a banner inside the card and offer a click-through that
-    // jumps directly to Step 4. The profile itself stays usable in the
-    // meantime — we don't reset done.
+    // jumps directly to the work-samples step. The profile itself stays
+    // usable in the meantime — we don't reset done.
     const needsSamples = status === 'complete' && !hasAllWorkSampleTiers(profile?.id);
+    // Phase 5b: same treatment for the new welcome_message step.
+    const needsWelcome = status === 'complete' && !(profile?.welcome_message || '').trim();
 
     const card = document.createElement('div');
     card.className = 't-card';
@@ -1437,6 +1479,12 @@ function renderClassCards() {
       </div>
       ${previewText ? `<div class="t-card-preview">${escHtml(previewText)}</div>` : ''}
       ${status === 'complete' ? `<div style="font-size:10px;color:#34d399;font-weight:600;margin-top:4px">✓ Setup complete</div>` : ''}
+      ${needsWelcome ? `
+        <div data-add-welcome="1" style="margin-top:10px;padding:10px 12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;cursor:pointer">
+          <div style="font-size:12px;font-weight:600;color:#F59E0B;margin-bottom:4px">⚡ New step added</div>
+          <div style="font-size:12px;color:var(--text);line-height:1.5">Add a welcome message so students see your voice when they open the class.</div>
+          <div style="font-size:11px;color:#F59E0B;font-weight:600;margin-top:6px">Add welcome message →</div>
+        </div>` : ''}
       ${needsSamples ? `
         <div data-add-samples="1" style="margin-top:10px;padding:10px 12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;cursor:pointer">
           <div style="font-size:12px;font-weight:600;color:#F59E0B;margin-bottom:4px">⚡ New step added</div>
@@ -1446,8 +1494,10 @@ function renderClassCards() {
       <div style="margin-top:8px;font-size:12px;font-weight:600;color:var(--accent)">${escHtml(btnLabel)} →</div>
     `;
     card.addEventListener('click', (e) => {
-      const jumpEl = e.target.closest('[data-add-samples]');
-      openWizard(course, subject, jumpEl ? { jumpToStep: 4 } : {});
+      const samplesEl = e.target.closest('[data-add-samples]');
+      const welcomeEl = e.target.closest('[data-add-welcome]');
+      const jumpStep = welcomeEl ? 4 : samplesEl ? 5 : null;
+      openWizard(course, subject, jumpStep ? { jumpToStep: jumpStep } : {});
     });
     grid.appendChild(card);
   });
@@ -1482,6 +1532,7 @@ async function openWizard(course, subject, opts) {
   document.getElementById('engagementRulesInput').value = profile?.engagement_rules || '';
   document.getElementById('teachingVoiceInput').value = profile?.teaching_voice || '';
   document.getElementById('courseInfoInput').value = profile?.course_info || '';
+  document.getElementById('welcomeMessageInput').value = profile?.welcome_message || '';
 
   // Edit-flow seed for work samples. tSamplesByProfile is populated by
   // loadAllTeacherProfiles. Done BEFORE showStep so renderTierUI has data.
@@ -1542,6 +1593,7 @@ async function openWizard(course, subject, opts) {
   updateWordCount('engagementRulesInput', 'engagementRulesCount', 'step1NextBtn');
   updateWordCount('teachingVoiceInput', 'teachingVoiceCount', 'step2NextBtn');
   updateWordCount('courseInfoInput', 'courseInfoCount', 'step3NextBtn');
+  updateCharCount('welcomeMessageInput', 'welcomeMessageCount', 'step4NextBtn');
 
   // Re-check step 1 button when title changes
   const titleEl = document.getElementById('titleSelect');
@@ -1549,7 +1601,7 @@ async function openWizard(course, subject, opts) {
   titleEl._titleHandler = () => updateWordCount('engagementRulesInput', 'engagementRulesCount', 'step1NextBtn');
   titleEl.addEventListener('change', titleEl._titleHandler);
 
-  // Wire up input listeners
+  // Wire up input listeners (word-count-gated steps 1/2/3)
   ['engagementRulesInput', 'teachingVoiceInput', 'courseInfoInput'].forEach(id => {
     const el = document.getElementById(id);
     el.removeEventListener('input', el._wordCountHandler);
@@ -1562,6 +1614,13 @@ async function openWizard(course, subject, opts) {
     el._wordCountHandler = handler;
     el.addEventListener('input', handler);
   });
+
+  // Wire up the welcome-message char-count gate (step 4).
+  const welcomeEl = document.getElementById('welcomeMessageInput');
+  welcomeEl.removeEventListener('input', welcomeEl._charCountHandler);
+  const welcomeHandler = () => updateCharCount('welcomeMessageInput', 'welcomeMessageCount', 'step4NextBtn');
+  welcomeEl._charCountHandler = welcomeHandler;
+  welcomeEl.addEventListener('input', welcomeHandler);
 
   // Wire tier description textareas
   ['progressing','proficient','exemplary'].forEach(tier => {
@@ -1588,11 +1647,11 @@ function showStep(n) {
     else if (step < n) dot.classList.add('completed');
   });
 
-  document.getElementById('wizardStepLabel').textContent = `Step ${n} of 5`;
+  document.getElementById('wizardStepLabel').textContent = `Step ${n} of 6`;
 
-  // Re-render Step 4 (work samples) when entering it — handles edit-flow
+  // Re-render Step 5 (work samples) when entering it — handles edit-flow
   // pre-population and ensures thumbs/counts/validation are fresh.
-  if (n === 4) {
+  if (n === 5) {
     ['progressing','proficient','exemplary'].forEach(tier => {
       renderTierUI(tier);
       const ta = document.getElementById('tierDesc-' + tier);
@@ -1601,12 +1660,13 @@ function showStep(n) {
     validateStep4();
   }
 
-  // Update summary on step 5
-  if (n === 5) {
+  // Update summary on step 6
+  if (n === 6) {
     document.getElementById('summaryTitle').textContent = document.getElementById('titleSelect').value || '(Not selected)';
     document.getElementById('summaryEngagementRules').textContent = document.getElementById('engagementRulesInput').value || '(Not filled)';
     document.getElementById('summaryTeachingVoice').textContent = document.getElementById('teachingVoiceInput').value || '(Not filled)';
     document.getElementById('summaryCourseInfo').textContent = document.getElementById('courseInfoInput').value || '(Not filled)';
+    document.getElementById('summaryWelcomeMessage').textContent = document.getElementById('welcomeMessageInput').value || '(Not filled)';
     updateWorkSamplesSummary();
 
     if (tSyllabusFile) {
@@ -1619,8 +1679,8 @@ function showStep(n) {
 }
 
 function nextStep() {
-  if (tCurrentStep === 4 && !validateStep4()) return;
-  if (tCurrentStep < 5) showStep(tCurrentStep + 1);
+  if (tCurrentStep === 5 && !validateStep4()) return;
+  if (tCurrentStep < 6) showStep(tCurrentStep + 1);
 }
 
 function prevStep() {
@@ -1650,6 +1710,22 @@ function updateWordCount(inputId, countId, btnId) {
   // Step 1 also requires title selection
   const titleOk = btnId !== 'step1NextBtn' || !!document.getElementById('titleSelect').value;
   btn.disabled = !(wordsMet && titleOk);
+}
+
+// Phase 5b: char-count gate for the welcome-message step. Soft limit at
+// 600 chars (visual only — never blocks). Required min 80 chars so the
+// teacher can't ship an empty or one-word welcome.
+function updateCharCount(inputId, countId, btnId, softLimit = 600, minRequired = 80) {
+  const text = document.getElementById(inputId).value;
+  const count = text.length;
+  const countEl = document.getElementById(countId);
+  const btn = document.getElementById(btnId);
+  if (!countEl || !btn) return;
+
+  countEl.textContent = `${count} / ${softLimit} characters`;
+  countEl.classList.toggle('valid', count >= minRequired);
+  countEl.classList.toggle('invalid', count < minRequired);
+  btn.disabled = count < minRequired;
 }
 
 // ─── WORK SAMPLES (Q4) ───────────────────────────────────────────────────────
@@ -1766,7 +1842,7 @@ function validateStep4() {
     if (card) card.classList.toggle('invalid', !tierOk);
     if (!tierOk) ok = false;
   });
-  const btn = document.getElementById('step4NextBtn');
+  const btn = document.getElementById('step5NextBtn');
   if (btn) btn.disabled = !ok;
   return ok;
 }
@@ -2035,6 +2111,7 @@ async function saveTeacherProfile() {
   const engagementRules = document.getElementById('engagementRulesInput').value.trim();
   const teachingVoice = document.getElementById('teachingVoiceInput').value.trim();
   const courseInfo = document.getElementById('courseInfoInput').value.trim();
+  const welcomeMessage = document.getElementById('welcomeMessageInput').value.trim();
   const shareCourseInfo = document.getElementById('shareCourseInfoCheckbox').checked;
 
   try {
@@ -2062,6 +2139,7 @@ async function saveTeacherProfile() {
         engagement_rules: engagementRules,
         teaching_voice: teachingVoice,
         course_info: courseInfo,
+        welcome_message: welcomeMessage || null,
         syllabus_file_path: syllabusFilePath,
         syllabus_text: tSyllabusText || null,
         syllabus_uploaded_at: syllabusFilePath ? new Date().toISOString() : null,

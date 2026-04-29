@@ -3796,14 +3796,16 @@ function renderPinnedWelcome(teacher, profile, course) {
     ? `— ${profile.title} ${lastInitial}.`
     : `— ${initials}`;
 
-  // Phase 5b will pipe profile.welcome_message in here. Until then, use a
-  // class-agnostic placeholder so the card has real-feeling content.
+  // Reads profile.welcome_message (Phase 5b column). When null — older
+  // profiles pre-dating the column, or in-progress onboarding — fall back to
+  // a short generic line so the card still has content. The teacher.html
+  // home-card banner nudges teachers to fill this in.
   const bodyHtml = profile.welcome_message
     ? escHtml(profile.welcome_message)
         .split(/\n\n+/)
         .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
         .join('')
-    : `<p>Hey — welcome to ${escHtml(course)}. A few things up front: I won't give you the answers, but I'll help you find them. When you're stuck, tell me what you've already tried — that's where the real learning happens.</p><p>If you're working on an assignment, paste a draft (even a rough one). We'll work from there.</p>`;
+    : `<p>Welcome to ${escHtml(course)}. Ask me anything!</p>`;
 
   const card = document.createElement('div');
   card.className = 'pinned-welcome';
