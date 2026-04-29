@@ -352,6 +352,16 @@ function teacherDisplayName(fullName, profile) {
   return fullName.split(' ').slice(-1)[0];
 }
 
+// Two-letter initials for the avatar circle next to teacher messages.
+// "Richard Harris" → "RH", "Madonna" → "M", empty → "✦".
+function teacherInitials(fullName) {
+  if (!fullName || typeof fullName !== 'string') return '✦';
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '✦';
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 function buildTutorSystem(subject, course, teacher, teacherProfile, teacherNotes = [], workSamples = null) {
   const hasProfile = !!teacherProfile;
   const firstName = teacher.split(' ')[0];
@@ -3788,11 +3798,12 @@ function renderMsg(role, content, animate, att) {
 
   if (role === 'lumi') {
     const hd = document.createElement('div'); hd.className = 'msg-head';
-    const av = document.createElement('div'); av.className = 'msg-avatar'; av.textContent = '✦';
+    const av = document.createElement('div'); av.className = 'msg-avatar';
+    av.textContent = S.tutorCtx ? teacherInitials(S.tutorCtx.teacher) : '✦';
     const nm = document.createElement('span'); nm.className = 'msg-name';
     nm.textContent = S.tutorCtx ? teacherDisplayName(S.tutorCtx.teacher, S.tutorCtx.teacherProfile) : 'Lumi';
     hd.append(av, nm); el.appendChild(hd);
-    // Speaker button added after bubble is built (needs text) — deferred below
+    // Speaker button + feedback row added after bubble is built (need text)
   }
 
   const bubble = document.createElement('div'); bubble.className = 'msg-bubble';
@@ -3854,11 +3865,48 @@ function renderMsg(role, content, animate, att) {
 
   if (animate) scrollBottom();
 
-  // Add speaker button to Lumi messages after bubble is in the DOM
+  // Add speaker button + feedback row to Lumi messages after bubble is in DOM
   if (role === 'lumi') {
     const plainText = typeof content === 'string' ? content
       : (Array.isArray(content) ? content.filter(p => p.type === 'text').map(p => p.text).join(' ') : '');
     if (plainText) _addSpeakerBtn(el, plainText);
+
+    // Feedback row: thumbs up/down (visual stubs) + copy (functional) + label.
+    const teacherDName = S.tutorCtx
+      ? teacherDisplayName(S.tutorCtx.teacher, S.tutorCtx.teacherProfile)
+      : 'Lumi';
+    const fbRow = document.createElement('div');
+    fbRow.className = 'msg-feedback';
+    fbRow.innerHTML = `
+      <button class="msg-fb-btn" data-action="up" aria-label="Helpful">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 22V11M2 13v7a2 2 0 0 0 2 2h13.5a2.5 2.5 0 0 0 2.4-1.8l2-7A2.5 2.5 0 0 0 19.5 10H14V5a3 3 0 0 0-3-3l-4 9z"/></svg>
+      </button>
+      <button class="msg-fb-btn" data-action="down" aria-label="Not helpful">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2v11M22 11V4a2 2 0 0 0-2-2H6.5A2.5 2.5 0 0 0 4.1 3.8l-2 7A2.5 2.5 0 0 0 4.5 14H10v5a3 3 0 0 0 3 3l4-9z"/></svg>
+      </button>
+      <button class="msg-fb-btn" data-action="copy" aria-label="Copy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+      <!-- TODO (Phase 6 sweep): this label is ambiguous; the design intent was
+           buttons alone. Either drop the span entirely or reword to "Was this
+           helpful?" so the action is unambiguous. -->
+      <span class="msg-fb-label">How would ${escHtml(teacherDName)} rate this?</span>
+    `;
+    fbRow.querySelectorAll('.msg-fb-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = btn.dataset.action;
+        if (action === 'copy' && plainText && navigator.clipboard) {
+          navigator.clipboard.writeText(plainText).then(
+            () => showToast('Copied', 'ok'),
+            () => showToast('Copy failed')
+          );
+          return;
+        }
+        // Visual flash for thumbs (real telemetry capture deferred).
+        btn.classList.toggle('active');
+      });
+    });
+    el.appendChild(fbRow);
   }
 }
 
@@ -3888,15 +3936,31 @@ function fmtText(text) {
 }
 
 function makeTyping() {
-  const wrap = document.createElement('div'); wrap.className = 'msg lumi';
+  const wrap = document.createElement('div'); wrap.className = 'msg lumi typing-msg';
   const hd   = document.createElement('div'); hd.className = 'msg-head';
-  const av   = document.createElement('div'); av.className = 'msg-avatar'; av.textContent = '✦';
+  const av   = document.createElement('div'); av.className = 'msg-avatar';
+  av.textContent = S.tutorCtx ? teacherInitials(S.tutorCtx.teacher) : '✦';
   const nm   = document.createElement('span'); nm.className = 'msg-name';
-  nm.textContent = S.tutorCtx ? S.tutorCtx.teacher : 'Lumi';
+  nm.textContent = S.tutorCtx
+    ? teacherDisplayName(S.tutorCtx.teacher, S.tutorCtx.teacherProfile)
+    : 'Lumi';
   hd.append(av, nm);
-  const ind = document.createElement('div'); ind.className = 'typing';
-  for (let i = 0; i < 3; i++) { const d = document.createElement('div'); d.className = 'typing-dot'; ind.appendChild(d); }
-  wrap.append(hd, ind); return wrap;
+
+  // Subtext is dynamic when the just-sent user message had an attachment
+  // (multimodal content array). Otherwise: plain "is thinking".
+  // TODO (Phase 6 sweep): expand to a rotation tied to actual conversation
+  // context — e.g. "cross-checking against doc 3" when a referenced document
+  // exists, or topic-aware variants drawn from the active project / homework
+  // task. Today's two-phrasing fallback is the minimum viable surface.
+  const lastMsg = S.messages[S.messages.length - 1];
+  const hasAttachment = Array.isArray(lastMsg?.content);
+  const subtext = `${nm.textContent} is thinking${hasAttachment ? ' · reading your packet' : ''}`;
+
+  const ind = document.createElement('div');
+  ind.className = 'typing';
+  ind.innerHTML = `<span class="typing-dot"></span><span class="typing-text">${escHtml(subtext)}</span>`;
+  wrap.append(hd, ind);
+  return wrap;
 }
 
 function scrollBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
