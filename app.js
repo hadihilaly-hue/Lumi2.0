@@ -14,6 +14,17 @@ let currentUser = null;
 
   currentUser = session.user;
 
+  // TM-2: teacher-test-mode boot detection. ?mode=test on the URL flips
+  // the flag for this tab; sessionStorage stickiness keeps it across
+  // refreshes inside the same tab without leaking to other tabs/sessions.
+  // Cleared by the exit toggle in TM-4 when the teacher returns to
+  // teacher.html.
+  const _testModeUrlParam = new URLSearchParams(window.location.search).get('mode');
+  if (_testModeUrlParam === 'test') {
+    sessionStorage.setItem('lumi_test_mode', 'true');
+  }
+  S.isTestMode = sessionStorage.getItem('lumi_test_mode') === 'true';
+
   // Hide loading screen and show the app
   document.getElementById('authLoading').style.display = 'none';
 
@@ -40,7 +51,12 @@ let currentUser = null;
   } else { sbAvatarEl.textContent = initials; }
 
   await loadProfileFromSupabase();
-  if (!localStorage.getItem('lumi_convs')) await loadConvsFromSupabase();
+  // TM-2: in test mode, always load convs fresh from Supabase (filtered
+  // to is_teacher_test=true). In student mode, only on fresh device
+  // where lumi_convs hasn't been cached.
+  if (S.isTestMode || !localStorage.getItem('lumi_convs')) await loadConvsFromSupabase();
+  // TM-2: synthesize the teacher's own classes into S.testSchedule.
+  if (S.isTestMode) await loadTestModeSchedule();
 
   // Show Teacher Mode link only for allowed teacher emails
   const ALLOWED_TEACHER_EMAILS = ['hadi.hilaly@menloschool.org'];
@@ -483,12 +499,54 @@ NEVER mention the JSON.`;
 // ─── SCHEDULE STORAGE ────────────────────────────────────────────────────────
 // Schedule: [{ course, teacher, subject }]
 function getSchedule() {
+  // TM-2: in test mode, return the in-memory synthetic schedule built
+  // from the teacher's own teacher_profiles rows. NEVER read localStorage
+  // — that key belongs to the student persona on this browser.
+  if (S.isTestMode) return S.testSchedule;
   try { return JSON.parse(localStorage.getItem('lumi_schedule') || '[]'); } catch { return []; }
 }
 function saveScheduleLocal(s) { localStorage.setItem('lumi_schedule', JSON.stringify(s)); }
 
+// TM-2: Build the teacher's own classes into a synthetic schedule shape
+// for the sidebar to consume. Only called in test mode; result lives on
+// S.testSchedule (in-memory only, never persisted). All courses appear
+// here — the sidebar locks incomplete ones at render time (TM-3).
+async function loadTestModeSchedule() {
+  if (!currentUser?.email) return;
+  S.testSchedule = [];
+  try {
+    const { data, error } = await sb
+      .from('teacher_profiles')
+      .select('course_name, subject')
+      .eq('teacher_email', currentUser.email);
+    if (error || !data) {
+      console.warn('[test-mode] teacher_profiles fetch failed:', error?.message);
+      return;
+    }
+    // Display name for synthetic schedule entries — prefer the session
+    // full_name; fall back to the email local-part. Register the
+    // name → email mapping so the existing getTeacherProfile lookup
+    // path works without a special case for test mode.
+    const fullName = currentUser.user_metadata?.full_name
+      || currentUser.email.split('@')[0];
+    TEACHER_EMAIL_MAP[fullName] = currentUser.email;
+    S.testSchedule = data.map(row => ({
+      course:  row.course_name,
+      teacher: fullName,
+      subject: row.subject || lookupSubjectForCourse(row.course_name).subjectName,
+      block:   'TEST',
+    }));
+    console.log(`[test-mode] synthesized schedule with ${S.testSchedule.length} class(es)`);
+  } catch (e) {
+    console.warn('[test-mode] schedule load failed:', e);
+  }
+}
+
 function syncScheduleToSupabase(schedule) {
   if (!currentUser) return;
+  // TM-2: never write a teacher's synthetic schedule into their auth
+  // user's profiles row — they're not a student.
+  if (S.isTestMode) return;
   sb.from('profiles').upsert({
     id: currentUser.id,
     schedule,
@@ -504,6 +562,9 @@ function syncScheduleToSupabase(schedule) {
 
 function syncEnrollments(schedule) {
   if (!currentUser) return;
+  // TM-2: enrollment writes would put the teacher's auth.uid() into
+  // class_enrollments.student_id and corrupt the roster. Hard skip.
+  if (S.isTestMode) return;
   const studentName = localStorage.getItem('lumi_name') || '';
   const pairs = schedule
     .map(({ course, teacher, block }) => {
@@ -860,6 +921,15 @@ const S = {
   ready:         false,
   busy:          false,
   tutorCtx:      null,   // { subjectId, subjectName, course, teacher } or null
+  // TM-2: teacher-test-mode flags. Boot detection sets isTestMode from
+  // ?mode=test URL param + sessionStorage stickiness. testSchedule is
+  // synthesized from teacher_profiles (NEVER written to localStorage to
+  // avoid cross-user pollution on shared browsers). testConvs is the
+  // in-memory conversation cache used in test mode (filtered to
+  // is_teacher_test=true; never touches lumi_convs localStorage).
+  isTestMode:    false,
+  testSchedule:  [],
+  testConvs:     {},
 };
 
 const SB = {
@@ -910,10 +980,14 @@ function lookupSubjectForCourse(courseName) {
 async function loadConvsFromSupabase() {
   if (!currentUser) return;
   try {
+    // TM-2: filter by is_teacher_test so test convs never appear in
+    // the student sidebar (and vice versa). Both branches go through
+    // the same RLS auth.uid() = user_id check.
     const { data, error } = await sb
       .from('conversations')
       .select('id, title, messages, teacher, course, created_at, updated_at')
       .eq('user_id', currentUser.id)
+      .eq('is_teacher_test', !!S.isTestMode)
       .order('created_at', { ascending: false })
       .limit(50);
     if (error || !data || !data.length) return;
@@ -969,12 +1043,16 @@ async function _doSyncConv(convId) {
   if (!conv || !conv.messages.length) return;
 
   const row = {
-    user_id:    currentUser.id,
-    title:      conv.title   || null,
-    messages:   conv.messages,
-    teacher:    conv.tutorCtx?.teacher || null,
-    course:     conv.tutorCtx?.course  || null,
-    updated_at: new Date().toISOString(),
+    user_id:         currentUser.id,
+    title:           conv.title   || null,
+    messages:        conv.messages,
+    teacher:         conv.tutorCtx?.teacher || null,
+    course:          conv.tutorCtx?.course  || null,
+    // TM-2: stamps the row so admin queries / sidebar reads can split
+    // teacher-test convs from real student convs. Default false in the
+    // schema; only test-mode writes flip it to true.
+    is_teacher_test: !!S.isTestMode,
+    updated_at:      new Date().toISOString(),
   };
 
   if (conv.sbId) {
@@ -1017,6 +1095,9 @@ function deleteConvFromSupabase(convId) {
 // Sync user profile (name, grade, accumulated values) to Supabase
 function syncProfileToSupabase() {
   if (!currentUser) return;
+  // TM-2: a teacher in test mode is not a student. Don't overwrite their
+  // auth user record's profiles row with synthetic student fields.
+  if (S.isTestMode) return;
   const name  = localStorage.getItem('lumi_name');
   const grade = localStorage.getItem('lumi_grade');
   const values_profile = {
@@ -1052,6 +1133,10 @@ function syncProfileToSupabase() {
 // Load profile from Supabase on new device (only if localStorage has no name)
 async function loadProfileFromSupabase() {
   if (!currentUser) return;
+  // TM-2: this pulls student profile state (name, grade, schedule, etc.)
+  // into localStorage. In test mode that would overwrite the browser's
+  // student-persona state with the teacher's auth user record.
+  if (S.isTestMode) return;
   const hasName = !!localStorage.getItem('lumi_name');
   try {
     const { data, error } = await sb
@@ -1093,8 +1178,16 @@ async function loadProfileFromSupabase() {
 
 // ─── CONVERSATION STORAGE ─────────────────────────────────────────────────────
 function genId() { return 'conv_' + Date.now() + '_' + Math.random().toString(36).slice(2,5); }
-function getConvs() { try { return JSON.parse(localStorage.getItem('lumi_convs') || '{}'); } catch { return {}; } }
-function saveConvs(c) { localStorage.setItem('lumi_convs', JSON.stringify(c)); }
+function getConvs() {
+  // TM-2: in test mode read from the in-memory cache; the lumi_convs
+  // localStorage key belongs to the student persona on this browser.
+  if (S.isTestMode) return S.testConvs;
+  try { return JSON.parse(localStorage.getItem('lumi_convs') || '{}'); } catch { return {}; }
+}
+function saveConvs(c) {
+  if (S.isTestMode) { S.testConvs = c; return; }
+  localStorage.setItem('lumi_convs', JSON.stringify(c));
+}
 
 function saveCurrentConv() {
   if (!S.currentId) return;
@@ -1262,7 +1355,11 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
 
   // Fetch per-student teacher notes (commit 3). Non-blocking: any failure → no notes.
   S.tutorCtx.teacherNotes = [];
-  if (profile && !profile.__notReady && profile.id && currentUser) {
+  // TM-2: in test mode the "student" is the teacher themselves. There
+  // are no notes to fetch — and a stray match could surface notes the
+  // teacher wrote about a real student with the same auth.uid (won't
+  // happen in practice, but the guard keeps the read path clean).
+  if (profile && !profile.__notReady && profile.id && currentUser && !S.isTestMode) {
     try {
       const notesPromise = sb.from('class_enrollments')
         .select('teacher_notes')
@@ -4080,6 +4177,9 @@ function getStudyStyle() {
 function saveStudyStyle(style) { localStorage.setItem('lumi_study_style', JSON.stringify(style)); }
 async function syncStudyStyleToSupabase(style) {
   if (!currentUser) return;
+  // TM-2: same as syncProfileToSupabase — don't write student-shaped
+  // fields into the teacher's auth user record.
+  if (S.isTestMode) return;
   try {
     await sb.from('profiles').upsert({ id: currentUser.id, study_style: style });
   } catch {}
