@@ -517,12 +517,44 @@ async function loadTestModeSchedule() {
   try {
     const { data, error } = await sb
       .from('teacher_profiles')
-      .select('course_name, subject')
+      .select('id, course_name, subject, done, welcome_message')
       .eq('teacher_email', currentUser.email);
     if (error || !data) {
       console.warn('[test-mode] teacher_profiles fetch failed:', error?.message);
       return;
     }
+
+    // TM-3: also pull work samples so we can decide which classes are
+    // "ready to test" (= done + welcome_message + all 3 work-sample
+    // tiers complete with photos and descriptions). Locked classes
+    // still appear in the sidebar but route to teacher.html for
+    // completion instead of opening a chat.
+    const profileIds = data.map(p => p.id).filter(Boolean);
+    const samplesByProfile = {};
+    if (profileIds.length) {
+      const { data: sampleRows, error: sErr } = await sb
+        .from('teacher_work_samples')
+        .select('teacher_profile_id, tier, description, photo_paths')
+        .in('teacher_profile_id', profileIds);
+      if (sErr) {
+        console.warn('[test-mode] work_samples fetch failed:', sErr.message);
+      } else {
+        (sampleRows || []).forEach(r => {
+          (samplesByProfile[r.teacher_profile_id] ||= {})[r.tier] = r;
+        });
+      }
+    }
+    const TIERS = ['progressing', 'proficient', 'exemplary'];
+    const hasAllTiers = (profileId) => {
+      const byTier = samplesByProfile[profileId];
+      if (!byTier) return false;
+      return TIERS.every(tier => {
+        const r = byTier[tier];
+        return r && Array.isArray(r.photo_paths) && r.photo_paths.length > 0
+            && (r.description || '').trim().length > 0;
+      });
+    };
+
     // Display name for synthetic schedule entries — prefer the session
     // full_name; fall back to the email local-part. Register the
     // name → email mapping so the existing getTeacherProfile lookup
@@ -535,8 +567,14 @@ async function loadTestModeSchedule() {
       teacher: fullName,
       subject: row.subject || lookupSubjectForCourse(row.course_name).subjectName,
       block:   'TEST',
+      // TM-3: ready iff fully onboarded — sidebar locks anything else
+      // and routes the click back to teacher.html for completion.
+      ready:   row.done === true
+            && (row.welcome_message || '').trim().length > 0
+            && hasAllTiers(row.id),
     }));
-    console.log(`[test-mode] synthesized schedule with ${S.testSchedule.length} class(es)`);
+    const readyCount = S.testSchedule.filter(c => c.ready).length;
+    console.log(`[test-mode] synthesized schedule: ${S.testSchedule.length} class(es), ${readyCount} ready`);
   } catch (e) {
     console.warn('[test-mode] schedule load failed:', e);
   }
@@ -1810,7 +1848,7 @@ function renderSidebar() {
     myHd.textContent = 'My Classes';
     sbNav.appendChild(myHd);
 
-    schedule.forEach(({ course, teacher }) => {
+    schedule.forEach(({ course, teacher, ready }) => {
       const email = TEACHER_EMAIL_MAP[teacher];
       const cachedProfile = email ? _profileCache[email + '__' + course] : null;
       const lastName = teacher ? teacher.split(' ').slice(-1)[0] : '';
@@ -1818,23 +1856,42 @@ function renderSidebar() {
       const isActive = SB.activeTeacher &&
         SB.activeTeacher.course === course &&
         SB.activeTeacher.teacher === teacher;
+      // TM-3: in test mode, lock items whose teacher_profile is not
+      // fully onboarded. Locked click routes to teacher.html for the
+      // teacher to finish that profile; ready click opens a chat as
+      // normal.
+      const isLocked = S.isTestMode && ready === false;
       const item = document.createElement('div');
-      item.className = 'sb-my-class-item' + (isActive ? ' active' : '');
+      item.className = 'sb-my-class-item'
+        + (isActive ? ' active' : '')
+        + (isLocked ? ' locked' : '');
       const name = document.createElement('span');
       name.className = 'sb-my-class-name';
       name.textContent = course;
       const tch = document.createElement('span');
       tch.className = 'sb-my-class-teacher';
-      tch.textContent = sidebarName;
-      const profileStatus = _profileStatusCache[course + '::' + teacher];
-      const badge = document.createElement('span');
-      badge.className = 'sb-profile-badge ' + (profileStatus === 'ready' ? 'ready' : 'pending');
-      badge.textContent = '';
-      badge.dataset.tip = profileStatus === 'ready' ? 'Profile ready' : 'Profile pending';
+      tch.textContent = isLocked ? 'Finish your profile to test' : sidebarName;
       item.appendChild(name);
       item.appendChild(tch);
-      item.appendChild(badge);
+      // The student-side profile-status badge is meaningless in test
+      // mode (the lock state already signals readiness). Skip it.
+      if (!S.isTestMode) {
+        const profileStatus = _profileStatusCache[course + '::' + teacher];
+        const badge = document.createElement('span');
+        badge.className = 'sb-profile-badge ' + (profileStatus === 'ready' ? 'ready' : 'pending');
+        badge.textContent = '';
+        badge.dataset.tip = profileStatus === 'ready' ? 'Profile ready' : 'Profile pending';
+        item.appendChild(badge);
+      }
       item.addEventListener('click', () => {
+        if (isLocked) {
+          // Route back to teacher.html with the course preselected so
+          // the wizard opens at Step 1 for completion. ?from=test-mode
+          // is preserved for TM-4 to wire a "back to test mode" link
+          // after onboarding completes.
+          window.location.href = `teacher.html?course=${encodeURIComponent(course)}&from=test-mode`;
+          return;
+        }
         const { subjectId } = lookupSubjectForCourse(course);
         openTutor(subjectId, course, teacher);
         closeSidebar();
@@ -1842,13 +1899,29 @@ function renderSidebar() {
       sbNav.appendChild(item);
     });
 
-    const addBtn = document.createElement('div');
-    addBtn.className = 'sb-add-class';
-    addBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add a class`;
-    addBtn.addEventListener('click', () => {
-      initScheduleSetup(() => { renderSidebar(); }, getSchedule());
-    });
-    sbNav.appendChild(addBtn);
+    // TM-3: when in test mode and zero classes are ready, surface a
+    // small explanatory note. Visual styling lives in TM-4's banner
+    // work — for TM-3 plain text via the existing .sb-empty class is
+    // enough.
+    if (S.isTestMode && !schedule.some(c => c.ready)) {
+      const note = document.createElement('div');
+      note.className = 'sb-empty';
+      note.textContent = 'Complete a class profile to start testing.';
+      sbNav.appendChild(note);
+    }
+
+    // "+ Add a class" is a student-onboarding affordance — hide in
+    // test mode (the teacher's classes come from teacher_profiles,
+    // not from the student schedule wizard).
+    if (!S.isTestMode) {
+      const addBtn = document.createElement('div');
+      addBtn.className = 'sb-add-class';
+      addBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add a class`;
+      addBtn.addEventListener('click', () => {
+        initScheduleSetup(() => { renderSidebar(); }, getSchedule());
+      });
+      sbNav.appendChild(addBtn);
+    }
 
     const divMid = document.createElement('div');
     divMid.className = 'sb-divider';

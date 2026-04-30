@@ -1366,6 +1366,18 @@ async function bootHome() {
     });
   });
 
+  // TM-3: if arriving via the locked-class route from the student app's
+  // test-mode sidebar (teacher.html?course=...&from=test-mode), jump
+  // straight into the wizard for that course instead of showing the
+  // home view first. The course must be one this teacher actually
+  // teaches — defensive check against URL tampering.
+  const _tmCourse = new URLSearchParams(window.location.search).get('course');
+  if (_tmCourse && tTeacher.classes?.includes(_tmCourse)) {
+    const subject = lookupSubjectForCourse(_tmCourse);
+    openWizard(_tmCourse, subject);
+    return;
+  }
+
   showView('homeView');
 }
 

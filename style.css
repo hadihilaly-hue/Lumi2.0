@@ -954,6 +954,11 @@ body.signin-page{
 .sb-my-class-name{font-size:13px;font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
 .sb-my-class-teacher{font-size:11px;color:var(--text-muted);line-height:1.3;margin-top:2px;}
 .sb-my-class-item.active .sb-my-class-teacher{color:var(--accent);opacity:.75}
+/* TM-3: locked test-mode item — class profile not fully onboarded.
+   Click routes to teacher.html for completion (see renderSidebar). */
+.sb-my-class-item.locked{opacity:.55;cursor:pointer;}
+.sb-my-class-item.locked:hover{opacity:.78;background:var(--surface-2);}
+.sb-my-class-item.locked .sb-my-class-teacher{font-style:italic;}
 .sb-add-class{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:12px;color:var(--text-muted);transition:all .15s;margin-top:2px;}
 .sb-add-class:hover{background:var(--surface-2);color:var(--accent)}
 /* All Classes — styled as a real button */
