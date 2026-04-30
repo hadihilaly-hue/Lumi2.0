@@ -139,7 +139,10 @@ gives direct answers, only guides reasoning.
 ### Other Supabase Tables
 - **profiles** — student user profiles (id, name, grade, values_profile jsonb)
 - **conversations** — chat history (id, user_id, title, messages jsonb,
-  teacher, course, created_at, updated_at)
+  teacher, course, is_teacher_test boolean (Teacher Test Mode TM-1 —
+  added in 20260429_2_teacher_test_mode.sql; default false; flips
+  to true for conversations created while a teacher is in test
+  mode), created_at, updated_at)
 - Both have RLS scoped to auth.uid()
 
 ### teacher_work_samples (Q4)
@@ -474,6 +477,56 @@ gives direct answers, only guides reasoning.
   - **DOM id rename `sbUserEmail` → `sbUserSubtitle`.** Phase 2b
     swapped the rendered content from email to "11th · Menlo" but
     kept the legacy id. Naming-only cleanup; no behaviour change.
+
+### Teacher Test Mode (✅ shipped 2026-04-29, post-redesign)
+- **What it is.** Lets a teacher enter the student app as themselves
+  to verify their AI persona — live conversation, not preview. Same
+  pedagogy guardrails, same pinned welcome card, same chat shell as
+  a real student session. Conversations save under the teacher's
+  auth.uid() with `is_teacher_test=true` so they never bleed into
+  student data or admin analytics.
+- **Schema.** `is_teacher_test BOOLEAN NOT NULL DEFAULT FALSE` on
+  conversations (TM-1, 20260429_2_teacher_test_mode.sql). No RLS
+  changes — existing `auth.uid() = user_id` policy isolates teacher's
+  test conversations naturally.
+- **URL conventions.**
+  - `app.html?mode=test` — entry point. Boot detection in app.js
+    flips `S.isTestMode = true` for the tab and mirrors to
+    `sessionStorage.lumi_test_mode` for stickiness across refreshes.
+    Cleared by the in-sidebar "Exit test mode" button.
+  - `teacher.html?course=<encoded>` — TM-3 locked-class route. The
+    student-app sidebar routes locked classes to teacher.html with
+    the course preselected; bootHome auto-opens the wizard.
+  - `teacher.html?from=test-mode` — TM-4 round-trip marker. When
+    bootHome sees this param, it reveals a "Back to test mode" banner
+    on the home view so the teacher can one-click their way back
+    after completing the wizard.
+- **Plumbing (TM-2).** Every write path is gated behind
+  `if (S.isTestMode) return;` to prevent a teacher from writing
+  student-shaped state into shared tables: syncProfileToSupabase,
+  syncEnrollments, syncScheduleToSupabase, syncStudyStyleToSupabase,
+  loadProfileFromSupabase. `getSchedule` / `getConvs` / `saveConvs`
+  branch to in-memory state (`S.testSchedule` / `S.testConvs`) so
+  localStorage keys belonging to the student persona on a shared
+  browser are never touched.
+- **Sidebar gating (TM-3).** `loadTestModeSchedule` synthesizes the
+  teacher's classes from teacher_profiles + teacher_work_samples,
+  baking a `ready` flag onto each entry. Locked items get a
+  `.locked` CSS class, "Finish your profile to test" subtitle, and
+  click-routes to `teacher.html?course=…&from=test-mode` for
+  completion. Zero-ready edge case appends a "Complete a class
+  profile to start testing." note. "+ Add a class" hidden.
+- **Banner + toggle (TM-4).** Persistent terracotta-accented banner
+  at the top of the chat panel ("TEST MODE — you're chatting with
+  your own AI persona for {course}.") — never dismissible. Sidebar
+  exit button below the user card. Teacher home gets an iOS-style
+  "Student mode" toggle in the header. The legacy
+  `rgba(123,105,245,.3)` Student-Mode link (a third purple shade
+  Phase 6 missed) is gone.
+- **Pollution-prevention checklist** — verify before adding any new
+  write path to app.js: does it write to a shared table or the
+  student persona's localStorage? If yes, add a guard
+  `if (S.isTestMode) return;` at the top.
 
 ### Roadmap: Post-commit-4 feature ideas
 

@@ -25,6 +25,23 @@ let currentUser = null;
   }
   S.isTestMode = sessionStorage.getItem('lumi_test_mode') === 'true';
 
+  // TM-4: when in test mode, reveal the persistent banner at the top
+  // of the chat panel and the exit-test-mode button under the user
+  // card in the sidebar. Both are display:none by default in the
+  // markup so student users never see them.
+  if (S.isTestMode) {
+    const banner = document.getElementById('testModeBanner');
+    if (banner) banner.style.display = 'flex';
+    const exitBtn = document.getElementById('sbExitTestBtn');
+    if (exitBtn) {
+      exitBtn.style.display = 'flex';
+      exitBtn.addEventListener('click', () => {
+        sessionStorage.removeItem('lumi_test_mode');
+        window.location.href = 'teacher.html';
+      });
+    }
+  }
+
   // Hide loading screen and show the app
   document.getElementById('authLoading').style.display = 'none';
 
@@ -258,6 +275,18 @@ function setSidebarUserSubtitle() {
   const subtitle = grade ? `${grade}th · Menlo` : 'Menlo';
   const el = document.getElementById('sbUserEmail');
   if (el) el.textContent = subtitle;
+}
+
+// TM-4: update the test-mode banner copy with the active class. Called
+// from openTutor whenever S.tutorCtx.course is set. No-op when not in
+// test mode (the banner element is display:none for student users).
+function updateTestModeBanner(course) {
+  if (!S.isTestMode) return;
+  const text = document.getElementById('testModeBannerText');
+  if (!text) return;
+  text.textContent = course
+    ? `TEST MODE — you're chatting with your own AI persona for ${course}.`
+    : 'TEST MODE — open a class to test your AI persona.';
 }
 function studentCtx() {
   const name       = localStorage.getItem('lumi_name');
@@ -1339,6 +1368,8 @@ async function openTutor(subjectId, course, teacher) {
   S.messages      = [];
   S.exchangeCount = 0;
   S.tutorCtx      = { subjectId, subjectName, course, teacher };
+  // TM-4: refresh the persistent test-mode banner with the new class.
+  updateTestModeBanner(course);
   S.ready         = true;
   S.values.clear(); S.goals.clear(); S.interests.clear();
   SB.mode = 'tutor'; SB.activeTeacher = { subjectId, course, teacher };

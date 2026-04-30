@@ -617,7 +617,16 @@ body { overflow: auto; display: block; }
       </div>
     </div>
     <div class="t-hdr-right">
-      <a href="app.html" style="font-size:12px;font-weight:500;color:var(--accent);text-decoration:none;padding:6px 12px;border:1px solid rgba(123,105,245,.3);border-radius:7px;background:var(--accent-soft)">🎒 Student Mode</a>
+      <!-- TM-4: Student mode toggle. Replaces the legacy crude link
+           (which carried a purple-residue rgba). Click navigates to
+           app.html?mode=test which flips the test-mode flag in
+           sessionStorage at the student-app boot path. -->
+      <button id="tTestModeToggle" class="t-test-mode-toggle" type="button"
+        onclick="window.location.href='app.html?mode=test'"
+        title="Open the student app as yourself for testing">
+        <span class="t-test-mode-label">Student mode</span>
+        <span class="t-test-mode-switch"><span class="t-test-mode-knob"></span></span>
+      </button>
       <div class="t-hdr-user">
         <span id="hdrName"></span>
         <div class="t-hdr-avatar" id="hdrAvatar"></div>
@@ -626,6 +635,15 @@ body { overflow: auto; display: block; }
     </div>
   </div>
   <div class="t-home-body">
+    <!-- TM-4: shown when the teacher arrived via the locked-class
+         route from the student app's test-mode sidebar
+         (?from=test-mode in URL). Offers a one-click return so the
+         teacher doesn't have to re-type the URL. Visibility is set
+         in bootHome based on the URL param. -->
+    <div id="tBackToTestBanner" class="t-back-to-test-banner" style="display:none">
+      <span class="t-back-to-test-text">You came from Test Mode.</span>
+      <a class="t-back-to-test-link" href="app.html?mode=test">Back to test mode →</a>
+    </div>
     <div class="t-welcome">
       <h2 id="welcomeHeading">Welcome</h2>
       <p>Set up your classes so Lumi can help your students like you would.</p>
@@ -1366,12 +1384,23 @@ async function bootHome() {
     });
   });
 
+  const _tmParams = new URLSearchParams(window.location.search);
+  const _tmCourse = _tmParams.get('course');
+
+  // TM-4: set the "Back to test mode" banner's visibility BEFORE the
+  // openWizard branch below. The banner lives inside homeView markup,
+  // so it's invisible while wizardView is showing and becomes visible
+  // automatically when goHome → showView('homeView') runs after Save.
+  if (_tmParams.get('from') === 'test-mode') {
+    const banner = document.getElementById('tBackToTestBanner');
+    if (banner) banner.style.display = 'flex';
+  }
+
   // TM-3: if arriving via the locked-class route from the student app's
   // test-mode sidebar (teacher.html?course=...&from=test-mode), jump
   // straight into the wizard for that course instead of showing the
   // home view first. The course must be one this teacher actually
   // teaches — defensive check against URL tampering.
-  const _tmCourse = new URLSearchParams(window.location.search).get('course');
   if (_tmCourse && tTeacher.classes?.includes(_tmCourse)) {
     const subject = lookupSubjectForCourse(_tmCourse);
     openWizard(_tmCourse, subject);
