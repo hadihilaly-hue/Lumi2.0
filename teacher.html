@@ -913,7 +913,7 @@ body { overflow: auto; display: block; }
         <div class="tier-desc">Students still developing the skill</div>
         <div class="tier-thumbs" id="tierThumbs-progressing"></div>
         <button type="button" class="tier-add-btn" id="tierAddBtn-progressing" onclick="document.getElementById('tierFiles-progressing').click()">
-          + Add photos<span class="tier-add-count" id="tierCount-progressing">(0/3)</span>
+          + Add photos<span class="tier-add-count" id="tierCount-progressing">(optional)</span>
         </button>
         <input type="file" id="tierFiles-progressing" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('progressing', event)">
         <div class="tier-converting" id="tierConverting-progressing">Converting HEIC photo…</div>
@@ -925,7 +925,7 @@ body { overflow: auto; display: block; }
         <div class="tier-desc">Students meeting expectations</div>
         <div class="tier-thumbs" id="tierThumbs-proficient"></div>
         <button type="button" class="tier-add-btn" id="tierAddBtn-proficient" onclick="document.getElementById('tierFiles-proficient').click()">
-          + Add photos<span class="tier-add-count" id="tierCount-proficient">(0/3)</span>
+          + Add photos<span class="tier-add-count" id="tierCount-proficient">(optional)</span>
         </button>
         <input type="file" id="tierFiles-proficient" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('proficient', event)">
         <div class="tier-converting" id="tierConverting-proficient">Converting HEIC photo…</div>
@@ -937,7 +937,7 @@ body { overflow: auto; display: block; }
         <div class="tier-desc">Students exceeding expectations</div>
         <div class="tier-thumbs" id="tierThumbs-exemplary"></div>
         <button type="button" class="tier-add-btn" id="tierAddBtn-exemplary" onclick="document.getElementById('tierFiles-exemplary').click()">
-          + Add photos<span class="tier-add-count" id="tierCount-exemplary">(0/3)</span>
+          + Add photos<span class="tier-add-count" id="tierCount-exemplary">(optional)</span>
         </button>
         <input type="file" id="tierFiles-exemplary" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('exemplary', event)">
         <div class="tier-converting" id="tierConverting-exemplary">Converting HEIC photo…</div>
@@ -946,7 +946,7 @@ body { overflow: auto; display: block; }
 
       <div class="wizard-nav">
         <button class="wizard-prev-btn" onclick="prevStep()">Back</button>
-        <button class="wizard-next-btn" id="step5NextBtn" onclick="nextStep()" disabled>Review & Save</button>
+        <button class="wizard-next-btn" id="step5NextBtn" onclick="nextStep()">Review & Save</button>
       </div>
     </div>
 
@@ -1847,7 +1847,7 @@ function renderTierUI(tier) {
   });
   const total = slot.existingPaths.length + slot.photos.length;
   const countEl = document.getElementById('tierCount-' + tier);
-  if (countEl) countEl.textContent = `(${total}/3)`;
+  if (countEl) countEl.textContent = total > 0 ? `(${total}/3)` : '(optional)';
   const addBtn = document.getElementById('tierAddBtn-' + tier);
   if (addBtn) addBtn.disabled = total >= 3;
 }
@@ -1872,20 +1872,12 @@ function makeThumb(url, onRemove) {
 }
 
 function validateStep4() {
-  const tiers = ['progressing','proficient','exemplary'];
-  let ok = true;
-  tiers.forEach(tier => {
-    const slot = tWorkSamples[tier];
-    const count = slot.existingPaths.length + slot.photos.length;
-    const hasDesc = (slot.description || '').trim().length > 0;
-    const tierOk = count >= 1 && hasDesc;
-    const card = document.querySelector(`.tier-card[data-tier="${tier}"]`);
-    if (card) card.classList.toggle('invalid', !tierOk);
-    if (!tierOk) ok = false;
-  });
+  // Step 5 (work samples) is fully optional — both photos and the per-tier
+  // description can be skipped. Continue is never gated.
+  document.querySelectorAll('.tier-card').forEach(c => c.classList.remove('invalid'));
   const btn = document.getElementById('step5NextBtn');
-  if (btn) btn.disabled = !ok;
-  return ok;
+  if (btn) btn.disabled = false;
+  return true;
 }
 
 function updateWorkSamplesSummary() {
@@ -2094,11 +2086,14 @@ Here's the syllabus:
 ${syllabusText || '(not provided)'}`;
 
   try {
-    const res = await fetch('https://jtwgxkvfdboxcoynlaij.supabase.co/functions/v1/claude-proxy', {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session?.access_token) throw new Error('Not authenticated');
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/claude-proxy`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp0d2d4a3ZmZGJveGNveW5sYWlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQyNDc5NDUsImV4cCI6MjA1OTgyMzk0NX0.8hRL7elzXhU0_E1FTKfDfE_TKHv95g6JqvSwK-sDpec',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5',
