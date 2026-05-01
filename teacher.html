@@ -310,22 +310,46 @@ body { overflow: auto; display: block; }
 
 /* ─── SYLLABUS UPLOAD ─────────────────────────────────────── */
 .syllabus-upload-area {
-  margin-bottom: 20px; padding: 20px;
+  margin-bottom: 12px; padding: 20px;
   background: var(--surface-2); border: 2px dashed var(--border);
   border-radius: 12px; text-align: center; transition: all .15s;
   cursor: pointer;
 }
 .syllabus-upload-area:hover { border-color: var(--accent); background: var(--accent-soft); }
-.syllabus-upload-area.has-file { border-style: solid; border-color: #34d399; }
+.syllabus-upload-area.full { opacity: .5; cursor: not-allowed; }
+.syllabus-upload-area.full:hover { border-color: var(--border); background: var(--surface-2); }
 .syllabus-upload-icon { font-size: 32px; margin-bottom: 8px; }
 .syllabus-upload-text { font-size: 14px; color: var(--text-muted); margin-bottom: 4px; }
 .syllabus-upload-hint { font-size: 12px; color: var(--text-faint); }
-.syllabus-file-name {
-  display: none; margin-top: 10px; padding: 8px 12px;
-  background: rgba(52,211,153,.1); border: 1px solid rgba(52,211,153,.2);
-  border-radius: 8px; font-size: 13px; color: #34d399;
+.syllabus-file-list {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-bottom: 12px;
 }
-.syllabus-upload-area.has-file .syllabus-file-name { display: block; }
+.syllabus-file-list:empty { display: none; }
+.syllabus-file-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px;
+  background: rgba(52,211,153,.08);
+  border: 1px solid rgba(52,211,153,.2);
+  border-radius: 8px; font-size: 13px;
+}
+.syllabus-file-row.pending {
+  background: rgba(123,105,245,.06);
+  border-color: rgba(123,105,245,.2);
+}
+.syllabus-file-icon { font-size: 16px; flex-shrink: 0; }
+.syllabus-file-name-cell {
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text);
+}
+.syllabus-file-size { font-size: 12px; color: var(--text-faint); flex-shrink: 0; }
+.syllabus-file-x {
+  background: rgba(0,0,0,.05); border: none; color: var(--text-muted);
+  width: 22px; height: 22px; border-radius: 50%;
+  cursor: pointer; font-size: 14px; line-height: 1;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.syllabus-file-x:hover { background: #ef4444; color: #fff; }
 #syllabusFileInput { display: none; }
 
 /* ─── WORK SAMPLES (Q4) ────────────────────────────────────── */
@@ -833,14 +857,14 @@ body { overflow: auto; display: block; }
         </div>
       </div>
 
-      <!-- Syllabus Upload -->
-      <div class="syllabus-upload-area" onclick="document.getElementById('syllabusFileInput').click()">
+      <!-- Syllabus Upload (multi-file, up to 20 PDFs) -->
+      <div class="syllabus-file-list" id="syllabusFileList"></div>
+      <div class="syllabus-upload-area" id="syllabusUploadArea" onclick="document.getElementById('syllabusFileInput').click()">
         <div class="syllabus-upload-icon">📄</div>
-        <div class="syllabus-upload-text">Got a syllabus? Upload it (PDF only)</div>
-        <div class="syllabus-upload-hint">We'll extract the text to help fill in your course info</div>
-        <div class="syllabus-file-name" id="syllabusFileName"></div>
+        <div class="syllabus-upload-text">Got a syllabus? Upload up to 20 PDFs <span id="syllabusCount">(0/20)</span></div>
+        <div class="syllabus-upload-hint">We'll extract the text to help fill in your course info. PDFs only, max 10MB each.</div>
       </div>
-      <input type="file" id="syllabusFileInput" accept="application/pdf" onchange="handleSyllabusUpload(event)">
+      <input type="file" id="syllabusFileInput" accept="application/pdf" multiple onchange="handleSyllabusUpload(event)">
 
       <button class="wizard-examples-toggle" onclick="toggleExamples(this)">
         <span>Show examples</span>
@@ -1262,8 +1286,14 @@ let tTeacher = null;
 let tProfiles = {};
 let tCurrentClass = null;
 let tCurrentStep = 1;
-let tSyllabusFile = null;
-let tSyllabusText = '';
+// Multi-syllabus state. Re-initialized in openWizard().
+// `tSyllabusNewFiles`     — newly-picked PDFs awaiting upload at save time;
+//                            each entry caches its client-side-extracted text.
+// `tSyllabusExistingPaths` — Storage paths of already-uploaded syllabi kept
+//                            across an edit. × button removes from this array;
+//                            the file gets deleted from storage on save.
+let tSyllabusNewFiles = [];
+let tSyllabusExistingPaths = [];
 let tTemplateData = null;
 let tRecognition = null;
 let tRecordingField = null;
@@ -1554,8 +1584,8 @@ async function openWizard(course, subject, opts) {
   opts = opts || {};
   tCurrentClass = { course, subject };
   tCurrentStep = 1;
-  tSyllabusFile = null;
-  tSyllabusText = '';
+  tSyllabusNewFiles = [];
+  tSyllabusExistingPaths = [];
   tTemplateData = null;
   tWorkSamples = {
     progressing: { photos: [], description: '', existingPaths: [] },
@@ -1615,15 +1645,8 @@ async function openWizard(course, subject, opts) {
       .catch(err => console.warn('signed URL fetch error:', err));
   }
 
-  if (profile?.syllabus_file_path) {
-    tSyllabusFile = { name: profile.syllabus_file_path.split('/').pop() };
-    tSyllabusText = profile.syllabus_text || '';
-    document.getElementById('syllabusFileName').textContent = '✓ ' + tSyllabusFile.name;
-    document.querySelector('.syllabus-upload-area').classList.add('has-file');
-  } else {
-    document.getElementById('syllabusFileName').textContent = '';
-    document.querySelector('.syllabus-upload-area').classList.remove('has-file');
-  }
+  tSyllabusExistingPaths = Array.isArray(profile?.syllabus_paths) ? [...profile.syllabus_paths] : [];
+  renderSyllabusList();
 
   document.getElementById('shareCourseInfoCheckbox').checked = profile?.share_course_info || false;
 
@@ -1710,9 +1733,13 @@ function showStep(n) {
     document.getElementById('summaryWelcomeMessage').textContent = document.getElementById('welcomeMessageInput').value || '(Not filled)';
     updateWorkSamplesSummary();
 
-    if (tSyllabusFile) {
+    const existingNames = tSyllabusExistingPaths.map(p => p.split('/').pop());
+    const newNames = tSyllabusNewFiles.map(e => e.file.name);
+    const allNames = [...existingNames, ...newNames];
+    if (allNames.length) {
       document.getElementById('summarySyllabusCard').style.display = 'block';
-      document.getElementById('summarySyllabusName').textContent = tSyllabusFile.name;
+      document.getElementById('summarySyllabusName').textContent =
+        allNames.length === 1 ? allNames[0] : `${allNames.length} files: ${allNames.join(', ')}`;
     } else {
       document.getElementById('summarySyllabusCard').style.display = 'none';
     }
@@ -1975,45 +2002,150 @@ function toggleMic(inputId) {
   tRecognition.start();
 }
 
-// ─── SYLLABUS UPLOAD ─────────────────────────────────────────────────────────
-async function handleSyllabusUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
+// ─── SYLLABUS UPLOAD (multi-file) ────────────────────────────────────────────
+const SYLLABUS_MAX_FILES = 20;
+const SYLLABUS_MAX_SIZE_BYTES = 10 * 1024 * 1024;
+const SYLLABUS_TEXT_CAP = 100_000;
 
-  if (file.type !== 'application/pdf') {
-    showToast('Please upload a PDF file', 'error');
-    return;
+async function extractPdfText(arrayBuffer) {
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map(item => item.str).join(' ') + '\n';
+  }
+  return text.trim();
+}
+
+async function handleSyllabusUpload(event) {
+  const files = Array.from(event.target.files);
+  // Reset the input first so the same file can be re-selected later if needed.
+  event.target.value = '';
+  if (!files.length) return;
+
+  let added = 0;
+  let firstNewExtractedText = '';
+
+  for (const file of files) {
+    const totalNow = tSyllabusExistingPaths.length + tSyllabusNewFiles.length;
+    if (totalNow >= SYLLABUS_MAX_FILES) {
+      showToast(`Cap of ${SYLLABUS_MAX_FILES} syllabi reached; remaining files skipped.`, 'error');
+      break;
+    }
+    if (file.type !== 'application/pdf') {
+      showToast(`Skipped ${file.name}: only PDFs are supported.`, 'error');
+      continue;
+    }
+    if (file.size > SYLLABUS_MAX_SIZE_BYTES) {
+      showToast(`Skipped ${file.name}: file exceeds 10MB.`, 'error');
+      continue;
+    }
+
+    let extractedText = '';
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      extractedText = await extractPdfText(arrayBuffer);
+    } catch (err) {
+      console.error('PDF extraction error for', file.name, err);
+      // Still add the file — the blob uploads and is stored, the AI just
+      // won't see this PDF's text. Toast is informational, not blocking.
+      showToast(`Couldn't extract text from ${file.name}; the file will still be uploaded.`, 'error');
+    }
+
+    tSyllabusNewFiles.push({ file, extractedText });
+    if (!firstNewExtractedText && extractedText) firstNewExtractedText = extractedText;
+    added++;
   }
 
-  tSyllabusFile = file;
-  document.getElementById('syllabusFileName').textContent = '✓ ' + file.name;
-  document.querySelector('.syllabus-upload-area').classList.add('has-file');
-
-  // Extract text from PDF
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    let text = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      text += content.items.map(item => item.str).join(' ') + '\n';
-    }
-    tSyllabusText = text.trim();
-
-    // Append to course info if it's mostly empty
+  // Auto-fill course info from the first newly-extracted text IF the field
+  // is still mostly empty. Mirrors the original single-file behavior — a
+  // help-not-clobber gesture for teachers who haven't typed much yet.
+  if (firstNewExtractedText) {
     const courseInput = document.getElementById('courseInfoInput');
     if (countWords(courseInput.value) < 20) {
       courseInput.value = (courseInput.value ? courseInput.value + '\n\n' : '') +
-        '--- Extracted from syllabus ---\n' + tSyllabusText.substring(0, 2000);
+        '--- Extracted from syllabus ---\n' + firstNewExtractedText.substring(0, 2000);
       courseInput.dispatchEvent(new Event('input'));
     }
-
-    showToast('Syllabus uploaded and text extracted', 'success');
-  } catch (err) {
-    console.error('PDF extraction error:', err);
-    showToast('Could not extract text from PDF', 'error');
   }
+
+  if (added > 0) {
+    showToast(`Added ${added} ${added === 1 ? 'syllabus' : 'syllabi'}.`, 'success');
+  }
+  renderSyllabusList();
+}
+
+function renderSyllabusList() {
+  const list = document.getElementById('syllabusFileList');
+  if (!list) return;
+  list.innerHTML = '';
+
+  // Existing-path rows (already in storage). × removes from
+  // tSyllabusExistingPaths; the file gets deleted from the bucket on save.
+  tSyllabusExistingPaths.forEach((path, i) => {
+    list.appendChild(makeSyllabusRow({
+      filename: path.split('/').pop(),
+      pending: false,
+      onRemove: () => {
+        tSyllabusExistingPaths.splice(i, 1);
+        renderSyllabusList();
+      },
+    }));
+  });
+
+  // New-file rows (in memory only). × removes from tSyllabusNewFiles;
+  // no storage write to undo since they were never uploaded.
+  tSyllabusNewFiles.forEach((entry, i) => {
+    list.appendChild(makeSyllabusRow({
+      filename: entry.file.name,
+      sizeBytes: entry.file.size,
+      pending: true,
+      onRemove: () => {
+        tSyllabusNewFiles.splice(i, 1);
+        renderSyllabusList();
+      },
+    }));
+  });
+
+  const total = tSyllabusExistingPaths.length + tSyllabusNewFiles.length;
+  const countEl = document.getElementById('syllabusCount');
+  if (countEl) countEl.textContent = `(${total}/${SYLLABUS_MAX_FILES})`;
+  const area = document.getElementById('syllabusUploadArea');
+  if (area) area.classList.toggle('full', total >= SYLLABUS_MAX_FILES);
+}
+
+function makeSyllabusRow({ filename, sizeBytes, pending, onRemove }) {
+  const row = document.createElement('div');
+  row.className = 'syllabus-file-row' + (pending ? ' pending' : '');
+  const icon = document.createElement('span');
+  icon.className = 'syllabus-file-icon';
+  icon.textContent = '📄';
+  row.appendChild(icon);
+  const name = document.createElement('div');
+  name.className = 'syllabus-file-name-cell';
+  name.textContent = filename;
+  row.appendChild(name);
+  if (sizeBytes != null) {
+    const size = document.createElement('span');
+    size.className = 'syllabus-file-size';
+    size.textContent = formatFileSize(sizeBytes);
+    row.appendChild(size);
+  }
+  const x = document.createElement('button');
+  x.type = 'button';
+  x.className = 'syllabus-file-x';
+  x.setAttribute('aria-label', 'Remove syllabus');
+  x.textContent = '×';
+  x.addEventListener('click', (e) => { e.stopPropagation(); onRemove(); });
+  row.appendChild(x);
+  return row;
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB';
 }
 
 // ─── TEMPLATE BORROWING ─────────────────────────────────────────────────────
@@ -2047,19 +2179,17 @@ function useTemplate() {
   document.getElementById('courseInfoInput').value = tTemplateData.course_info;
   document.getElementById('courseInfoInput').dispatchEvent(new Event('input'));
 
-  if (tTemplateData.syllabus_text) {
-    tSyllabusText = tTemplateData.syllabus_text;
-    tSyllabusFile = { name: 'Template syllabus (shared)' };
-    document.getElementById('syllabusFileName').textContent = '✓ Using shared syllabus';
-    document.querySelector('.syllabus-upload-area').classList.add('has-file');
-  }
+  // Multi-syllabus model intentionally drops the template's syllabus_text
+  // auto-import. The shared template only seeds course_info; teachers upload
+  // their own PDFs into the file list, which becomes the canonical source of
+  // syllabus_text via per-file extraction.
 
   document.getElementById('templateBanner').classList.remove('show');
 
   // Show notice about using shared content
   const notice = document.createElement('div');
   notice.className = 'template-notice';
-  notice.innerHTML = '📋 Using shared course info and syllabus text. Upload your own PDF below to replace.';
+  notice.innerHTML = '📋 Using shared course info. Upload your own PDFs below if you want Lumi to use them as syllabus context.';
   notice.style.cssText = 'padding:12px 16px;background:rgba(123,105,245,.08);border:1px solid rgba(123,105,245,.2);border-radius:8px;font-size:13px;color:var(--text);margin-bottom:16px;';
   const uploadArea = document.querySelector('.syllabus-upload-area');
   if (uploadArea && !document.querySelector('.template-notice')) {
@@ -2151,21 +2281,92 @@ async function saveTeacherProfile() {
   const shareCourseInfo = document.getElementById('shareCourseInfoCheckbox').checked;
 
   try {
-    // Upload syllabus file if new
-    let syllabusFilePath = tProfiles[tCurrentClass.course]?.syllabus_file_path || null;
-    if (tSyllabusFile && tSyllabusFile instanceof File) {
-      const filePath = `${tUser.email}/${tCurrentClass.course}/${Date.now()}_${tSyllabusFile.name}`;
-      const { error: uploadError } = await sb.storage
-        .from('syllabi')
-        .upload(filePath, tSyllabusFile);
-      if (uploadError) {
-        console.warn('Syllabus upload failed:', uploadError);
-      } else {
-        syllabusFilePath = filePath;
-      }
+    // ─── MULTI-SYLLABUS UPLOAD + RECONCILIATION ──────────────────────────────
+    // Strategy: upload all newly-picked PDFs to storage in parallel, compute
+    // the final syllabus_paths array (existing-kept ∪ new-uploaded), delete
+    // any removed paths from storage, and produce the combined syllabus_text
+    // capped at SYLLABUS_TEXT_CAP for safe injection into the student system
+    // prompt. Existing-paths text is reused from the previously-stored
+    // syllabus_text blob when the set hasn't changed (fast path); otherwise
+    // we re-download and re-extract surviving paths so removals don't leave
+    // stale text behind.
+    const oldPaths = Array.isArray(tProfiles[tCurrentClass.course]?.syllabus_paths)
+      ? [...tProfiles[tCurrentClass.course].syllabus_paths]
+      : [];
+
+    let newlyUploadedPaths = [];
+    if (tSyllabusNewFiles.length) {
+      newlyUploadedPaths = await Promise.all(
+        tSyllabusNewFiles.map(async ({ file }) => {
+          const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+          const path = `${tUser.email}/${tCurrentClass.course}/${Date.now()}_${cleanName}`;
+          const { error: uploadError } = await sb.storage.from('syllabi').upload(path, file);
+          if (uploadError) throw uploadError;
+          return path;
+        })
+      );
     }
 
-    // Save to database
+    const combinedPaths = [...tSyllabusExistingPaths, ...newlyUploadedPaths];
+
+    const toDelete = oldPaths.filter(p => !combinedPaths.includes(p));
+    if (toDelete.length) {
+      const { error: delErr } = await sb.storage.from('syllabi').remove(toDelete);
+      if (delErr) console.warn('[syllabi] delete failed:', delErr);
+    }
+
+    const existingUnchanged =
+      tSyllabusExistingPaths.length === oldPaths.length &&
+      tSyllabusExistingPaths.every(p => oldPaths.includes(p));
+
+    let existingText = '';
+    if (existingUnchanged) {
+      // Fast path: previously-stored syllabus_text already represents the
+      // unchanged surviving paths. No need to re-download anything.
+      existingText = tProfiles[tCurrentClass.course]?.syllabus_text || '';
+    } else if (tSyllabusExistingPaths.length) {
+      // REQUIRES: read_own + delete_own policies on the syllabi
+      // bucket's storage.objects (verified 2026-04-30 via Supabase
+      // Dashboard). Both scope by
+      // (storage.foldername(name))[1] = auth.jwt() ->> 'email',
+      // so a teacher can only download/delete files in their own
+      // email-prefixed folder. If these policies are dropped or
+      // their conditions tightened, this branch silently fails
+      // with 403 -> empty existingText -> text loss on save
+      // when existing paths changed.
+      // Set changed: re-extract every surviving existing path so removed-file
+      // text doesn't linger. Failures per file are tolerated — the file stays
+      // in storage but its text is dropped from this save's combined blob.
+      const texts = await Promise.all(tSyllabusExistingPaths.map(async (path) => {
+        try {
+          const { data, error } = await sb.storage.from('syllabi').download(path);
+          if (error || !data) return '';
+          const arrayBuffer = await data.arrayBuffer();
+          return await extractPdfText(arrayBuffer);
+        } catch (err) {
+          console.warn('[syllabi] re-extract failed for', path, err);
+          return '';
+        }
+      }));
+      existingText = texts.filter(Boolean).join('\n\n');
+    }
+
+    const newText = tSyllabusNewFiles.map(e => e.extractedText).filter(Boolean).join('\n\n');
+    const combinedRaw = [existingText, newText].filter(Boolean).join('\n\n');
+
+    let combinedText = combinedRaw;
+    if (combinedRaw.length > SYLLABUS_TEXT_CAP) {
+      combinedText = combinedRaw.slice(0, SYLLABUS_TEXT_CAP);
+      showToast(
+        `Your combined syllabi exceed ${SYLLABUS_TEXT_CAP / 1000}K characters; only the first portion will be used by the AI.`,
+        'error'
+      );
+    }
+
+    // Save to database. syllabus_paths is the source of truth; the legacy
+    // syllabus_file_path receives combinedPaths[0] for backward compat with
+    // the column during the transition window — drop in the follow-up
+    // cleanup migration once production data has flushed through.
     const { data, error } = await sb
       .from('teacher_profiles')
       .upsert({
@@ -2176,9 +2377,10 @@ async function saveTeacherProfile() {
         teaching_voice: teachingVoice,
         course_info: courseInfo,
         welcome_message: welcomeMessage || null,
-        syllabus_file_path: syllabusFilePath,
-        syllabus_text: tSyllabusText || null,
-        syllabus_uploaded_at: syllabusFilePath ? new Date().toISOString() : null,
+        syllabus_paths: combinedPaths,
+        syllabus_file_path: combinedPaths[0] || null,
+        syllabus_text: combinedText || null,
+        syllabus_uploaded_at: combinedPaths.length ? new Date().toISOString() : null,
         share_course_info: shareCourseInfo,
         done: true,
         updated_at: new Date().toISOString(),
@@ -2255,7 +2457,7 @@ async function saveTeacherProfile() {
     showToast('Profile saved!', 'success');
 
     // Generate suggested prompts in background (non-blocking)
-    generateSuggestedPrompts(courseInfo, tSyllabusText, tUser.email, tCurrentClass.course);
+    generateSuggestedPrompts(courseInfo, combinedText, tUser.email, tCurrentClass.course);
 
     setTimeout(() => {
       goHome();
