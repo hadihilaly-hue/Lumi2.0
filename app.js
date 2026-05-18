@@ -86,7 +86,7 @@ let currentUser = null;
 })();
 
 // ─── CLAUDE API PROXY ─────────────────────────────────────────────────────────
-const CLAUDE_PROXY_URL = 'https://mzrzmfkfjfdwsjwblbzz.supabase.co/functions/v1/claude-proxy';
+const CLAUDE_PROXY_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/';
 
 // Helper to make authenticated API calls to the Claude proxy
 async function fetchClaudeProxy(body, options = {}) {

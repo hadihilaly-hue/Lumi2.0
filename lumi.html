@@ -580,7 +580,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { flowType: 'implicit' } });
 
 // ─── CLAUDE API PROXY ─────────────────────────────────────────────────────────
-const CLAUDE_PROXY_URL = 'https://mzrzmfkfjfdwsjwblbzz.supabase.co/functions/v1/claude-proxy';
+const CLAUDE_PROXY_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/';
 
 async function fetchClaudeProxy(body, options = {}) {
   const { data: { session } } = await sb.auth.getSession();

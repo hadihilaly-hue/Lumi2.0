@@ -2218,7 +2218,7 @@ ${syllabusText || '(not provided)'}`;
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session?.access_token) throw new Error('Not authenticated');
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/claude-proxy`, {
+    const res = await fetch('https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -637,13 +637,13 @@ gives direct answers, only guides reasoning.
 - **Styling:** style.css (primary, ~75 KB) + styles.css (~18 KB); Inter font via Google Fonts
 - **Auth:** Supabase Auth with Google OAuth (implicit flow), restricted to @menloschool.org emails
 - **Database:** Supabase (PostgreSQL + RLS) — client initialized in supabase.js using @supabase/supabase-js loaded from CDN
-- **AI API:** Anthropic Messages API via Supabase Edge Function proxy
-  at `supabase/functions/claude-proxy/index.ts` (migrated in commit
-  22a3dd5). The proxy validates JWT auth, enforces a 2500 max_tokens
+- **AI API:** Anthropic Messages API via AWS Lambda lumi-claude-proxy
+  (Function URL: https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/).
+  The proxy validates JWT auth, enforces a 2500 max_tokens
   ceiling, restricts to an ALLOWED_MODELS whitelist, applies per-user
   daily rate limits (500/day teachers, 100/day students), logs token
-  usage to `api_usage`, then relays the body to Anthropic without
-  modifying system prompts or messages. Image content blocks are
+  usage to `api_usage`, then relays the body to Anthropic (via Bedrock)
+  without modifying system prompts or messages. Image content blocks are
   passed through unchanged.
   - Student tutoring & teacher onboarding: claude-sonnet-4-20250514 (max_tokens: 2500)
   - Lightweight classification tasks: claude-haiku-4-5 (conversation
