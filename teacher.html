@@ -1056,6 +1056,10 @@ body { overflow: auto; display: block; }
 <script src="supabase.js"></script>
 <script src="auth.js"></script>
 <script>
+// Lambda Function URL — used by /upload-url, /download-url, and the chat root call.
+// No trailing slash; endpoint paths in fetch() start with `/`.
+const LAMBDA_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws';
+
 // ─── CURRICULUM (same as app.js) ─────────────────────────────────────────────
 const MENLO_CURRICULUM = {
   "English": {
@@ -2218,7 +2222,7 @@ ${syllabusText || '(not provided)'}`;
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (!session?.access_token) throw new Error('Not authenticated');
-    const res = await fetch('https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/', {
+    const res = await fetch(`${LAMBDA_URL}/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -2296,23 +2300,62 @@ async function saveTeacherProfile() {
 
     let newlyUploadedPaths = [];
     if (tSyllabusNewFiles.length) {
+      const { data: { session } } = await sb.auth.getSession();
+      const classSlug = (tCurrentClass.course || 'general')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'general';
+
       newlyUploadedPaths = await Promise.all(
         tSyllabusNewFiles.map(async ({ file }) => {
           const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-          const path = `${tUser.email}/${tCurrentClass.course}/${Date.now()}_${cleanName}`;
-          const { error: uploadError } = await sb.storage.from('syllabi').upload(path, file);
-          if (uploadError) throw uploadError;
-          return path;
+
+          // 1. Request a signed S3 upload URL from the Lambda.
+          const sigRes = await fetch(`${LAMBDA_URL}/upload-url`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'apikey': SUPABASE_ANON_KEY,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              bucket: 'syllabi',
+              filename: cleanName,
+              contentType: 'application/pdf',
+              classId: classSlug,
+            }),
+          });
+          if (!sigRes.ok) {
+            const errText = await sigRes.text();
+            throw new Error(`Failed to get S3 upload URL (${sigRes.status}): ${errText}`);
+          }
+          const { uploadUrl, key } = await sigRes.json();
+
+          // 2. PUT the file directly to S3. Content-Type MUST match what we signed for.
+          const putRes = await fetch(uploadUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/pdf' },
+            body: file,
+          });
+          if (!putRes.ok) {
+            const errText = await putRes.text();
+            throw new Error(`S3 upload failed (${putRes.status}): ${errText}`);
+          }
+
+          return key;
         })
       );
     }
 
     const combinedPaths = [...tSyllabusExistingPaths, ...newlyUploadedPaths];
 
+    // TODO(Week2+): Lambda has no /delete-objects endpoint yet. Files removed from a
+    // teacher's list become S3 orphans. Acceptable for demo (cents/month at our scale).
+    // Fix options when prioritized: (a) add /delete-objects to Lambda, or (b) add an
+    // S3 lifecycle rule to auto-expire unreferenced objects.
     const toDelete = oldPaths.filter(p => !combinedPaths.includes(p));
     if (toDelete.length) {
-      const { error: delErr } = await sb.storage.from('syllabi').remove(toDelete);
-      if (delErr) console.warn('[syllabi] delete failed:', delErr);
+      console.info('[syllabi] skipped delete (S3 migration pending /delete-objects):', toDelete);
     }
 
     const existingUnchanged =
@@ -2337,11 +2380,26 @@ async function saveTeacherProfile() {
       // Set changed: re-extract every surviving existing path so removed-file
       // text doesn't linger. Failures per file are tolerated — the file stays
       // in storage but its text is dropped from this save's combined blob.
+      const { data: { session } } = await sb.auth.getSession();
       const texts = await Promise.all(tSyllabusExistingPaths.map(async (path) => {
         try {
-          const { data, error } = await sb.storage.from('syllabi').download(path);
-          if (error || !data) return '';
-          const arrayBuffer = await data.arrayBuffer();
+          // 1. Get a signed S3 download URL from the Lambda.
+          const sigRes = await fetch(`${LAMBDA_URL}/download-url`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'apikey': SUPABASE_ANON_KEY,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ bucket: 'syllabi', key: path }),
+          });
+          if (!sigRes.ok) return '';
+          const { downloadUrl } = await sigRes.json();
+
+          // 2. Fetch the file directly from S3 and extract its text.
+          const fileRes = await fetch(downloadUrl);
+          if (!fileRes.ok) return '';
+          const arrayBuffer = await fileRes.arrayBuffer();
           return await extractPdfText(arrayBuffer);
         } catch (err) {
           console.warn('[syllabi] re-extract failed for', path, err);
