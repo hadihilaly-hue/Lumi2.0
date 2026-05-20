@@ -318,6 +318,9 @@ body { overflow: auto; display: block; }
 .syllabus-upload-area:hover { border-color: var(--accent); background: var(--accent-soft); }
 .syllabus-upload-area.full { opacity: .5; cursor: not-allowed; }
 .syllabus-upload-area.full:hover { border-color: var(--border); background: var(--surface-2); }
+.syllabus-upload-area.dragover {
+  border-style: solid; border-color: var(--accent); background: var(--accent-soft);
+}
 .syllabus-upload-icon { font-size: 32px; margin-bottom: 8px; }
 .syllabus-upload-text { font-size: 14px; color: var(--text-muted); margin-bottom: 4px; }
 .syllabus-upload-hint { font-size: 12px; color: var(--text-faint); }
@@ -859,7 +862,11 @@ body { overflow: auto; display: block; }
 
       <!-- Syllabus Upload (multi-file, up to 20 PDFs) -->
       <div class="syllabus-file-list" id="syllabusFileList"></div>
-      <div class="syllabus-upload-area" id="syllabusUploadArea" onclick="document.getElementById('syllabusFileInput').click()">
+      <div class="syllabus-upload-area" id="syllabusUploadArea"
+           onclick="document.getElementById('syllabusFileInput').click()"
+           ondragover="handleSyllabusDragOver(event)"
+           ondragleave="handleSyllabusDragLeave(event)"
+           ondrop="handleSyllabusDrop(event)">
         <div class="syllabus-upload-icon">📄</div>
         <div class="syllabus-upload-text">Got a syllabus? Upload up to 20 PDFs <span id="syllabusCount">(0/20)</span></div>
         <div class="syllabus-upload-hint">We'll extract the text to help fill in your course info. PDFs only, max 10MB each.</div>
@@ -2078,6 +2085,29 @@ async function handleSyllabusUpload(event) {
     showToast(`Added ${added} ${added === 1 ? 'syllabus' : 'syllabi'}.`, 'success');
   }
   renderSyllabusList();
+}
+
+// Drag-and-drop handlers — funnel into handleSyllabusUpload via a synthesized
+// file-input event so the validation/extraction pipeline is identical to the
+// click-to-pick path.
+function handleSyllabusDragOver(event) {
+  event.preventDefault();
+  event.currentTarget.classList.add('dragover');
+}
+
+function handleSyllabusDragLeave(event) {
+  // Ignore leave events fired when the cursor moves onto a child element —
+  // the dropzone has decorative children (icon, text, hint) and a naive
+  // remove() flickers in that case.
+  const area = event.currentTarget;
+  if (event.relatedTarget && area.contains(event.relatedTarget)) return;
+  area.classList.remove('dragover');
+}
+
+function handleSyllabusDrop(event) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('dragover');
+  handleSyllabusUpload({ target: { files: event.dataTransfer.files } });
 }
 
 function renderSyllabusList() {
