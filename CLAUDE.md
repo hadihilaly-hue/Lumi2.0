@@ -40,10 +40,12 @@ gives direct answers, only guides reasoning.
   (not JSONB); syllabus PDFs go to AWS S3 (`syllabi` bucket) via
   Lambda signed URLs, with text still extracted client-side via
   pdf.js into `teacher_profiles.syllabus_text`; work-sample photos
-  go to the `work-samples` bucket; per-tier photo paths + description
-  rows live in teacher_work_samples (one row per tier per teacher
-  _profile_id). See Data Architecture and the Storage bucket
-  inventory for the full picture.
+  go to AWS S3 (`work-samples` bucket) via the same Lambda signed
+  URLs, with the runtime base64 vision pipeline (per-image fetch +
+  base64 + Anthropic vision blocks at chat-open) unchanged; per-tier
+  photo paths + description rows live in teacher_work_samples (one
+  row per tier per teacher_profile_id). See Data Architecture and
+  the Storage bucket inventory for the full picture.
 
 ### MODE 2: STUDENT MODE
 - Loads the selected teacher's profile from Supabase
@@ -178,17 +180,31 @@ gives direct answers, only guides reasoning.
   the Lambda, returned in the upload-url response, stored in
   `teacher_profiles.syllabus_paths`). Written and read from
   `saveTeacherProfile()` in teacher.html. The `work-samples` bucket
-  below will follow the same pattern in a future migration.
-- **`work-samples`** (Q4) — graded student-work photos. Defined in
-  SQL by 20260427_teacher_work_samples.sql, NOT via dashboard.
-  Private, 10MB per file, allowed_mime_types restricted to
-  JPEG/PNG/WebP. HEIC is intentionally excluded because Claude's
-  vision API doesn't accept it; teacher.html converts HEIC → JPEG
-  client-side via the heic2any CDN script before upload. Storage
-  policies on storage.objects use the standard
-  `(storage.foldername(name))[1] = auth.jwt() ->> 'email'` owner
-  pattern. Path convention
-  `{teacher_email}/{course_name}/{tier}/{timestamp}_{filename}`.
+  below uses the same pattern (migrated Day 4, commit 8d2c3d8).
+- **`work-samples`** (Q4) — graded student-work photos. Storage lives
+  in AWS S3 bucket `lumi-work-samples` (us-east-1); not accessible
+  via Supabase Storage anymore (migrated Day 4, commit 8d2c3d8). All
+  access is mediated by the Lambda's `POST /upload-url` and
+  `POST /download-url` endpoints on the same Lambda Function URL as
+  syllabi/chat. Key convention
+  `teachers/{userId}/{classSlug}/{tier}/{ts}-{filename}` — four
+  segments (one more than syllabi) because tier is also encoded in
+  the key, in addition to the `tier` DB column on
+  `teacher_work_samples` (redundant, intentional). 10 MB per file,
+  JPEG/PNG/WebP only (server-enforced via Content-Type signing on
+  the upload URL). HEIC conversion stays client-side via heic2any
+  in teacher.html before upload — unchanged. Pre-signed download
+  URLs valid for 1 hour (longer than syllabi's 5min because the
+  runtime vision pipeline fans out to per-image fetches at
+  chat-open). **Runtime vision pipeline:** `loadWorkSampleImages()`
+  in app.js fetches signed URLs in parallel via `POST /download-url`,
+  then fetches each image blob, converts to base64, and sends them
+  to Claude as vision content blocks — same end shape as before,
+  only the signed-URL source changed. **Auth chain:** Supabase JWT
+  → Lambda `verifyAuth` → Menlo domain check (teachers-only on
+  upload, any authenticated user on download). Written from
+  `saveTeacherProfile()` in teacher.html; read from openWizard's
+  thumbnail batch and from `loadWorkSampleImages()` in app.js.
 
 ### System Prompt Architecture
 - Built dynamically from teacher profile object at session start
@@ -379,10 +395,15 @@ gives direct answers, only guides reasoning.
   voice mimics the teacher's actual graded comments.
 - **Schema + bucket.** New table `teacher_work_samples` (one row per
   tier, FK to teacher_profiles, ON DELETE CASCADE) and a new private
-  Storage bucket `work-samples` (10MB cap, JPEG/PNG/WebP only — HEIC
-  excluded because Claude's vision API doesn't accept it; teacher.html
-  converts HEIC → JPEG client-side via the heic2any CDN script before
-  upload). Defined in `supabase/migrations/20260427_teacher_work_samples.sql`.
+  bucket `work-samples` for graded student-work photos (10MB cap,
+  JPEG/PNG/WebP only — HEIC excluded because Claude's vision API
+  doesn't accept it; teacher.html converts HEIC → JPEG client-side
+  via the heic2any CDN script before upload). Initially Supabase
+  Storage; migrated to AWS S3 via Lambda signed URLs in Day 4 of the
+  AWS migration (commit 8d2c3d8). Defined in
+  `supabase/migrations/20260427_teacher_work_samples.sql` (table
+  definition still valid; the bucket + RLS policies portion is now
+  historical).
 - **Banner for existing teachers.** Profiles that are `done: true` but
   missing one or more tiers show a yellow callout inside the home-card
   saying "New step added — please add a few graded work samples".
@@ -413,6 +434,11 @@ gives direct answers, only guides reasoning.
   - `netlify/functions/anthropic.mjs` is dead since the Supabase
     Edge Function migration in commit 22a3dd5 — remove in its own
     cleanup commit.
+  - `supabase/functions/claude-proxy/index.ts` is now fully dead code
+    — chat moved to Lambda in commit 5247f0b (Week 1), syllabi storage
+    in 506eed9 (Day 3), work-samples storage in 8d2c3d8 (Day 4).
+    Nothing in the codebase calls Supabase Storage for either bucket
+    anymore. Queued for cleanup deletion.
   - **Syllabi storage migrated to AWS S3 (commit 506eed9, 2026-05-19).**
     Bucket `lumi-syllabi-613136968914` (us-east-1). Access is gated
     by the Lambda's IAM execution role (`S3LumiStorage` inline policy)
@@ -428,6 +454,23 @@ gives direct answers, only guides reasoning.
     at current scale (cents/month). Fix options when prioritized: add
     `/delete-objects` to the Lambda, or attach an S3 lifecycle rule
     to auto-expire unreferenced objects.
+  - **Work-samples storage migrated to AWS S3 (commit 8d2c3d8, 2026-05-20).**
+    Bucket `lumi-work-samples` (us-east-1). Access pattern identical
+    to syllabi: Lambda's IAM execution role + auth chain (Supabase JWT
+    verify → teacher row check → `@menloschool.org` domain check)
+    gate pre-signed URL issuance. CORS restricted to the GitHub Pages
+    origin. Pre-signed URLs valid for 1 hour (longer than syllabi
+    because the runtime vision pipeline needs headroom for parallel
+    per-image fetches at chat-open). HEIC conversion stays client-side
+    via heic2any — the bucket only ever sees JPEG/PNG/WebP. The
+    original bucket + RLS policies portion of
+    `supabase/migrations/20260427_teacher_work_samples.sql` is now
+    stale at the storage layer (the table definition itself is still
+    valid). **TODO:** Lambda has no `/delete-objects` endpoint yet,
+    so files a teacher removes from a tier become S3 orphans (~3×
+    the rate of syllabi orphans because deletes happen per-tier
+    inside the save loop). Same fix options as syllabi: add
+    `/delete-objects` to the Lambda, or attach an S3 lifecycle rule.
   - `teacher_profiles.suggested_prompts` is still write-only on the
     teacher side (per the commit-4 cleanup note in Data Architecture).
     Q4 did NOT re-wire it.
