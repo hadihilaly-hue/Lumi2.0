@@ -923,22 +923,46 @@ async function loadWorkSampleImages(profile) {
 
   const allPaths = tiers.flatMap(tier => ws[tier].photo_paths.map(path => ({ tier, path })));
 
-  let signedRes;
+  // Get fresh session for auth on Lambda calls.
+  let session;
   try {
-    signedRes = await sb.storage.from('work-samples')
-      .createSignedUrls(allPaths.map(p => p.path), 3600);
+    const sessRes = await sb.auth.getSession();
+    session = sessRes && sessRes.data && sessRes.data.session;
+    if (!session) {
+      console.warn('[work_samples] no session');
+      return null;
+    }
   } catch (e) {
-    console.warn('[work_samples] signed URL batch threw:', e);
+    console.warn('[work_samples] getSession failed:', e);
     return null;
   }
-  if (!signedRes || signedRes.error || !Array.isArray(signedRes.data)) {
-    console.warn('[work_samples] signed URL error:', signedRes && signedRes.error);
+
+  // Fetch signed download URLs in parallel via Lambda /download-url.
+  let signedResolutions;
+  try {
+    signedResolutions = await Promise.all(allPaths.map(async (p) => {
+      const res = await fetch(`${CLAUDE_PROXY_URL}download-url`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ bucket: 'work-samples', key: p.path }),
+      });
+      if (!res.ok) throw new Error('download-url HTTP ' + res.status + ' for ' + p.path);
+      const json = await res.json();
+      if (!json.downloadUrl) throw new Error('missing downloadUrl for ' + p.path);
+      return { signedUrl: json.downloadUrl };
+    }));
+  } catch (e) {
+    console.warn('[work_samples] signed URL fetch failed:', e);
     return null;
   }
 
   let imageBlobs;
   try {
-    imageBlobs = await Promise.all(signedRes.data.map(async (entry, i) => {
+    imageBlobs = await Promise.all(signedResolutions.map(async (entry, i) => {
       const meta = allPaths[i];
       if (!entry || !entry.signedUrl) throw new Error('missing signed URL for ' + (meta && meta.path));
       const res = await fetch(entry.signedUrl);
