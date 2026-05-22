@@ -4310,7 +4310,7 @@ async function syncStudyStyleToSupabase(style) {
   if (S.isTestMode) return;
   try {
     await sb.from('profiles').upsert({ id: currentUser.id, study_style: style });
-  } catch {}
+  } catch (e) { console.warn('Study style sync error:', e); }
 }
 
 function getPlanStartMinutes() {
@@ -5634,7 +5634,8 @@ function syncHwToSupabase() {
     is_complete: !!t.isComplete,
   }));
   if (!rows.length) {
-    sb.from('homework_tasks').delete().eq('user_id', currentUser.id).then(() => {});
+    sb.from('homework_tasks').delete().eq('user_id', currentUser.id)
+      .then(({ error }) => { if (error) console.warn('[syncHw] delete error:', error); });
     return;
   }
   sb.from('homework_tasks').upsert(rows, { onConflict: 'id' })
