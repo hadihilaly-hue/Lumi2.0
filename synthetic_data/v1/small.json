@@ -1,0 +1,1914 @@
+{
+  "school": {
+    "name": "Example High School",
+    "term": "Spring 2026",
+    "exported_at": "2026-05-23T16:46:59Z",
+    "schema_version": "1.0"
+  },
+  "teachers": [
+    {
+      "id": "T0001",
+      "first_name": "Danielle",
+      "last_name": "Johnson",
+      "email": "danielle.johnson@example-school.test",
+      "department": "Math",
+      "title": "Mr.",
+      "pronouns": "he/him"
+    },
+    {
+      "id": "T0002",
+      "first_name": "Joshua",
+      "last_name": "Walker",
+      "email": "joshua.walker@example-school.test",
+      "department": "Math",
+      "title": "Ms.",
+      "pronouns": "they/them"
+    },
+    {
+      "id": "T0003",
+      "first_name": "Jill",
+      "last_name": "Rhodes",
+      "email": "jill.rhodes@example-school.test",
+      "department": "English",
+      "title": "Mr."
+    },
+    {
+      "id": "T0004",
+      "first_name": "Patricia",
+      "last_name": "Miller",
+      "email": "patricia.miller@example-school.test",
+      "department": "English",
+      "title": "Mr.",
+      "pronouns": "she/her"
+    },
+    {
+      "id": "T0005",
+      "first_name": "Robert",
+      "last_name": "Johnson",
+      "email": "robert.johnson@example-school.test",
+      "department": "Science",
+      "title": "Mr.",
+      "pronouns": "she/her"
+    },
+    {
+      "id": "T0006",
+      "first_name": "Jeffery",
+      "last_name": "Wagner",
+      "email": "jeffery.wagner@example-school.test",
+      "department": "History",
+      "title": "Mr.",
+      "pronouns": "they/them"
+    },
+    {
+      "id": "T0007",
+      "first_name": "Anthony",
+      "last_name": "Gonzalez",
+      "email": "anthony.gonzalez@example-school.test",
+      "department": "Foreign Language",
+      "title": "Dr.",
+      "pronouns": "they/them"
+    },
+    {
+      "id": "T0008",
+      "first_name": "Debra",
+      "last_name": "Gardner",
+      "email": "debra.gardner@example-school.test",
+      "department": "Arts",
+      "title": "Mx."
+    },
+    {
+      "id": "T0009",
+      "first_name": "Jeffrey",
+      "last_name": "Lawrence",
+      "email": "jeffrey.lawrence@example-school.test",
+      "department": "PE",
+      "title": "Mr."
+    },
+    {
+      "id": "T0010",
+      "first_name": "Lisa",
+      "last_name": "Smith",
+      "email": "lisa.smith@example-school.test",
+      "department": "Elective",
+      "title": "Ms."
+    }
+  ],
+  "students": [
+    {
+      "id": "S0001",
+      "first_name": "Linda",
+      "last_name": "Wolfe",
+      "email": "linda.wolfe@example-school.test",
+      "grade_level": 12,
+      "pronouns": "she/her"
+    },
+    {
+      "id": "S0002",
+      "first_name": "Matthew",
+      "last_name": "Moore",
+      "email": "matthew.moore@example-school.test",
+      "grade_level": 10
+    },
+    {
+      "id": "S0003",
+      "first_name": "Susan",
+      "last_name": "Rogers",
+      "email": "susan.rogers@example-school.test",
+      "grade_level": 11
+    },
+    {
+      "id": "S0004",
+      "first_name": "Christopher",
+      "last_name": "Davis",
+      "email": "christopher.davis@example-school.test",
+      "grade_level": 12
+    },
+    {
+      "id": "S0005",
+      "first_name": "Melanie",
+      "last_name": "Munoz",
+      "email": "melanie.munoz@example-school.test",
+      "grade_level": 12
+    },
+    {
+      "id": "S0006",
+      "first_name": "Lindsay",
+      "last_name": "Blair",
+      "email": "lindsay.blair@example-school.test",
+      "grade_level": 10
+    },
+    {
+      "id": "S0007",
+      "first_name": "Amanda",
+      "last_name": "Dudley",
+      "email": "amanda.dudley@example-school.test",
+      "grade_level": 9
+    },
+    {
+      "id": "S0008",
+      "first_name": "Nicholas",
+      "last_name": "Arnold",
+      "email": "nicholas.arnold@example-school.test",
+      "grade_level": 9,
+      "pronouns": "she/her"
+    },
+    {
+      "id": "S0009",
+      "first_name": "Maria",
+      "last_name": "Montgomery",
+      "email": "maria.montgomery@example-school.test",
+      "grade_level": 12
+    },
+    {
+      "id": "S0010",
+      "first_name": "Michelle",
+      "last_name": "Ray",
+      "email": "michelle.ray@example-school.test",
+      "grade_level": 12
+    },
+    {
+      "id": "S0011",
+      "first_name": "Janet",
+      "last_name": "Williams",
+      "email": "janet.williams@example-school.test",
+      "grade_level": 12
+    },
+    {
+      "id": "S0012",
+      "first_name": "Jeremy",
+      "last_name": "Roberts",
+      "email": "jeremy.roberts@example-school.test",
+      "grade_level": 9
+    },
+    {
+      "id": "S0013",
+      "first_name": "Christopher",
+      "last_name": "Hall",
+      "email": "christopher.hall@example-school.test",
+      "grade_level": 9
+    },
+    {
+      "id": "S0014",
+      "first_name": "Craig",
+      "last_name": "Ramirez",
+      "email": "craig.ramirez@example-school.test",
+      "grade_level": 11
+    },
+    {
+      "id": "S0015",
+      "first_name": "Cynthia",
+      "last_name": "Diaz",
+      "email": "cynthia.diaz@example-school.test",
+      "grade_level": 11,
+      "pronouns": "he/him"
+    },
+    {
+      "id": "S0016",
+      "first_name": "Mitchell",
+      "last_name": "Clark",
+      "email": "mitchell.clark@example-school.test",
+      "grade_level": 10
+    },
+    {
+      "id": "S0017",
+      "first_name": "Joseph",
+      "last_name": "Zuniga",
+      "email": "joseph.zuniga@example-school.test",
+      "grade_level": 11
+    },
+    {
+      "id": "S0018",
+      "first_name": "Deborah",
+      "last_name": "Lynch",
+      "email": "deborah.lynch@example-school.test",
+      "grade_level": 10
+    },
+    {
+      "id": "S0019",
+      "first_name": "George",
+      "last_name": "Daniel",
+      "email": "george.daniel@example-school.test",
+      "grade_level": 9
+    },
+    {
+      "id": "S0020",
+      "first_name": "Frank",
+      "last_name": "Gray",
+      "email": "frank.gray@example-school.test",
+      "grade_level": 11
+    },
+    {
+      "id": "S0021",
+      "first_name": "Veronica",
+      "last_name": "Bowman",
+      "email": "veronica.bowman@example-school.test",
+      "grade_level": 10,
+      "pronouns": "she/her"
+    },
+    {
+      "id": "S0022",
+      "first_name": "Angela",
+      "last_name": "Cohen",
+      "email": "angela.cohen@example-school.test",
+      "grade_level": 9
+    },
+    {
+      "id": "S0023",
+      "first_name": "Megan",
+      "last_name": "Parsons",
+      "email": "megan.parsons@example-school.test",
+      "grade_level": 12,
+      "pronouns": "he/him"
+    },
+    {
+      "id": "S0024",
+      "first_name": "Jeremy",
+      "last_name": "Johnson",
+      "email": "jeremy.johnson@example-school.test",
+      "grade_level": 11,
+      "pronouns": "she/her"
+    },
+    {
+      "id": "S0025",
+      "first_name": "Leslie",
+      "last_name": "Adams",
+      "email": "leslie.adams@example-school.test",
+      "grade_level": 9,
+      "pronouns": "he/him"
+    },
+    {
+      "id": "S0026",
+      "first_name": "Jason",
+      "last_name": "Hahn",
+      "email": "jason.hahn@example-school.test",
+      "grade_level": 9
+    },
+    {
+      "id": "S0027",
+      "first_name": "Nancy",
+      "last_name": "Edwards",
+      "email": "nancy.edwards@example-school.test",
+      "grade_level": 10,
+      "pronouns": "he/him"
+    },
+    {
+      "id": "S0028",
+      "first_name": "Diana",
+      "last_name": "Foster",
+      "email": "diana.foster@example-school.test",
+      "grade_level": 10,
+      "pronouns": "they/them"
+    },
+    {
+      "id": "S0029",
+      "first_name": "Robin",
+      "last_name": "Ellis",
+      "email": "robin.ellis@example-school.test",
+      "grade_level": 12
+    },
+    {
+      "id": "S0030",
+      "first_name": "Joseph",
+      "last_name": "Wright",
+      "email": "joseph.wright@example-school.test",
+      "grade_level": 10
+    },
+    {
+      "id": "S0031",
+      "first_name": "Anna",
+      "last_name": "Baker",
+      "email": "anna.baker@example-school.test",
+      "grade_level": 12
+    },
+    {
+      "id": "S0032",
+      "first_name": "Brenda",
+      "last_name": "Hurst",
+      "email": "brenda.hurst@example-school.test",
+      "grade_level": 11
+    },
+    {
+      "id": "S0033",
+      "first_name": "Reginald",
+      "last_name": "Robinson",
+      "email": "reginald.robinson@example-school.test",
+      "grade_level": 12,
+      "pronouns": "she/her"
+    },
+    {
+      "id": "S0034",
+      "first_name": "Whitney",
+      "last_name": "Hicks",
+      "email": "whitney.hicks@example-school.test",
+      "grade_level": 9
+    },
+    {
+      "id": "S0035",
+      "first_name": "Christopher",
+      "last_name": "Williams",
+      "email": "christopher.williams@example-school.test",
+      "grade_level": 10
+    },
+    {
+      "id": "S0036",
+      "first_name": "Daniel",
+      "last_name": "Burton",
+      "email": "daniel.burton@example-school.test",
+      "grade_level": 9,
+      "pronouns": "they/them"
+    },
+    {
+      "id": "S0037",
+      "first_name": "Laura",
+      "last_name": "Henderson",
+      "email": "laura.henderson@example-school.test",
+      "grade_level": 9,
+      "pronouns": "she/her"
+    },
+    {
+      "id": "S0038",
+      "first_name": "Bryan",
+      "last_name": "James",
+      "email": "bryan.james@example-school.test",
+      "grade_level": 11,
+      "pronouns": "she/her"
+    },
+    {
+      "id": "S0039",
+      "first_name": "Wendy",
+      "last_name": "Rice",
+      "email": "wendy.rice@example-school.test",
+      "grade_level": 11
+    },
+    {
+      "id": "S0040",
+      "first_name": "Tasha",
+      "last_name": "Valencia",
+      "email": "tasha.valencia@example-school.test",
+      "grade_level": 10
+    },
+    {
+      "id": "S0041",
+      "first_name": "Alexander",
+      "last_name": "Le",
+      "email": "alexander.le@example-school.test",
+      "grade_level": 12,
+      "pronouns": "he/him"
+    },
+    {
+      "id": "S0042",
+      "first_name": "Erin",
+      "last_name": "Herrera",
+      "email": "erin.herrera@example-school.test",
+      "grade_level": 12,
+      "pronouns": "she/her"
+    },
+    {
+      "id": "S0043",
+      "first_name": "Joseph",
+      "last_name": "Davidson",
+      "email": "joseph.davidson@example-school.test",
+      "grade_level": 12
+    },
+    {
+      "id": "S0044",
+      "first_name": "Daniel",
+      "last_name": "Graham",
+      "email": "daniel.graham@example-school.test",
+      "grade_level": 12
+    },
+    {
+      "id": "S0045",
+      "first_name": "Shawn",
+      "last_name": "Mckay",
+      "email": "shawn.mckay@example-school.test",
+      "grade_level": 9
+    },
+    {
+      "id": "S0046",
+      "first_name": "Nancy",
+      "last_name": "Baker",
+      "email": "nancy.baker@example-school.test",
+      "grade_level": 9,
+      "pronouns": "they/them"
+    },
+    {
+      "id": "S0047",
+      "first_name": "Vincent",
+      "last_name": "White",
+      "email": "vincent.white@example-school.test",
+      "grade_level": 11
+    },
+    {
+      "id": "S0048",
+      "first_name": "Rita",
+      "last_name": "Harrell",
+      "email": "rita.harrell@example-school.test",
+      "grade_level": 9,
+      "pronouns": "she/her"
+    },
+    {
+      "id": "S0049",
+      "first_name": "Kenneth",
+      "last_name": "Fowler",
+      "email": "kenneth.fowler@example-school.test",
+      "grade_level": 12,
+      "pronouns": "she/her"
+    },
+    {
+      "id": "S0050",
+      "first_name": "Chelsea",
+      "last_name": "Hernandez",
+      "email": "chelsea.hernandez@example-school.test",
+      "grade_level": 11
+    }
+  ],
+  "classes": [
+    {
+      "id": "C0001",
+      "name": "Algebra 2 - Period 3",
+      "course_name": "Algebra 2",
+      "course_code": "MATH-201",
+      "subject": "Math",
+      "teacher_id": "T0001",
+      "term": "Spring 2026",
+      "period": 3,
+      "room": "MATH-105",
+      "meeting_days": [
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri"
+      ]
+    },
+    {
+      "id": "C0002",
+      "name": "Geometry - Period 2",
+      "course_name": "Geometry",
+      "course_code": "MATH-301",
+      "subject": "Math",
+      "teacher_id": "T0002",
+      "term": "Spring 2026",
+      "period": 2,
+      "room": "MATH-201",
+      "meeting_days": [
+        "Mon",
+        "Wed",
+        "Fri"
+      ]
+    },
+    {
+      "id": "C0003",
+      "name": "Algebra 1 - Period 6",
+      "course_name": "Algebra 1",
+      "course_code": "MATH-101",
+      "subject": "Math",
+      "teacher_id": "T0001",
+      "term": "Spring 2026",
+      "period": 6,
+      "room": "MATH-304",
+      "meeting_days": [
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri"
+      ]
+    },
+    {
+      "id": "C0004",
+      "name": "English 10 - Period 2",
+      "course_name": "English 10",
+      "course_code": "ENG-201",
+      "subject": "English",
+      "teacher_id": "T0003",
+      "term": "Spring 2026",
+      "period": 2,
+      "room": "ENG-201",
+      "meeting_days": [
+        "Tue",
+        "Thu"
+      ]
+    },
+    {
+      "id": "C0005",
+      "name": "English 9 - Period 5",
+      "course_name": "English 9",
+      "course_code": "ENG-101",
+      "subject": "English",
+      "teacher_id": "T0004",
+      "term": "Spring 2026",
+      "period": 5,
+      "room": "ENG-309",
+      "meeting_days": [
+        "Mon",
+        "Wed",
+        "Fri"
+      ]
+    },
+    {
+      "id": "C0006",
+      "name": "Chemistry - Period 2",
+      "course_name": "Chemistry",
+      "course_code": "SCI-201",
+      "subject": "Science",
+      "teacher_id": "T0005",
+      "term": "Spring 2026",
+      "period": 2,
+      "room": "SCI-103",
+      "meeting_days": [
+        "Mon",
+        "Wed",
+        "Fri"
+      ]
+    },
+    {
+      "id": "C0007",
+      "name": "Biology - Period 2",
+      "course_name": "Biology",
+      "course_code": "SCI-101",
+      "subject": "Science",
+      "teacher_id": "T0005",
+      "term": "Spring 2026",
+      "period": 2,
+      "room": "SCI-101",
+      "meeting_days": [
+        "Mon",
+        "Wed",
+        "Fri"
+      ]
+    },
+    {
+      "id": "C0008",
+      "name": "US History - Period 8",
+      "course_name": "US History",
+      "course_code": "HIST-201",
+      "subject": "History",
+      "teacher_id": "T0006",
+      "term": "Spring 2026",
+      "period": 8,
+      "room": "HIST-305",
+      "meeting_days": [
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri"
+      ]
+    },
+    {
+      "id": "C0009",
+      "name": "World History - Period 6",
+      "course_name": "World History",
+      "course_code": "HIST-101",
+      "subject": "History",
+      "teacher_id": "T0006",
+      "term": "Spring 2026",
+      "period": 6,
+      "room": "HIST-203",
+      "meeting_days": [
+        "Tue",
+        "Thu"
+      ]
+    },
+    {
+      "id": "C0010",
+      "name": "Spanish 1 - Period 2",
+      "course_name": "Spanish 1",
+      "course_code": "LANG-101",
+      "subject": "Foreign Language",
+      "teacher_id": "T0007",
+      "term": "Spring 2026",
+      "period": 2,
+      "room": "LANG-302",
+      "meeting_days": [
+        "Tue",
+        "Thu"
+      ]
+    },
+    {
+      "id": "C0011",
+      "name": "Spanish 2 - Period 4",
+      "course_name": "Spanish 2",
+      "course_code": "LANG-201",
+      "subject": "Foreign Language",
+      "teacher_id": "T0007",
+      "term": "Spring 2026",
+      "period": 4,
+      "room": "LANG-107",
+      "meeting_days": [
+        "Mon",
+        "Wed",
+        "Fri"
+      ]
+    },
+    {
+      "id": "C0012",
+      "name": "Visual Arts - Period 4",
+      "course_name": "Visual Arts",
+      "course_code": "ART-101",
+      "subject": "Arts",
+      "teacher_id": "T0008",
+      "term": "Spring 2026",
+      "period": 4,
+      "room": "ART-305",
+      "meeting_days": [
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri"
+      ]
+    },
+    {
+      "id": "C0013",
+      "name": "Music - Period 4",
+      "course_name": "Music",
+      "course_code": "ART-201",
+      "subject": "Arts",
+      "teacher_id": "T0008",
+      "term": "Spring 2026",
+      "period": 4,
+      "room": "ART-105",
+      "meeting_days": [
+        "Mon",
+        "Wed",
+        "Fri"
+      ]
+    },
+    {
+      "id": "C0014",
+      "name": "PE 9 - Period 5",
+      "course_name": "PE 9",
+      "course_code": "PE-101",
+      "subject": "PE",
+      "teacher_id": "T0009",
+      "term": "Spring 2026",
+      "period": 5,
+      "room": "PE-103",
+      "meeting_days": [
+        "Tue",
+        "Thu"
+      ]
+    },
+    {
+      "id": "C0015",
+      "name": "Computer Science - Period 6",
+      "course_name": "Computer Science",
+      "course_code": "ELEC-101",
+      "subject": "Elective",
+      "teacher_id": "T0010",
+      "term": "Spring 2026",
+      "period": 6,
+      "room": "ELEC-107",
+      "meeting_days": [
+        "Mon",
+        "Wed",
+        "Fri"
+      ]
+    }
+  ],
+  "enrollments": [
+    {
+      "student_id": "S0001",
+      "class_id": "C0003"
+    },
+    {
+      "student_id": "S0001",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0001",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0001",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0001",
+      "class_id": "C0010"
+    },
+    {
+      "student_id": "S0001",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0002",
+      "class_id": "C0002"
+    },
+    {
+      "student_id": "S0002",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0002",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0002",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0002",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0002",
+      "class_id": "C0013"
+    },
+    {
+      "student_id": "S0003",
+      "class_id": "C0001"
+    },
+    {
+      "student_id": "S0003",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0003",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0003",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0003",
+      "class_id": "C0010"
+    },
+    {
+      "student_id": "S0003",
+      "class_id": "C0012"
+    },
+    {
+      "student_id": "S0004",
+      "class_id": "C0003"
+    },
+    {
+      "student_id": "S0004",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0004",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0004",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0004",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0004",
+      "class_id": "C0013"
+    },
+    {
+      "student_id": "S0005",
+      "class_id": "C0002"
+    },
+    {
+      "student_id": "S0005",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0005",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0005",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0005",
+      "class_id": "C0010"
+    },
+    {
+      "student_id": "S0005",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0006",
+      "class_id": "C0001"
+    },
+    {
+      "student_id": "S0006",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0006",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0006",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0006",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0006",
+      "class_id": "C0012"
+    },
+    {
+      "student_id": "S0007",
+      "class_id": "C0001"
+    },
+    {
+      "student_id": "S0007",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0007",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0007",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0007",
+      "class_id": "C0010"
+    },
+    {
+      "student_id": "S0007",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0008",
+      "class_id": "C0002"
+    },
+    {
+      "student_id": "S0008",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0008",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0008",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0008",
+      "class_id": "C0010"
+    },
+    {
+      "student_id": "S0008",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0009",
+      "class_id": "C0003"
+    },
+    {
+      "student_id": "S0009",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0009",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0009",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0009",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0009",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0010",
+      "class_id": "C0001"
+    },
+    {
+      "student_id": "S0010",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0010",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0010",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0010",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0010",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0011",
+      "class_id": "C0001"
+    },
+    {
+      "student_id": "S0011",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0011",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0011",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0011",
+      "class_id": "C0013"
+    },
+    {
+      "student_id": "S0011",
+      "class_id": "C0012"
+    },
+    {
+      "student_id": "S0012",
+      "class_id": "C0001"
+    },
+    {
+      "student_id": "S0012",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0012",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0012",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0012",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0012",
+      "class_id": "C0013"
+    },
+    {
+      "student_id": "S0013",
+      "class_id": "C0002"
+    },
+    {
+      "student_id": "S0013",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0013",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0013",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0013",
+      "class_id": "C0013"
+    },
+    {
+      "student_id": "S0013",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0014",
+      "class_id": "C0002"
+    },
+    {
+      "student_id": "S0014",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0014",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0014",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0014",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0014",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0015",
+      "class_id": "C0003"
+    },
+    {
+      "student_id": "S0015",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0015",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0015",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0015",
+      "class_id": "C0012"
+    },
+    {
+      "student_id": "S0015",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0016",
+      "class_id": "C0003"
+    },
+    {
+      "student_id": "S0016",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0016",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0016",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0016",
+      "class_id": "C0010"
+    },
+    {
+      "student_id": "S0016",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0017",
+      "class_id": "C0003"
+    },
+    {
+      "student_id": "S0017",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0017",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0017",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0017",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0017",
+      "class_id": "C0010"
+    },
+    {
+      "student_id": "S0018",
+      "class_id": "C0002"
+    },
+    {
+      "student_id": "S0018",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0018",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0018",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0018",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0018",
+      "class_id": "C0013"
+    },
+    {
+      "student_id": "S0019",
+      "class_id": "C0001"
+    },
+    {
+      "student_id": "S0019",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0019",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0019",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0019",
+      "class_id": "C0012"
+    },
+    {
+      "student_id": "S0019",
+      "class_id": "C0010"
+    },
+    {
+      "student_id": "S0020",
+      "class_id": "C0002"
+    },
+    {
+      "student_id": "S0020",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0020",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0020",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0020",
+      "class_id": "C0012"
+    },
+    {
+      "student_id": "S0020",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0021",
+      "class_id": "C0003"
+    },
+    {
+      "student_id": "S0021",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0021",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0021",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0021",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0021",
+      "class_id": "C0013"
+    },
+    {
+      "student_id": "S0022",
+      "class_id": "C0003"
+    },
+    {
+      "student_id": "S0022",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0022",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0022",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0022",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0022",
+      "class_id": "C0012"
+    },
+    {
+      "student_id": "S0023",
+      "class_id": "C0001"
+    },
+    {
+      "student_id": "S0023",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0023",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0023",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0023",
+      "class_id": "C0013"
+    },
+    {
+      "student_id": "S0023",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0024",
+      "class_id": "C0001"
+    },
+    {
+      "student_id": "S0024",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0024",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0024",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0024",
+      "class_id": "C0010"
+    },
+    {
+      "student_id": "S0024",
+      "class_id": "C0013"
+    },
+    {
+      "student_id": "S0025",
+      "class_id": "C0001"
+    },
+    {
+      "student_id": "S0025",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0025",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0025",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0025",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0025",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0026",
+      "class_id": "C0002"
+    },
+    {
+      "student_id": "S0026",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0026",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0026",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0026",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0026",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0027",
+      "class_id": "C0002"
+    },
+    {
+      "student_id": "S0027",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0027",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0027",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0027",
+      "class_id": "C0010"
+    },
+    {
+      "student_id": "S0027",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0028",
+      "class_id": "C0001"
+    },
+    {
+      "student_id": "S0028",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0028",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0028",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0028",
+      "class_id": "C0013"
+    },
+    {
+      "student_id": "S0028",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0029",
+      "class_id": "C0003"
+    },
+    {
+      "student_id": "S0029",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0029",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0029",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0029",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0029",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0030",
+      "class_id": "C0001"
+    },
+    {
+      "student_id": "S0030",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0030",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0030",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0030",
+      "class_id": "C0013"
+    },
+    {
+      "student_id": "S0030",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0031",
+      "class_id": "C0003"
+    },
+    {
+      "student_id": "S0031",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0031",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0031",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0031",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0031",
+      "class_id": "C0012"
+    },
+    {
+      "student_id": "S0032",
+      "class_id": "C0003"
+    },
+    {
+      "student_id": "S0032",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0032",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0032",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0032",
+      "class_id": "C0013"
+    },
+    {
+      "student_id": "S0032",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0033",
+      "class_id": "C0003"
+    },
+    {
+      "student_id": "S0033",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0033",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0033",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0033",
+      "class_id": "C0012"
+    },
+    {
+      "student_id": "S0033",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0034",
+      "class_id": "C0001"
+    },
+    {
+      "student_id": "S0034",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0034",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0034",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0034",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0034",
+      "class_id": "C0010"
+    },
+    {
+      "student_id": "S0035",
+      "class_id": "C0003"
+    },
+    {
+      "student_id": "S0035",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0035",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0035",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0035",
+      "class_id": "C0013"
+    },
+    {
+      "student_id": "S0035",
+      "class_id": "C0012"
+    },
+    {
+      "student_id": "S0036",
+      "class_id": "C0003"
+    },
+    {
+      "student_id": "S0036",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0036",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0036",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0036",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0036",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0037",
+      "class_id": "C0002"
+    },
+    {
+      "student_id": "S0037",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0037",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0037",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0037",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0037",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0038",
+      "class_id": "C0001"
+    },
+    {
+      "student_id": "S0038",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0038",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0038",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0038",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0038",
+      "class_id": "C0012"
+    },
+    {
+      "student_id": "S0039",
+      "class_id": "C0003"
+    },
+    {
+      "student_id": "S0039",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0039",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0039",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0039",
+      "class_id": "C0012"
+    },
+    {
+      "student_id": "S0039",
+      "class_id": "C0010"
+    },
+    {
+      "student_id": "S0040",
+      "class_id": "C0002"
+    },
+    {
+      "student_id": "S0040",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0040",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0040",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0040",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0040",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0041",
+      "class_id": "C0003"
+    },
+    {
+      "student_id": "S0041",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0041",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0041",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0041",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0041",
+      "class_id": "C0010"
+    },
+    {
+      "student_id": "S0042",
+      "class_id": "C0001"
+    },
+    {
+      "student_id": "S0042",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0042",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0042",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0042",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0042",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0043",
+      "class_id": "C0002"
+    },
+    {
+      "student_id": "S0043",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0043",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0043",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0043",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0043",
+      "class_id": "C0012"
+    },
+    {
+      "student_id": "S0044",
+      "class_id": "C0001"
+    },
+    {
+      "student_id": "S0044",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0044",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0044",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0044",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0044",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0045",
+      "class_id": "C0003"
+    },
+    {
+      "student_id": "S0045",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0045",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0045",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0045",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0045",
+      "class_id": "C0011"
+    },
+    {
+      "student_id": "S0046",
+      "class_id": "C0002"
+    },
+    {
+      "student_id": "S0046",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0046",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0046",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0046",
+      "class_id": "C0012"
+    },
+    {
+      "student_id": "S0046",
+      "class_id": "C0010"
+    },
+    {
+      "student_id": "S0047",
+      "class_id": "C0001"
+    },
+    {
+      "student_id": "S0047",
+      "class_id": "C0004"
+    },
+    {
+      "student_id": "S0047",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0047",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0047",
+      "class_id": "C0010"
+    },
+    {
+      "student_id": "S0047",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0048",
+      "class_id": "C0002"
+    },
+    {
+      "student_id": "S0048",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0048",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0048",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0048",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0048",
+      "class_id": "C0012"
+    },
+    {
+      "student_id": "S0049",
+      "class_id": "C0002"
+    },
+    {
+      "student_id": "S0049",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0049",
+      "class_id": "C0006"
+    },
+    {
+      "student_id": "S0049",
+      "class_id": "C0008"
+    },
+    {
+      "student_id": "S0049",
+      "class_id": "C0015"
+    },
+    {
+      "student_id": "S0049",
+      "class_id": "C0014"
+    },
+    {
+      "student_id": "S0050",
+      "class_id": "C0002"
+    },
+    {
+      "student_id": "S0050",
+      "class_id": "C0005"
+    },
+    {
+      "student_id": "S0050",
+      "class_id": "C0007"
+    },
+    {
+      "student_id": "S0050",
+      "class_id": "C0009"
+    },
+    {
+      "student_id": "S0050",
+      "class_id": "C0012"
+    },
+    {
+      "student_id": "S0050",
+      "class_id": "C0011"
+    }
+  ]
+}
