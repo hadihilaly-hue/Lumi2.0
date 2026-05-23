@@ -16,6 +16,36 @@ Companion docs (committed):
 - `synthetic_data/schema.md` — canonical SIS input format spec
 - `synthetic_data/v1/{small,medium,large}.json` — pre-generated test data
 
+## Progress
+
+Last updated: 2026-05-23 (Week 3 RDS + Proxy session)
+
+- **Workstream A — Data cleanup:** ✅ DONE. Harris and Bush records removed from `teacher_profiles`, `class_enrollments`, `conversations`, `homework_tasks`, `profiles`, `api_usage`; their files removed from S3 buckets; their Supabase Auth records deleted. Verification queries returned 0s across all tables.
+- **Workstream B — AWS infrastructure:** ⏳ IN PROGRESS
+  - ✅ VPC: `lumi-vpc` (`vpc-053d0095358fdf6e2`), 10.0.0.0/16, 2 AZs, 2 public + 2 private subnets, S3 Gateway endpoint, no NAT
+  - ✅ RDS Postgres: `lumi-db` provisioned. PostgreSQL 18.3, `db.t3.micro`, 20 GiB gp3, private subnets only, public access No, IAM + password auth, 7-day backups, deletion protection ON
+  - ✅ Secrets Manager: `lumi/db/master-credentials` storing `lumiadmin` password
+  - ✅ Security group: `lumi-rds-sg` with self-referencing inbound rule on port 5432
+  - ✅ RDS Proxy: `lumi-proxy` (resource ID `prx-0bd9b6e44d9aea72a`), IAM auth required, enhanced logging enabled, fronting `lumi-db` via the secret
+  - ✅ Lambda IAM role updates on `lumi-claude-proxy-role-fc8576tr`: AWSLambdaVPCAccessExecutionRole attached, `LumiProxyConnect` inline policy added (scoped to proxy ARN for `lumiadmin`)
+  - ⏳ Lambda VPC integration (move `lumi-claude-proxy` into `lumi-vpc`)
+  - ⏳ Bedrock VPC endpoint (must follow Lambda VPC integration in same session — Bedrock breaks between)
+  - ⏳ End-to-end test (Lambda → Proxy → `lumi-db` `SELECT 1`)
+  - ⏳ CloudWatch log group retention (90-day) + CloudTrail
+- **Workstreams C–I:** Not yet started.
+
+**Key identifiers:**
+- AWS account: 613136968914 (us-east-1)
+- VPC ID: `vpc-053d0095358fdf6e2`
+- Private subnet IDs: `subnet-0157b44867e233960`, `subnet-0832b9ce029280619`
+- RDS endpoint: `lumi-db.csvwioaseagx.us-east-1.rds.amazonaws.com:5432`
+- Proxy endpoint: `lumi-proxy.proxy-csvwioaseagx.us-east-1.rds.amazonaws.com`
+- Proxy ARN: `arn:aws:rds:us-east-1:613136968914:db-proxy:prx-0bd9b6e44d9aea72a`
+- Lambda execution role: `lumi-claude-proxy-role-fc8576tr`
+- Lambda function URL (current, pre-VPC): `https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/`
+
+**Next session:** finish Workstream B — Lambda VPC integration + Bedrock VPC endpoint + connection test, in one focused session because Bedrock breaks between steps 1 and 2.
+
 ## Architectural decisions (locked in)
 
 1. **AWS region:** us-east-1 (same region as existing Lambda + Bedrock proxy)
