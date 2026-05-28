@@ -18,21 +18,23 @@ Companion docs (committed):
 
 ## Progress
 
-Last updated: 2026-05-23 (Week 3 RDS + Proxy session)
+Last updated: 2026-05-28 (Week 3 — schema migration done + first data route live)
 
 - **Workstream A — Data cleanup:** ✅ DONE. Harris and Bush records removed from `teacher_profiles`, `class_enrollments`, `conversations`, `homework_tasks`, `profiles`, `api_usage`; their files removed from S3 buckets; their Supabase Auth records deleted. Verification queries returned 0s across all tables.
-- **Workstream B — AWS infrastructure:** ⏳ IN PROGRESS
-  - ✅ VPC: `lumi-vpc` (`vpc-053d0095358fdf6e2`), 10.0.0.0/16, 2 AZs, 2 public + 2 private subnets, S3 Gateway endpoint, no NAT
+- **Workstream B — AWS infrastructure:** ✅ DONE (except CloudWatch retention + CloudTrail, deferred)
+  - ✅ VPC: `lumi-vpc` (`vpc-053d0095358fdf6e2`), 10.0.0.0/16, 2 AZs, 2 public + 2 private subnets, S3 Gateway endpoint, NAT Gateway in public subnet for Lambda egress
   - ✅ RDS Postgres: `lumi-db` provisioned. PostgreSQL 18.3, `db.t3.micro`, 20 GiB gp3, private subnets only, public access No, IAM + password auth, 7-day backups, deletion protection ON
   - ✅ Secrets Manager: `lumi/db/master-credentials` storing `lumiadmin` password
-  - ✅ Security group: `lumi-rds-sg` with self-referencing inbound rule on port 5432
+  - ✅ Security group: `lumi-rds-sg` with self-referencing inbound rule on port 5432. RDS Proxy was migrated off its auto-created SG (`sg-0bab06e1b08a6514b`) onto `lumi-rds-sg` on 2026-05-26 — the self-reference is what actually grants the Lambda access.
   - ✅ RDS Proxy: `lumi-proxy` (resource ID `prx-0bd9b6e44d9aea72a`), IAM auth required, enhanced logging enabled, fronting `lumi-db` via the secret
   - ✅ Lambda IAM role updates on `lumi-claude-proxy-role-fc8576tr`: AWSLambdaVPCAccessExecutionRole attached, `LumiProxyConnect` inline policy added (scoped to proxy ARN for `lumiadmin`)
-  - ⏳ Lambda VPC integration (move `lumi-claude-proxy` into `lumi-vpc`)
-  - ⏳ Bedrock VPC endpoint (must follow Lambda VPC integration in same session — Bedrock breaks between)
-  - ⏳ End-to-end test (Lambda → Proxy → `lumi-db` `SELECT 1`)
-  - ⏳ CloudWatch log group retention (90-day) + CloudTrail
-- **Workstreams C–I:** Not yet started.
+  - ✅ Lambda VPC integration: `lumi-claude-proxy` running in `lumi-vpc` private subnets with `lumi-rds-sg` (completed 2026-05-26)
+  - ✅ Bedrock VPC endpoint provisioned (completed 2026-05-26 in same session as Lambda VPC integration, per the "Bedrock breaks between" sequencing constraint)
+  - ✅ End-to-end test: Lambda → Proxy → `lumi-db` `SELECT 1` validated by `GET /db-health` returning `200 {"status":"ok","db":"reachable","result":{"ok":1}}` (cold ~2.4 s, warm ~1.3 s)
+  - ⏳ CloudWatch log group retention (90-day) + CloudTrail — deferred, not blocking other workstreams
+- **Workstream C — Schema migration:** ✅ DONE. Supabase `pg_dump --schema-only` adapted to `migration/rds-schema.sql` for plain RDS PG18 — stripped all RLS (7 tables / 18 policies), the `auth.jwt()`-dependent `protect_teacher_notes` trigger, and all 5 `auth.users` FKs (identity columns kept as plain `uuid` for later Cognito wiring). Added SIS-import objects: `schools` table (multi-tenant root), `class_enrollments.term`, and `teacher_profiles.course_code`. Applied to `lumi-db`. No Supabase extensions needed (`gen_random_uuid()` is core to Postgres since v13). Source dump (`supabase-schema.sql`) + a synthetic `seed-teacher.sql` committed; real data dumps (`migration/*-data.sql`) are git-ignored.
+- **Workstream F — Lambda rewiring:** ⏳ STARTED. Foundation shipped on 2026-05-26: `db.js` (IAM-auth pg pool with 14-min token cache, module-level pool reuse) + `GET /db-health` route as the first consumer. `pg` + `@aws-sdk/rds-signer` are the first bundled deps in the Lambda zip. All Workstream F data routes (`/teacher-profile`, `/conversations`, etc.) will import `{ query }` from `db.js`. Response shape now locked: raw object on success, `{error}` with proper status code on failure (MIGRATION_HARDENING.md §7). First real data route `GET /teacher-profile` built + deployed 2026-05-28 — verifyAuth + `@menloschool.org` domain gate, returns the teacher's `teacher_profiles` rows from RDS as a raw JSON array (404 when none); deployed zip CodeSha256 verified against the live function.
+- **Workstreams D–E, G–I:** Not yet started.
 
 **Key identifiers:**
 - AWS account: 613136968914 (us-east-1)
@@ -42,9 +44,9 @@ Last updated: 2026-05-23 (Week 3 RDS + Proxy session)
 - Proxy endpoint: `lumi-proxy.proxy-csvwioaseagx.us-east-1.rds.amazonaws.com`
 - Proxy ARN: `arn:aws:rds:us-east-1:613136968914:db-proxy:prx-0bd9b6e44d9aea72a`
 - Lambda execution role: `lumi-claude-proxy-role-fc8576tr`
-- Lambda function URL (current, pre-VPC): `https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/`
+- Lambda function URL: `https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/`
 
-**Next session:** finish Workstream B — Lambda VPC integration + Bedrock VPC endpoint + connection test, in one focused session because Bedrock breaks between steps 1 and 2.
+**Next session:** continue Workstream F — build the next data routes (`/profiles`, `/conversations`, `/homework-tasks`) against the now-locked response shape, reusing `db.js` and the `/teacher-profile` pattern (verifyAuth + domain gate + parameterized RDS query). Also: knock out CloudWatch log retention + CloudTrail (small, deferred from Workstream B).
 
 ## Architectural decisions (locked in)
 
