@@ -330,17 +330,27 @@ export const handler = awslambda.streamifyResponse(async (event, responseStream)
   }
 
   // === Route: GET /teacher-profile ===
-  // Authed (verifyAuth) + domain-gated above. Returns ALL of the teacher's profile
-  // rows: teacher_email is non-unique (UNIQUE is on (teacher_email, course_name)),
-  // so a teacher with multiple courses has multiple rows.
+  // Authed (verifyAuth) + domain-gated above. Optional ?teacher_email=&course_name=
+  // filters. Any authenticated (domain-gated) caller may read ANY teacher's profile —
+  // replicates the prior Supabase `auth_read` RLS (authenticated => SELECT). With no
+  // teacher_email, defaults to the caller's own (teacher self-view). teacher_email is
+  // non-unique (UNIQUE is (teacher_email, course_name)) so the result is always an array.
   if (path === "/teacher-profile") {
     const method = event.requestContext?.http?.method || "GET";
     if (method !== "GET") return sendJson(405, { error: "Method not allowed" });
+    const qs = event.queryStringParameters || {};
+    const targetEmail = (qs.teacher_email || user.email).toLowerCase();
+    const courseName = qs.course_name || null;
     try {
-      const result = await dbQuery(
-        "SELECT * FROM public.teacher_profiles WHERE teacher_email = $1 ORDER BY course_name",
-        [user.email.toLowerCase()]
-      );
+      const result = courseName
+        ? await dbQuery(
+            "SELECT * FROM public.teacher_profiles WHERE teacher_email = $1 AND course_name = $2 ORDER BY course_name",
+            [targetEmail, courseName]
+          )
+        : await dbQuery(
+            "SELECT * FROM public.teacher_profiles WHERE teacher_email = $1 ORDER BY course_name",
+            [targetEmail]
+          );
       if (result.rowCount === 0) return sendJson(404, { error: "No teacher profile found" });
       return sendJson(200, result.rows);
     } catch (err) {
