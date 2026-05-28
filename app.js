@@ -652,9 +652,10 @@ function syncEnrollments(schedule) {
   if (!pairs.length) return;
 
   const emails = [...new Set(pairs.map(p => p.email))];
-  sb.from('teacher_profiles')
-    .select('id, teacher_email, course_name')
-    .in('teacher_email', emails)
+  const profilesP = USE_RDS_TEACHER_PROFILE
+    ? fetchTeacherProfilesByEmails(emails).then(data => ({ data, error: null }), error => ({ data: null, error }))
+    : sb.from('teacher_profiles').select('id, teacher_email, course_name').in('teacher_email', emails);
+  profilesP
     .then(({ data, error }) => {
       if (error) { console.error('Enrollment sync failed: could not load teacher profiles:', error); return; }
       // Build lookup: "email__course" → teacher_profile UUID
@@ -788,11 +789,17 @@ async function preloadProfileStatuses() {
   const emails = [...new Set(schedule.map(s => TEACHER_EMAIL_MAP[s.teacher]).filter(Boolean))];
   if (!emails.length) return;
   try {
-    const { data, error } = await sb
-      .from('teacher_profiles')
-      .select('teacher_email, course_name, done')
-      .in('teacher_email', emails);
-    if (error) { console.warn('[preloadProfileStatuses] error:', error); return; }
+    let data;
+    if (USE_RDS_TEACHER_PROFILE) {
+      data = await fetchTeacherProfilesByEmails(emails);
+    } else {
+      const res = await sb
+        .from('teacher_profiles')
+        .select('teacher_email, course_name, done')
+        .in('teacher_email', emails);
+      if (res.error) { console.warn('[preloadProfileStatuses] error:', res.error); return; }
+      data = res.data;
+    }
     // Build a lookup: email__course -> done
     const lookup = {};
     (data || []).forEach(row => { lookup[row.teacher_email + '__' + row.course_name] = row.done; });
@@ -821,6 +828,23 @@ async function fetchTeacherProfileLambda(email, course) {
   if (!res.ok) throw new Error(`teacher-profile ${res.status}`);
   const rows = await res.json();
   return Array.isArray(rows) ? (rows[0] || null) : (rows || null);
+}
+
+// Option 2 (list sites): fetch all profile rows for a set of teacher emails via the
+// RDS Lambda — one parallel request per email (the route takes a single teacher_email;
+// a student's schedule is only a handful of teachers). Returns a flat array of rows.
+async function fetchTeacherProfilesByEmails(emails) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session?.access_token) return [];
+  const lists = await Promise.all(emails.map(async (email) => {
+    const url = `${CLAUDE_PROXY_URL}teacher-profile?teacher_email=${encodeURIComponent(email)}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${session.access_token}` } });
+    if (res.status === 404) return [];
+    if (!res.ok) throw new Error(`teacher-profile ${res.status}`);
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows : [];
+  }));
+  return lists.flat();
 }
 
 // Single lookup function — Supabase first, then in-memory cache.
@@ -4740,8 +4764,10 @@ async function getTeacherProfileCached(course, teacherName) {
   // Check the main profile cache first (seeded profiles)
   if (_profileCache[key]) { _hwProfileCache[key] = _profileCache[key]; return _profileCache[key]; }
   try {
-    const { data } = await sb.from('teacher_profiles').select('*')
-      .eq('teacher_email', email).eq('course_name', course).maybeSingle();
+    const data = USE_RDS_TEACHER_PROFILE
+      ? await fetchTeacherProfileLambda(email, course)
+      : (await sb.from('teacher_profiles').select('*')
+          .eq('teacher_email', email).eq('course_name', course).maybeSingle()).data;
     _hwProfileCache[key] = data || null;
   } catch { _hwProfileCache[key] = null; }
   return _hwProfileCache[key];
