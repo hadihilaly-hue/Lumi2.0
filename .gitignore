@@ -8,3 +8,7 @@ supabase/.temp/
 
 # Migration data dumps — may hold real student/teacher PII; never commit
 migration/*-data.sql
+
+# Lambda build artifacts (source tracked in lambda/; rebuild + deploy per lambda/README.md)
+lambda/node_modules/
+lambda/*.zip

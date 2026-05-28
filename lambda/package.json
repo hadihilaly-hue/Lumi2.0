@@ -1,0 +1,12 @@
+{
+  "name": "lumi-claude-proxy",
+  "version": "1.0.0",
+  "description": "Lumi backend Lambda — Bedrock proxy, S3 signed URLs, RDS data routes.",
+  "type": "module",
+  "main": "index.mjs",
+  "private": true,
+  "dependencies": {
+    "@aws-sdk/rds-signer": "^3.726.0",
+    "pg": "^8.13.1"
+  }
+}
