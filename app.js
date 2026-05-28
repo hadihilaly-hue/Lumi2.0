@@ -88,6 +88,11 @@ let currentUser = null;
 // ─── CLAUDE API PROXY ─────────────────────────────────────────────────────────
 const CLAUDE_PROXY_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/';
 
+// Option 2 (parallel swap): when true, teacher_profiles reads go to the RDS-backed
+// Lambda GET /teacher-profile instead of Supabase; Supabase stays as the fallback.
+// Flip to true + redeploy to cut over (one-line rollback). See MIGRATION_PLAN F/G.
+const USE_RDS_TEACHER_PROFILE = false;
+
 // Helper to make authenticated API calls to the Claude proxy
 async function fetchClaudeProxy(body, options = {}) {
   const { data: { session } } = await sb.auth.getSession();
@@ -803,6 +808,21 @@ async function preloadProfileStatuses() {
   } catch (e) { console.warn('[preloadProfileStatuses] failed:', e); }
 }
 
+// Option 2: fetch one teacher profile from the RDS-backed Lambda route, shape-matched
+// to the supabase-js path (returns the row object, or null on 404). Auth is the same
+// Supabase JWT the chat proxy already uses. The route returns an array (teacher_email
+// is non-unique); we filter by course_name server-side and take the first row.
+async function fetchTeacherProfileLambda(email, course) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session?.access_token) return null;
+  const url = `${CLAUDE_PROXY_URL}teacher-profile?teacher_email=${encodeURIComponent(email)}&course_name=${encodeURIComponent(course)}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${session.access_token}` } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`teacher-profile ${res.status}`);
+  const rows = await res.json();
+  return Array.isArray(rows) ? (rows[0] || null) : (rows || null);
+}
+
 // Single lookup function — Supabase first, then in-memory cache.
 // Returns profile if complete, { __notReady } if in progress, null if not found.
 async function getTeacherProfile(teacherName, course) {
@@ -812,51 +832,62 @@ async function getTeacherProfile(teacherName, course) {
   const cacheKey = email + '__' + course;
   console.log('[getTeacherProfile] loading:', teacherName, course);
 
-  // Try Supabase first (5s timeout)
+  // Fetch the profile (5s timeout) — Supabase, or the RDS-backed Lambda when
+  // USE_RDS_TEACHER_PROFILE is on (Option 2 parallel swap). Both paths yield a single
+  // row object (or null) and share the work-samples enrichment + caching + done-gating
+  // below. NOTE: work_samples still reads from Supabase — not part of this swap.
   try {
-    const timeout = new Promise(resolve => setTimeout(() => resolve(null), 5000));
-    const query = sb
-      .from('teacher_profiles')
-      .select('*')
-      .eq('teacher_email', email)
-      .eq('course_name', course)
-      .maybeSingle();
-    const result = await Promise.race([query, timeout]);
-    if (result) {
-      const { data, error } = result;
-      if (!error && data) {
-        console.log('[getTeacherProfile] Supabase hit, done:', data.done);
-        // Q4: fetch teacher_work_samples rows for this profile (3s budget,
-        // never blocks profile usage). Stored as data.workSamples keyed by
-        // tier — descriptions live here, images are loaded separately by
-        // loadWorkSampleImages() at chat-open time.
-        data.workSamples = {};
-        if (data.id) {
-          try {
-            const sQuery = sb.from('teacher_work_samples')
-              .select('*')
-              .eq('teacher_profile_id', data.id);
-            const sTimeout = new Promise(resolve => setTimeout(() => resolve(null), 3000));
-            const sRes = await Promise.race([sQuery, sTimeout]);
-            if (sRes && !sRes.error && Array.isArray(sRes.data)) {
-              sRes.data.forEach(r => { data.workSamples[r.tier] = r; });
-            } else if (sRes?.error) {
-              console.warn('[getTeacherProfile] work_samples error:', sRes.error.message);
-            }
-          } catch (e) {
-            console.warn('[getTeacherProfile] work_samples fetch failed:', e);
-          }
-        }
-        _profileCache[cacheKey] = data; // update cache (incl. workSamples)
-        if (!data.done) return { __notReady: true };
-        return data;
-      }
-      if (error) console.warn('[getTeacherProfile] query error:', error.message);
+    let data = null;
+    const timeout = new Promise(resolve => setTimeout(() => resolve(undefined), 5000));
+    if (USE_RDS_TEACHER_PROFILE) {
+      const raced = await Promise.race([fetchTeacherProfileLambda(email, course), timeout]);
+      if (raced === undefined) console.log('[getTeacherProfile] Lambda timed out');
+      else data = raced; // row object, or null on 404
     } else {
-      console.log('[getTeacherProfile] Supabase timed out');
+      const query = sb
+        .from('teacher_profiles')
+        .select('*')
+        .eq('teacher_email', email)
+        .eq('course_name', course)
+        .maybeSingle();
+      const raced = await Promise.race([query, timeout]);
+      if (raced === undefined) {
+        console.log('[getTeacherProfile] Supabase timed out');
+      } else {
+        const { data: d, error } = raced;
+        if (error) console.warn('[getTeacherProfile] query error:', error.message);
+        else data = d;
+      }
+    }
+    if (data) {
+      console.log('[getTeacherProfile] hit, done:', data.done);
+      // Q4: fetch teacher_work_samples rows for this profile (3s budget,
+      // never blocks profile usage). Stored as data.workSamples keyed by
+      // tier — descriptions live here, images are loaded separately by
+      // loadWorkSampleImages() at chat-open time.
+      data.workSamples = {};
+      if (data.id) {
+        try {
+          const sQuery = sb.from('teacher_work_samples')
+            .select('*')
+            .eq('teacher_profile_id', data.id);
+          const sTimeout = new Promise(resolve => setTimeout(() => resolve(null), 3000));
+          const sRes = await Promise.race([sQuery, sTimeout]);
+          if (sRes && !sRes.error && Array.isArray(sRes.data)) {
+            sRes.data.forEach(r => { data.workSamples[r.tier] = r; });
+          } else if (sRes?.error) {
+            console.warn('[getTeacherProfile] work_samples error:', sRes.error.message);
+          }
+        } catch (e) {
+          console.warn('[getTeacherProfile] work_samples fetch failed:', e);
+        }
+      }
+      _profileCache[cacheKey] = data; // update cache (incl. workSamples)
+      if (!data.done) return { __notReady: true };
+      return data;
     }
   } catch (e) {
-    console.warn('[getTeacherProfile] Supabase failed:', e);
+    console.warn('[getTeacherProfile] profile fetch failed:', e);
   }
 
   // Fall back to in-memory cache (seeded profiles)
