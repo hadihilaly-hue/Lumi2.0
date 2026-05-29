@@ -88,10 +88,13 @@ let currentUser = null;
 // ─── CLAUDE API PROXY ─────────────────────────────────────────────────────────
 const CLAUDE_PROXY_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/';
 
-// Option 2 (parallel swap): when true, teacher_profiles reads go to the RDS-backed
-// Lambda GET /teacher-profile instead of Supabase; Supabase stays as the fallback.
-// Flip to true + redeploy to cut over (one-line rollback). See MIGRATION_PLAN F/G.
-const USE_RDS_TEACHER_PROFILE = false;
+// Dev/test flag — append ?lambda=1 to the URL to route teacher_profiles reads through
+// the RDS-backed Lambda (GET /teacher-profile) instead of Supabase. Read once on load,
+// stateless. No param = unchanged Supabase path. On the Lambda path, failures fail
+// VISIBLY (console.error everywhere; an error banner in the chat area for the main
+// tutor fetch) — NO silent fallback. RDS holds only test data; not a prod cutover.
+// See CLAUDE.md.
+const USE_RDS_TEACHER_PROFILE = new URLSearchParams(window.location.search).get('lambda') === '1';
 
 // Helper to make authenticated API calls to the Claude proxy
 async function fetchClaudeProxy(body, options = {}) {
@@ -549,13 +552,25 @@ async function loadTestModeSchedule() {
   if (!currentUser?.email) return;
   S.testSchedule = [];
   try {
-    const { data, error } = await sb
-      .from('teacher_profiles')
-      .select('id, course_name, subject, done, welcome_message')
-      .eq('teacher_email', currentUser.email);
-    if (error || !data) {
-      console.warn('[test-mode] teacher_profiles fetch failed:', error?.message);
-      return;
+    let data;
+    if (USE_RDS_TEACHER_PROFILE) {
+      // Lambda path (?lambda=1): fail-visible, no Supabase fallback.
+      try {
+        data = await fetchTeacherProfilesByEmails([currentUser.email]);
+      } catch (err) {
+        console.error('[test-mode] Lambda teacher_profiles fetch failed (no fallback):', err);
+        return;
+      }
+    } else {
+      const res = await sb
+        .from('teacher_profiles')
+        .select('id, course_name, subject, done, welcome_message')
+        .eq('teacher_email', currentUser.email);
+      if (res.error || !res.data) {
+        console.warn('[test-mode] teacher_profiles fetch failed:', res.error?.message);
+        return;
+      }
+      data = res.data;
     }
 
     // TM-3: also pull work samples so we can decide which classes are
@@ -791,7 +806,12 @@ async function preloadProfileStatuses() {
   try {
     let data;
     if (USE_RDS_TEACHER_PROFILE) {
-      data = await fetchTeacherProfilesByEmails(emails);
+      try {
+        data = await fetchTeacherProfilesByEmails(emails);
+      } catch (err) {
+        console.error('[preloadProfileStatuses] Lambda fetch failed (no fallback):', err);
+        return;
+      }
     } else {
       const res = await sb
         .from('teacher_profiles')
@@ -856,17 +876,27 @@ async function getTeacherProfile(teacherName, course) {
   const cacheKey = email + '__' + course;
   console.log('[getTeacherProfile] loading:', teacherName, course);
 
-  // Fetch the profile (5s timeout) — Supabase, or the RDS-backed Lambda when
-  // USE_RDS_TEACHER_PROFILE is on (Option 2 parallel swap). Both paths yield a single
-  // row object (or null) and share the work-samples enrichment + caching + done-gating
-  // below. NOTE: work_samples still reads from Supabase — not part of this swap.
+  // Fetch the profile (5s timeout). With ?lambda=1 (USE_RDS_TEACHER_PROFILE) read from the
+  // RDS-backed Lambda and FAIL VISIBLY — console.error + an { __error } marker the chat
+  // consumer turns into a banner, and NO Supabase/cache fallback. Without the flag, the
+  // original Supabase path + in-memory cache fallback is unchanged. work_samples still
+  // reads from Supabase either way (not part of this swap).
   try {
     let data = null;
     const timeout = new Promise(resolve => setTimeout(() => resolve(undefined), 5000));
     if (USE_RDS_TEACHER_PROFILE) {
-      const raced = await Promise.race([fetchTeacherProfileLambda(email, course), timeout]);
-      if (raced === undefined) console.log('[getTeacherProfile] Lambda timed out');
-      else data = raced; // row object, or null on 404
+      let raced;
+      try {
+        raced = await Promise.race([fetchTeacherProfileLambda(email, course), timeout]);
+      } catch (err) {
+        console.error('[getTeacherProfile] Lambda fetch failed (?lambda=1, no fallback):', teacherName, course, err);
+        return { __error: true, message: err?.message || String(err) };
+      }
+      if (raced === undefined) {
+        console.error('[getTeacherProfile] Lambda timed out (?lambda=1, no fallback):', teacherName, course);
+        return { __error: true, message: 'Lambda request timed out (5s)' };
+      }
+      data = raced; // row object, or null on 404
     } else {
       const query = sb
         .from('teacher_profiles')
@@ -910,11 +940,17 @@ async function getTeacherProfile(teacherName, course) {
       if (!data.done) return { __notReady: true };
       return data;
     }
+    // ?lambda=1 returned no row (404): a definitive "not found" — do NOT fall back to
+    // the in-memory cache or Supabase (we're testing the live RDS path).
+    if (USE_RDS_TEACHER_PROFILE) {
+      console.log('[getTeacherProfile] Lambda: no profile for', email, course);
+      return null;
+    }
   } catch (e) {
     console.warn('[getTeacherProfile] profile fetch failed:', e);
   }
 
-  // Fall back to in-memory cache (seeded profiles)
+  // Supabase-path fallback to in-memory cache (seeded profiles). Not reached on ?lambda=1.
   const cached = _profileCache[cacheKey];
   if (cached) {
     console.log('[getTeacherProfile] using cached profile');
@@ -1555,7 +1591,20 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
   const firstName = teacher.split(' ')[0];
   const dName = teacherDisplayName(teacher, profile);
 
-  if (profile?.__notReady) {
+  if (profile?.__error) {
+    // R4 fail-visible: the Lambda (?lambda=1) fetch failed. Show a small banner in the
+    // chat area instead of the misleading "teacher hasn't set up" message.
+    console.error('[openTutor] teacher-profile fetch failed (?lambda=1):', teacher, course, profile.message);
+    const errBanner = document.createElement('div');
+    errBanner.className = 'lambda-error-banner';
+    errBanner.style.cssText = 'margin:12px;padding:10px 14px;border:1px solid #c0392b;background:#fdecea;color:#902;border-radius:8px;font-size:13px;line-height:1.45';
+    errBanner.textContent = `⚠️ Couldn't load ${course} from the RDS Lambda (?lambda=1): ${profile.message}. Test path only — check the console, or remove ?lambda=1 to use Supabase.`;
+    messagesEl.appendChild(errBanner);
+    S.tutorCtx.teacherProfile = null;
+    msgInput.disabled = true;
+    msgInput.placeholder = 'Profile fetch failed (test path) — see console';
+    $('sendBtn').disabled = true;
+  } else if (profile?.__notReady) {
     greeting = `${firstName} hasn't finished setting up their Lumi profile yet — their interview is still in progress. Check back soon, or try General Chat in the meantime.`;
     S.tutorCtx.teacherProfile = null;
     msgInput.disabled = true;
@@ -1587,7 +1636,7 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
     renderMsg('lumi', greeting, true);
   }
   // Add "Open General Chat" button for pending/missing profiles
-  if (!profile || profile.__notReady) {
+  if (!profile || profile.__notReady || profile.__error) {
     const btnWrap = document.createElement('div');
     btnWrap.style.cssText = 'text-align:center;margin:12px 0';
     btnWrap.innerHTML = '<button class="pending-gen-chat-btn" onclick="openGeneralChat()">Open General Chat instead \u2192</button>';
@@ -4769,7 +4818,10 @@ async function getTeacherProfileCached(course, teacherName) {
       : (await sb.from('teacher_profiles').select('*')
           .eq('teacher_email', email).eq('course_name', course).maybeSingle()).data;
     _hwProfileCache[key] = data || null;
-  } catch { _hwProfileCache[key] = null; }
+  } catch (err) {
+    if (USE_RDS_TEACHER_PROFILE) console.error('[getTeacherProfileCached] Lambda fetch failed (no fallback):', course, err);
+    _hwProfileCache[key] = null;
+  }
   return _hwProfileCache[key];
 }
 

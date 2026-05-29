@@ -48,7 +48,18 @@ gives direct answers, only guides reasoning.
   the Storage bucket inventory for the full picture.
 
 ### MODE 2: STUDENT MODE
-- Loads the selected teacher's profile from Supabase
+- Loads the selected teacher's profile from Supabase.
+  - **Dev/test flag (AWS migration):** append `?lambda=1` to the app URL to
+    read `teacher_profiles` from the RDS-backed Lambda (`GET /teacher-profile`)
+    instead of Supabase. Stateless, read once on load via
+    `USE_RDS_TEACHER_PROFILE` in app.js, wired into all 5 read sites
+    (loadTestModeSchedule, syncEnrollments, preloadProfileStatuses,
+    getTeacherProfile, getTeacherProfileCached). No param = unchanged Supabase
+    path. The Lambda path fails VISIBLY (console.error everywhere + an error
+    banner in the chat area for the main tutor fetch) with NO silent fallback.
+    RDS currently holds only test data — `?lambda=1` is for exercising the path,
+    not a production cutover. Requires `GET` in the Lambda function URL's CORS
+    AllowMethods (added 2026-05-28).
 - Guides students through the subject WITHOUT giving direct answers
 - Always asks students to walk through their reasoning first
 - Never says "that's wrong" — instead: "walk me through how you
