@@ -359,7 +359,44 @@ export const handler = awslambda.streamifyResponse(async (event, responseStream)
       return sendJson(500, { error: "Database error" });
     }
   }
-  
+
+  // === Route: GET /class-enrollments ===
+  // Authed + domain-gated above. ?scope=teaching => the caller's roster across the classes
+  // they OWN (join teacher_profiles on the JWT email), WITH teacher_notes. Default (student
+  // scope) => the caller's own enrollments (student_id = JWT user id), WITHOUT teacher_notes
+  // (teacher_notes are never returned to a student — see CLAUDE.md). Returns an array
+  // (200 [] when none — it's a list, not a single-row lookup like /teacher-profile).
+  if (path === "/class-enrollments") {
+    const method = event.requestContext?.http?.method || "GET";
+    if (method !== "GET") return sendJson(405, { error: "Method not allowed" });
+    const qs = event.queryStringParameters || {};
+    try {
+      if (qs.scope === "teaching") {
+        const result = await dbQuery(
+          `SELECT ce.id, ce.student_id, ce.student_name, ce.teacher_profile_id,
+                  ce.block, ce.teacher_notes, ce.created_at, ce.updated_at
+             FROM public.class_enrollments ce
+             JOIN public.teacher_profiles tp ON tp.id = ce.teacher_profile_id
+            WHERE tp.teacher_email = $1
+            ORDER BY ce.teacher_profile_id, ce.block, ce.student_name`,
+          [user.email.toLowerCase()]
+        );
+        return sendJson(200, result.rows);
+      }
+      // Student scope: caller's own enrollments only, teacher_notes EXCLUDED.
+      const result = await dbQuery(
+        `SELECT id, teacher_profile_id, block, student_name, created_at, updated_at
+           FROM public.class_enrollments WHERE student_id = $1
+          ORDER BY teacher_profile_id, block`,
+        [user.id]
+      );
+      return sendJson(200, result.rows);
+    } catch (err) {
+      console.error("class-enrollments error:", err.code ?? err.message);
+      return sendJson(500, { error: "Database error" });
+    }
+  }
+
   // === Route: POST /upload-url ===
   if (path === "/upload-url") {
     try {
