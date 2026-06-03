@@ -1066,6 +1066,10 @@ body { overflow: auto; display: block; }
 // Lambda Function URL — used by /upload-url, /download-url, and the chat root call.
 // No trailing slash; endpoint paths in fetch() start with `/`.
 const LAMBDA_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws';
+// Dev/test flag — ?lambda=1 routes class_enrollments READS through the RDS-backed Lambda
+// (GET /class-enrollments?scope=teaching) instead of Supabase. Mirrors USE_RDS in app.js;
+// read once on load. No param = unchanged Supabase path. WRITES stay on Supabase (see CLAUDE.md).
+const USE_RDS = new URLSearchParams(window.location.search).get('lambda') === '1';
 
 // ─── CURRICULUM (same as app.js) ─────────────────────────────────────────────
 const MENLO_CURRICULUM = {
@@ -2633,6 +2637,23 @@ function showToast(message, type = '') {
 async function loadAllEnrollments() {
   const profileIds = Object.values(tProfiles).map(p => p.id).filter(Boolean);
   if (!profileIds.length) { tEnrollments = []; return; }
+  if (USE_RDS) {
+    // RDS path (?lambda=1): teacher roster via GET /class-enrollments?scope=teaching.
+    // Server derives the owned classes from the JWT email. Fail-visible (console.error +
+    // toast), NO Supabase fallback.
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      const res = await fetch(`${LAMBDA_URL}/class-enrollments?scope=teaching`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } });
+      if (!res.ok) throw new Error(`class-enrollments ${res.status}`);
+      tEnrollments = await res.json();
+    } catch (err) {
+      console.error('loadAllEnrollments Lambda failed (no fallback):', err);
+      showToast('Could not load students from RDS (?lambda=1) — see console', 'error');
+      tEnrollments = [];
+    }
+    return;
+  }
   try {
     const { data, error } = await sb
       .from('class_enrollments')

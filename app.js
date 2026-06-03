@@ -94,7 +94,7 @@ const CLAUDE_PROXY_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us
 // VISIBLY (console.error everywhere; an error banner in the chat area for the main
 // tutor fetch) — NO silent fallback. RDS holds only test data; not a prod cutover.
 // See CLAUDE.md.
-const USE_RDS_TEACHER_PROFILE = new URLSearchParams(window.location.search).get('lambda') === '1';
+const USE_RDS = new URLSearchParams(window.location.search).get('lambda') === '1';
 
 // Helper to make authenticated API calls to the Claude proxy
 async function fetchClaudeProxy(body, options = {}) {
@@ -553,7 +553,7 @@ async function loadTestModeSchedule() {
   S.testSchedule = [];
   try {
     let data;
-    if (USE_RDS_TEACHER_PROFILE) {
+    if (USE_RDS) {
       // Lambda path (?lambda=1): fail-visible, no Supabase fallback.
       try {
         data = await fetchTeacherProfilesByEmails([currentUser.email]);
@@ -667,7 +667,7 @@ function syncEnrollments(schedule) {
   if (!pairs.length) return;
 
   const emails = [...new Set(pairs.map(p => p.email))];
-  const profilesP = USE_RDS_TEACHER_PROFILE
+  const profilesP = USE_RDS
     ? fetchTeacherProfilesByEmails(emails).then(data => ({ data, error: null }), error => ({ data: null, error }))
     : sb.from('teacher_profiles').select('id, teacher_email, course_name').in('teacher_email', emails);
   profilesP
@@ -805,7 +805,7 @@ async function preloadProfileStatuses() {
   if (!emails.length) return;
   try {
     let data;
-    if (USE_RDS_TEACHER_PROFILE) {
+    if (USE_RDS) {
       try {
         data = await fetchTeacherProfilesByEmails(emails);
       } catch (err) {
@@ -876,7 +876,7 @@ async function getTeacherProfile(teacherName, course) {
   const cacheKey = email + '__' + course;
   console.log('[getTeacherProfile] loading:', teacherName, course);
 
-  // Fetch the profile (5s timeout). With ?lambda=1 (USE_RDS_TEACHER_PROFILE) read from the
+  // Fetch the profile (5s timeout). With ?lambda=1 (USE_RDS) read from the
   // RDS-backed Lambda and FAIL VISIBLY — console.error + an { __error } marker the chat
   // consumer turns into a banner, and NO Supabase/cache fallback. Without the flag, the
   // original Supabase path + in-memory cache fallback is unchanged. work_samples still
@@ -884,7 +884,7 @@ async function getTeacherProfile(teacherName, course) {
   try {
     let data = null;
     const timeout = new Promise(resolve => setTimeout(() => resolve(undefined), 5000));
-    if (USE_RDS_TEACHER_PROFILE) {
+    if (USE_RDS) {
       let raced;
       try {
         raced = await Promise.race([fetchTeacherProfileLambda(email, course), timeout]);
@@ -942,7 +942,7 @@ async function getTeacherProfile(teacherName, course) {
     }
     // ?lambda=1 returned no row (404): a definitive "not found" — do NOT fall back to
     // the in-memory cache or Supabase (we're testing the live RDS path).
-    if (USE_RDS_TEACHER_PROFILE) {
+    if (USE_RDS) {
       console.log('[getTeacherProfile] Lambda: no profile for', email, course);
       return null;
     }
@@ -4813,13 +4813,13 @@ async function getTeacherProfileCached(course, teacherName) {
   // Check the main profile cache first (seeded profiles)
   if (_profileCache[key]) { _hwProfileCache[key] = _profileCache[key]; return _profileCache[key]; }
   try {
-    const data = USE_RDS_TEACHER_PROFILE
+    const data = USE_RDS
       ? await fetchTeacherProfileLambda(email, course)
       : (await sb.from('teacher_profiles').select('*')
           .eq('teacher_email', email).eq('course_name', course).maybeSingle()).data;
     _hwProfileCache[key] = data || null;
   } catch (err) {
-    if (USE_RDS_TEACHER_PROFILE) console.error('[getTeacherProfileCached] Lambda fetch failed (no fallback):', course, err);
+    if (USE_RDS) console.error('[getTeacherProfileCached] Lambda fetch failed (no fallback):', course, err);
     _hwProfileCache[key] = null;
   }
   return _hwProfileCache[key];

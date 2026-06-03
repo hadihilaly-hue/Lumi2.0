@@ -49,17 +49,19 @@ gives direct answers, only guides reasoning.
 
 ### MODE 2: STUDENT MODE
 - Loads the selected teacher's profile from Supabase.
-  - **Dev/test flag (AWS migration):** append `?lambda=1` to the app URL to
-    read `teacher_profiles` from the RDS-backed Lambda (`GET /teacher-profile`)
-    instead of Supabase. Stateless, read once on load via
-    `USE_RDS_TEACHER_PROFILE` in app.js, wired into all 5 read sites
-    (loadTestModeSchedule, syncEnrollments, preloadProfileStatuses,
-    getTeacherProfile, getTeacherProfileCached). No param = unchanged Supabase
-    path. The Lambda path fails VISIBLY (console.error everywhere + an error
-    banner in the chat area for the main tutor fetch) with NO silent fallback.
-    RDS currently holds only test data — `?lambda=1` is for exercising the path,
-    not a production cutover. Requires `GET` in the Lambda function URL's CORS
-    AllowMethods (added 2026-05-28).
+  - **Dev/test flag (AWS migration):** append `?lambda=1` to the app URL to read
+    from the RDS-backed Lambda instead of Supabase. Stateless, read once on load
+    via `USE_RDS` (in **app.js and teacher.html** — renamed from the original
+    `USE_RDS_TEACHER_PROFILE`). Covers: `teacher_profiles` reads (`GET
+    /teacher-profile`) across all 5 app.js sites (loadTestModeSchedule,
+    syncEnrollments, preloadProfileStatuses, getTeacherProfile,
+    getTeacherProfileCached), AND the teacher roster's `class_enrollments` read
+    (`GET /class-enrollments?scope=teaching`, teacher.html `loadAllEnrollments`).
+    No param = unchanged Supabase path. The Lambda path fails VISIBLY
+    (console.error everywhere; chat-area banner for the main tutor fetch; toast
+    for the roster) with NO silent fallback. RDS holds only test data — `?lambda=1`
+    is for exercising the path, not a production cutover. Requires `GET` in the
+    Lambda function URL's CORS AllowMethods.
 - Guides students through the subject WITHOUT giving direct answers
 - Always asks students to walk through their reasoning first
 - Never says "that's wrong" — instead: "walk me through how you
@@ -150,6 +152,34 @@ gives direct answers, only guides reasoning.
   classes. If a student removes a class from their schedule, the old
   enrollment row persists and the teacher still sees that student on
   their roster. Needs handling before pitching to Menlo admin.
+- **RDS read path (AWS migration, behind `?lambda=1` / `USE_RDS`).** `GET
+  /class-enrollments` on the Lambda mirrors the two SELECT RLS policies:
+  - `?scope=teaching` → the caller's roster across classes they OWN
+    (`JOIN teacher_profiles tp ON tp.id = ce.teacher_profile_id WHERE
+    tp.teacher_email = <jwt email>`), returned **with** `teacher_notes` (the
+    teacher owns them). Replicates `teacher_read_class`. Wired into teacher.html
+    `loadAllEnrollments`.
+  - default (student scope) → the caller's own rows (`WHERE student_id = <jwt
+    user id>`), returned **without** `teacher_notes`. Replicates
+    `student_read_own` minus notes. No frontend student consumer today.
+  - **`teacher_notes` protection.** The original `protect_teacher_notes()`
+    trigger was a WRITE guard (only the owning teacher could *modify* notes); it
+    did NOT restrict reads, and it was dropped in the RDS schema (it used
+    `auth.jwt()`). The route re-implements protection as a READ rule:
+    `teacher_notes` is never returned to a student — it appears only in the
+    teacher-scope projection (server-side authz, not RLS).
+- **Known limit — read/write split under `?lambda=1`.** Only READS are on the
+  Lambda this round; WRITES still go to Supabase (the `class_enrollments` upsert
+  in app.js `syncEnrollments`, and the `teacher_notes` update in teacher.html).
+  So under `?lambda=1` the roster reads from RDS, but a note saved there writes
+  to Supabase and will NOT appear on an RDS re-read. Expected until writes migrate.
+- **Follow-up — move tutor prompt-building server-side.** The student
+  notes-injection read (app.js `finishOpenTutor`, still on Supabase) pulls
+  `teacher_notes` to the client to build the system prompt locally — so raw notes
+  reach the browser regardless of this route's read-protection. The real fix:
+  build the tutor system prompt server-side (in the chat Lambda) so `teacher_notes`
+  are injected without ever being returned to the client. Until then, that one
+  student read stays on Supabase and is deliberately NOT migrated.
 
 ### Other Supabase Tables
 - **profiles** — student user profiles (id, name, grade, values_profile jsonb)
