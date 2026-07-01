@@ -60,6 +60,12 @@ function getPool() {
       max: 1,
       idleTimeoutMillis: 120_000,
       connectionTimeoutMillis: 5_000,
+      // 2026-07-01 incident: a silently-dropped idle connection (NAT/proxy)
+      // made pool.query hang forever — the invocation ate the full 60s Lambda
+      // timeout and a concurrency slot (account limit is 10). Bound every
+      // query client-side and keep the socket alive between invocations.
+      query_timeout: 8_000,
+      keepAlive: true,
     });
     // Surface async pool errors without crashing the Lambda.
     pool.on('error', (err) => {
