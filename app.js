@@ -5850,12 +5850,33 @@ function syncHwToSupabase() {
     is_complete: !!t.isComplete,
   }));
   if (!rows.length) {
-    sb.from('homework_tasks').delete().eq('user_id', currentUser.id)
-      .then(({ error }) => { if (error) console.warn('[syncHw] delete error:', error); });
+    if (USE_RDS) {
+      // Hardened (§2/§3): the empty-list wipe was the codebase's only fully
+      // silent destructive write — now logged AND toasted on failure.
+      rdsFetch('homework-tasks?all=true', { method: 'DELETE' }).catch(err => {
+        console.warn('[syncHw] delete error:', err);
+        showToast('Could not sync homework — see console');
+      });
+    } else {
+      sb.from('homework_tasks').delete().eq('user_id', currentUser.id)
+        .then(({ error }) => { if (error) console.warn('[syncHw] delete error:', error); });
+    }
     return;
   }
-  sb.from('homework_tasks').upsert(rows, { onConflict: 'id' })
-    .then(({ error }) => { if (error) console.warn('[syncHw] upsert error:', error); });
+  if (USE_RDS) {
+    // user_id in each row is ignored server-side (always the JWT user).
+    rdsFetch('homework-tasks', { method: 'POST', body: rows }).then(res => {
+      if (res && res.upserted !== rows.length) {
+        console.warn('[syncHw] upsert error:', `only ${res.upserted}/${rows.length} rows written (foreign id skipped)`);
+      }
+    }).catch(err => {
+      console.warn('[syncHw] upsert error:', err);
+      showToast('Could not sync homework — see console');
+    });
+  } else {
+    sb.from('homework_tasks').upsert(rows, { onConflict: 'id' })
+      .then(({ error }) => { if (error) console.warn('[syncHw] upsert error:', error); });
+  }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -6645,18 +6666,26 @@ function loadProjectsFromSupabase() {
 async function loadHwFromSupabase() {
   if (!currentUser) return;
   try {
-    const { data, error } = await sb
-      .from('homework_tasks')
-      .select('*')
-      .eq('user_id', currentUser.id);
-    if (error) { console.warn('[loadHw] error:', error); return; }
+    let data;
+    if (USE_RDS) {
+      data = await rdsFetch('homework-tasks');
+    } else {
+      const res = await sb
+        .from('homework_tasks')
+        .select('*')
+        .eq('user_id', currentUser.id);
+      if (res.error) { console.warn('[loadHw] error:', res.error); return; }
+      data = res.data;
+    }
     if (!data || !data.length) return;
     const tasks = data.map(row => ({
       id: row.id,
       title: row.title,
       className: row.class_name || '',
       teacherName: row.teacher_name || '',
-      dueDate: row.due_date || '',
+      // RDS returns date columns as full ISO timestamps; Supabase returned
+      // YYYY-MM-DD. slice(0,10) normalizes both to the app's date-only shape.
+      dueDate: (row.due_date || '').slice(0, 10),
       estimatedMinutes: row.estimated_minutes || null,
       isComplete: !!row.is_complete,
       createdAt: row.created_at,
