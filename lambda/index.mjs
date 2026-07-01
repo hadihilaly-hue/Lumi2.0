@@ -250,6 +250,14 @@ const PROFILE_COLS = {
   homework_start_time: "raw",
 };
 
+const CONVERSATION_COLS = {
+  title: "raw",
+  messages: "jsonb",
+  teacher: "raw",
+  course: "raw",
+  is_teacher_test: "raw",
+};
+
 // Filters body down to allowlisted columns, serializing jsonb values.
 function pickColumns(body, spec) {
   const cols = [];
@@ -536,6 +544,92 @@ export const handler = awslambda.streamifyResponse(async (event, responseStream)
       return sendJson(405, { error: "Method not allowed" });
     } catch (err) {
       console.error("profiles error:", err.code ?? err.message);
+      return sendJson(500, { error: "Database error" });
+    }
+  }
+
+  // === Route: /conversations (GET, POST, PATCH, DELETE) ===
+  // Authed + domain-gated above. Replicates the 'Users can only access own
+  // conversations' ALL policy (`auth.uid() = user_id`): every statement carries
+  // user_id = JWT user id; POST never reads user_id from the body
+  // (MIGRATION_HARDENING §1 insert path). messages jsonb is student chat content —
+  // NEVER log request/response bodies on this route.
+  // GET   — ?is_teacher_test=true|false (default false; Teacher Test Mode split).
+  //         Caller's 50 most recent, newest first. 200 [] when none (list semantics).
+  // POST  — insert; returns {id} only (the frontend consumes just the new id).
+  // PATCH — body.id targets the row; SET only provided allowlisted columns +
+  //         updated_at. Returns {id, updated_at} (not the row — messages can be
+  //         hundreds of KB and the caller already has them). 404 when not owned.
+  // DELETE — ?id=<uuid> single delete, or ?all=true wipe (Clear-memory button).
+  //         Both scoped to the caller. Returns {deleted: n}.
+  if (path === "/conversations") {
+    const method = event.requestContext?.http?.method || "GET";
+    const qs = event.queryStringParameters || {};
+    try {
+      if (method === "GET") {
+        const isTest = qs.is_teacher_test === "true";
+        const result = await dbQuery(
+          `SELECT id, title, messages, teacher, course, created_at, updated_at
+             FROM public.conversations
+            WHERE user_id = $1 AND is_teacher_test = $2
+            ORDER BY created_at DESC
+            LIMIT 50`,
+          [user.id, isTest]
+        );
+        return sendJson(200, result.rows);
+      }
+
+      if (method === "POST") {
+        const { cols, vals } = pickColumns(body, CONVERSATION_COLS);
+        const insertCols = ["user_id", ...cols];
+        const placeholders = insertCols.map((_, i) => `$${i + 1}`);
+        const result = await dbQuery(
+          `INSERT INTO public.conversations (${insertCols.join(", ")})
+                VALUES (${placeholders.join(", ")})
+             RETURNING id`,
+          [user.id, ...vals]
+        );
+        return sendJson(200, { id: result.rows[0].id });
+      }
+
+      if (method === "PATCH") {
+        if (typeof body.id !== "string" || !body.id) {
+          return sendJson(400, { error: "Missing id" });
+        }
+        const { cols, vals } = pickColumns(body, CONVERSATION_COLS);
+        if (cols.length === 0) return sendJson(400, { error: "No updatable fields" });
+        const setClauses = cols.map((c, i) => `${c} = $${i + 3}`).concat("updated_at = now()");
+        const result = await dbQuery(
+          `UPDATE public.conversations SET ${setClauses.join(", ")}
+            WHERE id = $1 AND user_id = $2
+            RETURNING id, updated_at`,
+          [body.id, user.id, ...vals]
+        );
+        if (result.rowCount === 0) return sendJson(404, { error: "No conversation found" });
+        return sendJson(200, result.rows[0]);
+      }
+
+      if (method === "DELETE") {
+        if (qs.all === "true") {
+          const result = await dbQuery(
+            "DELETE FROM public.conversations WHERE user_id = $1",
+            [user.id]
+          );
+          return sendJson(200, { deleted: result.rowCount });
+        }
+        if (qs.id) {
+          const result = await dbQuery(
+            "DELETE FROM public.conversations WHERE id = $1 AND user_id = $2",
+            [qs.id, user.id]
+          );
+          return sendJson(200, { deleted: result.rowCount });
+        }
+        return sendJson(400, { error: "Provide ?id= or ?all=true" });
+      }
+
+      return sendJson(405, { error: "Method not allowed" });
+    } catch (err) {
+      console.error("conversations error:", err.code ?? err.message);
       return sendJson(500, { error: "Database error" });
     }
   }
