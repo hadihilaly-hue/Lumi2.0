@@ -83,13 +83,35 @@ async function isTeacher(email) {
 }
 
 // === Rate Limit ===
+// api_usage cutover flag (confirmed 2026-07-01): there is deliberately NO client-facing
+// /api-usage route — a JWT-authed POST would let any student forge usage rows. The
+// Lambda's own checkRateLimit + logUsage are the sole reader/writer. USE_RDS_USAGE=1
+// flips BOTH to RDS together at cutover; until then they stay on Supabase, which holds
+// the real usage history (an early flip would silently reset everyone's rate limits).
+const USE_RDS_USAGE = process.env.USE_RDS_USAGE === "1";
+
 async function checkRateLimit(userId, isTeacherUser) {
-  const limit = isTeacherUser 
-    ? SCHOOL_CONFIG.teacherRateLimit 
+  const limit = isTeacherUser
+    ? SCHOOL_CONFIG.teacherRateLimit
     : SCHOOL_CONFIG.studentRateLimit;
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
-  
+
+  if (USE_RDS_USAGE) {
+    try {
+      const result = await dbQuery(
+        "SELECT count(*)::int AS n FROM public.api_usage WHERE user_id = $1 AND created_at >= $2",
+        [userId, today.toISOString()]
+      );
+      const count = result.rows[0].n;
+      return { allowed: count < limit, remaining: Math.max(0, limit - count), limit };
+    } catch (err) {
+      // Same fail-open posture as the Supabase path below.
+      console.error("checkRateLimit (rds) error:", err.code ?? err.message);
+      return { allowed: true, remaining: limit, limit };
+    }
+  }
+
   try {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/api_usage?user_id=eq.${userId}&created_at=gte.${today.toISOString()}&select=count`,
@@ -113,6 +135,18 @@ async function checkRateLimit(userId, isTeacherUser) {
 
 // === Usage Logging ===
 async function logUsage({ userId, email, isTeacherUser, model, inputTokens, outputTokens }) {
+  if (USE_RDS_USAGE) {
+    try {
+      await dbQuery(
+        `INSERT INTO public.api_usage (user_id, user_email, is_teacher, model, input_tokens, output_tokens)
+              VALUES ($1, $2, $3, $4, $5, $6)`,
+        [userId, email.toLowerCase(), isTeacherUser, model, inputTokens, outputTokens]
+      );
+    } catch (err) {
+      console.error("logUsage (rds) error:", err.code ?? err.message);
+    }
+    return;
+  }
   try {
     await fetch(`${SUPABASE_URL}/rest/v1/api_usage`, {
       method: "POST",
