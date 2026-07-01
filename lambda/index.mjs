@@ -731,6 +731,94 @@ export const handler = awslambda.streamifyResponse(async (event, responseStream)
     }
   }
 
+  // === Route: /work-samples (GET, POST, DELETE) ===
+  // Authed + domain-gated above. Replicates teacher_work_samples RLS:
+  // GET — `auth_read`: ANY authenticated caller may read (students need samples for
+  //   the vision pipeline at chat-open). ?teacher_profile_id=<uuid> or
+  //   ?teacher_profile_ids=a,b,c (the .in() reads). 200 [] when none.
+  // POST/DELETE — owner_insert/update/delete are a JOIN-by-email EXISTS check; here
+  //   that's the server-side 2-step (MIGRATION_HARDENING §5): resolve the target
+  //   teacher_profiles row, require its teacher_email == JWT email → else 403
+  //   (fail-visible; RLS returned empty silently). 404 when the profile id doesn't
+  //   exist (profiles are world-readable per auth_read, so no existence oracle).
+  // POST is the per-tier saveTeacherProfile upsert (onConflict teacher_profile_id,tier).
+  // DELETE by (teacher_profile_id, tier) — no frontend consumer today; owner_delete parity.
+  if (path === "/work-samples") {
+    const method = event.requestContext?.http?.method || "GET";
+    const qs = event.queryStringParameters || {};
+    const TIERS = ["progressing", "proficient", "exemplary"];
+    // Shared 2-step write authz. Returns null when authorized, else {status, error}
+    // for the caller to send (sendJson may only be called once per request).
+    const denyUnlessOwner = async (teacherProfileId) => {
+      if (typeof teacherProfileId !== "string" || !teacherProfileId) {
+        return { status: 400, error: "Missing teacher_profile_id" };
+      }
+      const owner = await dbQuery(
+        "SELECT teacher_email FROM public.teacher_profiles WHERE id = $1",
+        [teacherProfileId]
+      );
+      if (owner.rowCount === 0) return { status: 404, error: "No teacher profile found" };
+      if (owner.rows[0].teacher_email !== user.email.toLowerCase()) {
+        return { status: 403, error: "Not the owning teacher" };
+      }
+      return null;
+    };
+    try {
+      if (method === "GET") {
+        const ids = qs.teacher_profile_ids
+          ? qs.teacher_profile_ids.split(",").map((s) => s.trim()).filter(Boolean)
+          : qs.teacher_profile_id ? [qs.teacher_profile_id] : null;
+        if (!ids || ids.length === 0) {
+          return sendJson(400, { error: "Provide ?teacher_profile_id= or ?teacher_profile_ids=" });
+        }
+        const result = await dbQuery(
+          `SELECT * FROM public.teacher_work_samples
+            WHERE teacher_profile_id = ANY($1::uuid[])
+            ORDER BY teacher_profile_id, tier`,
+          [ids]
+        );
+        return sendJson(200, result.rows);
+      }
+
+      if (method === "POST") {
+        if (!TIERS.includes(body.tier)) return sendJson(400, { error: "Invalid tier" });
+        if (typeof body.description !== "string" || !body.description.trim()) {
+          return sendJson(400, { error: "Missing description" });
+        }
+        const photoPaths = Array.isArray(body.photo_paths) ? body.photo_paths : [];
+        const denied = await denyUnlessOwner(body.teacher_profile_id);
+        if (denied) return sendJson(denied.status, { error: denied.error });
+        const result = await dbQuery(
+          `INSERT INTO public.teacher_work_samples (teacher_profile_id, tier, description, photo_paths)
+                VALUES ($1, $2, $3, $4)
+           ON CONFLICT (teacher_profile_id, tier)
+             DO UPDATE SET description = EXCLUDED.description,
+                           photo_paths = EXCLUDED.photo_paths,
+                           updated_at = now()
+             RETURNING *`,
+          [body.teacher_profile_id, body.tier, body.description, photoPaths]
+        );
+        return sendJson(200, result.rows[0]);
+      }
+
+      if (method === "DELETE") {
+        if (!TIERS.includes(qs.tier)) return sendJson(400, { error: "Invalid tier" });
+        const denied = await denyUnlessOwner(qs.teacher_profile_id);
+        if (denied) return sendJson(denied.status, { error: denied.error });
+        const result = await dbQuery(
+          "DELETE FROM public.teacher_work_samples WHERE teacher_profile_id = $1 AND tier = $2",
+          [qs.teacher_profile_id, qs.tier]
+        );
+        return sendJson(200, { deleted: result.rowCount });
+      }
+
+      return sendJson(405, { error: "Method not allowed" });
+    } catch (err) {
+      console.error("work-samples error:", err.code ?? err.message);
+      return sendJson(500, { error: "Database error" });
+    }
+  }
+
   // === Route: GET /class-enrollments ===
   // Authed + domain-gated above. ?scope=teaching => the caller's roster across the classes
   // they OWN (join teacher_profiles on the JWT email), WITH teacher_notes. Default (student
