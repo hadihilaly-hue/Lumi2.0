@@ -1499,17 +1499,27 @@ async function loadAllTeacherProfiles() {
     tSamplesByProfile = {};
     const profileIds = data.map(p => p.id).filter(Boolean);
     if (profileIds.length) {
-      const { data: sampleRows, error: sErr } = await sb
-        .from('teacher_work_samples')
-        .select('*')
-        .in('teacher_profile_id', profileIds);
-      if (sErr) {
-        console.warn('Could not load work samples:', sErr);
+      let sampleRows = null;
+      if (USE_RDS) {
+        try {
+          sampleRows = await rdsFetch(`work-samples?teacher_profile_ids=${profileIds.map(encodeURIComponent).join(',')}`);
+        } catch (sErr) {
+          console.warn('Could not load work samples:', sErr);
+        }
       } else {
-        (sampleRows || []).forEach(r => {
-          (tSamplesByProfile[r.teacher_profile_id] ||= {})[r.tier] = r;
-        });
+        const res = await sb
+          .from('teacher_work_samples')
+          .select('*')
+          .in('teacher_profile_id', profileIds);
+        if (res.error) {
+          console.warn('Could not load work samples:', res.error);
+        } else {
+          sampleRows = res.data;
+        }
       }
+      (sampleRows || []).forEach(r => {
+        (tSamplesByProfile[r.teacher_profile_id] ||= {})[r.tier] = r;
+      });
     }
   } catch (err) {
     console.warn('Could not load teacher profiles:', err);
@@ -2631,14 +2641,25 @@ async function saveTeacherProfile() {
           console.info(`[Q4] skipped delete for ${tier} (S3 migration pending /delete-objects):`, toDelete);
         }
 
-        const { error: rowErr } = await sb.from('teacher_work_samples').upsert({
-          teacher_profile_id: profileId,
-          tier,
-          description: local.description.trim(),
-          photo_paths: finalPaths,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'teacher_profile_id,tier' });
-        if (rowErr) throw rowErr;
+        if (USE_RDS) {
+          // POST is the same (teacher_profile_id, tier) upsert; updated_at is
+          // server-set. Throws on non-2xx → caught by the per-tier handler below.
+          await rdsFetch('work-samples', { method: 'POST', body: {
+            teacher_profile_id: profileId,
+            tier,
+            description: local.description.trim(),
+            photo_paths: finalPaths,
+          } });
+        } else {
+          const { error: rowErr } = await sb.from('teacher_work_samples').upsert({
+            teacher_profile_id: profileId,
+            tier,
+            description: local.description.trim(),
+            photo_paths: finalPaths,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'teacher_profile_id,tier' });
+          if (rowErr) throw rowErr;
+        }
 
         // Mirror DB snapshot for next-edit delete-detection.
         tExistingSamplesByTier[tier] = { photo_paths: [...finalPaths] };

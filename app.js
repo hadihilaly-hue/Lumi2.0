@@ -581,17 +581,27 @@ async function loadTestModeSchedule() {
     const profileIds = data.map(p => p.id).filter(Boolean);
     const samplesByProfile = {};
     if (profileIds.length) {
-      const { data: sampleRows, error: sErr } = await sb
-        .from('teacher_work_samples')
-        .select('teacher_profile_id, tier, description, photo_paths')
-        .in('teacher_profile_id', profileIds);
-      if (sErr) {
-        console.warn('[test-mode] work_samples fetch failed:', sErr.message);
+      let sampleRows = null;
+      if (USE_RDS) {
+        try {
+          sampleRows = await rdsFetch(`work-samples?teacher_profile_ids=${profileIds.map(encodeURIComponent).join(',')}`);
+        } catch (err) {
+          console.warn('[test-mode] work_samples fetch failed:', err.message);
+        }
       } else {
-        (sampleRows || []).forEach(r => {
-          (samplesByProfile[r.teacher_profile_id] ||= {})[r.tier] = r;
-        });
+        const res = await sb
+          .from('teacher_work_samples')
+          .select('teacher_profile_id, tier, description, photo_paths')
+          .in('teacher_profile_id', profileIds);
+        if (res.error) {
+          console.warn('[test-mode] work_samples fetch failed:', res.error.message);
+        } else {
+          sampleRows = res.data;
+        }
       }
+      (sampleRows || []).forEach(r => {
+        (samplesByProfile[r.teacher_profile_id] ||= {})[r.tier] = r;
+      });
     }
     const TIERS = ['progressing', 'proficient', 'exemplary'];
     const hasAllTiers = (profileId) => {
@@ -956,9 +966,13 @@ async function getTeacherProfile(teacherName, course) {
       data.workSamples = {};
       if (data.id) {
         try {
-          const sQuery = sb.from('teacher_work_samples')
-            .select('*')
-            .eq('teacher_profile_id', data.id);
+          // Same 3s budget on both branches — never blocks profile usage.
+          const sQuery = USE_RDS
+            ? rdsFetch(`work-samples?teacher_profile_id=${encodeURIComponent(data.id)}`)
+                .then(rows => ({ data: rows || [], error: null }), error => ({ data: null, error }))
+            : sb.from('teacher_work_samples')
+                .select('*')
+                .eq('teacher_profile_id', data.id);
           const sTimeout = new Promise(resolve => setTimeout(() => resolve(null), 3000));
           const sRes = await Promise.race([sQuery, sTimeout]);
           if (sRes && !sRes.error && Array.isArray(sRes.data)) {
