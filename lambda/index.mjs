@@ -60,24 +60,20 @@ async function verifyAuth(authHeader) {
 }
 
 // === Teacher check ===
+// Cutover 2026-07-01: reads RDS (teacher_profiles is authoritative there).
+// Fail-closed to "not a teacher" on DB error — same posture as the old
+// Supabase REST path.
 async function isTeacher(email) {
   if (SCHOOL_CONFIG.adminEmails.has(email.toLowerCase())) return true;
-  
+
   try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/teacher_profiles?teacher_email=eq.${encodeURIComponent(email.toLowerCase())}&done=eq.true&select=id&limit=1`,
-      {
-        headers: {
-          "apikey": SUPABASE_SERVICE_ROLE_KEY,
-          "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        }
-      }
+    const result = await dbQuery(
+      "SELECT 1 FROM public.teacher_profiles WHERE teacher_email = $1 AND done = true LIMIT 1",
+      [email.toLowerCase()]
     );
-    if (!res.ok) return false;
-    const data = await res.json();
-    return data.length > 0;
+    return result.rowCount > 0;
   } catch (err) {
-    console.error("isTeacher error:", err);
+    console.error("isTeacher error:", err.code ?? err.message);
     return false;
   }
 }
