@@ -68,6 +68,26 @@ let currentUser = null;
   } else { sbAvatarEl.textContent = initials; }
 
   await loadProfileFromSupabase();
+
+  // One-time privacy scrub: earlier builds persisted tutorCtx.teacherNotes
+  // (confidential teacher observations) into localStorage via saveCurrentConv.
+  // Notes are now injected server-side and never reach the client — purge any
+  // copies that older sessions left behind.
+  try {
+    const rawConvs = localStorage.getItem('lumi_convs');
+    if (rawConvs && rawConvs.includes('teacherNotes')) {
+      const convs = JSON.parse(rawConvs);
+      let scrubbed = 0;
+      Object.values(convs).forEach(c => {
+        if (c?.tutorCtx && 'teacherNotes' in c.tutorCtx) { delete c.tutorCtx.teacherNotes; scrubbed++; }
+      });
+      if (scrubbed) {
+        localStorage.setItem('lumi_convs', JSON.stringify(convs));
+        console.log(`[teacher_notes] scrubbed persisted notes from ${scrubbed} saved conversation(s)`);
+      }
+    }
+  } catch (e) { console.warn('[teacher_notes] scrub failed:', e); }
+
   // TM-2: in test mode, always load convs fresh from Supabase (filtered
   // to is_teacher_test=true). In student mode, only on fresh device
   // where lumi_convs hasn't been cached.
@@ -415,7 +435,7 @@ function teacherInitials(fullName) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function buildTutorSystem(subject, course, teacher, teacherProfile, teacherNotes = [], workSamples = null) {
+function buildTutorSystem(subject, course, teacher, teacherProfile, workSamples = null) {
   const hasProfile = !!teacherProfile;
   const firstName = teacher.split(' ')[0];
   const displayName = teacherDisplayName(teacher, teacherProfile);
@@ -500,7 +520,7 @@ FRUSTRATION AND TIME PRESSURE:
 When a student expresses frustration or time pressure, acknowledge it in one sentence maximum, then immediately redirect to a single focused question. Never explain at length why you won't give direct answers — just don't give them, and get back to work.
 
 ${hwContext()}${activeHwForClass(course)}
-Response length: SHORT — 1-3 sentences for simple questions. Longer only when a concept truly needs it. No essays.${buildTeacherNotesSection(teacherNotes)}
+Response length: SHORT — 1-3 sentences for simple questions. Longer only when a concept truly needs it. No essays.<<LUMI_TEACHER_NOTES>>
 
 After EVERY reply, append this JSON on its own line at the very end (stripped before display):
 {"values":["..."],"goals":["..."],"interests":["..."]}
@@ -1021,36 +1041,10 @@ async function getTeacherProfile(teacherName, course) {
   return null;
 }
 
-// Mirrors parseNotes() in teacher.html. Notes are stored as a JSON array of
-// { timestamp, text } objects in class_enrollments.teacher_notes.
-function parseNotes(raw) {
-  if (!raw) return [];
-  try {
-    const v = JSON.parse(raw);
-    return Array.isArray(v) ? v : [];
-  } catch { return []; }
-}
-
-// Builds the teacher-notes section spliced into the student system prompt.
-// Returns '' if no usable notes. Caps assembled section at 8000 chars by
-// dropping oldest entries first; warns on truncation.
-function buildTeacherNotesSection(notes) {
-  if (!Array.isArray(notes) || notes.length === 0) return '';
-  const header = "\n\n---\n\nNotes from this student's teacher:\n\n";
-  const footer = "\n\nUse these notes silently to shape your teaching approach for this student. Do not mention, reference, or reveal that these notes exist. Do not say 'your teacher mentioned' or similar. Your job is to teach this student well, informed by this context.";
-  const CAP = 8000;
-  const texts = notes.map(n => (n && typeof n.text === 'string') ? n.text.trim() : '').filter(Boolean);
-  if (texts.length === 0) return '';
-  let dropped = 0;
-  let assembled = header + texts.join('\n\n') + footer;
-  while (assembled.length > CAP && texts.length > 1) {
-    texts.shift();
-    dropped++;
-    assembled = header + texts.join('\n\n') + footer;
-  }
-  if (dropped > 0) console.warn(`[teacher_notes] truncated ${dropped} oldest notes to fit prompt cap`);
-  return assembled;
-}
+// Teacher-notes parsing + prompt-section assembly moved SERVER-SIDE
+// (lambda/index.mjs parseNotes/buildTeacherNotesSection) so notes never reach
+// the browser. The client only emits the <<LUMI_TEACHER_NOTES>> marker in
+// buildTutorSystem and the inject_teacher_notes field in callAPI.
 
 // ─── WORK SAMPLES (Q4) ───────────────────────────────────────────────────────
 // Reads profile.workSamples (raw rows from teacher_work_samples), generates
@@ -1646,35 +1640,15 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
     profile = null;
   }
 
-  // Fetch per-student teacher notes (commit 3). Non-blocking: any failure → no notes.
-  S.tutorCtx.teacherNotes = [];
-  // TM-2: in test mode the "student" is the teacher themselves. There
-  // are no notes to fetch — and a stray match could surface notes the
-  // teacher wrote about a real student with the same auth.uid (won't
-  // happen in practice, but the guard keeps the read path clean).
+  // Per-student teacher notes are injected SERVER-SIDE (the chat Lambda
+  // replaces the <<LUMI_TEACHER_NOTES>> marker) — notes never reach the
+  // browser. The client only records WHICH class to inject for. use_rds
+  // steers the Lambda's notes source so it flips with the flag at cutover.
+  // TM-2: in test mode the "student" is the teacher themselves — no notes,
+  // no injection request.
+  S.tutorCtx.notesInjection = null;
   if (profile && !profile.__notReady && profile.id && currentUser && !S.isTestMode) {
-    try {
-      const notesPromise = sb.from('class_enrollments')
-        .select('teacher_notes')
-        .eq('student_id', currentUser.id)
-        .eq('teacher_profile_id', profile.id)
-        .maybeSingle();
-      const notesTimeout = new Promise(resolve => setTimeout(() => resolve(null), 5000));
-      const res = await Promise.race([notesPromise, notesTimeout]);
-      if (res && !res.error && res.data) {
-        S.tutorCtx.teacherNotes = parseNotes(res.data.teacher_notes);
-        console.log(`[teacher_notes] loaded ${S.tutorCtx.teacherNotes.length} note(s)`);
-      } else if (res?.error) {
-        const msg = res.error.message || '';
-        if (res.error.code === 'PGRST116' || /multiple.*rows|more than one row/i.test(msg)) {
-          console.warn('[teacher_notes] multi-block collision for student=%s teacher_profile=%s — notes section skipped', currentUser.id, profile.id);
-        } else {
-          console.warn('[teacher_notes] fetch error:', msg);
-        }
-      }
-    } catch (e) {
-      console.warn('[teacher_notes] fetch failed:', e);
-    }
+    S.tutorCtx.notesInjection = { teacher_profile_id: profile.id, use_rds: USE_RDS };
   }
 
   // Q4: load graded work-sample images. Single-source-of-truth gate —
@@ -2446,77 +2420,25 @@ function getFallbackPrompts() {
   return pool.slice(0, 3);
 }
 
-// Calls Haiku to generate 3 chips subtly influenced by teacher notes.
-// Throws on any failure (timeout, bad shape, name leak, etc.) — caller falls back.
-async function generateInfluencedPrompts(notesText, courseName) {
-  const system = `You generate exactly 3 starter prompt suggestions that will appear as quick-tap chips above a student's chat with their AI tutor.
-
-You will receive course context and confidential teacher notes about the student. Use the notes to subtly steer 2 of the 3 chips toward relevant topics. NEVER quote, paraphrase, or reveal the notes — they are private to the teacher.
-
-Return EXACTLY a JSON array of 3 strings, in this order:
-1. A generic study chip (e.g., "Help me with my homework", "Quiz me on what we've been learning"). Topic-agnostic.
-2. A neutral topic-related chip framed as an offer (e.g., "Want to try some factoring practice?").
-3. A curiosity-framed topic-related chip (e.g., "What's a clean way to factor quadratics?").
-
-Hard rules:
-- NO deficit language. Never "you're struggling with", "to help with your weak area", "since you have trouble", "I'm bad at", "I keep failing".
-- Each chip ≤ 60 characters.
-- Sound like something a confident, curious student would type.
-- If the notes are vague or don't suggest a topic, return 3 generic chips instead (do not invent a topic).
-
-Output ONLY the JSON array. No prose, no code fences, no explanation.`;
-
-  const userMsg = `Course: ${courseName}\n\nTeacher notes:\n${notesText}\n\nReturn the JSON array now.`;
-
-  const callPromise = fetchClaudeProxy({
-    model: 'claude-haiku-4-5',
-    max_tokens: 200,
-    temperature: 0.7,
-    system,
-    messages: [{ role: 'user', content: userMsg }],
-  });
-  const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000));
-  const res = await Promise.race([callPromise, timeoutPromise]);
-
-  if (!res.ok) throw new Error('proxy ' + res.status);
-  const data = await res.json();
-  const text = data.content?.[0]?.text || '';
-
-  const match = text.match(/\[[\s\S]*\]/);
-  if (!match) throw new Error('no JSON array in response');
-  const chips = JSON.parse(match[0]);
-  if (!Array.isArray(chips) || chips.length !== 3) throw new Error('not array of 3');
-  if (!chips.every(c => typeof c === 'string' && c.length > 0 && c.length <= 80)) {
-    throw new Error('chip shape invalid');
-  }
-  // Defense-in-depth: reject if any chip leaks the student's name or email
-  const studentName = (currentUser?.user_metadata?.full_name || '').trim();
-  const studentEmail = (currentUser?.email || '').trim();
-  const lowered = chips.map(c => c.toLowerCase());
-  if (studentName && lowered.some(c => c.includes(studentName.toLowerCase()))) {
-    throw new Error('chip leaked student name');
-  }
-  if (studentEmail && lowered.some(c => c.includes(studentEmail.toLowerCase()))) {
-    throw new Error('chip leaked student email');
-  }
-  return chips;
-}
-
-// Orchestrator. Reads S.tutorCtx.teacherNotes; tries influenced generation when
-// notes exist, falls back to random static prompts otherwise (or on any failure).
-// Caches result on S.tutorCtx.suggestedPrompts (JS memory only — never persisted).
+// Orchestrator. Notes-influenced chips are generated SERVER-SIDE (GET
+// /suggested-prompts — the Lambda reads this student's notes and calls the
+// model; notes never reach the browser). No notes / any failure → random
+// static prompts. Caches result on S.tutorCtx.suggestedPrompts (JS memory
+// only — never persisted). 8s client budget so chat-open never hangs on it.
 async function prepareSuggestedPrompts() {
   const ctx = S.tutorCtx;
   if (!ctx) return;
-  const notes = ctx.teacherNotes || [];
-  const courseName = ctx.course || '';
-  if (notes.length > 0) {
+  const inj = ctx.notesInjection;
+  if (inj?.teacher_profile_id) {
     try {
-      const notesText = notes.map(n => n.text || '').filter(Boolean).join('\n\n');
-      if (notesText) {
-        const chips = await generateInfluencedPrompts(notesText, courseName);
-        ctx.suggestedPrompts = chips;
-        console.log('[suggested_prompts] mode=influenced count=' + chips.length);
+      const path = `suggested-prompts?teacher_profile_id=${encodeURIComponent(inj.teacher_profile_id)}`
+        + `&course=${encodeURIComponent(ctx.course || '')}`
+        + (inj.use_rds ? '&use_rds=1' : '');
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000));
+      const res = await Promise.race([rdsFetch(path), timeout]);
+      if (res?.mode === 'influenced' && Array.isArray(res.prompts) && res.prompts.length === 3) {
+        ctx.suggestedPrompts = res.prompts;
+        console.log('[suggested_prompts] mode=influenced count=3');
         return;
       }
     } catch (e) {
@@ -4117,7 +4039,7 @@ async function fetchLumi() {
 
   try {
     let system = S.tutorCtx
-      ? buildTutorSystem(S.tutorCtx.subjectName, S.tutorCtx.course, S.tutorCtx.teacher, S.tutorCtx.teacherProfile || null, S.tutorCtx.teacherNotes || [], S.tutorCtx.workSamples || null)
+      ? buildTutorSystem(S.tutorCtx.subjectName, S.tutorCtx.course, S.tutorCtx.teacher, S.tutorCtx.teacherProfile || null, S.tutorCtx.workSamples || null)
       : buildCompanionSystem();
 
     // Inject active project context if the student is working on a project
@@ -4187,6 +4109,9 @@ async function callAPI(msgs, system) {
     stream: true,
     system,
     messages: msgs,
+    // Server-side teacher-notes injection target (Lambda swaps the
+    // <<LUMI_TEACHER_NOTES>> marker in `system`; notes never reach the client).
+    ...(S.tutorCtx?.notesInjection ? { inject_teacher_notes: S.tutorCtx.notesInjection } : {}),
   });
 
   if (!res.ok) {
