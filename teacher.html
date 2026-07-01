@@ -2935,10 +2935,20 @@ async function sendNote() {
   input.disabled = true;
   sendBtn.disabled = true;
 
-  const { error } = await sb
-    .from('class_enrollments')
-    .update({ teacher_notes: serialized })
-    .eq('id', enrollment.id);
+  let error = null;
+  if (USE_RDS) {
+    // PATCH authz is server-side (caller must own the linked class); a 404/403
+    // throws in rdsFetch and lands in the same error toast as the RLS path.
+    try {
+      const res = await rdsFetch('class-enrollments', { method: 'PATCH', body: { id: enrollment.id, teacher_notes: serialized } });
+      if (!res) error = new Error('enrollment not found (404)');
+    } catch (err) { error = err; }
+  } else {
+    ({ error } = await sb
+      .from('class_enrollments')
+      .update({ teacher_notes: serialized })
+      .eq('id', enrollment.id));
+  }
 
   input.disabled = false;
 

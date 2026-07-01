@@ -708,13 +708,24 @@ function syncEnrollments(schedule) {
         .filter(Boolean);
       if (!rows.length) return;
 
-      sb.from('class_enrollments')
-        .upsert(rows, { onConflict: 'student_id,teacher_profile_id,block' })
-        .then(({ error: upsertErr }) => {
-          if (upsertErr) console.error('Enrollment sync failed: upsert error:', upsertErr);
-          else console.log('[enrollment] synced', rows.length, 'enrollment(s)');
-        })
-        .catch(err => console.error('Enrollment sync failed:', err));
+      if (USE_RDS) {
+        // Hardened (§2): failure now surfaces to the user. student_id in each
+        // row is ignored server-side (always the JWT user).
+        rdsFetch('class-enrollments', { method: 'POST', body: rows })
+          .then(res => console.log('[enrollment] synced', res?.upserted ?? rows.length, 'enrollment(s)'))
+          .catch(err => {
+            console.error('Enrollment sync failed: upsert error:', err);
+            showToast('Could not sync your class enrollments — see console');
+          });
+      } else {
+        sb.from('class_enrollments')
+          .upsert(rows, { onConflict: 'student_id,teacher_profile_id,block' })
+          .then(({ error: upsertErr }) => {
+            if (upsertErr) console.error('Enrollment sync failed: upsert error:', upsertErr);
+            else console.log('[enrollment] synced', rows.length, 'enrollment(s)');
+          })
+          .catch(err => console.error('Enrollment sync failed:', err));
+      }
     })
     .catch(err => console.error('Enrollment sync failed:', err));
 }
