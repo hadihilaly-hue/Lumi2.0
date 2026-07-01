@@ -197,11 +197,10 @@ body { overflow: auto; display: block; }
 <script>
 const ADMIN_EMAIL = 'hadi.hilaly@menloschool.org';
 
-// Lambda Function URL + dev/test flag — same convention as app.js/teacher.html.
-// ?lambda=1 routes the teacher_profiles broad read through the RDS-backed Lambda
-// (GET /teacher-profile?scope=all, admin-email-gated server-side).
+// CUTOVER 2026-07-01: RDS is the default data layer. ?lambda=0 is the
+// rollback escape hatch back to Supabase (kept until post-cutover teardown).
 const LAMBDA_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws';
-const USE_RDS = new URLSearchParams(window.location.search).get('lambda') === '1';
+const USE_RDS = new URLSearchParams(window.location.search).get('lambda') !== '0';
 
 // ─── CURRICULUM (same as teacher.html) ───────────────────────────────────────
 const MENLO_CURRICULUM = {

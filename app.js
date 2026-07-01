@@ -114,7 +114,9 @@ const CLAUDE_PROXY_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us
 // VISIBLY (console.error everywhere; an error banner in the chat area for the main
 // tutor fetch) — NO silent fallback. RDS holds only test data; not a prod cutover.
 // See CLAUDE.md.
-const USE_RDS = new URLSearchParams(window.location.search).get('lambda') === '1';
+// CUTOVER 2026-07-01: RDS is the default data layer. ?lambda=0 is the
+// rollback escape hatch back to Supabase (kept until post-cutover teardown).
+const USE_RDS = new URLSearchParams(window.location.search).get('lambda') !== '0';
 
 // Helper to make authenticated API calls to the Claude proxy
 async function fetchClaudeProxy(body, options = {}) {

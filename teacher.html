@@ -1066,10 +1066,9 @@ body { overflow: auto; display: block; }
 // Lambda Function URL — used by /upload-url, /download-url, and the chat root call.
 // No trailing slash; endpoint paths in fetch() start with `/`.
 const LAMBDA_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws';
-// Dev/test flag — ?lambda=1 routes data reads AND writes through the RDS-backed Lambda
-// instead of Supabase. Mirrors USE_RDS in app.js; read once on load.
-// No param = unchanged Supabase path.
-const USE_RDS = new URLSearchParams(window.location.search).get('lambda') === '1';
+// CUTOVER 2026-07-01: RDS is the default data layer. ?lambda=0 is the
+// rollback escape hatch back to Supabase (kept until post-cutover teardown).
+const USE_RDS = new URLSearchParams(window.location.search).get('lambda') !== '0';
 
 // Generic RDS Lambda fetch — mirror of rdsFetch in app.js (LAMBDA_URL here has
 // no trailing slash). 404 -> null; other non-2xx throws so USE_RDS sites fail
