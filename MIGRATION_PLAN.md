@@ -53,8 +53,15 @@ Last updated: 2026-07-01 (Workstream F COMPLETE — all data routes live & e2e v
   `teacher_notes` read stays on Supabase until prompt-building moves server-side.
   Commits 6743ecd…56f9001; all groups live-verified on the deployed Pages site with
   a real session. Manual checklist: `migration/SMOKE_TEST.md`.
-- **Workstreams D–E, H–I:** Not yet started. Next: Workstream E prep (Phase 4 —
-  pg_dump/restore commands + cutover flip/teardown lists, written not executed).
+- **Workstreams E + H — prep:** ✅ WRITTEN (2026-07-01), not executed. Full manual
+  runbook in `migration/CUTOVER_PLAN.md`: per-table pg_dump commands, chunked
+  /admin/sql apply, row-count + spot-check verification, the ordered flip list
+  (isTeacher→RDS pre-commit, USE_RDS_USAGE=1, frontend flag default flip with
+  ?lambda=0 escape hatch), 48h watch + rollback, and the 7-item teardown list.
+  One blocking decision surfaced (§0): the still-on-Supabase teacher_notes
+  injection read — keep Supabase DB alive until server-side prompt build, or
+  accept silent notes loss. Operator (Hadi) executes cutover manually.
+- **Workstreams D, I:** Not yet started (SIS importer; Cognito auth).
 
 **Key identifiers:**
 - AWS account: 613136968914 (us-east-1)

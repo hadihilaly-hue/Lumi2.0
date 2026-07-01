@@ -64,6 +64,8 @@ gives direct answers, only guides reasoning.
     chat-area banner for the main tutor fetch) with NO silent fallback. RDS
     holds only test data — `?lambda=1` is for exercising the path until
     cutover. Manual re-validation checklist: `migration/SMOKE_TEST.md`.
+    Cutover itself (data sync, flag-default flip, teardown) is a manual
+    operator runbook: `migration/CUTOVER_PLAN.md` — written, NOT executed.
 - Guides students through the subject WITHOUT giving direct answers
 - Always asks students to walk through their reasoning first
 - Never says "that's wrong" — instead: "walk me through how you
