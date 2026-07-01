@@ -18,7 +18,7 @@ Companion docs (committed):
 
 ## Progress
 
-Last updated: 2026-05-28 (Week 3 — schema migration done + first data route live & e2e validated)
+Last updated: 2026-07-01 (Workstream F COMPLETE — all data routes live & e2e validated)
 
 - **Workstream A — Data cleanup:** ✅ DONE. Harris and Bush records removed from `teacher_profiles`, `class_enrollments`, `conversations`, `homework_tasks`, `profiles`, `api_usage`; their files removed from S3 buckets; their Supabase Auth records deleted. Verification queries returned 0s across all tables.
 - **Workstream B — AWS infrastructure:** ✅ DONE (except CloudWatch retention + CloudTrail, deferred)
@@ -34,7 +34,18 @@ Last updated: 2026-05-28 (Week 3 — schema migration done + first data route li
   - ⏳ CloudWatch log group retention (90-day) + CloudTrail — deferred, not blocking other workstreams
 - **Workstream C — Schema migration:** ✅ DONE. Supabase `pg_dump --schema-only` adapted to `migration/rds-schema.sql` for plain RDS PG18 — stripped all RLS (7 tables / 18 policies), the `auth.jwt()`-dependent `protect_teacher_notes` trigger, and all 5 `auth.users` FKs (identity columns kept as plain `uuid` for later Cognito wiring). Added SIS-import objects: `schools` table (multi-tenant root), `class_enrollments.term`, and `teacher_profiles.course_code`. Applied to `lumi-db`. No Supabase extensions needed (`gen_random_uuid()` is core to Postgres since v13). Source dump (`supabase-schema.sql`) + a synthetic `seed-teacher.sql` committed; real data dumps (`migration/*-data.sql`) are git-ignored.
 - **Workstream F — Lambda rewiring:** ⏳ STARTED. Foundation shipped on 2026-05-26: `db.js` (IAM-auth pg pool with 14-min token cache, module-level pool reuse) + `GET /db-health` route as the first consumer. `pg` + `@aws-sdk/rds-signer` are the first bundled deps in the Lambda zip. All Workstream F data routes (`/teacher-profile`, `/conversations`, etc.) will import `{ query }` from `db.js`. Response shape now locked: raw object on success, `{error}` with proper status code on failure (MIGRATION_HARDENING.md §7). First real data route `GET /teacher-profile` built + deployed 2026-05-28 — verifyAuth + `@menloschool.org` domain gate, returns the teacher's `teacher_profiles` rows from RDS as a raw JSON array (404 when none); deployed zip CodeSha256 verified against the live function. Validated end-to-end 2026-05-28: a real Google OAuth session returned `200` with the teacher's profile rows read live from RDS (browser → Supabase JWT → Lambda `verifyAuth` → RDS Proxy/IAM → `lumi-db`).
-- **Workstreams D–E, G–I:** Not yet started.
+- **Workstream F — Lambda rewiring:** ✅ DONE (2026-07-01, except `/sis-import` which
+  belongs to Workstream D). All data routes live on `lumi-claude-proxy` and e2e-validated
+  with a real authed browser session: `/teacher-profile` GET+POST+PATCH (incl.
+  `?template_for_course=` and admin-gated `?scope=all`), `/profiles` GET+POST+PATCH,
+  `/conversations` GET+POST+PATCH+DELETE, `/homework-tasks` GET+POST+PATCH+DELETE
+  (uuid-hijack-guarded bulk upsert), `/work-samples` GET+POST+DELETE (JOIN-by-email
+  2-step authz), `/class-enrollments` GET (earlier). api_usage: no client route by
+  design — checkRateLimit/logUsage carry RDS branches behind `USE_RDS_USAGE=1`
+  (unset; flips at cutover). Function URL CORS AllowMethods extended to PATCH+DELETE.
+  Commits `0c173e3`→`80a8f07`. See CLAUDE.md "RDS Lambda data routes" for the contract.
+- **Workstreams D–E, G–I:** Not yet started. Next: Workstream G (frontend rewiring
+  behind USE_RDS, ~27 remaining call sites + MIGRATION_HARDENING §2 silent-failure fixes).
 
 **Key identifiers:**
 - AWS account: 613136968914 (us-east-1)

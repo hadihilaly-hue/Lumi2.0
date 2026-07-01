@@ -247,6 +247,41 @@ gives direct answers, only guides reasoning.
   `saveTeacherProfile()` in teacher.html; read from openWizard's
   thumbnail batch and from `loadWorkSampleImages()` in app.js.
 
+### RDS Lambda data routes (Workstream F — complete 2026-07-01)
+All six route groups live on `lumi-claude-proxy` (source: `lambda/index.mjs`),
+each verified end-to-end with a real authed browser session against RDS.
+Shared contract: `verifyAuth` (Supabase JWT) → @menloschool.org domain gate →
+per-route authz replicating the old RLS (RLS_AUDIT.md) → parameterized query
+via `db.js` → raw row(s) on success / `{error}` + status on failure → logs
+carry `err.code` only, never PII. Identity is ALWAYS taken from the JWT and
+never from the request body (MIGRATION_HARDENING.md §1) — verified live with
+spoofed ids.
+- **/teacher-profile** GET (default; `?template_for_course=` for
+  checkForTemplate; `?scope=all` admin-gated to SCHOOL_CONFIG.adminEmails —
+  deliberately narrower than the old any-authenticated auth_read) +
+  POST (saveTeacherProfile upsert, teacher_email from JWT, RETURNING *) +
+  PATCH (column-allowlist update by (JWT email, course_name), 404 when
+  unowned). GET 404s on zero rows — frontend must treat as "no profiles yet".
+- **/profiles** GET (own row, single object, 404 when none) + POST
+  (partial-column upsert, id = JWT sub) + PATCH (update-only).
+- **/conversations** GET (`?is_teacher_test=` splits TM-1 threads, newest 50)
+  + POST (returns `{id}` only) + PATCH (`{id, updated_at}` back — messages
+  jsonb never echoed) + DELETE (`?id=` / `?all=true`).
+- **/homework-tasks** GET + POST (bulk upsert, client uuids; conflict-update
+  arm carries `WHERE user_id = EXCLUDED.user_id` so a guessed uuid can't
+  hijack a foreign row — returned `{upserted}` count exposes skips) + PATCH +
+  DELETE (`?id=` / `?all=true`).
+- **/work-samples** GET (any authenticated caller, `?teacher_profile_id=` or
+  `?teacher_profile_ids=`) + POST/DELETE (2-step JOIN-by-email authz: 403
+  non-owner, 404 missing profile — fail-visible where RLS was silently empty).
+- **api_usage: NO client route by design** (forgeable). `checkRateLimit` +
+  `logUsage` inside the Lambda gained RDS branches gated on `USE_RDS_USAGE=1`
+  (env var, unset until cutover so live rate limits keep reading Supabase's
+  real history; both must flip together).
+- Function URL CORS AllowMethods now `GET, POST, PATCH, DELETE`.
+- jsonb params are JSON.stringify'd in routes (node-postgres turns JS arrays
+  into PG array literals otherwise); text[] columns pass raw arrays.
+
 ### System Prompt Architecture
 - Built dynamically from teacher profile object at session start
 - NEVER rebuilt mid-conversation
