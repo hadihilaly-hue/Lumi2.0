@@ -1198,15 +1198,22 @@ async function loadConvsFromSupabase() {
   try {
     // TM-2: filter by is_teacher_test so test convs never appear in
     // the student sidebar (and vice versa). Both branches go through
-    // the same RLS auth.uid() = user_id check.
-    const { data, error } = await sb
-      .from('conversations')
-      .select('id, title, messages, teacher, course, created_at, updated_at')
-      .eq('user_id', currentUser.id)
-      .eq('is_teacher_test', !!S.isTestMode)
-      .order('created_at', { ascending: false })
-      .limit(50);
-    if (error || !data || !data.length) return;
+    // the same auth.uid() = user_id scoping (RLS or Lambda-side).
+    let data;
+    if (USE_RDS) {
+      data = await rdsFetch(`conversations?is_teacher_test=${!!S.isTestMode}`);
+    } else {
+      const res = await sb
+        .from('conversations')
+        .select('id, title, messages, teacher, course, created_at, updated_at')
+        .eq('user_id', currentUser.id)
+        .eq('is_teacher_test', !!S.isTestMode)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (res.error) return;
+      data = res.data;
+    }
+    if (!data || !data.length) return;
 
     const convs = {};
     data.forEach(row => {
@@ -1272,25 +1279,42 @@ async function _doSyncConv(convId) {
   };
 
   if (conv.sbId) {
-    // Already exists in Supabase — update
-    const { error } = await sb
-      .from('conversations')
-      .update(row)
-      .eq('id', conv.sbId)
-      .eq('user_id', currentUser.id);
-    if (error) console.warn('Supabase update error:', error);
+    // Already exists — update. Lambda PATCH scopes to the JWT user server-side
+    // and 404s on an unowned/unknown id (surfaced via the rdsFetch null → warn).
+    if (USE_RDS) {
+      try {
+        const res = await rdsFetch('conversations', { method: 'PATCH', body: { id: conv.sbId, ...row } });
+        if (!res) console.warn('Supabase update error:', 'conversation not found (404)');
+      } catch (err) { console.warn('Supabase update error:', err); }
+    } else {
+      const { error } = await sb
+        .from('conversations')
+        .update(row)
+        .eq('id', conv.sbId)
+        .eq('user_id', currentUser.id);
+      if (error) console.warn('Supabase update error:', error);
+    }
   } else {
     // New conversation — insert and capture the UUID
-    const { data, error } = await sb
-      .from('conversations')
-      .insert(row)
-      .select('id')
-      .single();
-    if (error) { console.warn('Supabase insert error:', error); return; }
-    if (data?.id) {
+    let newId = null;
+    if (USE_RDS) {
+      try {
+        const res = await rdsFetch('conversations', { method: 'POST', body: row });
+        newId = res?.id || null;
+      } catch (err) { console.warn('Supabase insert error:', err); return; }
+    } else {
+      const { data, error } = await sb
+        .from('conversations')
+        .insert(row)
+        .select('id')
+        .single();
+      if (error) { console.warn('Supabase insert error:', error); return; }
+      newId = data?.id || null;
+    }
+    if (newId) {
       // Store sbId back into local storage
       const c2 = getConvs();
-      if (c2[convId]) { c2[convId].sbId = data.id; saveConvs(c2); }
+      if (c2[convId]) { c2[convId].sbId = newId; saveConvs(c2); }
     }
   }
 }
@@ -1301,11 +1325,20 @@ function deleteConvFromSupabase(convId) {
   const convs = getConvs();
   const sbId  = convs[convId]?.sbId;
   if (!sbId) return;
-  sb.from('conversations')
-    .delete()
-    .eq('id', sbId)
-    .eq('user_id', currentUser.id)
-    .then(({ error }) => { if (error) console.warn('Supabase delete error:', error); });
+  if (USE_RDS) {
+    // Hardened (§2): failure now surfaces to the user, not just the console.
+    rdsFetch(`conversations?id=${encodeURIComponent(sbId)}`, { method: 'DELETE' })
+      .catch(err => {
+        console.warn('Supabase delete error:', err);
+        showToast('Could not delete the conversation on the server — see console');
+      });
+  } else {
+    sb.from('conversations')
+      .delete()
+      .eq('id', sbId)
+      .eq('user_id', currentUser.id)
+      .then(({ error }) => { if (error) console.warn('Supabase delete error:', error); });
+  }
 }
 
 // Sync user profile (name, grade, accumulated values) to Supabase
@@ -3765,7 +3798,9 @@ function wireListeners() {
             values_profile: { values: [], goals: [], interests: [] },
           };
           await Promise.all([
-            sb.from('conversations').delete().eq('user_id', currentUser.id),
+            USE_RDS
+              ? rdsFetch('conversations?all=true', { method: 'DELETE' })
+              : sb.from('conversations').delete().eq('user_id', currentUser.id),
             USE_RDS
               ? rdsFetch('profiles', { method: 'POST', body: profileReset })
               : sb.from('profiles').upsert({ id: currentUser.id, ...profileReset }),
