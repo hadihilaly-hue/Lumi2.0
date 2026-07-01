@@ -634,12 +634,24 @@ function syncScheduleToSupabase(schedule) {
   // TM-2: never write a teacher's synthetic schedule into their auth
   // user's profiles row — they're not a student.
   if (S.isTestMode) return;
-  sb.from('profiles').upsert({
-    id: currentUser.id,
-    schedule,
-    schedule_updated_at: new Date().toISOString(),
-  })
-    .then(({ error }) => { if (error) console.warn('Schedule sync error:', error); });
+  if (USE_RDS) {
+    // Hardened (MIGRATION_HARDENING §2): awaited-in-promise with a real error
+    // surface instead of console-only fire-and-forget. No Supabase fallback.
+    rdsFetch('profiles', { method: 'POST', body: {
+      schedule,
+      schedule_updated_at: new Date().toISOString(),
+    } }).catch(err => {
+      console.warn('Schedule sync error:', err);
+      showToast('Could not sync your schedule — see console');
+    });
+  } else {
+    sb.from('profiles').upsert({
+      id: currentUser.id,
+      schedule,
+      schedule_updated_at: new Date().toISOString(),
+    })
+      .then(({ error }) => { if (error) console.warn('Schedule sync error:', error); });
+  }
 
   // Upsert enrollment rows so teachers can see their roster and write per-student notes.
   // Looks up teacher_profile IDs first — skips classes whose teacher hasn't onboarded yet.
@@ -833,6 +845,28 @@ async function preloadProfileStatuses() {
     });
     renderSidebar();
   } catch (e) { console.warn('[preloadProfileStatuses] failed:', e); }
+}
+
+// Generic RDS Lambda fetch (Workstream G). Same auth idiom as
+// fetchTeacherProfileLambda below: Supabase JWT as Bearer, JSON in/out.
+// 404 -> null (not-found is a data state, not an error); any other non-2xx
+// throws so USE_RDS call sites fail VISIBLY — never silently fall back to
+// Supabase. `path` starts without a slash (CLAUDE_PROXY_URL ends with one);
+// query params go in `path`, write payloads in `body`.
+async function rdsFetch(path, { method = 'GET', body } = {}) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session?.access_token) throw new Error('rdsFetch: no session');
+  const res = await fetch(`${CLAUDE_PROXY_URL}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`${path.split('?')[0]} ${res.status}`);
+  return res.json();
 }
 
 // Option 2: fetch one teacher profile from the RDS-backed Lambda route, shape-matched
@@ -1297,8 +1331,7 @@ function syncProfileToSupabase() {
   let study_style = null;
   try { study_style = JSON.parse(localStorage.getItem('lumi_study_style') || 'null'); } catch {}
 
-  sb.from('profiles').upsert({
-    id:             currentUser.id,
+  const profileRow = {
     name:           name  || null,
     grade:          grade || null,
     values_profile,
@@ -1308,8 +1341,17 @@ function syncProfileToSupabase() {
     homework_start_time,
     study_style,
     onboarding_complete,
-  })
-    .then(({ error }) => { if (error) console.warn('Supabase profile sync error:', error); });
+  };
+  if (USE_RDS) {
+    // Hardened (§2): real error surface, no silent fallback. id comes from the JWT.
+    rdsFetch('profiles', { method: 'POST', body: profileRow }).catch(err => {
+      console.warn('Supabase profile sync error:', err);
+      showToast('Could not sync your profile — see console');
+    });
+  } else {
+    sb.from('profiles').upsert({ id: currentUser.id, ...profileRow })
+      .then(({ error }) => { if (error) console.warn('Supabase profile sync error:', error); });
+  }
 }
 
 // Load profile from Supabase on new device (only if localStorage has no name)
@@ -1321,12 +1363,21 @@ async function loadProfileFromSupabase() {
   if (S.isTestMode) return;
   const hasName = !!localStorage.getItem('lumi_name');
   try {
-    const { data, error } = await sb
-      .from('profiles')
-      .select('name, grade, values_profile, schedule, learning_style, pain_points, typical_activities, homework_start_time, study_style, onboarding_complete')
-      .eq('id', currentUser.id)
-      .single();
-    if (error || !data) return;
+    let data;
+    if (USE_RDS) {
+      // GET /profiles returns the caller's row as a single object; null on 404
+      // (no profile yet — same exit as the Supabase error/no-data path).
+      data = await rdsFetch('profiles');
+    } else {
+      const res = await sb
+        .from('profiles')
+        .select('name, grade, values_profile, schedule, learning_style, pain_points, typical_activities, homework_start_time, study_style, onboarding_complete')
+        .eq('id', currentUser.id)
+        .single();
+      if (res.error) return;
+      data = res.data;
+    }
+    if (!data) return;
     // Always restore name/grade (overwrite if Supabase is newer)
     if (!hasName && data.name)  localStorage.setItem('lumi_name',  data.name);
     if (!hasName && data.grade) localStorage.setItem('lumi_grade', data.grade);
@@ -3188,19 +3239,27 @@ async function obSaveFullProfile() {
   if (!currentUser) return;
   // Save only the personality fields collected during the chat.
   // Grade and schedule are saved separately by initScheduleSetup.
+  const obRow = {
+    name:                OB.profile.name  || null,
+    study_style:         OB.profile.study_style,
+    learning_style:      OB.profile.learning_style  || 'mixed',
+    homework_start_time: OB.profile.homework_start_time || '18:00',
+    typical_activities:  OB.profile.typical_activities || '',
+    pain_points:         OB.profile.pain_points || [],
+    calendar_connected:  OB.profile.calendar_connected || false,
+    onboarding_complete: true,
+  };
   try {
-    await sb.from('profiles').upsert({
-      id:                  currentUser.id,
-      name:                OB.profile.name  || null,
-      study_style:         OB.profile.study_style,
-      learning_style:      OB.profile.learning_style  || 'mixed',
-      homework_start_time: OB.profile.homework_start_time || '18:00',
-      typical_activities:  OB.profile.typical_activities || '',
-      pain_points:         OB.profile.pain_points || [],
-      calendar_connected:  OB.profile.calendar_connected || false,
-      onboarding_complete: true,
-    });
-  } catch (e) { console.warn('Profile save error:', e); }
+    if (USE_RDS) {
+      await rdsFetch('profiles', { method: 'POST', body: obRow });
+    } else {
+      await sb.from('profiles').upsert({ id: currentUser.id, ...obRow });
+    }
+  } catch (e) {
+    // Hardened (§2): onboarding continues, but the failure is now user-visible.
+    console.warn('Profile save error:', e);
+    showToast('Could not save your profile — see console');
+  }
 }
 
 async function startObConversation() {
@@ -3701,15 +3760,20 @@ function wireListeners() {
       // Delete from Supabase (both tables, for this user)
       if (currentUser) {
         try {
+          const profileReset = {
+            name: null, grade: null,
+            values_profile: { values: [], goals: [], interests: [] },
+          };
           await Promise.all([
             sb.from('conversations').delete().eq('user_id', currentUser.id),
-            sb.from('profiles').upsert({
-              id: currentUser.id,
-              name: null, grade: null,
-              values_profile: { values: [], goals: [], interests: [] },
-            }),
+            USE_RDS
+              ? rdsFetch('profiles', { method: 'POST', body: profileReset })
+              : sb.from('profiles').upsert({ id: currentUser.id, ...profileReset }),
           ]);
-        } catch (e) { console.warn('Supabase clear failed:', e); }
+        } catch (e) {
+          console.warn('Supabase clear failed:', e);
+          showToast('Could not clear server memory — see console');
+        }
       }
       localStorage.removeItem('lumi_convs');
       localStorage.removeItem('lumi_current');
@@ -4413,8 +4477,16 @@ async function syncStudyStyleToSupabase(style) {
   // fields into the teacher's auth user record.
   if (S.isTestMode) return;
   try {
-    await sb.from('profiles').upsert({ id: currentUser.id, study_style: style });
-  } catch (e) { console.warn('Study style sync error:', e); }
+    if (USE_RDS) {
+      await rdsFetch('profiles', { method: 'POST', body: { study_style: style } });
+    } else {
+      await sb.from('profiles').upsert({ id: currentUser.id, study_style: style });
+    }
+  } catch (e) {
+    // Hardened (§2): this was app.js's only fully-silent catch; now logged + toasted.
+    console.warn('Study style sync error:', e);
+    showToast('Could not sync your study style — see console');
+  }
 }
 
 function getPlanStartMinutes() {
