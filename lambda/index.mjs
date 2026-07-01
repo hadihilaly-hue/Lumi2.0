@@ -38,23 +38,29 @@ const bedrockClient = new BedrockRuntimeClient({ region: AWS_REGION });
 const s3Client = new S3Client({ region: AWS_REGION });
 
 // === Auth: verify Supabase JWT ===
+// HARD TIMEOUT (2026-07-01 incident): this fetch previously had none, so a
+// stalled Lambda→Supabase connection hung the whole invocation to the 60s
+// Lambda timeout. With the account concurrency limit of 10, a handful of
+// hung requests starved EVERY route (429s). Fail fast to 401 instead —
+// clients see an auth error and retry; concurrency slots free in 5s.
 async function verifyAuth(authHeader) {
   if (!authHeader?.startsWith("Bearer ")) return null;
   const token = authHeader.slice(7);
-  
+
   try {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
       headers: {
         "Authorization": `Bearer ${token}`,
         "apikey": SUPABASE_SERVICE_ROLE_KEY,
-      }
+      },
+      signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.email) return null;
     return { id: data.id, email: data.email };
   } catch (err) {
-    console.error("verifyAuth error:", err);
+    console.error("verifyAuth error:", err.name === "TimeoutError" ? "supabase auth timeout (5s)" : err);
     return null;
   }
 }
@@ -117,7 +123,8 @@ async function checkRateLimit(userId, isTeacherUser) {
           "apikey": SUPABASE_SERVICE_ROLE_KEY,
           "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
           "Prefer": "count=exact",
-        }
+        },
+        signal: AbortSignal.timeout(5000),
       }
     );
     const range = res.headers.get("content-range") || "0/0";
@@ -151,6 +158,7 @@ async function logUsage({ userId, email, isTeacherUser, model, inputTokens, outp
         "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
         "Content-Type": "application/json",
       },
+      signal: AbortSignal.timeout(5000),
       body: JSON.stringify({
         user_id: userId,
         user_email: email.toLowerCase(),
@@ -358,7 +366,7 @@ async function fetchTeacherNotes({ studentId, teacherProfileId, useRds }) {
         ).then(r => r.rows.map(x => x.teacher_notes))
       : fetch(
           `${SUPABASE_URL}/rest/v1/class_enrollments?student_id=eq.${encodeURIComponent(studentId)}&teacher_profile_id=eq.${encodeURIComponent(teacherProfileId)}&select=teacher_notes`,
-          { headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` } }
+          { headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` }, signal: AbortSignal.timeout(3000) }
         ).then(async res => {
           if (!res.ok) throw new Error(`supabase ${res.status}`);
           const rows = await res.json();
