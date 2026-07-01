@@ -44,8 +44,17 @@ Last updated: 2026-07-01 (Workstream F COMPLETE — all data routes live & e2e v
   design — checkRateLimit/logUsage carry RDS branches behind `USE_RDS_USAGE=1`
   (unset; flips at cutover). Function URL CORS AllowMethods extended to PATCH+DELETE.
   Commits `0c173e3`→`80a8f07`. See CLAUDE.md "RDS Lambda data routes" for the contract.
-- **Workstreams D–E, G–I:** Not yet started. Next: Workstream G (frontend rewiring
-  behind USE_RDS, ~27 remaining call sites + MIGRATION_HARDENING §2 silent-failure fixes).
+- **Workstream G — Frontend rewiring:** ✅ DONE (2026-07-01). Every Supabase DATA
+  call site in app.js/teacher.html/admin.html is behind `USE_RDS` (`?lambda=1`) via
+  per-file `rdsFetch` helpers, with MIGRATION_HARDENING §2 fixes (await/try-catch +
+  console + toast) applied on the RDS paths. Flag-off Supabase paths untouched
+  (regression-verified live). Lambda gained `/class-enrollments` POST+PATCH as the
+  prerequisite (commit 6743ecd). One deliberate retention: the student chat-open
+  `teacher_notes` read stays on Supabase until prompt-building moves server-side.
+  Commits 6743ecd…56f9001; all groups live-verified on the deployed Pages site with
+  a real session. Manual checklist: `migration/SMOKE_TEST.md`.
+- **Workstreams D–E, H–I:** Not yet started. Next: Workstream E prep (Phase 4 —
+  pg_dump/restore commands + cutover flip/teardown lists, written not executed).
 
 **Key identifiers:**
 - AWS account: 613136968914 (us-east-1)

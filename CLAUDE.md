@@ -49,19 +49,21 @@ gives direct answers, only guides reasoning.
 
 ### MODE 2: STUDENT MODE
 - Loads the selected teacher's profile from Supabase.
-  - **Dev/test flag (AWS migration):** append `?lambda=1` to the app URL to read
-    from the RDS-backed Lambda instead of Supabase. Stateless, read once on load
-    via `USE_RDS` (in **app.js and teacher.html** — renamed from the original
-    `USE_RDS_TEACHER_PROFILE`). Covers: `teacher_profiles` reads (`GET
-    /teacher-profile`) across all 5 app.js sites (loadTestModeSchedule,
-    syncEnrollments, preloadProfileStatuses, getTeacherProfile,
-    getTeacherProfileCached), AND the teacher roster's `class_enrollments` read
-    (`GET /class-enrollments?scope=teaching`, teacher.html `loadAllEnrollments`).
-    No param = unchanged Supabase path. The Lambda path fails VISIBLY
-    (console.error everywhere; chat-area banner for the main tutor fetch; toast
-    for the roster) with NO silent fallback. RDS holds only test data — `?lambda=1`
-    is for exercising the path, not a production cutover. Requires `GET` in the
-    Lambda function URL's CORS AllowMethods.
+  - **Dev/test flag (AWS migration):** append `?lambda=1` to the app URL to route
+    data calls through the RDS-backed Lambda instead of Supabase. Stateless, read
+    once on load via `USE_RDS` (in **app.js, teacher.html, AND admin.html**).
+    **As of Workstream G (2026-07-01) the flag covers EVERY data call site** —
+    reads and writes across teacher_profiles, profiles, conversations,
+    homework_tasks, teacher_work_samples, and class_enrollments — via the
+    per-file `rdsFetch(path, {method, body})` helper (app.js + teacher.html;
+    admin.html inlines its single fetch). The ONE deliberate exception: the
+    student chat-open `teacher_notes` read in `finishOpenTutor` stays on
+    Supabase (see the Follow-up note under class_enrollments). No param =
+    byte-identical Supabase path. The Lambda path fails VISIBLY (console.error
+    with the original log strings + showToast at every §2 hardened write; the
+    chat-area banner for the main tutor fetch) with NO silent fallback. RDS
+    holds only test data — `?lambda=1` is for exercising the path until
+    cutover. Manual re-validation checklist: `migration/SMOKE_TEST.md`.
 - Guides students through the subject WITHOUT giving direct answers
 - Always asks students to walk through their reasoning first
 - Never says "that's wrong" — instead: "walk me through how you
@@ -168,11 +170,13 @@ gives direct answers, only guides reasoning.
     `auth.jwt()`). The route re-implements protection as a READ rule:
     `teacher_notes` is never returned to a student — it appears only in the
     teacher-scope projection (server-side authz, not RLS).
-- **Known limit — read/write split under `?lambda=1`.** Only READS are on the
-  Lambda this round; WRITES still go to Supabase (the `class_enrollments` upsert
-  in app.js `syncEnrollments`, and the `teacher_notes` update in teacher.html).
-  So under `?lambda=1` the roster reads from RDS, but a note saved there writes
-  to Supabase and will NOT appear on an RDS re-read. Expected until writes migrate.
+- **Writes migrated (Workstream G, 2026-07-01).** `POST /class-enrollments`
+  (the syncEnrollments student upsert — student_id always from the JWT; the
+  conflict-update arm can only touch student_name/updated_at, so teacher_notes
+  is structurally unwritable by students) and `PATCH /class-enrollments`
+  (teacher note save — 2-step email ownership check, 403 non-owner). Both
+  wired into the frontend behind `USE_RDS`. No DELETE route — no RLS policy
+  to port; dropped-class cleanup is still the pre-Menlo TODO.
 - **Follow-up — move tutor prompt-building server-side.** The student
   notes-injection read (app.js `finishOpenTutor`, still on Supabase) pulls
   `teacher_notes` to the client to build the system prompt locally — so raw notes
