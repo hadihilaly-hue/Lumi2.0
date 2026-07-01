@@ -197,6 +197,12 @@ body { overflow: auto; display: block; }
 <script>
 const ADMIN_EMAIL = 'hadi.hilaly@menloschool.org';
 
+// Lambda Function URL + dev/test flag — same convention as app.js/teacher.html.
+// ?lambda=1 routes the teacher_profiles broad read through the RDS-backed Lambda
+// (GET /teacher-profile?scope=all, admin-email-gated server-side).
+const LAMBDA_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws';
+const USE_RDS = new URLSearchParams(window.location.search).get('lambda') === '1';
+
 // ─── CURRICULUM (same as teacher.html) ───────────────────────────────────────
 const MENLO_CURRICULUM = {
   "English": {
@@ -443,10 +449,23 @@ let aRefreshTimer = null;
 // ─── DATA ─────────────────────────────────────────────────────────────────────
 async function loadAndRender() {
   try {
-    const { data, error } = await sb
-      .from('teacher_profiles')
-      .select('teacher_email, course_name, done, updated_at, engagement_rules, teaching_voice');
-    if (!error && data) {
+    let data;
+    if (USE_RDS) {
+      // Admin-gated on the Lambda (SCHOOL_CONFIG.adminEmails) — deliberately
+      // narrower than the old any-authenticated auth_read RLS. 200 [] when empty;
+      // fail-visible with no Supabase fallback per the ?lambda=1 convention.
+      const { data: { session } } = await sb.auth.getSession();
+      const res = await fetch(`${LAMBDA_URL}/teacher-profile?scope=all`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } });
+      if (!res.ok) throw new Error(`teacher-profile?scope=all ${res.status}`);
+      data = await res.json();
+    } else {
+      const res = await sb
+        .from('teacher_profiles')
+        .select('teacher_email, course_name, done, updated_at, engagement_rules, teaching_voice');
+      data = res.error ? null : res.data;
+    }
+    if (data) {
       aProfiles = {};
       data.forEach(row => {
         aProfiles[`${row.teacher_email}|${row.course_name}`] = row;
