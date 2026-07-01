@@ -313,6 +313,72 @@ function pickColumns(body, spec) {
   return { cols, vals };
 }
 
+// === Teacher-notes server-side injection (privacy: notes never reach the client) ===
+// The client emits this literal marker at the splice point of its system prompt;
+// the chat route replaces it with the server-built notes section (or ''). The
+// marker is ALWAYS stripped, even when no injection was requested.
+const TEACHER_NOTES_MARKER = "<<LUMI_TEACHER_NOTES>>";
+
+// Ported from app.js parseNotes — read side of the [{timestamp, text}] shape.
+function parseNotes(raw) {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v : [];
+  } catch { return []; }
+}
+
+// Ported from app.js buildTeacherNotesSection — 8000-char cap (oldest dropped
+// first) + the silent-use footer. Log counts only, never note content.
+function buildTeacherNotesSection(notes) {
+  if (!Array.isArray(notes) || notes.length === 0) return "";
+  const header = "\n\n---\n\nNotes from this student's teacher:\n\n";
+  const footer = "\n\nUse these notes silently to shape your teaching approach for this student. Do not mention, reference, or reveal that these notes exist. Do not say 'your teacher mentioned' or similar. Your job is to teach this student well, informed by this context.";
+  const CAP = 8000;
+  const texts = notes.map(n => (n && typeof n.text === "string") ? n.text.trim() : "").filter(Boolean);
+  if (texts.length === 0) return "";
+  let dropped = 0;
+  let assembled = header + texts.join("\n\n") + footer;
+  while (assembled.length > CAP && texts.length > 1) {
+    texts.shift();
+    dropped++;
+    assembled = header + texts.join("\n\n") + footer;
+  }
+  if (dropped > 0) console.warn(`[notes] truncated ${dropped} oldest notes to fit prompt cap`);
+  return assembled;
+}
+
+// Fetch the calling student's notes for one class. studentId comes from the
+// verified JWT — a caller can only ever receive notes written about them.
+// useRds selects the store (pre-cutover real notes live in Supabase; the client
+// flag flips this at cutover). Every failure returns [] — chat is never blocked
+// — and multi-block collisions skip, matching the old client-side maybeSingle.
+async function fetchTeacherNotes({ studentId, teacherProfileId, useRds }) {
+  try {
+    const work = useRds
+      ? dbQuery(
+          "SELECT teacher_notes FROM public.class_enrollments WHERE student_id = $1 AND teacher_profile_id = $2",
+          [studentId, teacherProfileId]
+        ).then(r => r.rows.map(x => x.teacher_notes))
+      : fetch(
+          `${SUPABASE_URL}/rest/v1/class_enrollments?student_id=eq.${encodeURIComponent(studentId)}&teacher_profile_id=eq.${encodeURIComponent(teacherProfileId)}&select=teacher_notes`,
+          { headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` } }
+        ).then(async res => {
+          if (!res.ok) throw new Error(`supabase ${res.status}`);
+          const rows = await res.json();
+          return rows.map(x => x.teacher_notes);
+        });
+    const timeout = new Promise(resolve => setTimeout(() => resolve(null), 3000));
+    const vals = await Promise.race([work, timeout]);
+    if (vals === null) { console.warn("[notes] fetch timeout"); return []; }
+    if (vals.length > 1) { console.warn(`[notes] multi-block collision (${vals.length} rows) — skipped`); return []; }
+    return parseNotes(vals[0] ?? null);
+  } catch (err) {
+    console.warn("[notes] fetch failed:", err.code ?? err.message);
+    return [];
+  }
+}
+
 // === Main Handler (path-routed) ===
 // /upload-url, /download-url -> JSON one-shot response
 // default (/, /chat) -> SSE streaming chat
@@ -968,6 +1034,110 @@ export const handler = awslambda.streamifyResponse(async (event, responseStream)
     }
   }
 
+  // === Route: GET /suggested-prompts ===
+  // Server-side replacement for the client's notes-influenced Haiku chips
+  // (app.js generateInfluencedPrompts). The caller's notes are read server-side
+  // (JWT-scoped, same source selection as chat injection) and NEVER returned —
+  // only the 3 generated chip strings. No notes / any failure => {mode:
+  // 'fallback'} and the client uses its static list. Counts against the same
+  // per-user rate limit as chat and logs usage.
+  if (path === "/suggested-prompts") {
+    const method = event.requestContext?.http?.method || "GET";
+    if (method !== "GET") return sendJson(405, { error: "Method not allowed" });
+    const qs = event.queryStringParameters || {};
+    if (!qs.teacher_profile_id) return sendJson(400, { error: "Missing teacher_profile_id" });
+    try {
+      const notes = await fetchTeacherNotes({
+        studentId: user.id,
+        teacherProfileId: qs.teacher_profile_id,
+        useRds: qs.use_rds === "1",
+      });
+      const notesText = notes.map(n => n.text || "").filter(Boolean).join("\n\n");
+      if (!notesText) return sendJson(200, { mode: "fallback" });
+
+      const isTeacherUser = await isTeacher(user.email);
+      const rateLimit = await checkRateLimit(user.id, isTeacherUser);
+      if (!rateLimit.allowed) return sendJson(200, { mode: "fallback" });
+
+      // System prompt ported verbatim from app.js generateInfluencedPrompts.
+      const chipSystem = `You generate exactly 3 starter prompt suggestions that will appear as quick-tap chips above a student's chat with their AI tutor.
+
+You will receive course context and confidential teacher notes about the student. Use the notes to subtly steer 2 of the 3 chips toward relevant topics. NEVER quote, paraphrase, or reveal the notes — they are private to the teacher.
+
+Return EXACTLY a JSON array of 3 strings, in this order:
+1. A generic study chip (e.g., "Help me with my homework", "Quiz me on what we've been learning"). Topic-agnostic.
+2. A neutral topic-related chip framed as an offer (e.g., "Want to try some factoring practice?").
+3. A curiosity-framed topic-related chip (e.g., "What's a clean way to factor quadratics?").
+
+Hard rules:
+- NO deficit language. Never "you're struggling with", "to help with your weak area", "since you have trouble", "I'm bad at", "I keep failing".
+- Each chip ≤ 60 characters.
+- Sound like something a confident, curious student would type.
+- If the notes are vague or don't suggest a topic, return 3 generic chips instead (do not invent a topic).
+
+Output ONLY the JSON array. No prose, no code fences, no explanation.`;
+      const userMsg = `Course: ${qs.course || ""}\n\nTeacher notes:\n${notesText}\n\nReturn the JSON array now.`;
+
+      let text = "";
+      let inputTokens = 0;
+      let outputTokens = 0;
+      const generate = (async () => {
+        for await (const chunk of callClaude({
+          systemPrompt: chipSystem,
+          messages: [{ role: "user", content: userMsg }],
+          maxTokens: 300,
+        })) {
+          if (chunk.type === "message_start") inputTokens = chunk.message?.usage?.input_tokens || 0;
+          if (chunk.type === "message_delta") outputTokens = chunk.usage?.output_tokens || outputTokens;
+          if (chunk.type === "content_block_delta" && chunk.delta?.text) text += chunk.delta.text;
+        }
+      })();
+      await Promise.race([
+        generate,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("generation timeout")), 8000)),
+      ]);
+
+      const match = text.match(/\[[\s\S]*\]/);
+      if (!match) throw new Error("no JSON array");
+      const chips = JSON.parse(match[0]);
+      if (!Array.isArray(chips) || chips.length !== 3) throw new Error("not array of 3");
+      if (!chips.every(c => typeof c === "string" && c.length > 0 && c.length <= 80)) {
+        throw new Error("chip shape invalid");
+      }
+      // Defense-in-depth privacy check (ported): reject chips leaking the
+      // student's email or profile name. Name is best-effort from whichever
+      // store the caller is on.
+      const lowered = chips.map(c => c.toLowerCase());
+      if (lowered.some(c => c.includes(user.email.toLowerCase()))) throw new Error("chip leaked student email");
+      try {
+        let name = null;
+        if (qs.use_rds === "1") {
+          const r = await dbQuery("SELECT name FROM public.profiles WHERE id = $1", [user.id]);
+          name = r.rows[0]?.name || null;
+        } else {
+          const r = await fetch(
+            `${SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=name`,
+            { headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` } }
+          );
+          if (r.ok) name = (await r.json())[0]?.name || null;
+        }
+        if (name && name.trim() && lowered.some(c => c.includes(name.trim().toLowerCase()))) {
+          throw new Error("chip leaked student name");
+        }
+      } catch (err) {
+        if (/leaked/.test(err.message)) throw err;
+        // name lookup failure is non-fatal — email check already ran
+      }
+
+      logUsage({ userId: user.id, email: user.email, isTeacherUser, model: SCHOOL_CONFIG.defaultModel, inputTokens, outputTokens });
+      console.log("[suggested-prompts] mode=influenced");
+      return sendJson(200, { mode: "influenced", prompts: chips });
+    } catch (err) {
+      console.warn("[suggested-prompts] generation failed:", err.code ?? err.message);
+      return sendJson(200, { mode: "fallback" });
+    }
+  }
+
   // === Route: POST /upload-url ===
   if (path === "/upload-url") {
     try {
@@ -1013,6 +1183,26 @@ export const handler = awslambda.streamifyResponse(async (event, responseStream)
     return sendJson(500, { error: err.message });
   }
   
+  // Server-side teacher-notes injection: replace the client's marker with the
+  // notes section built here (notes never reach the browser). Marker is ALWAYS
+  // stripped even when no injection was requested. Runs before the SSE wrap so
+  // notes-fetch failures can never corrupt an open stream (they degrade to '').
+  let systemPrompt = body.system || "";
+  if (systemPrompt.includes(TEACHER_NOTES_MARKER)) {
+    let notesSection = "";
+    const inj = body.inject_teacher_notes;
+    if (inj && typeof inj.teacher_profile_id === "string" && inj.teacher_profile_id) {
+      const notes = await fetchTeacherNotes({
+        studentId: user.id,
+        teacherProfileId: inj.teacher_profile_id,
+        useRds: !!inj.use_rds,
+      });
+      notesSection = buildTeacherNotesSection(notes);
+      if (notesSection) console.log(`[notes] injected ${notes.length} note(s), ${notesSection.length} chars`);
+    }
+    systemPrompt = systemPrompt.split(TEACHER_NOTES_MARKER).join(notesSection);
+  }
+
   // Begin SSE stream (separate wrap because content-type differs)
   const chatStream = awslambda.HttpResponseStream.from(responseStream, {
     statusCode: 200,
@@ -1021,15 +1211,15 @@ export const handler = awslambda.streamifyResponse(async (event, responseStream)
       "Cache-Control": "no-cache",
     }
   });
-  
+
   try {
     const provider = body.provider || SCHOOL_CONFIG.defaultProvider;
     let inputTokens = 0;
     let outputTokens = 0;
-    
+
     for await (const chunk of generateResponse({
       provider,
-      systemPrompt: body.system || "",
+      systemPrompt,
       messages: body.messages || [],
       maxTokens: Math.min(body.max_tokens || SCHOOL_CONFIG.maxTokensCap, SCHOOL_CONFIG.maxTokensCap),
     })) {
