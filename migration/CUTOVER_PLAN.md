@@ -1,9 +1,29 @@
 # Cutover plan — Supabase → RDS (Workstreams E + H)
 
-Written 2026-07-01 (Phase 4 of the route/rewiring effort). **Nothing in this
-file has been executed.** Every command is for manual execution by the
-operator, in order. Companion docs: `migration/SMOKE_TEST.md` (post-flip
-validation), `MIGRATION_HARDENING.md`, `RLS_AUDIT.md`.
+> **STATUS: EXECUTED 2026-07-01** (§§1–4 done; §5 teardown pending the 48h
+> watch). Execution log:
+> - §1 isTeacher→RDS: commit 95d97cc. Plus two incident fixes shipped during
+>   the run: ccfd602 (5s timeouts on all Supabase fetches in the Lambda) and
+>   a146e4b (pg pool query_timeout 8s + keepAlive) — hung egress/dead pooled
+>   sockets were eating 60s Lambda timeouts and, with the account's 10-slot
+>   concurrency limit, starving all routes (429s).
+> - §2 data sync: adapted — Supabase held only 23 conversations + 29
+>   api_usage rows (everything else 0 post-cleanup), so the sync ran as
+>   REST-read → /admin/sql inserts (scratch script), no pg_dump needed.
+>   Counts + jsonb spot-checks + FK-orphan checks all green. Synthetic RDS
+>   fixtures (other.teacher profile, synthetic-student enrollment) deleted.
+> - §3 USE_RDS_USAGE=1 set (full-env-map merge); verified by a live usage
+>   row written to RDS.
+> - §4 flag default flipped in commit 711f7c5 (`!== '0'`; ?lambda=0 escape
+>   hatch); Pages deploy confirmed; smoke pass: app/teacher/admin all on RDS
+>   with zero supabase.co/rest data calls, 23 imported conversations visible,
+>   ?lambda=0 fallback proven.
+> - Known follow-up: request an account concurrency-limit increase (10 is
+>   the new-account default and too tight); teardown T1–T7 after 48h.
+
+Original runbook below, kept for reference. Companion docs:
+`migration/SMOKE_TEST.md` (post-flip validation), `MIGRATION_HARDENING.md`,
+`RLS_AUDIT.md`.
 
 ---
 

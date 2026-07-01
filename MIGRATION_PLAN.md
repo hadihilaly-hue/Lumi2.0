@@ -18,7 +18,7 @@ Companion docs (committed):
 
 ## Progress
 
-Last updated: 2026-07-01 (Workstream F COMPLETE — all data routes live & e2e validated)
+Last updated: 2026-07-01 (**CUTOVER EXECUTED** — RDS is the default data layer; 48h watch running)
 
 - **Workstream A — Data cleanup:** ✅ DONE. Harris and Bush records removed from `teacher_profiles`, `class_enrollments`, `conversations`, `homework_tasks`, `profiles`, `api_usage`; their files removed from S3 buckets; their Supabase Auth records deleted. Verification queries returned 0s across all tables.
 - **Workstream B — AWS infrastructure:** ✅ DONE (except CloudWatch retention + CloudTrail, deferred)
@@ -67,6 +67,15 @@ Last updated: 2026-07-01 (Workstream F COMPLETE — all data routes live & e2e v
   the CUTOVER_PLAN §0 blocker is dissolved and T6 (Supabase Postgres
   decommission) is unblocked. Client also scrubs previously-persisted notes
   from localStorage.
+- **Workstreams E + H — CUTOVER EXECUTED (2026-07-01).** Data synced (23
+  conversations + 29 api_usage; everything else was empty), USE_RDS_USAGE=1,
+  isTeacher on RDS (95d97cc), frontend flag defaults ON (711f7c5; `?lambda=0`
+  = Supabase escape hatch until teardown). Smoke pass green. Incident fixes
+  shipped mid-cutover: 5s Supabase-fetch timeouts (ccfd602) + pg pool
+  query_timeout/keepAlive (a146e4b) — unbounded hangs were starving the
+  account's 10-slot Lambda concurrency. 48h watch running; teardown T1–T7
+  (see migration/CUTOVER_PLAN.md) after. TODO: request Lambda concurrency
+  limit increase from AWS (new-account default 10).
 - **Workstreams D, I:** Not yet started (SIS importer; Cognito auth).
 
 **Key identifiers:**

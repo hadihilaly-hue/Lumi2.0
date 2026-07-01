@@ -48,10 +48,13 @@ gives direct answers, only guides reasoning.
   the Storage bucket inventory for the full picture.
 
 ### MODE 2: STUDENT MODE
-- Loads the selected teacher's profile from Supabase.
-  - **Dev/test flag (AWS migration):** append `?lambda=1` to the app URL to route
-    data calls through the RDS-backed Lambda instead of Supabase. Stateless, read
-    once on load via `USE_RDS` (in **app.js, teacher.html, AND admin.html**).
+- Loads the selected teacher's profile from **RDS via the Lambda (the default
+  data layer since the 2026-07-01 cutover)**.
+  - **Data-layer flag (post-cutover):** `USE_RDS` now defaults to TRUE in
+    app.js, teacher.html, AND admin.html; append `?lambda=0` to fall back to
+    the Supabase data path (rollback escape hatch, kept until the post-cutover
+    teardown — see migration/CUTOVER_PLAN.md status header). Stateless, read
+    once on load.
     **As of Workstream G (2026-07-01) the flag covers EVERY data call site** —
     reads and writes across teacher_profiles, profiles, conversations,
     homework_tasks, teacher_work_samples, and class_enrollments — via the
