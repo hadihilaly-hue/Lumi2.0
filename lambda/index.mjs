@@ -233,6 +233,23 @@ const TEACHER_PROFILE_COLS = {
   suggested_prompts: "jsonb",
 };
 
+const PROFILE_COLS = {
+  name: "raw",
+  grade: "raw",
+  values_profile: "jsonb",
+  schedule: "jsonb",
+  schedule_updated_at: "raw",
+  semester_banner_dismissed_at: "raw",
+  study_style: "jsonb",
+  google_calendar_token: "raw",
+  calendar_connected: "raw",
+  learning_style: "raw",
+  pain_points: "jsonb",
+  typical_activities: "raw",
+  onboarding_complete: "raw",
+  homework_start_time: "raw",
+};
+
 // Filters body down to allowlisted columns, serializing jsonb values.
 function pickColumns(body, spec) {
   const cols = [];
@@ -465,6 +482,60 @@ export const handler = awslambda.streamifyResponse(async (event, responseStream)
     } catch (err) {
       // No email / row data / token in logs — code or message only.
       console.error("teacher-profile error:", err.code ?? err.message);
+      return sendJson(500, { error: "Database error" });
+    }
+  }
+
+  // === Route: /profiles (GET, POST, PATCH) ===
+  // Authed + domain-gated above. Replicates the "Users can only access own profile"
+  // ALL policy (`auth.uid() = id`): the row id is ALWAYS the JWT user id — never read
+  // from the body (5 trust-the-client upserts in app.js per MIGRATION_HARDENING §1).
+  // profiles.id IS the auth UUID (no separate user_id column, no updated_at column).
+  // GET — caller's own row as a single object; 404 when none (frontend .single()
+  //   semantics). PII lives here (google_calendar_token) — never log row data.
+  // POST — partial-column upsert: INSERT .. ON CONFLICT (id) DO UPDATE SET only the
+  //   provided allowlisted columns (matches Supabase upsert semantics at all 5 sites).
+  // PATCH — update-only variant (no insert); 404 when the row doesn't exist yet.
+  if (path === "/profiles") {
+    const method = event.requestContext?.http?.method || "GET";
+    try {
+      if (method === "GET") {
+        const result = await dbQuery("SELECT * FROM public.profiles WHERE id = $1", [user.id]);
+        if (result.rowCount === 0) return sendJson(404, { error: "No profile found" });
+        return sendJson(200, result.rows[0]);
+      }
+
+      if (method === "POST") {
+        const { cols, vals } = pickColumns(body, PROFILE_COLS);
+        if (cols.length === 0) return sendJson(400, { error: "No updatable fields" });
+        const insertCols = ["id", ...cols];
+        const placeholders = insertCols.map((_, i) => `$${i + 1}`);
+        const setClauses = cols.map((c) => `${c} = EXCLUDED.${c}`);
+        const result = await dbQuery(
+          `INSERT INTO public.profiles (${insertCols.join(", ")})
+                VALUES (${placeholders.join(", ")})
+           ON CONFLICT (id) DO UPDATE SET ${setClauses.join(", ")}
+             RETURNING *`,
+          [user.id, ...vals]
+        );
+        return sendJson(200, result.rows[0]);
+      }
+
+      if (method === "PATCH") {
+        const { cols, vals } = pickColumns(body, PROFILE_COLS);
+        if (cols.length === 0) return sendJson(400, { error: "No updatable fields" });
+        const setClauses = cols.map((c, i) => `${c} = $${i + 2}`);
+        const result = await dbQuery(
+          `UPDATE public.profiles SET ${setClauses.join(", ")} WHERE id = $1 RETURNING *`,
+          [user.id, ...vals]
+        );
+        if (result.rowCount === 0) return sendJson(404, { error: "No profile found" });
+        return sendJson(200, result.rows[0]);
+      }
+
+      return sendJson(405, { error: "Method not allowed" });
+    } catch (err) {
+      console.error("profiles error:", err.code ?? err.message);
       return sendJson(500, { error: "Database error" });
     }
   }
