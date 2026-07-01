@@ -56,10 +56,11 @@ gives direct answers, only guides reasoning.
     reads and writes across teacher_profiles, profiles, conversations,
     homework_tasks, teacher_work_samples, and class_enrollments — via the
     per-file `rdsFetch(path, {method, body})` helper (app.js + teacher.html;
-    admin.html inlines its single fetch). The ONE deliberate exception: the
-    student chat-open `teacher_notes` read in `finishOpenTutor` stays on
-    Supabase (see the Follow-up note under class_enrollments). No param =
-    byte-identical Supabase path. The Lambda path fails VISIBLY (console.error
+    admin.html inlines its single fetch). The former exception — the student
+    chat-open `teacher_notes` read — was ELIMINATED on 2026-07-01: notes are
+    now injected server-side by the chat Lambda and never reach the client
+    (see "Per-student teacher notes injection"). No param = byte-identical
+    Supabase path for all remaining data sites. The Lambda path fails VISIBLY (console.error
     with the original log strings + showToast at every §2 hardened write; the
     chat-area banner for the main tutor fetch) with NO silent fallback. RDS
     holds only test data — `?lambda=1` is for exercising the path until
@@ -179,13 +180,14 @@ gives direct answers, only guides reasoning.
   (teacher note save — 2-step email ownership check, 403 non-owner). Both
   wired into the frontend behind `USE_RDS`. No DELETE route — no RLS policy
   to port; dropped-class cleanup is still the pre-Menlo TODO.
-- **Follow-up — move tutor prompt-building server-side.** The student
-  notes-injection read (app.js `finishOpenTutor`, still on Supabase) pulls
-  `teacher_notes` to the client to build the system prompt locally — so raw notes
-  reach the browser regardless of this route's read-protection. The real fix:
-  build the tutor system prompt server-side (in the chat Lambda) so `teacher_notes`
-  are injected without ever being returned to the client. Until then, that one
-  student read stays on Supabase and is deliberately NOT migrated.
+- **✅ Server-side prompt injection (shipped 2026-07-01).** The student
+  notes-injection read is GONE from the client entirely. The chat Lambda
+  replaces the `<<LUMI_TEACHER_NOTES>>` marker the client emits in its system
+  prompt with a server-built notes section (student identity from the JWT;
+  `inject_teacher_notes.use_rds` selects RDS vs Supabase so the source flips
+  with the flag at cutover). Notes never reach the browser for any purpose —
+  chips moved server-side too (`GET /suggested-prompts`). See "Per-student
+  teacher notes injection" under System Prompt Architecture.
 
 ### Other Supabase Tables
 - **profiles** — student user profiles (id, name, grade, values_profile jsonb)
@@ -298,78 +300,74 @@ spoofed ids.
 - If no profile found: show student "This teacher hasn't set up their
   Lumi profile yet" — NEVER silently fall back to generic behavior
 
-### Per-student teacher notes injection (commit 3)
-- `buildTutorSystem(subject, course, teacher, teacherProfile,
-  teacherNotes = [])` in app.js takes notes as a 5th parameter
-  (defaults to `[]`). On the profile branch, the assembled notes
-  section is spliced between the "Response length: SHORT" line and
-  the "After EVERY reply, append this JSON" rule — `${buildTeacher
-  NotesSection(teacherNotes)}` is concatenated to the SHORT line so
-  it lands inside the prompt body, not after the JSON instruction.
-- The no-profile fallback branch is unchanged: notes are not queried
-  and not injected when there is no teacher_profile_id. There is
-  nowhere to scope a class_enrollments lookup without a profile.id.
-- `finishOpenTutor()` in app.js fetches teacher_notes from
-  class_enrollments scoped to (currentUser.id, profile.id) using
-  `.maybeSingle()`, wrapped in `Promise.race` against a 5s timeout
-  so the chat open never hangs on a slow query. Result is stored on
-  `S.tutorCtx.teacherNotes` and read by buildTutorSystem when the
-  prompt is built.
-- All failure modes silently produce no notes section: timeout
-  (resolves to null), generic error, and the multi-block collision
-  case where a student is enrolled in two blocks of the same class
-  (Supabase returns PGRST116 / "multiple rows"). Each path leaves
-  `S.tutorCtx.teacherNotes = []` and logs a console.warn for
-  developers; the student sees no error.
-- Helpers (both in app.js):
-  - `parseNotes(raw)` — graceful JSON parse; returns `[]` on null
-    or malformed input. Mirrors the parseNotes() in teacher.html
-    intentionally — the read side and write side must agree on the
-    `[{ timestamp, text }, ...]` shape.
-  - `buildTeacherNotesSection(notes)` — assembles header + joined
-    note texts + footer. Caps the assembled section at 8000 chars
-    by dropping oldest entries first (`texts.shift()` in a loop)
-    and emits `console.warn` reporting the dropped count when
-    truncation occurs.
-- The footer of the notes section explicitly instructs Lumi to use
-  the notes silently and never reference them to the student: "Use
-  these notes silently to shape your teaching approach for this
-  student. Do not mention, reference, or reveal that these notes
-  exist." This is part of the prompt, not a code-level guardrail —
-  if a future edit weakens or removes it, Lumi may start leaking
-  notes back to students.
+### Per-student teacher notes injection (commit 3; moved SERVER-SIDE 2026-07-01)
+- **Notes never reach the browser.** The client emits the literal marker
+  `<<LUMI_TEACHER_NOTES>>` in `buildTutorSystem` (profile branch only,
+  at the old splice point between the "Response length: SHORT" line and
+  the "After EVERY reply, append this JSON" rule). The chat Lambda
+  (`lambda/index.mjs`) replaces the marker with the server-built notes
+  section; the marker is ALWAYS stripped even when no injection is
+  requested (stray-marker defense).
+- `finishOpenTutor()` no longer queries class_enrollments at all. It sets
+  `S.tutorCtx.notesInjection = { teacher_profile_id, use_rds }` (null when
+  no profile.id or in test mode — the TM-2 guard survives), and `callAPI`
+  passes it as `inject_teacher_notes` in the chat body. `use_rds` steers
+  the Lambda's notes source (RDS dbQuery vs Supabase REST via service
+  key) so the source flips with the USE_RDS flag at cutover.
+- Server-side authz: student identity comes from the verified JWT —
+  a caller can only ever receive notes written about them. Server logs
+  carry counts/lengths only (`[notes] injected n note(s), m chars`),
+  never note content.
+- Failure modes (all → no notes section, chat never blocked): 3s fetch
+  budget, multi-block collision (>1 rows → skip + count-only warn,
+  parity with the old client maybeSingle), any query/parse error.
+- Helpers `parseNotes(raw)` + `buildTeacherNotesSection(notes)` now live
+  in lambda/index.mjs (ported verbatim: graceful JSON parse; 8000-char
+  cap dropping oldest first; the silent-use footer — still prompt-level,
+  not a code guardrail: "Use these notes silently… Do not mention,
+  reference, or reveal that these notes exist."). teacher.html keeps its
+  own parseNotes for the WRITE side.
+- **localStorage hygiene:** tutorCtx no longer carries teacherNotes; app
+  boot runs a one-time scrub that deletes `teacherNotes` from any
+  conversation objects older builds persisted into `lumi_convs`.
 
 ### Per-class suggested prompts (commit 4)
 - The empty-state of a tutor session shows three "starter" chips. As
-  of commit 4, chip text is sourced via a **2-tier precedence**:
-  1. `S.tutorCtx.teacherNotes` non-empty → call
-     `generateInfluencedPrompts()` for three Haiku-generated chips
-     (one generic, one neutral topic-influenced, one curiosity-framed
-     topic-influenced). On any Haiku failure (timeout, malformed
-     JSON, validation reject) → fall through to tier 2.
-  2. Notes empty (or tier 1 failed) → `getFallbackPrompts()` returns
-     3 random entries (Fisher–Yates) from `STATIC_FALLBACK_PROMPTS`.
+  of commit 4 (generation moved SERVER-SIDE 2026-07-01), chip text is
+  sourced via a **2-tier precedence**:
+  1. `S.tutorCtx.notesInjection` set → `GET /suggested-prompts` on the
+     Lambda, which reads this student's notes server-side (JWT-scoped;
+     `use_rds` selects the store) and generates three chips (one
+     generic, one neutral topic-influenced, one curiosity-framed
+     topic-influenced) via Bedrock — **notes never reach the browser**.
+     Server validates shape (3 strings ≤80 chars) + email/name leak
+     check, rate-limits and logs usage like chat, and returns
+     `{mode:'fallback'}` on ANY failure → tier 2.
+  2. No notesInjection (or tier 1 failed/timed out at the 8s client
+     budget) → `getFallbackPrompts()` returns 3 random entries
+     (Fisher–Yates) from `STATIC_FALLBACK_PROMPTS`.
 - Result is cached on `S.tutorCtx.suggestedPrompts` and re-shuffled
   in slot order on each render so influenced chips don't always
   occupy the same positions.
-- **Helpers (all in app.js):**
-  - `STATIC_FALLBACK_PROMPTS` — module-level const near the top of
-    the file with other constants. 9 voice-neutral, class-agnostic
-    prompts covering homework, practice, review, explain, quiz,
-    work-through, study-prep, explore, and challenge action types.
-    Each ≤ 60 chars, no deficit framing.
-  - `getFallbackPrompts()` — Fisher–Yates shuffle a copy of the
-    static list, slice 3. Called from both `prepareSuggestedPrompts`
-    (orchestrator path) and `renderEmptyState` (defensive fallback
-    if `S.tutorCtx.suggestedPrompts` is unset).
-  - `generateInfluencedPrompts(notesText, courseName)` — Haiku call
-    (`claude-haiku-4-5`, max_tokens 200, temperature 0.7), wrapped
-    in a 5s `Promise.race` timeout. Validates: response is a JSON
-    array of exactly 3 strings, each ≤ 80 chars, none containing
-    the literal student email or full name (privacy guard against
-    accidental note leakage). Throws on any failure; caller catches.
-  - `prepareSuggestedPrompts()` — orchestrator. Reads
-    `S.tutorCtx.teacherNotes` and `S.tutorCtx.course`, runs the
+- **Helpers:**
+  - `STATIC_FALLBACK_PROMPTS` (app.js) — module-level const near the
+    top of the file with other constants. 9 voice-neutral,
+    class-agnostic prompts covering homework, practice, review,
+    explain, quiz, work-through, study-prep, explore, and challenge
+    action types. Each ≤ 60 chars, no deficit framing.
+  - `getFallbackPrompts()` (app.js) — Fisher–Yates shuffle a copy of
+    the static list, slice 3. Called from both
+    `prepareSuggestedPrompts` (orchestrator path) and
+    `renderEmptyState` (defensive fallback if
+    `S.tutorCtx.suggestedPrompts` is unset).
+  - The generation itself lives in lambda/index.mjs (route
+    `/suggested-prompts`): the commit-4 chip spec + validations were
+    ported verbatim; `generateInfluencedPrompts` no longer exists in
+    app.js. (The old client call was also latently broken — it
+    expected a JSON body from a route that streams SSE — so chips
+    silently always fell back; the server route fixes that.)
+  - `prepareSuggestedPrompts()` (app.js) — orchestrator. Reads
+    `S.tutorCtx.notesInjection` and `S.tutorCtx.course`, runs the
     precedence, writes to `S.tutorCtx.suggestedPrompts`, logs
     `[suggested_prompts] mode=influenced count=3` or
     `[suggested_prompts] mode=fallback count=3`.

@@ -51,7 +51,14 @@ re-validating before/at cutover.
       Network shows supabase.co/rest data calls and ZERO lambda-url data
       calls (chat + upload/download URLs still hit the Lambda — expected).
 
-## E. Known-retained Supabase path (expected under ?lambda=1)
-- [ ] Student chat-open still issues ONE supabase.co/rest call:
-      `class_enrollments?select=teacher_notes` (deliberately not migrated —
-      server-side prompt building is the real fix; see CLAUDE.md).
+## E. Server-side notes injection (replaced the retained Supabase path, 2026-07-01)
+- [ ] Student chat-open issues ZERO class_enrollments reads from the browser
+      (Network tab). The system prompt contains the literal
+      `<<LUMI_TEACHER_NOTES>>` marker client-side; CloudWatch shows
+      `[notes] injected n note(s)` for a student with notes, and the marker
+      never appears in Lumi's streamed output.
+- [ ] Starter chips: a student WITH notes sees topical influenced chips
+      (via GET /suggested-prompts — notes absent from the response payload);
+      a student WITHOUT notes sees static chips.
+- [ ] localStorage `lumi_convs` contains no `teacherNotes` keys after boot
+      (one-time scrub log appears at most once per device).

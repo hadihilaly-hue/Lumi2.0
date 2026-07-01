@@ -61,6 +61,12 @@ Last updated: 2026-07-01 (Workstream F COMPLETE — all data routes live & e2e v
   One blocking decision surfaced (§0): the still-on-Supabase teacher_notes
   injection read — keep Supabase DB alive until server-side prompt build, or
   accept silent notes loss. Operator (Hadi) executes cutover manually.
+- **Server-side prompt build:** ✅ DONE (2026-07-01, commits 9934463 + fbf3661).
+  teacher_notes injection + notes-influenced chips moved into the Lambda
+  (marker-based splice; GET /suggested-prompts). Notes never reach the browser;
+  the CUTOVER_PLAN §0 blocker is dissolved and T6 (Supabase Postgres
+  decommission) is unblocked. Client also scrubs previously-persisted notes
+  from localStorage.
 - **Workstreams D, I:** Not yet started (SIS importer; Cognito auth).
 
 **Key identifiers:**

@@ -7,23 +7,13 @@ validation), `MIGRATION_HARDENING.md`, `RLS_AUDIT.md`.
 
 ---
 
-## 0. Blocking decision to make BEFORE scheduling cutover
+## 0. ~~Blocking decision~~ RESOLVED 2026-07-01
 
-**teacher_notes injection.** The student chat-open read of
-`class_enrollments.teacher_notes` (app.js `finishOpenTutor`) deliberately
-still hits Supabase Postgres, and ALL of its failure modes are silent by
-design. If Supabase Postgres is decommissioned after cutover, per-student
-notes injection silently stops working. Choose one:
-- **(a) Keep Supabase Postgres alive** (free tier, paused-tolerant) until the
-  tutor system prompt is built server-side in the chat Lambda — the real fix,
-  which injects notes without ever returning them to the client. Teardown
-  item T6 then waits on that work.
-- **(b) Accept silent notes loss** at cutover (notes still visible to
-  teachers via the roster; only the prompt injection stops).
-
-Note: under (a), notes WRITTEN after cutover go to RDS (sendNote PATCH) while
-the injection read still hits Supabase — new notes won't inject until the
-server-side prompt build lands. (a) is only sensible if that work is imminent.
+**teacher_notes injection moved server-side** (commits 9934463 + fbf3661):
+the chat Lambda injects notes via the `<<LUMI_TEACHER_NOTES>>` marker and the
+`inject_teacher_notes.use_rds` field selects the store — it flips with the
+frontend flag automatically at the §4.4 push. No decision needed; Supabase
+Postgres decommission (T6) is fully unblocked after cutover.
 
 ## 1. Pre-cutover code commit (small, do days before)
 
@@ -195,7 +185,7 @@ SELECT tp.teacher_email, tp.course_name, count(ws.*) tiers
 | T3 | Remove frontend Supabase data branches | Delete the `else` halves at every USE_RDS site + eventually the flag consts; keep `sb.auth.*` (auth stays). One commit per file. |
 | T4 | Dead code cleanup queue (pre-existing) | `supabase/functions/claude-proxy/index.ts`, `netlify/functions/anthropic.mjs`, stale `supabase/migrations/20260430_syllabi_bucket.sql`; mark `supabase_setup.sql` historical. |
 | T5 | Docs | Rewrite CLAUDE.md data-layer sections to AWS-only; archive RDS_MIGRATION_DIAGNOSTIC/RLS_AUDIT/MIGRATION_HARDENING as historical. |
-| T6 | Decommission Supabase Postgres | ONLY after the §0 decision resolves (server-side prompt build lands, or notes loss accepted). Supabase AUTH stays until the Cognito workstream. |
+| T6 | Decommission Supabase Postgres | Unblocked (server-side prompt build shipped 2026-07-01). Also remove the Supabase source branch in the Lambda's fetchTeacherNotes + /suggested-prompts once decommissioned. Supabase AUTH stays until the Cognito workstream. |
 | T7 | Delete `migration/data/*.sql` dumps | Local PII copies of student data — shred after verification (`rm -P` / secure delete). |
 
 ## Consistency checks on this document
