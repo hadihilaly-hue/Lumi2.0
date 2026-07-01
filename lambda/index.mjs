@@ -211,6 +211,40 @@ async function* generateResponse({ provider, systemPrompt, messages, maxTokens }
   }
 }
 
+// === Data-route column allowlists (Workstream F) ===
+// Writable columns per table. Identity/key columns (teacher_email, profiles.id,
+// user_id) are NEVER read from the body — they are overwritten from the JWT
+// (MIGRATION_HARDENING.md §1). kind "jsonb" values are JSON.stringify'd before
+// parameterization: node-postgres serializes JS arrays as Postgres array
+// literals, which breaks jsonb columns (text[] columns stay raw on purpose).
+const TEACHER_PROFILE_COLS = {
+  course_code: "raw",
+  title: "raw",
+  engagement_rules: "raw",
+  teaching_voice: "raw",
+  course_info: "raw",
+  welcome_message: "raw",
+  syllabus_paths: "raw",           // text[]
+  syllabus_file_path: "raw",
+  syllabus_text: "raw",
+  syllabus_uploaded_at: "raw",
+  share_course_info: "raw",
+  done: "raw",
+  suggested_prompts: "jsonb",
+};
+
+// Filters body down to allowlisted columns, serializing jsonb values.
+function pickColumns(body, spec) {
+  const cols = [];
+  const vals = [];
+  for (const [col, kind] of Object.entries(spec)) {
+    if (body[col] === undefined) continue;
+    cols.push(col);
+    vals.push(kind === "jsonb" && body[col] !== null ? JSON.stringify(body[col]) : body[col]);
+  }
+  return { cols, vals };
+}
+
 // === Main Handler (path-routed) ===
 // /upload-url, /download-url -> JSON one-shot response
 // default (/, /chat) -> SSE streaming chat
@@ -329,30 +363,105 @@ export const handler = awslambda.streamifyResponse(async (event, responseStream)
     return sendJson(403, { error: `Forbidden: ${SCHOOL_CONFIG.domain} only` });
   }
 
-  // === Route: GET /teacher-profile ===
-  // Authed (verifyAuth) + domain-gated above. Optional ?teacher_email=&course_name=
-  // filters. Any authenticated (domain-gated) caller may read ANY teacher's profile —
-  // replicates the prior Supabase `auth_read` RLS (authenticated => SELECT). With no
-  // teacher_email, defaults to the caller's own (teacher self-view). teacher_email is
-  // non-unique (UNIQUE is (teacher_email, course_name)) so the result is always an array.
+  // === Route: /teacher-profile (GET, POST, PATCH) ===
+  // Authed (verifyAuth) + domain-gated above.
+  //
+  // GET — three modes:
+  //   default: ?teacher_email=&course_name= filters. Any authenticated caller may read
+  //     ANY teacher's profile — replicates the prior `auth_read` RLS. No teacher_email
+  //     => caller's own. teacher_email is non-unique so the result is always an array;
+  //     404 when zero rows (existing consumers depend on this).
+  //   ?template_for_course=<course> — another teacher's shared course template
+  //     (share_course_info = true, teacher_email <> caller). Replicates `auth_read`.
+  //     Returns an array (200 [] when none — frontend checkForTemplate checks length).
+  //   ?scope=all — admin dashboard broad read. Gated to SCHOOL_CONFIG.adminEmails
+  //     (deliberately NARROWER than the old any-authenticated auth_read; confirmed
+  //     2026-07-01). Limited to the columns admin.html renders. 200 [] when empty.
+  // POST — the saveTeacherProfile upsert. teacher_email is ALWAYS the JWT email
+  //   (replicates `owner_insert` WITH CHECK jwt.email = teacher_email; the conflict key
+  //   contains teacher_email, so the update arm can only ever touch the caller's own
+  //   row — `owner_update`). Returns the upserted row (RETURNING *) — the frontend
+  //   needs its id for work-sample writes.
+  // PATCH — partial update by (JWT email, course_name) — `owner_update`. 404 when the
+  //   caller owns no such row. Returns the updated row.
   if (path === "/teacher-profile") {
     const method = event.requestContext?.http?.method || "GET";
-    if (method !== "GET") return sendJson(405, { error: "Method not allowed" });
     const qs = event.queryStringParameters || {};
-    const targetEmail = (qs.teacher_email || user.email).toLowerCase();
-    const courseName = qs.course_name || null;
     try {
-      const result = courseName
-        ? await dbQuery(
-            "SELECT * FROM public.teacher_profiles WHERE teacher_email = $1 AND course_name = $2 ORDER BY course_name",
-            [targetEmail, courseName]
-          )
-        : await dbQuery(
-            "SELECT * FROM public.teacher_profiles WHERE teacher_email = $1 ORDER BY course_name",
-            [targetEmail]
+      if (method === "GET") {
+        if (qs.scope === "all") {
+          if (!SCHOOL_CONFIG.adminEmails.has(user.email.toLowerCase())) {
+            return sendJson(403, { error: "Admins only" });
+          }
+          const result = await dbQuery(
+            `SELECT teacher_email, course_name, done, updated_at, engagement_rules, teaching_voice
+               FROM public.teacher_profiles ORDER BY updated_at DESC NULLS LAST`
           );
-      if (result.rowCount === 0) return sendJson(404, { error: "No teacher profile found" });
-      return sendJson(200, result.rows);
+          return sendJson(200, result.rows);
+        }
+        if (qs.template_for_course) {
+          const result = await dbQuery(
+            `SELECT course_info, syllabus_text, syllabus_file_path
+               FROM public.teacher_profiles
+              WHERE course_name = $1 AND share_course_info = true AND teacher_email <> $2
+              ORDER BY updated_at DESC NULLS LAST
+              LIMIT 1`,
+            [qs.template_for_course, user.email.toLowerCase()]
+          );
+          return sendJson(200, result.rows);
+        }
+        const targetEmail = (qs.teacher_email || user.email).toLowerCase();
+        const courseName = qs.course_name || null;
+        const result = courseName
+          ? await dbQuery(
+              "SELECT * FROM public.teacher_profiles WHERE teacher_email = $1 AND course_name = $2 ORDER BY course_name",
+              [targetEmail, courseName]
+            )
+          : await dbQuery(
+              "SELECT * FROM public.teacher_profiles WHERE teacher_email = $1 ORDER BY course_name",
+              [targetEmail]
+            );
+        if (result.rowCount === 0) return sendJson(404, { error: "No teacher profile found" });
+        return sendJson(200, result.rows);
+      }
+
+      if (method === "POST") {
+        if (typeof body.course_name !== "string" || !body.course_name.trim()) {
+          return sendJson(400, { error: "Missing course_name" });
+        }
+        const { cols, vals } = pickColumns(body, TEACHER_PROFILE_COLS);
+        const insertCols = ["teacher_email", "course_name", ...cols];
+        const placeholders = insertCols.map((_, i) => `$${i + 1}`);
+        const setClauses = cols.map((c) => `${c} = EXCLUDED.${c}`).concat("updated_at = now()");
+        const result = await dbQuery(
+          `INSERT INTO public.teacher_profiles (${insertCols.join(", ")})
+                VALUES (${placeholders.join(", ")})
+           ON CONFLICT (teacher_email, course_name)
+             DO UPDATE SET ${setClauses.join(", ")}
+             RETURNING *`,
+          [user.email.toLowerCase(), body.course_name, ...vals]
+        );
+        return sendJson(200, result.rows[0]);
+      }
+
+      if (method === "PATCH") {
+        if (typeof body.course_name !== "string" || !body.course_name.trim()) {
+          return sendJson(400, { error: "Missing course_name" });
+        }
+        const { cols, vals } = pickColumns(body, TEACHER_PROFILE_COLS);
+        if (cols.length === 0) return sendJson(400, { error: "No updatable fields" });
+        const setClauses = cols.map((c, i) => `${c} = $${i + 3}`).concat("updated_at = now()");
+        const result = await dbQuery(
+          `UPDATE public.teacher_profiles SET ${setClauses.join(", ")}
+            WHERE teacher_email = $1 AND course_name = $2
+            RETURNING *`,
+          [user.email.toLowerCase(), body.course_name, ...vals]
+        );
+        if (result.rowCount === 0) return sendJson(404, { error: "No teacher profile found" });
+        return sendJson(200, result.rows[0]);
+      }
+
+      return sendJson(405, { error: "Method not allowed" });
     } catch (err) {
       // No email / row data / token in logs — code or message only.
       console.error("teacher-profile error:", err.code ?? err.message);
