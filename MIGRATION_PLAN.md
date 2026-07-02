@@ -76,7 +76,14 @@ Last updated: 2026-07-01 (**CUTOVER EXECUTED** — RDS is the default data layer
   account's 10-slot Lambda concurrency. 48h watch running; teardown T1–T7
   (see migration/CUTOVER_PLAN.md) after. TODO: request Lambda concurrency
   limit increase from AWS (new-account default 10).
-- **Workstreams D, I:** Not yet started (SIS importer; Cognito auth).
+- **Workstream D — SIS importer:** ✅ DONE (2026-07-01). `POST /sis-import`
+  (validation-first, idempotent, resumable within the 60s Lambda timeout) +
+  `sections`/`sis_map` tables (migration/rds-sis-tables.sql). Tested against all
+  three synthetic sizes incl. idempotent re-import and the four §9 reject cases;
+  synthetic data + auth users fully cleaned after (migration/sis-test-cleanup.py).
+  Known v1 limits: re-exports don't prune stale rows; imported people can't sign
+  in until the domain gate is replaced (Workstream I).
+- **Workstream I:** Not yet started (Cognito auth).
 
 **Key identifiers:**
 - AWS account: 613136968914 (us-east-1)

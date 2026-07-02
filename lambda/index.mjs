@@ -1221,6 +1221,16 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
       if (prev && prev !== c.course_code) warnings.push(`bijection: course ${c.course_name} carries codes ${prev} and ${c.course_code}`);
       codeByCourse.set(c.course_name, c.course_code);
     }
+    // Cross-type email reuse (a teacher email also appearing as a student, or
+    // duplicates within an array) — the spec only requires id uniqueness, so
+    // surface as a warning. Both records will map to ONE auth identity.
+    const emailSeen = new Map();
+    for (const p of [...teachers.map(t => ({ ...t, _k: "teacher" })), ...students.map(s => ({ ...s, _k: "student" }))]) {
+      const prev = emailSeen.get(p.email);
+      if (prev) warnings.push(`email shared by ${prev} and ${p._k} ${p.id} — both map to one auth identity`);
+      else emailSeen.set(p.email, `${p._k} ${p.id}`);
+    }
+
     // §9 SHOULDs — surface, don't reject
     const enrolledClassIds = new Set(enrollments.map(e => e.class_id));
     for (const c of classes) if (!enrolledClassIds.has(c.id)) warnings.push(`class ${c.id} has zero enrollments`);
@@ -1269,7 +1279,13 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
           body: JSON.stringify({ type: "magiclink", email }),
           signal: AbortSignal.timeout(8000),
         });
-        if (link.ok) return { id: (await link.json()).user?.id, created: false };
+        if (link.ok) {
+          // GoTrue versions differ: user fields arrive either nested under
+          // `user` or flat at the top level of the generate_link response.
+          const j = await link.json();
+          const id = j.user?.id ?? j.id;
+          if (id) return { id, created: false };
+        }
       }
       throw new Error(`auth user create failed (${res.status})`);
     }

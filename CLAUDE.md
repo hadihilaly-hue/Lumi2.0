@@ -293,6 +293,38 @@ spoofed ids.
 - jsonb params are JSON.stringify'd in routes (node-postgres turns JS arrays
   into PG array literals otherwise); text[] columns pass raw arrays.
 
+### SIS importer (Workstream D — shipped 2026-07-01)
+- **`POST /sis-import`** on the Lambda ingests one school's roster in the
+  canonical v1.0 format (synthetic_data/schema.md). Admin-only
+  (SCHOOL_CONFIG.adminEmails). Validation-first: all 8 §9 rules hard-fail
+  (400 + structured error list, nothing written); course_code bijection,
+  cross-type email reuse, zero-enrollment classes, and zero-class teachers
+  surface as warnings.
+- **Write pipeline (all idempotent):** school upsert → Supabase auth users
+  via admin API (get-or-create; existing emails resolve via generate_link —
+  people who share an email map to ONE auth identity) + `sis_map` rows →
+  profiles stubs (COALESCE — never clobbers self-entered data) →
+  teacher_profiles stubs (done=false; existing rows never un-onboarded) →
+  `sections` rows → class_enrollments (teacher_notes untouched).
+- **Sections/block bridge:** the SIS models sections with integer periods;
+  the app runs on Menlo-style block letters. Full section fidelity lands in
+  the `sections` table (migration/rds-sis-tables.sql) and each section gets
+  a deterministic letter within its (teacher, course_name) group ordered by
+  sis_id (A, B, …; hard-fails past 7). `sis_map` keys stable SIS person-ids
+  to auth UUIDs.
+- **Resumable:** ~45s internal deadline returns `{status:'partial'}`; the
+  caller re-POSTs the same payload until `{status:'complete'}`. Tested with
+  all three synthetic sizes (small 1 round; medium 2; large 6 rounds /
+  920 people / 200 sections / 4800 enrollments) + idempotent re-import
+  (zero new rows) + the four §9 reject cases.
+- **Known v1 limitations:** re-exports UPSERT but do not PRUNE rows missing
+  from the new export (stale enrollments persist — same problem-class as
+  dropped-class cleanup); imported people can't sign in until the
+  @menloschool.org domain gate is replaced in the Cognito workstream.
+- Test artifacts: migration/sis-test-cleanup.py removes a synthetic school
+  end-to-end (auth users included); it depends on /admin/sql — delete both
+  together at teardown.
+
 ### System Prompt Architecture
 - Built dynamically from teacher profile object at session start
 - NEVER rebuilt mid-conversation
