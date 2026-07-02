@@ -4,6 +4,7 @@ import {
 } from "@aws-sdk/client-bedrock-runtime";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { query as dbQuery } from "./db.js";
 import { timingSafeEqual } from "node:crypto";
 
@@ -34,19 +35,113 @@ const AWS_REGION = "us-east-1";
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// === Cognito Config (Workstream I) ===
+// Verifier is only constructed when both env vars are set, so deploying this
+// code before the env flip is inert — every token falls through to Supabase.
+const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID;
+const COGNITO_CLIENT_ID = process.env.COGNITO_CLIENT_ID;
+const COGNITO_ISSUER = COGNITO_USER_POOL_ID
+  ? `https://cognito-idp.${AWS_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}`
+  : null;
+const cognitoVerifier = (COGNITO_USER_POOL_ID && COGNITO_CLIENT_ID)
+  ? CognitoJwtVerifier.create({
+      userPoolId: COGNITO_USER_POOL_ID,
+      tokenUse: "id",           // frontend sends the ID token (access tokens lack email)
+      clientId: COGNITO_CLIENT_ID,
+    })
+  : null;
+
 const bedrockClient = new BedrockRuntimeClient({ region: AWS_REGION });
 const s3Client = new S3Client({ region: AWS_REGION });
 
-// === Auth: verify Supabase JWT ===
+// === Auth (Workstream I: dual-path) ===
+// verifyAuth dispatches on the token's UNVERIFIED iss claim. This is safe:
+// the selected verifier still fully checks signature/aud/exp/token_use, so a
+// forged iss only routes the token to a verifier that rejects it. Cognito
+// tokens verify LOCALLY against a module-cached JWKS (no per-request egress);
+// everything else takes the legacy Supabase path until the Phase 3 cutover.
+async function verifyAuth(authHeader) {
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const token = authHeader.slice(7);
+  if (cognitoVerifier && decodeJwtPayloadUnsafe(token)?.iss === COGNITO_ISSUER) {
+    return verifyCognitoAuth(token);
+  }
+  return verifySupabaseAuth(token);
+}
+
+// Payload decode WITHOUT verification — used only to pick a verifier.
+function decodeJwtPayloadUnsafe(token) {
+  try {
+    const part = token.split(".")[1];
+    return JSON.parse(Buffer.from(part, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
+}
+
+// Cognito sub -> {id, email} resolved via app_users (identity bridge that
+// preserves the Supabase-era uuids all RDS tables key on). Container-scope
+// cache: the mapping is immutable once linked, so no TTL needed.
+const APP_USER_CACHE_MAX = 500;
+const appUserCache = new Map();
+
+async function verifyCognitoAuth(token) {
+  try {
+    // Signature, issuer, audience, expiry, token_use — all local (JWKS cached
+    // in-module by aws-jwt-verify; its fetcher has a built-in short timeout,
+    // so there is no unbounded-egress path here).
+    const claims = await cognitoVerifier.verify(token);
+    const email = claims.email?.toLowerCase();
+    const emailVerified = claims.email_verified === true || claims.email_verified === "true";
+    if (!email || !emailVerified) return null;
+
+    const cached = appUserCache.get(claims.sub);
+    if (cached) return { id: cached.id, email };
+
+    // Fast path: known sub. (Also covers Google-side email changes — the
+    // stored app_users.email goes stale, which is fine: authz everywhere in
+    // this file keys on the JWT email, not the stored one.)
+    let row = (await dbQuery(
+      "SELECT lumi_id FROM public.app_users WHERE cognito_sub = $1",
+      [claims.sub]
+    )).rows[0];
+
+    if (!row) {
+      // First sign-in: link by verified email to a pre-created row (seed or
+      // future SIS import), else mint a fresh lumi_id.
+      row = (await dbQuery(
+        `INSERT INTO public.app_users (cognito_sub, email) VALUES ($1, $2)
+         ON CONFLICT (email) DO UPDATE
+           SET cognito_sub = COALESCE(public.app_users.cognito_sub, EXCLUDED.cognito_sub),
+               updated_at = now()
+         RETURNING lumi_id, cognito_sub`,
+        [claims.sub, email]
+      )).rows[0];
+      if (row.cognito_sub !== claims.sub) {
+        // Email already bound to a DIFFERENT Cognito identity — fail closed.
+        console.error("[auth] app_users email/sub collision — refusing token");
+        return null;
+      }
+    }
+
+    if (appUserCache.size >= APP_USER_CACHE_MAX) {
+      appUserCache.delete(appUserCache.keys().next().value);
+    }
+    appUserCache.set(claims.sub, { id: row.lumi_id });
+    return { id: row.lumi_id, email };
+  } catch (err) {
+    console.error("verifyCognitoAuth error:", err.name ?? err.code ?? "unknown");
+    return null;
+  }
+}
+
+// === Legacy auth: verify Supabase JWT (removed at Phase 3 cutover +) ===
 // HARD TIMEOUT (2026-07-01 incident): this fetch previously had none, so a
 // stalled Lambda→Supabase connection hung the whole invocation to the 60s
 // Lambda timeout. With the account concurrency limit of 10, a handful of
 // hung requests starved EVERY route (429s). Fail fast to 401 instead —
 // clients see an auth error and retry; concurrency slots free in 5s.
-async function verifyAuth(authHeader) {
-  if (!authHeader?.startsWith("Bearer ")) return null;
-  const token = authHeader.slice(7);
-
+async function verifySupabaseAuth(token) {
   try {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
       headers: {
@@ -60,7 +155,7 @@ async function verifyAuth(authHeader) {
     if (!data.email) return null;
     return { id: data.id, email: data.email };
   } catch (err) {
-    console.error("verifyAuth error:", err.name === "TimeoutError" ? "supabase auth timeout (5s)" : err);
+    console.error("verifySupabaseAuth error:", err.name === "TimeoutError" ? "supabase auth timeout (5s)" : err);
     return null;
   }
 }

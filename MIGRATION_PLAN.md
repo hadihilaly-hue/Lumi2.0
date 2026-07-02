@@ -110,8 +110,29 @@ layer; Supabase is auth-only pending Workstream I/Cognito. Workstream I Phase 1
   federation into the same pool is a per-school onboarding item (Phase 4+).
   Supabase auth untouched; nothing user-facing changed. `lumi-deploy` gained
   a `cognito-idp:*` inline policy (named `cognito`) to script all of this.
-  Next: Phase 2 — `app_users` table + dual-path verifyAuth (plan-mode round
-  first, per workstream rules).
+  **Phase 2 DONE (2026-07-02):** `app_users` identity bridge
+  (migration/rds-app-users.sql, applied + seeded via /admin/sql) and dual-path
+  verifyAuth deployed. Dispatch on the token's unverified `iss` → Cognito ID
+  tokens verify LOCALLY via `aws-jwt-verify` (JWKS cached in-module, zero
+  per-request egress; new deps bundled) with cognito_sub → lumi_id resolution
+  (container cache → sub fast-path SELECT → link-by-verified-email upsert,
+  email/sub collision fails closed); everything else takes the untouched
+  Supabase path (`verifySupabaseAuth`, still 5s-bounded). New Lambda env:
+  COGNITO_USER_POOL_ID + COGNITO_CLIENT_ID (verifier not constructed without
+  them — code is inert if env lags). Verified live: Cognito ID token → GET
+  /profiles + /conversations returned the pre-cutover rows under the preserved
+  uuid 3587c875-…; tampered/access/garbage tokens → 401; app_users holds
+  exactly the seed row; live app on Pages (Supabase session) regression-green;
+  logs PII-free. Rollback artifact: pre-deploy zip saved (re-deployable via
+  update-function-code). **Incident note (pre-existing, NOT Phase 2):** Lambda
+  timeout analysis during verification showed 60s zero-log timeouts occurring
+  for hours BEFORE the deploy, including a steady 1/min drip matching
+  admin.html's 60s auto-refresh through stale browser keep-alive sockets to
+  the function URL — each such request silently burns a concurrency slot (of
+  10) for a full minute. Needs its own investigation (server-side
+  write/stream stall, likely response streaming to a half-dead client).
+  Next: Phase 3 — frontend `cognito-auth.js` sb-compatible shim + sign-in
+  pages, standalone test page first, then the one cutover commit.
 
 **Key identifiers:**
 - AWS account: 613136968914 (us-east-1)
