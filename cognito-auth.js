@@ -111,10 +111,19 @@ const bootPromise = (async () => {
   const state = url.searchParams.get('state');
   if (!code) return;
 
+  // Scrub ?code/&state from the address bar in EVERY path — including stale
+  // callbacks replayed via back/forward, where no exchange runs.
+  const scrubUrl = () => {
+    url.searchParams.delete('code');
+    url.searchParams.delete('state');
+    history.replaceState(null, '', url.toString());
+  };
+
   let stored = null;
   try { stored = JSON.parse(sessionStorage.getItem(PKCE_STORAGE_KEY) || 'null'); } catch {}
   if (!stored || stored.state !== state) {
     console.warn('[auth] callback code with missing/mismatched state — ignoring');
+    scrubUrl();
     return;
   }
   sessionStorage.removeItem(PKCE_STORAGE_KEY);
@@ -135,10 +144,7 @@ const bootPromise = (async () => {
     console.error('[auth] code exchange failed:', err.message);
     return;
   } finally {
-    // Scrub ?code/&state from the address bar either way.
-    url.searchParams.delete('code');
-    url.searchParams.delete('state');
-    history.replaceState(null, '', url.toString());
+    scrubUrl();
   }
 
   // Restore any query/hash the caller's redirectTo carried (redirect_uri had
