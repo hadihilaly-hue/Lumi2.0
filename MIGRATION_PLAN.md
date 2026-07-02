@@ -154,7 +154,14 @@ layer; Supabase is auth-only pending Workstream I/Cognito. Workstream I Phase 1
   push origin main && git push hadi main` — Pages redeploys in ~1 min;
   Supabase auth infra is still alive until Phase 6 and old Supabase browser
   sessions live under different localStorage keys, so revert fully restores
-  the pre-cutover world. Next: Phase 4 — per-school domain gate
+  the pre-cutover world. Cutover commit c90aa61 (+2b2c337 stale-callback URL
+  scrub); LIVE SMOKE PASSED 2026-07-02: fresh Cognito sign-in on the deployed
+  app, sidebar data + real chat message (2 api_usage rows under the preserved
+  uuid), teacher.html + admin.html session pickup, sign-out→sign-in round
+  trip. app_users still exactly 1 row. Ops note: GitHub Pages' deploy queue
+  wedged twice (build ok, deployment_queued → 10min timeout, status page
+  green) — `gh api -X POST repos/<r>/pages/builds` to retrigger; third
+  attempt deployed. Next: Phase 4 — per-school domain gate
   (schools.allowed_domains) replacing SCHOOL_CONFIG.domain + isMenloEmail.
 
 **Key identifiers:**
