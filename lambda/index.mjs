@@ -1142,6 +1142,275 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
     }
   }
 
+  // === Route: POST /sis-import (Workstream D) ===
+  // Ingests one school's roster in the canonical SIS format
+  // (synthetic_data/schema.md v1.0). Admin-only. Validation-first (the 8 §9
+  // rules; nothing written on any hard failure), then idempotent writes:
+  //   school → auth users + sis_map (teachers, students) → profiles stubs →
+  //   teacher_profiles stubs (done=false, never un-onboarded) → sections
+  //   (with the per-(teacher,course) block-letter bridge) → class_enrollments.
+  // RESUMABLE: a ~45s internal deadline commits progress and returns
+  // {status:'partial'} — the caller re-POSTs the same payload until
+  // {status:'complete'}. All writes are ON CONFLICT-idempotent and people are
+  // keyed by sis_map, so re-runs never duplicate.
+  // FERPA: logs carry entity COUNTS only — never names or emails.
+  if (path === "/sis-import") {
+    const method = event.requestContext?.http?.method || "POST";
+    if (method !== "POST") return sendJson(405, { error: "Method not allowed" });
+    if (!SCHOOL_CONFIG.adminEmails.has(user.email.toLowerCase())) {
+      return sendJson(403, { error: "Admins only" });
+    }
+
+    const importStart = Date.now();
+    const DEADLINE_MS = 45_000;
+    const overBudget = () => Date.now() - importStart > DEADLINE_MS;
+
+    // ---- Validation (schema.md §9) — reject everything before any write ----
+    const errors = [];
+    const warnings = [];
+    const school = body.school || {};
+    const teachers = Array.isArray(body.teachers) ? body.teachers : null;
+    const students = Array.isArray(body.students) ? body.students : null;
+    const classes = Array.isArray(body.classes) ? body.classes : null;
+    const enrollments = Array.isArray(body.enrollments) ? body.enrollments : null;
+    if (!school.name || !school.term) errors.push("school.name and school.term are required");
+    if (school.schema_version !== "1.0") errors.push(`rule 8: unsupported schema_version ${JSON.stringify(school.schema_version ?? null)}`);
+    if (!teachers || !students || !classes || !enrollments) {
+      errors.push("teachers[], students[], classes[], enrollments[] are all required arrays");
+      return sendJson(400, { errors });
+    }
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const dupCheck = (arr, label) => {
+      const seen = new Set();
+      for (const item of arr) {
+        if (typeof item.id !== "string" || !item.id) { errors.push(`rule 7: ${label} entry missing id`); return null; }
+        if (seen.has(item.id)) errors.push(`rule 7: duplicate ${label} id ${item.id}`);
+        seen.add(item.id);
+      }
+      return seen;
+    };
+    const teacherIds = dupCheck(teachers, "teachers");
+    const studentIds = dupCheck(students, "students");
+    const classIds = dupCheck(classes, "classes");
+    for (const t of teachers) {
+      if (!EMAIL_RE.test(t.email || "")) errors.push(`rule 5: teacher ${t.id} has invalid email`);
+    }
+    for (const s of students) {
+      if (!EMAIL_RE.test(s.email || "")) errors.push(`rule 5: student ${s.id} has invalid email`);
+      if (!Number.isInteger(s.grade_level) || s.grade_level < 9 || s.grade_level > 12) {
+        errors.push(`rule 6: student ${s.id} grade_level must be an integer in [9,12]`);
+      }
+    }
+    for (const c of classes) {
+      if (!teacherIds?.has(c.teacher_id)) errors.push(`rule 1: class ${c.id} references unknown teacher_id ${c.teacher_id}`);
+      if (!c.course_name || !c.subject || !c.term || !c.name) errors.push(`class ${c.id} missing required field(s)`);
+    }
+    const pairSeen = new Set();
+    for (const e of enrollments) {
+      if (!studentIds?.has(e.student_id)) errors.push(`rule 2: enrollment references unknown student_id ${e.student_id}`);
+      if (!classIds?.has(e.class_id)) errors.push(`rule 3: enrollment references unknown class_id ${e.class_id}`);
+      const key = `${e.student_id}	${e.class_id}`;
+      if (pairSeen.has(key)) errors.push(`rule 4: duplicate enrollment pair (${e.student_id}, ${e.class_id})`);
+      pairSeen.add(key);
+    }
+    // course_name ↔ course_code bijection — warning, not fatal (spec §9 note)
+    const codeByCourse = new Map();
+    for (const c of classes) {
+      if (!c.course_code) continue;
+      const prev = codeByCourse.get(c.course_name);
+      if (prev && prev !== c.course_code) warnings.push(`bijection: course ${c.course_name} carries codes ${prev} and ${c.course_code}`);
+      codeByCourse.set(c.course_name, c.course_code);
+    }
+    // §9 SHOULDs — surface, don't reject
+    const enrolledClassIds = new Set(enrollments.map(e => e.class_id));
+    for (const c of classes) if (!enrolledClassIds.has(c.id)) warnings.push(`class ${c.id} has zero enrollments`);
+    const teachingIds = new Set(classes.map(c => c.teacher_id));
+    for (const t of teachers) if (!teachingIds.has(t.id)) warnings.push(`teacher ${t.id} has zero classes this term`);
+
+    // Block-letter bridge: sections grouped per (teacher, course_name),
+    // ordered by sis id → A, B, C… Hard cap at 7 (block CHECK constraint).
+    const BLOCK_LETTERS = ["A", "B", "C", "D", "E", "F", "G"];
+    const blockByClassId = new Map();
+    const groups = new Map();
+    for (const c of classes) {
+      const gkey = `${c.teacher_id}	${c.course_name}`;
+      (groups.get(gkey) ?? groups.set(gkey, []).get(gkey)).push(c);
+    }
+    for (const [gkey, list] of groups) {
+      list.sort((a, b) => a.id < b.id ? -1 : 1);
+      if (list.length > BLOCK_LETTERS.length) {
+        errors.push(`course group ${gkey.split("	")[1]} has ${list.length} sections for one teacher — exceeds the ${BLOCK_LETTERS.length}-block bridge (see migration/rds-sis-tables.sql)`);
+        continue;
+      }
+      list.forEach((c, i) => blockByClassId.set(c.id, BLOCK_LETTERS[i]));
+    }
+    if (errors.length) return sendJson(400, { errors, warnings });
+
+    // ---- Writes ----
+    const teacherById = new Map(teachers.map(t => [t.id, t]));
+    const progress = { teachers_created: 0, teachers_existing: 0, students_created: 0, students_existing: 0, profiles_stubs: 0, sections: 0, enrollments: 0 };
+
+    // Get-or-create one Supabase auth user; returns uuid. Conflict (email
+    // already registered) falls back to a magiclink generate to read the id.
+    const authAdmin = { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, "Content-Type": "application/json" };
+    async function getOrCreateAuthUser(email, fullName) {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+        method: "POST",
+        headers: authAdmin,
+        body: JSON.stringify({ email, email_confirm: true, user_metadata: { full_name: fullName } }),
+        signal: AbortSignal.timeout(8000),
+      });
+      if (res.ok) return { id: (await res.json()).id, created: true };
+      const errText = await res.text();
+      if (/already|exists|registered/i.test(errText)) {
+        const link = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
+          method: "POST",
+          headers: authAdmin,
+          body: JSON.stringify({ type: "magiclink", email }),
+          signal: AbortSignal.timeout(8000),
+        });
+        if (link.ok) return { id: (await link.json()).user?.id, created: false };
+      }
+      throw new Error(`auth user create failed (${res.status})`);
+    }
+
+    try {
+      // 1. school
+      const schoolRow = await dbQuery(
+        `INSERT INTO public.schools (name) VALUES ($1)
+         ON CONFLICT (name) DO UPDATE SET updated_at = now() RETURNING id`,
+        [school.name]
+      );
+      const schoolId = schoolRow.rows[0].id;
+
+      // 2. preload sis_map for idempotent resume
+      const mapRows = await dbQuery(
+        "SELECT entity_type, sis_id, lumi_id FROM public.sis_map WHERE school_id = $1",
+        [schoolId]
+      );
+      const idMap = new Map(mapRows.rows.map(r => [`${r.entity_type}	${r.sis_id}`, r.lumi_id]));
+
+      // 3. people (teachers first — few; then students — the bulk)
+      const ensurePerson = async (kind, person, fullName) => {
+        const mapKey = `${kind}	${person.id}`;
+        if (idMap.has(mapKey)) {
+          progress[`${kind}s_existing`]++;
+          return idMap.get(mapKey);
+        }
+        const { id: uuid, created } = await getOrCreateAuthUser(person.email.toLowerCase(), fullName);
+        if (!uuid) throw new Error("auth user resolution returned no id");
+        await dbQuery(
+          `INSERT INTO public.sis_map (school_id, entity_type, sis_id, lumi_id, email)
+           VALUES ($1,$2,$3,$4,$5) ON CONFLICT (school_id, entity_type, sis_id) DO NOTHING`,
+          [schoolId, kind, person.id, uuid, person.email.toLowerCase()]
+        );
+        idMap.set(mapKey, uuid);
+        progress[created ? `${kind}s_created` : `${kind}s_existing`]++;
+        return uuid;
+      };
+
+      for (const t of teachers) {
+        if (overBudget()) return sendJson(200, { status: "partial", next: "teachers", progress, warnings });
+        await ensurePerson("teacher", t, `${t.first_name} ${t.last_name}`);
+      }
+
+      for (const s of students) {
+        if (overBudget()) return sendJson(200, { status: "partial", next: "students", progress, warnings });
+        const uuid = await ensurePerson("student", s, `${s.first_name} ${s.last_name}`);
+        // profiles stub — never clobber a student's self-entered data
+        await dbQuery(
+          `INSERT INTO public.profiles (id, name, grade)
+           VALUES ($1,$2,$3)
+           ON CONFLICT (id) DO UPDATE SET
+             name = COALESCE(public.profiles.name, EXCLUDED.name),
+             grade = COALESCE(public.profiles.grade, EXCLUDED.grade)`,
+          [uuid, `${s.first_name} ${s.last_name}`, String(s.grade_level)]
+        );
+        progress.profiles_stubs++;
+      }
+
+      // 4. teacher_profiles stubs — one per distinct (teacher, course_name).
+      // done stays false for new rows and is NEVER overwritten (no un-onboarding);
+      // an onboarded teacher's title is kept.
+      const profileIdByKey = new Map();
+      for (const [gkey, list] of groups) {
+        if (overBudget()) return sendJson(200, { status: "partial", next: "teacher_profiles", progress, warnings });
+        const t = teacherById.get(gkey.split("	")[0]);
+        const courseName = gkey.split("	")[1];
+        const res = await dbQuery(
+          `INSERT INTO public.teacher_profiles (teacher_email, course_name, course_code, title, done)
+           VALUES ($1,$2,$3,$4,false)
+           ON CONFLICT (teacher_email, course_name) DO UPDATE SET
+             course_code = EXCLUDED.course_code,
+             title = COALESCE(public.teacher_profiles.title, EXCLUDED.title),
+             updated_at = now()
+           RETURNING id`,
+          [t.email.toLowerCase(), courseName, list[0].course_code ?? null, t.title ?? null]
+        );
+        profileIdByKey.set(gkey, res.rows[0].id);
+      }
+
+      // 5. sections
+      for (const c of classes) {
+        if (overBudget()) return sendJson(200, { status: "partial", next: "sections", progress, warnings });
+        const gkey = `${c.teacher_id}	${c.course_name}`;
+        await dbQuery(
+          `INSERT INTO public.sections (school_id, sis_id, teacher_profile_id, name, course_name,
+                                        course_code, subject, term, period, room, meeting_days, block)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+           ON CONFLICT (school_id, sis_id) DO UPDATE SET
+             teacher_profile_id = EXCLUDED.teacher_profile_id, name = EXCLUDED.name,
+             course_name = EXCLUDED.course_name, course_code = EXCLUDED.course_code,
+             subject = EXCLUDED.subject, term = EXCLUDED.term, period = EXCLUDED.period,
+             room = EXCLUDED.room, meeting_days = EXCLUDED.meeting_days,
+             block = EXCLUDED.block, updated_at = now()`,
+          [schoolId, c.id, profileIdByKey.get(gkey), c.name, c.course_name,
+           c.course_code ?? null, c.subject, c.term, c.period ?? null, c.room ?? null,
+           Array.isArray(c.meeting_days) ? c.meeting_days : [], blockByClassId.get(c.id)]
+        );
+        progress.sections++;
+      }
+
+      // 6. enrollments — batched multi-VALUES upserts (same pattern as /homework-tasks)
+      const classById = new Map(classes.map(c => [c.id, c]));
+      const studentNameById = new Map(students.map(s => [s.id, `${s.first_name} ${s.last_name}`]));
+      const CHUNK = 100;
+      for (let i = 0; i < enrollments.length; i += CHUNK) {
+        if (overBudget()) return sendJson(200, { status: "partial", next: "enrollments", progress, warnings });
+        const chunk = enrollments.slice(i, i + CHUNK);
+        const values = [];
+        const tuples = chunk.map((e, rowIdx) => {
+          const c = classById.get(e.class_id);
+          const gkey = `${c.teacher_id}	${c.course_name}`;
+          values.push(
+            idMap.get(`student	${e.student_id}`),
+            profileIdByKey.get(gkey),
+            blockByClassId.get(e.class_id),
+            studentNameById.get(e.student_id),
+            c.term
+          );
+          const base = rowIdx * 5;
+          return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`;
+        });
+        const res = await dbQuery(
+          `INSERT INTO public.class_enrollments (student_id, teacher_profile_id, block, student_name, term)
+           VALUES ${tuples.join(", ")}
+           ON CONFLICT (student_id, teacher_profile_id, block) DO UPDATE SET
+             student_name = EXCLUDED.student_name, term = EXCLUDED.term, updated_at = now()
+           RETURNING id`,
+          values
+        );
+        progress.enrollments += res.rowCount;
+      }
+
+      console.log(`[sis-import] complete: ${teachers.length}t/${students.length}s/${classes.length}c/${enrollments.length}e; created t=${progress.teachers_created} s=${progress.students_created}; ${warnings.length} warning(s)`);
+      return sendJson(200, { status: "complete", school_id: schoolId, progress, warnings });
+    } catch (err) {
+      console.error("sis-import error:", err.code ?? err.message);
+      return sendJson(500, { error: "Import failed — safe to re-POST (all writes idempotent)", detail: err.code ?? err.message, progress, warnings });
+    }
+  }
+
   // === Route: POST /upload-url ===
   if (path === "/upload-url") {
     try {
