@@ -1066,13 +1066,10 @@ body { overflow: auto; display: block; }
 // Lambda Function URL — used by /upload-url, /download-url, and the chat root call.
 // No trailing slash; endpoint paths in fetch() start with `/`.
 const LAMBDA_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws';
-// CUTOVER 2026-07-01: RDS is the default data layer. ?lambda=0 is the
-// rollback escape hatch back to Supabase (kept until post-cutover teardown).
-const USE_RDS = new URLSearchParams(window.location.search).get('lambda') !== '0';
 
 // Generic RDS Lambda fetch — mirror of rdsFetch in app.js (LAMBDA_URL here has
-// no trailing slash). 404 -> null; other non-2xx throws so USE_RDS sites fail
-// VISIBLY with no silent Supabase fallback.
+// no trailing slash). 404 -> null; other non-2xx throws so call sites fail
+// VISIBLY.
 async function rdsFetch(path, { method = 'GET', body } = {}) {
   const { data: { session } } = await sb.auth.getSession();
   if (!session?.access_token) throw new Error('rdsFetch: no session');
@@ -1477,19 +1474,9 @@ async function loadAllTeacherProfiles() {
   try {
     const email = tUser?.email;
     if (!email) return;
-    let data;
-    if (USE_RDS) {
-      // GET /teacher-profile defaults to the caller's own rows; 404 (rdsFetch
-      // null) = brand-new teacher with no profiles yet — same as empty.
-      data = (await rdsFetch('teacher-profile')) || [];
-    } else {
-      const res = await sb
-        .from('teacher_profiles')
-        .select('*')
-        .eq('teacher_email', email);
-      if (res.error || !res.data) return;
-      data = res.data;
-    }
+    // GET /teacher-profile defaults to the caller's own rows; 404 (rdsFetch
+    // null) = brand-new teacher with no profiles yet — same as empty.
+    const data = (await rdsFetch('teacher-profile')) || [];
     tProfiles = {};
     data.forEach(row => { tProfiles[row.course_name] = row; });
 
@@ -1499,22 +1486,10 @@ async function loadAllTeacherProfiles() {
     const profileIds = data.map(p => p.id).filter(Boolean);
     if (profileIds.length) {
       let sampleRows = null;
-      if (USE_RDS) {
-        try {
-          sampleRows = await rdsFetch(`work-samples?teacher_profile_ids=${profileIds.map(encodeURIComponent).join(',')}`);
-        } catch (sErr) {
-          console.warn('Could not load work samples:', sErr);
-        }
-      } else {
-        const res = await sb
-          .from('teacher_work_samples')
-          .select('*')
-          .in('teacher_profile_id', profileIds);
-        if (res.error) {
-          console.warn('Could not load work samples:', res.error);
-        } else {
-          sampleRows = res.data;
-        }
+      try {
+        sampleRows = await rdsFetch(`work-samples?teacher_profile_ids=${profileIds.map(encodeURIComponent).join(',')}`);
+      } catch (sErr) {
+        console.warn('Could not load work samples:', sErr);
       }
       (sampleRows || []).forEach(r => {
         (tSamplesByProfile[r.teacher_profile_id] ||= {})[r.tier] = r;
@@ -2247,22 +2222,9 @@ function formatFileSize(bytes) {
 async function checkForTemplate() {
   const course = tCurrentClass.course;
   try {
-    let data;
-    if (USE_RDS) {
-      // Returns an array (200 [] when no shared template) — same shape as the
-      // Supabase limit(1) read. Server excludes the caller's own rows.
-      data = await rdsFetch(`teacher-profile?template_for_course=${encodeURIComponent(course)}`);
-    } else {
-      const res = await sb
-        .from('teacher_profiles')
-        .select('course_info, syllabus_text, syllabus_file_path')
-        .eq('course_name', course)
-        .eq('share_course_info', true)
-        .neq('teacher_email', tUser.email)
-        .order('updated_at', { ascending: false })
-        .limit(1);
-      data = res.error ? null : res.data;
-    }
+    // Returns an array (200 [] when no shared template). Server excludes the
+    // caller's own rows.
+    const data = await rdsFetch(`teacher-profile?template_for_course=${encodeURIComponent(course)}`);
 
     if (data && data.length > 0 && data[0].course_info) {
       tTemplateData = data[0];
@@ -2348,15 +2310,8 @@ ${syllabusText || '(not provided)'}`;
     if (!Array.isArray(prompts) || prompts.length !== 3) throw new Error('Invalid prompt array');
 
     // Update the profile with generated prompts. The Lambda PATCH scopes to
-    // the JWT email server-side, so teacherEmail is implicit on the RDS path.
-    if (USE_RDS) {
-      await rdsFetch('teacher-profile', { method: 'PATCH', body: { course_name: courseName, suggested_prompts: prompts } });
-    } else {
-      await sb.from('teacher_profiles')
-        .update({ suggested_prompts: prompts })
-        .eq('teacher_email', teacherEmail)
-        .eq('course_name', courseName);
-    }
+    // the JWT email server-side, so teacherEmail is implicit.
+    await rdsFetch('teacher-profile', { method: 'PATCH', body: { course_name: courseName, suggested_prompts: prompts } });
 
     console.log('Generated suggested prompts:', prompts);
   } catch (err) {
@@ -2367,14 +2322,7 @@ ${syllabusText || '(not provided)'}`;
       "Explain a concept I'm stuck on"
     ];
     try {
-      if (USE_RDS) {
-        await rdsFetch('teacher-profile', { method: 'PATCH', body: { course_name: courseName, suggested_prompts: fallback } });
-      } else {
-        await sb.from('teacher_profiles')
-          .update({ suggested_prompts: fallback })
-          .eq('teacher_email', teacherEmail)
-          .eq('course_name', courseName);
-      }
+      await rdsFetch('teacher-profile', { method: 'PATCH', body: { course_name: courseName, suggested_prompts: fallback } });
     } catch { /* ignore secondary failure */ }
   }
 }
@@ -2547,25 +2495,10 @@ async function saveTeacherProfile() {
       share_course_info: shareCourseInfo,
       done: true,
     };
-    let data;
-    if (USE_RDS) {
-      // POST returns the upserted row directly (teacher_email + updated_at are
-      // server-set). Same consumption as .select().single(): data.id below.
-      data = await rdsFetch('teacher-profile', { method: 'POST', body: profileRow });
-      if (!data) throw new Error('teacher-profile save returned no row');
-    } else {
-      const res = await sb
-        .from('teacher_profiles')
-        .upsert({
-          teacher_email: tUser.email,
-          ...profileRow,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'teacher_email,course_name' })
-        .select()
-        .single();
-      if (res.error) throw res.error;
-      data = res.data;
-    }
+    // POST returns the upserted row directly (teacher_email + updated_at are
+    // server-set); data.id is consumed below.
+    const data = await rdsFetch('teacher-profile', { method: 'POST', body: profileRow });
+    if (!data) throw new Error('teacher-profile save returned no row');
 
     // Q4: upload work-sample photos and upsert teacher_work_samples (one row per tier).
     // Per-tier failures are tolerated — successful tiers are persisted and the
@@ -2640,25 +2573,14 @@ async function saveTeacherProfile() {
           console.info(`[Q4] skipped delete for ${tier} (S3 migration pending /delete-objects):`, toDelete);
         }
 
-        if (USE_RDS) {
-          // POST is the same (teacher_profile_id, tier) upsert; updated_at is
-          // server-set. Throws on non-2xx → caught by the per-tier handler below.
-          await rdsFetch('work-samples', { method: 'POST', body: {
-            teacher_profile_id: profileId,
-            tier,
-            description: local.description.trim(),
-            photo_paths: finalPaths,
-          } });
-        } else {
-          const { error: rowErr } = await sb.from('teacher_work_samples').upsert({
-            teacher_profile_id: profileId,
-            tier,
-            description: local.description.trim(),
-            photo_paths: finalPaths,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'teacher_profile_id,tier' });
-          if (rowErr) throw rowErr;
-        }
+        // POST is a (teacher_profile_id, tier) upsert; updated_at is
+        // server-set. Throws on non-2xx → caught by the per-tier handler below.
+        await rdsFetch('work-samples', { method: 'POST', body: {
+          teacher_profile_id: profileId,
+          tier,
+          description: local.description.trim(),
+          photo_paths: finalPaths,
+        } });
 
         // Mirror DB snapshot for next-edit delete-detection.
         tExistingSamplesByTier[tier] = { photo_paths: [...finalPaths] };
@@ -2712,32 +2634,17 @@ function showToast(message, type = '') {
 async function loadAllEnrollments() {
   const profileIds = Object.values(tProfiles).map(p => p.id).filter(Boolean);
   if (!profileIds.length) { tEnrollments = []; return; }
-  if (USE_RDS) {
-    // RDS path (?lambda=1): teacher roster via GET /class-enrollments?scope=teaching.
-    // Server derives the owned classes from the JWT email. Fail-visible (console.error +
-    // toast), NO Supabase fallback.
-    try {
-      const { data: { session } } = await sb.auth.getSession();
-      const res = await fetch(`${LAMBDA_URL}/class-enrollments?scope=teaching`,
-        { headers: { Authorization: `Bearer ${session.access_token}` } });
-      if (!res.ok) throw new Error(`class-enrollments ${res.status}`);
-      tEnrollments = await res.json();
-    } catch (err) {
-      console.error('loadAllEnrollments Lambda failed (no fallback):', err);
-      showToast('Could not load students from RDS (?lambda=1) — see console', 'error');
-      tEnrollments = [];
-    }
-    return;
-  }
+  // Teacher roster via GET /class-enrollments?scope=teaching. Server derives
+  // the owned classes from the JWT email. Fail-visible (console.error + toast).
   try {
-    const { data, error } = await sb
-      .from('class_enrollments')
-      .select('id, student_id, student_name, teacher_profile_id, block, teacher_notes')
-      .in('teacher_profile_id', profileIds);
-    if (error) { console.error('loadAllEnrollments error:', error); tEnrollments = []; return; }
-    tEnrollments = data || [];
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${LAMBDA_URL}/class-enrollments?scope=teaching`,
+      { headers: { Authorization: `Bearer ${session.access_token}` } });
+    if (!res.ok) throw new Error(`class-enrollments ${res.status}`);
+    tEnrollments = await res.json();
   } catch (err) {
-    console.error('loadAllEnrollments exception:', err);
+    console.error('loadAllEnrollments failed:', err);
+    showToast('Could not load students — see console', 'error');
     tEnrollments = [];
   }
 }
@@ -2935,19 +2842,12 @@ async function sendNote() {
   sendBtn.disabled = true;
 
   let error = null;
-  if (USE_RDS) {
-    // PATCH authz is server-side (caller must own the linked class); a 404/403
-    // throws in rdsFetch and lands in the same error toast as the RLS path.
-    try {
-      const res = await rdsFetch('class-enrollments', { method: 'PATCH', body: { id: enrollment.id, teacher_notes: serialized } });
-      if (!res) error = new Error('enrollment not found (404)');
-    } catch (err) { error = err; }
-  } else {
-    ({ error } = await sb
-      .from('class_enrollments')
-      .update({ teacher_notes: serialized })
-      .eq('id', enrollment.id));
-  }
+  // PATCH authz is server-side (caller must own the linked class); a 404/403
+  // throws in rdsFetch and lands in the error toast below.
+  try {
+    const res = await rdsFetch('class-enrollments', { method: 'PATCH', body: { id: enrollment.id, teacher_notes: serialized } });
+    if (!res) error = new Error('enrollment not found (404)');
+  } catch (err) { error = err; }
 
   input.disabled = false;
 

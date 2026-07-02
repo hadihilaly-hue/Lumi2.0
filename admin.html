@@ -197,10 +197,7 @@ body { overflow: auto; display: block; }
 <script>
 const ADMIN_EMAIL = 'hadi.hilaly@menloschool.org';
 
-// CUTOVER 2026-07-01: RDS is the default data layer. ?lambda=0 is the
-// rollback escape hatch back to Supabase (kept until post-cutover teardown).
 const LAMBDA_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws';
-const USE_RDS = new URLSearchParams(window.location.search).get('lambda') !== '0';
 
 // ─── CURRICULUM (same as teacher.html) ───────────────────────────────────────
 const MENLO_CURRICULUM = {
@@ -448,22 +445,13 @@ let aRefreshTimer = null;
 // ─── DATA ─────────────────────────────────────────────────────────────────────
 async function loadAndRender() {
   try {
-    let data;
-    if (USE_RDS) {
-      // Admin-gated on the Lambda (SCHOOL_CONFIG.adminEmails) — deliberately
-      // narrower than the old any-authenticated auth_read RLS. 200 [] when empty;
-      // fail-visible with no Supabase fallback per the ?lambda=1 convention.
-      const { data: { session } } = await sb.auth.getSession();
-      const res = await fetch(`${LAMBDA_URL}/teacher-profile?scope=all`,
-        { headers: { Authorization: `Bearer ${session.access_token}` } });
-      if (!res.ok) throw new Error(`teacher-profile?scope=all ${res.status}`);
-      data = await res.json();
-    } else {
-      const res = await sb
-        .from('teacher_profiles')
-        .select('teacher_email, course_name, done, updated_at, engagement_rules, teaching_voice');
-      data = res.error ? null : res.data;
-    }
+    // Admin-gated on the Lambda (SCHOOL_CONFIG.adminEmails). 200 [] when
+    // empty; fail-visible.
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${LAMBDA_URL}/teacher-profile?scope=all`,
+      { headers: { Authorization: `Bearer ${session.access_token}` } });
+    if (!res.ok) throw new Error(`teacher-profile?scope=all ${res.status}`);
+    const data = await res.json();
     if (data) {
       aProfiles = {};
       data.forEach(row => {
