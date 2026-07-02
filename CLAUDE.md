@@ -54,8 +54,10 @@ gives direct answers, only guides reasoning.
   through the per-file `rdsFetch(path, {method, body})` helper (app.js +
   teacher.html; admin.html inlines its single fetch). Failures surface
   VISIBLY (console.error + showToast at hardened writes; chat-area banner
-  for the main tutor fetch) — there is no fallback store. Supabase remains
-  ONLY as the auth provider (`sb.auth.*`) until the Cognito workstream.
+  for the main tutor fetch) — there is no fallback store. Auth is AWS
+  Cognito via `cognito-auth.js` (Workstream I Phase 3 cutover, 2026-07-02);
+  the `sb.auth.*` surface survives as the shim's API. Supabase's project
+  exists only for the SIS importer's user creation until Phase 5–6 teardown.
   Teacher notes are injected server-side by the chat Lambda and never reach
   the client (see "Per-student teacher notes injection").
   `migration/SMOKE_TEST.md` and `migration/CUTOVER_PLAN.md` are historical
@@ -803,7 +805,7 @@ spoofed ids.
 - **Pages:** index.html (sign-in), app.html (student chat), teacher.html
   (teacher onboarding), admin.html, lumi.html
 - **Styling:** style.css (primary, ~75 KB) + styles.css (~18 KB); Inter font via Google Fonts
-- **Auth:** Supabase Auth with Google OAuth (implicit flow), restricted to @menloschool.org emails
+- **Auth:** AWS Cognito (pool `lumi-users`, us-east-1) with Google as the sole IdP — code+PKCE via `cognito-auth.js` (repo root; exposes the old `sb.auth.*` surface, so call sites still read like supabase-js). `session.access_token` = the Cognito ID token; the Lambda resolves it to the preserved lumi uuid via `app_users`. Client + Lambda still restrict to @menloschool.org emails until the per-school domain gate (Workstream I Phase 4). supabase.js/auth.js are deleted; the Supabase project survives only for the SIS importer's user creation + final teardown (Phases 5–6).
 - **Database:** AWS RDS Postgres (`lumi-db`) behind the `lumi-claude-proxy` Lambda — per-route JWT authz replaced RLS (see "RDS Lambda data routes"). Supabase is AUTH-ONLY (`sb.auth.*` via supabase.js CDN client) until the Cognito migration; supabase_setup.sql is historical.
 - **AI API:** Anthropic Messages API via AWS Lambda lumi-claude-proxy
   (Function URL: https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/).

@@ -131,8 +131,31 @@ layer; Supabase is auth-only pending Workstream I/Cognito. Workstream I Phase 1
   the function URL — each such request silently burns a concurrency slot (of
   10) for a full minute. Needs its own investigation (server-side
   write/stream stall, likely response streaming to a half-dead client).
-  Next: Phase 3 — frontend `cognito-auth.js` sb-compatible shim + sign-in
-  pages, standalone test page first, then the one cutover commit.
+  **Phase 3 DONE (2026-07-02) — FRONTEND CUT OVER TO COGNITO.**
+  `cognito-auth.js` (repo root) replaces BOTH supabase.js and auth.js with an
+  sb-compatible surface (getSession with deduped refresh-token grant,
+  signInWithOAuth = code+PKCE straight to Google, signOut through the Cognito
+  hosted /logout so switch-account works, onAuthStateChange, page-load code
+  exchange bootstrap, isMenloEmail, doSignOut). `session.access_token` carries
+  the Cognito ID token; `session.user.id` is now the COGNITO SUB (client-side
+  only — server identity is always the JWT → app_users → preserved lumi uuid).
+  Verified first on the standalone harness cognito-test.html (live on Pages,
+  real sign-in: profile uuid 3587c875-…, 23 conversations, forced refresh),
+  then cut over in one commit: all five pages load cognito-auth.js;
+  supabase.js + auth.js DELETED; the stale `apikey: SUPABASE_ANON_KEY` header
+  removed from 7 fetch sites (would have thrown ReferenceError post-deletion);
+  `hd` queryParams dropped (Cognito can't forward it — domain enforcement was
+  always isMenloEmail + the Lambda gate); index.html parks the wrong-domain
+  error in sessionStorage across the logout round trip. **Google Calendar
+  connect is STUBBED** (`connectGoogleCalendar` → toast): Cognito never
+  exposes the Google provider_token to the browser; the only real user never
+  connected it (calendar_connected=false). Rebuild later with Google Identity
+  Services initTokenClient. **ROLLBACK:** `git revert <cutover-sha> && git
+  push origin main && git push hadi main` — Pages redeploys in ~1 min;
+  Supabase auth infra is still alive until Phase 6 and old Supabase browser
+  sessions live under different localStorage keys, so revert fully restores
+  the pre-cutover world. Next: Phase 4 — per-school domain gate
+  (schools.allowed_domains) replacing SCHOOL_CONFIG.domain + isMenloEmail.
 
 **Key identifiers:**
 - AWS account: 613136968914 (us-east-1)

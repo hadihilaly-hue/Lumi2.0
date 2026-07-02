@@ -119,7 +119,6 @@ async function fetchClaudeProxy(body, options = {}) {
     headers: {
       'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
-      'apikey': SUPABASE_ANON_KEY,
     },
     body: JSON.stringify(body),
     ...options,
@@ -1002,8 +1001,7 @@ async function loadWorkSampleImages(profile) {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
-          'apikey': SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json',
+              'Content-Type': 'application/json',
         },
         body: JSON.stringify({ bucket: 'work-samples', key: p.path }),
       });
@@ -4429,17 +4427,11 @@ function updateCalUi() {
 }
 
 async function connectGoogleCalendar() {
-  try {
-    const { error } = await sb.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        scopes: 'https://www.googleapis.com/auth/calendar.readonly',
-        redirectTo: window.location.href,
-        queryParams: { access_type: 'offline', prompt: 'consent' },
-      },
-    });
-    if (error) showToast('Calendar connection failed: ' + error.message);
-  } catch { showToast('Calendar connection failed.'); }
+  // TODO(GIS): Cognito never exposes the Google provider access token to the
+  // browser, so the old Supabase provider_token flow can't be ported. Rebuild
+  // with Google Identity Services initTokenClient (a direct API grant) when
+  // calendar connect is prioritized — see MIGRATION_PLAN.md Workstream I.
+  showToast('Calendar connect is temporarily unavailable.');
 }
 
 function wireCalListeners() {

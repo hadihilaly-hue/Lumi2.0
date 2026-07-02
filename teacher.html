@@ -1060,8 +1060,7 @@ body { overflow: auto; display: block; }
 <!-- TOAST -->
 <div class="t-toast" id="toast"></div>
 
-<script src="supabase.js"></script>
-<script src="auth.js"></script>
+<script src="cognito-auth.js"></script>
 <script>
 // Lambda Function URL — used by /upload-url, /download-url, and the chat root call.
 // No trailing slash; endpoint paths in fetch() start with `/`.
@@ -1393,7 +1392,7 @@ function wireSigninBtn() {
       const redirectTo = base + 'teacher.html';
       const { error } = await sb.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo, queryParams: { hd: 'menloschool.org' } },
+        options: { redirectTo },
       });
       if (error) throw error;
     } catch (err) {
@@ -1659,7 +1658,6 @@ async function openWizard(course, subject, opts) {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${session.access_token}`,
-                'apikey': SUPABASE_ANON_KEY,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({ bucket: 'work-samples', key: p.path }),
@@ -2287,7 +2285,6 @@ ${syllabusText || '(not provided)'}`;
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': SUPABASE_ANON_KEY,
         'Authorization': `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({
@@ -2371,7 +2368,6 @@ async function saveTeacherProfile() {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${session.access_token}`,
-              'apikey': SUPABASE_ANON_KEY,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -2444,7 +2440,6 @@ async function saveTeacherProfile() {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${session.access_token}`,
-              'apikey': SUPABASE_ANON_KEY,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ bucket: 'syllabi', key: path }),
@@ -2526,7 +2521,6 @@ async function saveTeacherProfile() {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${session.access_token}`,
-                'apikey': SUPABASE_ANON_KEY,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({

@@ -78,8 +78,7 @@
   </div>
 </div>
 
-<script src="supabase.js"></script>
-<script src="auth.js"></script>
+<script src="cognito-auth.js"></script>
 <script>
 const GOOGLE_SVG = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -99,6 +98,16 @@ function selectRole(role) {
 }
 
 (async () => {
+  // A rejected sign-in bounces through the Cognito logout back to this page —
+  // the error message is parked in sessionStorage across that round trip.
+  const parkedError = sessionStorage.getItem('lumi_auth_error');
+  if (parkedError) {
+    sessionStorage.removeItem('lumi_auth_error');
+    const errEl = document.getElementById('signinError');
+    errEl.textContent = parkedError;
+    errEl.style.display = 'block';
+  }
+
   // If already signed in, redirect immediately
   const { data: { session } } = await sb.auth.getSession();
   if (session?.user && isMenloEmail(session.user.email)) {
@@ -110,10 +119,8 @@ function selectRole(role) {
   sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_IN' && session?.user) {
       if (!isMenloEmail(session.user.email)) {
-        sb.auth.signOut();
-        const errEl = document.getElementById('signinError');
-        errEl.textContent = 'Access is limited to @menloschool.org accounts.';
-        errEl.style.display = 'block';
+        sessionStorage.setItem('lumi_auth_error', 'Access is limited to @menloschool.org accounts.');
+        sb.auth.signOut(); // navigates: Cognito logout → back here → parked error shows
         return;
       }
       window.location.href = selectedRole === 'teacher' ? 'teacher.html' : 'app.html';
@@ -130,7 +137,7 @@ function selectRole(role) {
       const redirectTo = base + (selectedRole === 'teacher' ? 'teacher.html' : 'app.html');
       const { error }  = await sb.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo, queryParams: { hd: 'menloschool.org' } },
+        options: { redirectTo },
       });
       if (error) throw error;
     } catch (err) {
