@@ -66,6 +66,18 @@ function getPool() {
       // query client-side and keep the socket alive between invocations.
       query_timeout: 8_000,
       keepAlive: true,
+      // 2026-07-02 incident (the REAL root cause of the zero-log 60s
+      // timeouts): this Lambda is streamified, and the streaming runtime
+      // waits for the event loop to EMPTY before finalizing an invocation.
+      // An idle pooled connection is a ref'd socket plus a ref'd
+      // idleTimeoutMillis reap timer, so EVERY invocation that ran a query
+      // stayed open to the full 60s Lambda timeout — after the client had
+      // already received its response — burning a concurrency slot (account
+      // limit 10) each time. allowExitOnIdle unrefs both while the client
+      // sits idle (pg-pool re-refs on checkout), so the loop drains and the
+      // invocation completes as soon as the response is flushed. The warm
+      // socket is still reused by the next invocation.
+      allowExitOnIdle: true,
     });
     // Surface async pool errors without crashing the Lambda.
     pool.on('error', (err) => {

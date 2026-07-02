@@ -4,6 +4,7 @@ import {
 } from "@aws-sdk/client-bedrock-runtime";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { query as dbQuery } from "./db.js";
 import { timingSafeEqual } from "node:crypto";
@@ -51,7 +52,15 @@ const cognitoVerifier = (COGNITO_USER_POOL_ID && COGNITO_CLIENT_ID)
     })
   : null;
 
-const bedrockClient = new BedrockRuntimeClient({ region: AWS_REGION });
+// Bedrock was the last unbounded egress path (2026-07-02 hung-invocation
+// incident): no connect/idle timeout meant a stalled connection ate the full
+// 60s Lambda timeout with zero logs. connectionTimeout bounds TCP connect;
+// socketTimeout is an IDLE timeout — streamed tokens arrive continuously, so
+// 45s only fires when the stream is genuinely dead, never mid-generation.
+const bedrockClient = new BedrockRuntimeClient({
+  region: AWS_REGION,
+  requestHandler: new NodeHttpHandler({ connectionTimeout: 3000, socketTimeout: 45_000 }),
+});
 const s3Client = new S3Client({ region: AWS_REGION });
 
 // === Auth (Workstream I: dual-path) ===
@@ -420,9 +429,54 @@ async function fetchTeacherNotes({ studentId, teacherProfileId }) {
 // === Main Handler (path-routed) ===
 // /upload-url, /download-url -> JSON one-shot response
 // default (/, /chat) -> SSE streaming chat
+//
+// Instrumented shell (2026-07-02 hung-invocation incident): invocations were
+// burning the full 60s Lambda timeout with ZERO log output — unattributable,
+// and each one pinned a concurrency slot (account limit 10) for a minute, so
+// a couple of stale browser tabs could starve every route into 429s.
+//   1. Entry/handled logs make every request attributable (method+path only —
+//      query strings can carry emails, bodies carry student content; FERPA).
+//   2. The watchdog fires BEFORE the Lambda timeout, logs where the request
+//      was stuck, and destroys the response stream — aborting the invocation
+//      and freeing the slot. It is cleared on stream CLOSE, not on handler
+//      return, so a post-handler flush hang to a half-dead client (the
+//      suspected mechanism) is bounded too.
+// Chat + sis-import get a longer leash: streamed generations and the
+// importer's ~45s internal deadline are legitimately slow.
+const WATCHDOG_LONG_PATHS = new Set(["/", "/chat", "/sis-import"]);
+
 export const handler = awslambda.streamifyResponse(async (event, responseStream) => {
+  const method = event.requestContext?.http?.method || "?";
+  const reqPath = event.requestContext?.http?.path || event.rawPath || "/";
+  const t0 = Date.now();
+  console.log(`[req] ${method} ${reqPath}`);
+
+  let closed = false;
+  const watchdog = setTimeout(() => {
+    if (closed) return;
+    console.error(`[watchdog] ${method} ${reqPath} still open after ${Date.now() - t0}ms — destroying stream`);
+    try { responseStream.destroy(new Error("watchdog timeout")); } catch {}
+  }, WATCHDOG_LONG_PATHS.has(reqPath) ? 55_000 : 25_000);
+  // 'finish' = fully flushed, 'close' = torn down. Either disarms — a hung
+  // flush fires neither, which is exactly when the watchdog must stay armed.
+  const disarm = () => { closed = true; clearTimeout(watchdog); };
+  responseStream.on("finish", disarm);
+  responseStream.on("close", disarm);
+  // destroy(err) emits 'error'; without a listener that would crash the runtime.
+  responseStream.on("error", () => {});
+
+  try {
+    await routeRequest(event, responseStream);
+    console.log(`[req] ${method} ${reqPath} handled in ${Date.now() - t0}ms`);
+  } catch (err) {
+    console.error(`[req] ${method} ${reqPath} unhandled error:`, err?.message);
+    try { responseStream.destroy(err); } catch {}
+  }
+});
+
+async function routeRequest(event, responseStream) {
   const path = event.requestContext?.http?.path || event.rawPath || "/";
-  
+
   // One-shot JSON response helper. Wraps the stream with given status + JSON content-type.
   // IMPORTANT: only call once per request. After this, the stream is consumed.
   const sendJson = (statusCode, payload) => {
@@ -1557,8 +1611,14 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
       outputTokens,
     });
   } catch (err) {
-    console.error("Chat stream error:", err);
-    chatStream.write(`data: ${JSON.stringify({ error: err.message || "Stream error" })}\n\n`);
-    chatStream.end();
+    console.error("Chat stream error:", err.message ?? err);
+    // The stream may already be destroyed (watchdog / client gone) — writing
+    // to it would throw out of the catch; degrade to destroy instead.
+    try {
+      chatStream.write(`data: ${JSON.stringify({ error: err.message || "Stream error" })}\n\n`);
+      chatStream.end();
+    } catch {
+      try { chatStream.destroy(); } catch {}
+    }
   }
-});
+}
