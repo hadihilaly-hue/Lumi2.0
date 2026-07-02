@@ -19,7 +19,8 @@ Companion docs (committed):
 ## Progress
 
 Last updated: 2026-07-01 (**CUTOVER + TEARDOWN EXECUTED** — RDS is the ONLY data
-layer; Supabase is auth-only pending Workstream I/Cognito)
+layer; Supabase is auth-only pending Workstream I/Cognito. Workstream I Phase 1
+— Cognito pool + Google IdP — shipped and verified later the same day)
 
 - **Workstream A — Data cleanup:** ✅ DONE. Harris and Bush records removed from `teacher_profiles`, `class_enrollments`, `conversations`, `homework_tasks`, `profiles`, `api_usage`; their files removed from S3 buckets; their Supabase Auth records deleted. Verification queries returned 0s across all tables.
 - **Workstream B — AWS infrastructure:** ✅ DONE (except CloudWatch retention + CloudTrail, deferred)
@@ -84,7 +85,33 @@ layer; Supabase is auth-only pending Workstream I/Cognito)
   synthetic data + auth users fully cleaned after (migration/sis-test-cleanup.py).
   Known v1 limits: re-exports don't prune stale rows; imported people can't sign
   in until the domain gate is replaced (Workstream I).
-- **Workstream I:** Not yet started (Cognito auth).
+- **Workstream I — Cognito auth:** ⏳ STARTED. **Phase 1 DONE (2026-07-01):**
+  Cognito user pool + Google IdP live and verified end-to-end with a real
+  Google sign-in (hadi.hilaly@menloschool.org): manual PKCE round trip →
+  authorization code → token exchange → valid ID token (iss/aud/token_use/
+  email_verified all correct) → refresh-token grant confirmed. Pool:
+  `lumi-users` (`us-east-1_C0xhKzu94`), self-registration disabled, MFA off,
+  deletion protection ACTIVE. App client `lumi-web`
+  (`538k8vb5uh8k7ikim8ql64vf44`): public, no secret, code+PKCE only, scopes
+  openid/email/profile, Google as the sole IdP, callbacks = the six GitHub
+  Pages URLs, ID/access 1h + refresh 30d. Hosted domain
+  `lumi-auth-613136968914.auth.us-east-1.amazoncognito.com`; Google OAuth
+  client (Hadi-created, Google Cloud project `lumi-491920`) redirects to
+  `/oauth2/idpresponse`. Decisions locked: UUID preservation via an RDS
+  `app_users` mapping table (cognito_sub → lumi uuid, linked by verified
+  email at first sign-in — NO Cognito triggers/custom attributes; seed row
+  maps hadi.hilaly@menloschool.org → 3587c875-ddc8-4e0b-b65f-ff3677d7ccce;
+  his Cognito sub is `14f83488-b051-70d3-ab5d-91ee8f879cee`); frontend will
+  send the Cognito **ID token** as Bearer via an sb-compatible shim; Lambda
+  verifyAuth will verify locally via `aws-jwt-verify` (JWKS cached in-module,
+  no per-request egress) with dual-accept fallback to Supabase until the
+  cutover commit. Okta was raised and deliberately deferred: Google IdP works
+  today (incl. Okta-fronted Google Workspace schools); direct Okta/SAML
+  federation into the same pool is a per-school onboarding item (Phase 4+).
+  Supabase auth untouched; nothing user-facing changed. `lumi-deploy` gained
+  a `cognito-idp:*` inline policy (named `cognito`) to script all of this.
+  Next: Phase 2 — `app_users` table + dual-path verifyAuth (plan-mode round
+  first, per workstream rules).
 
 **Key identifiers:**
 - AWS account: 613136968914 (us-east-1)
@@ -95,6 +122,9 @@ layer; Supabase is auth-only pending Workstream I/Cognito)
 - Proxy ARN: `arn:aws:rds:us-east-1:613136968914:db-proxy:prx-0bd9b6e44d9aea72a`
 - Lambda execution role: `lumi-claude-proxy-role-fc8576tr`
 - Lambda function URL: `https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/`
+- Cognito user pool: `lumi-users` (`us-east-1_C0xhKzu94`), app client `lumi-web` (`538k8vb5uh8k7ikim8ql64vf44`)
+- Cognito hosted domain: `https://lumi-auth-613136968914.auth.us-east-1.amazoncognito.com`
+- Google OAuth client (for the Cognito IdP): `1028728342629-3olh0msn81ht399dmua4138fr7102tul.apps.googleusercontent.com` (project `lumi-491920`; secret lives only in the Cognito IdP config)
 
 **Next session:** continue Workstream F — build the next data routes (`/profiles`, `/conversations`, `/homework-tasks`) against the now-locked response shape, reusing `db.js` and the `/teacher-profile` pattern (verifyAuth + domain gate + parameterized RDS query). Also: knock out CloudWatch log retention + CloudTrail (small, deferred from Workstream B).
 
