@@ -1,4 +1,10 @@
--- ─── LUMI SUPABASE SETUP ──────────────────────────────────────────────────────
+-- ─── HISTORICAL — DO NOT RUN ─────────────────────────────────────────────────
+-- Lumi's data layer moved to AWS RDS on 2026-07-01 (see MIGRATION_PLAN.md and
+-- migration/rds-schema.sql for the live schema). This file documents the old
+-- Supabase Postgres setup and had drifted from the deployed state even before
+-- the migration. Kept for reference only.
+--
+-- ─── LUMI SUPABASE SETUP (historical) ────────────────────────────────────────
 -- Run this entire file in: Supabase Dashboard → SQL Editor → New query
 
 -- ─── TABLES ───────────────────────────────────────────────────────────────────

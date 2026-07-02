@@ -48,28 +48,18 @@ gives direct answers, only guides reasoning.
   the Storage bucket inventory for the full picture.
 
 ### MODE 2: STUDENT MODE
-- Loads the selected teacher's profile from **RDS via the Lambda (the default
-  data layer since the 2026-07-01 cutover)**.
-  - **Data-layer flag (post-cutover):** `USE_RDS` now defaults to TRUE in
-    app.js, teacher.html, AND admin.html; append `?lambda=0` to fall back to
-    the Supabase data path (rollback escape hatch, kept until the post-cutover
-    teardown — see migration/CUTOVER_PLAN.md status header). Stateless, read
-    once on load.
-    **As of Workstream G (2026-07-01) the flag covers EVERY data call site** —
-    reads and writes across teacher_profiles, profiles, conversations,
-    homework_tasks, teacher_work_samples, and class_enrollments — via the
-    per-file `rdsFetch(path, {method, body})` helper (app.js + teacher.html;
-    admin.html inlines its single fetch). The former exception — the student
-    chat-open `teacher_notes` read — was ELIMINATED on 2026-07-01: notes are
-    now injected server-side by the chat Lambda and never reach the client
-    (see "Per-student teacher notes injection"). No param = byte-identical
-    Supabase path for all remaining data sites. The Lambda path fails VISIBLY (console.error
-    with the original log strings + showToast at every §2 hardened write; the
-    chat-area banner for the main tutor fetch) with NO silent fallback. RDS
-    holds only test data — `?lambda=1` is for exercising the path until
-    cutover. Manual re-validation checklist: `migration/SMOKE_TEST.md`.
-    Cutover itself (data sync, flag-default flip, teardown) is a manual
-    operator runbook: `migration/CUTOVER_PLAN.md` — written, NOT executed.
+- Loads the selected teacher's profile from **RDS via the Lambda — the ONLY
+  data layer since the 2026-07-01 cutover + teardown.** The old `USE_RDS`
+  flag and every Supabase data branch are deleted; all reads/writes go
+  through the per-file `rdsFetch(path, {method, body})` helper (app.js +
+  teacher.html; admin.html inlines its single fetch). Failures surface
+  VISIBLY (console.error + showToast at hardened writes; chat-area banner
+  for the main tutor fetch) — there is no fallback store. Supabase remains
+  ONLY as the auth provider (`sb.auth.*`) until the Cognito workstream.
+  Teacher notes are injected server-side by the chat Lambda and never reach
+  the client (see "Per-student teacher notes injection").
+  `migration/SMOKE_TEST.md` and `migration/CUTOVER_PLAN.md` are historical
+  records of the executed cutover.
 - Guides students through the subject WITHOUT giving direct answers
 - Always asks students to walk through their reasoning first
 - Never says "that's wrong" — instead: "walk me through how you
@@ -82,7 +72,7 @@ gives direct answers, only guides reasoning.
 
 ## Data Architecture
 
-### Teacher Profile Object (stored in Supabase: teacher_profiles table)
+### Teacher Profile Object (RDS: teacher_profiles table)
 - Lookup key: teacher_email + class_name (unique constraint on combo)
 - Same teacher can have multiple rows, one per class they teach
 - Fields: teacher_email, class_name, subject, title (honorific — Mr./
@@ -96,7 +86,7 @@ gives direct answers, only guides reasoning.
 - RLS: teachers manage own rows (matched by auth email), all
   authenticated users can read (so student sessions can fetch profiles)
 
-### Class Enrollments (Supabase: class_enrollments table)
+### Class Enrollments (RDS: class_enrollments table)
 - Tracks which students are in which classes, with per-student teacher notes
 - Columns:
   - id (uuid, PK)
@@ -160,7 +150,7 @@ gives direct answers, only guides reasoning.
   classes. If a student removes a class from their schedule, the old
   enrollment row persists and the teacher still sees that student on
   their roster. Needs handling before pitching to Menlo admin.
-- **RDS read path (AWS migration, behind `?lambda=1` / `USE_RDS`).** `GET
+- **RDS read path (the only path since teardown).** `GET
   /class-enrollments` on the Lambda mirrors the two SELECT RLS policies:
   - `?scope=teaching` → the caller's roster across classes they OWN
     (`JOIN teacher_profiles tp ON tp.id = ce.teacher_profile_id WHERE
@@ -192,7 +182,7 @@ gives direct answers, only guides reasoning.
   chips moved server-side too (`GET /suggested-prompts`). See "Per-student
   teacher notes injection" under System Prompt Architecture.
 
-### Other Supabase Tables
+### Other RDS Tables
 - **profiles** — student user profiles (id, name, grade, values_profile jsonb)
 - **conversations** — chat history (id, user_id, title, messages jsonb,
   teacher, course, is_teacher_test boolean (Teacher Test Mode TM-1 —
@@ -814,7 +804,7 @@ spoofed ids.
   (teacher onboarding), admin.html, lumi.html
 - **Styling:** style.css (primary, ~75 KB) + styles.css (~18 KB); Inter font via Google Fonts
 - **Auth:** Supabase Auth with Google OAuth (implicit flow), restricted to @menloschool.org emails
-- **Database:** Supabase (PostgreSQL + RLS) — client initialized in supabase.js using @supabase/supabase-js loaded from CDN
+- **Database:** AWS RDS Postgres (`lumi-db`) behind the `lumi-claude-proxy` Lambda — per-route JWT authz replaced RLS (see "RDS Lambda data routes"). Supabase is AUTH-ONLY (`sb.auth.*` via supabase.js CDN client) until the Cognito migration; supabase_setup.sql is historical.
 - **AI API:** Anthropic Messages API via AWS Lambda lumi-claude-proxy
   (Function URL: https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/).
   The proxy validates JWT auth, enforces a 2500 max_tokens

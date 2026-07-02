@@ -19,7 +19,13 @@
 >   with zero supabase.co/rest data calls, 23 imported conversations visible,
 >   ?lambda=0 fallback proven.
 > - Known follow-up: request an account concurrency-limit increase (10 is
->   the new-account default and too tight); teardown T1–T7 after 48h.
+>   the new-account default and too tight).
+> - **TEARDOWN EXECUTED 2026-07-01** (watch compressed by user decision —
+>   single-user system): T2 (Lambda Supabase branches, commit 73b3b99),
+>   T3 (frontend branches + USE_RDS flag, fb9e811 + 315df9b), T4 (dead code),
+>   T5 (docs), T7 (no local dumps ever existed) — done. T1 (/admin/sql +
+>   ADMIN_TOKEN) and T6 (Supabase project deletion) ride with the Cognito
+>   workstream, which also owns verifyAuth + the importer's auth-user calls.
 
 Original runbook below, kept for reference. Companion docs:
 `migration/SMOKE_TEST.md` (post-flip validation), `MIGRATION_HARDENING.md`,

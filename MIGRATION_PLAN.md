@@ -18,7 +18,8 @@ Companion docs (committed):
 
 ## Progress
 
-Last updated: 2026-07-01 (**CUTOVER EXECUTED** — RDS is the default data layer; 48h watch running)
+Last updated: 2026-07-01 (**CUTOVER + TEARDOWN EXECUTED** — RDS is the ONLY data
+layer; Supabase is auth-only pending Workstream I/Cognito)
 
 - **Workstream A — Data cleanup:** ✅ DONE. Harris and Bush records removed from `teacher_profiles`, `class_enrollments`, `conversations`, `homework_tasks`, `profiles`, `api_usage`; their files removed from S3 buckets; their Supabase Auth records deleted. Verification queries returned 0s across all tables.
 - **Workstream B — AWS infrastructure:** ✅ DONE (except CloudWatch retention + CloudTrail, deferred)
