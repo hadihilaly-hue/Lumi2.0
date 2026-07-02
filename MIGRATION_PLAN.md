@@ -176,6 +176,15 @@ layer; Supabase is auth-only pending Workstream I/Cognito. Workstream I Phase 1
   their row's allowed_domains is populated — HOW it gets populated is a
   Phase 5 decision (SIS v1 has no domain field: derive from imported emails
   vs. manual admin SQL). Rollback: pre-phase Lambda zip + git revert.
+  LIVE-VERIFIED 2026-07-02: /allowed-domains serves the seed; menlo session
+  unaffected; gmail sign-in blocked at the sign-in page (client UX gate) AND
+  — via cognito-test.html, which has no client gate — rejected by the SERVER
+  (4× count-only "non-allowed domain" warns, zero PII, /profiles 401) with
+  app_users still exactly 1 row (pollution guard proven). Ops: during the
+  test the account hit ConcurrentInvocationLimitExceeded — the stale-tab 60s
+  timeout burn is consuming slots TODAY (21 timeouts/15min with several Lumi
+  tabs open); the separate slot-starvation investigation + the AWS
+  concurrency-increase request are now urgent, not background.
   Next: Phase 5 — SIS importer drops the Supabase admin API, writes
   app_users rows; decide allowed_domains population.
 
