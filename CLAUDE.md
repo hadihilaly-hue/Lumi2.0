@@ -784,6 +784,30 @@ spoofed ids.
   separately leaves a window where the table is unprotected, and a
   failed UPDATE in the middle would leave the trigger off entirely.
 
+- **A streamified Lambda invocation only finalizes when the event loop
+  drains — any ref'd handle burns the FULL Lambda timeout.** Root cause
+  of the 2026-07-01/02 timeout storm: after the RDS cutover, every
+  invocation that ran a pg query left an idle pooled connection (ref'd
+  socket + ref'd idleTimeoutMillis reap timer). The client received its
+  response normally, but the invocation stayed open to the 60s Lambda
+  timeout with ZERO log output, pinning a concurrency slot (account
+  limit 10) — a single auto-refreshing admin tab was enough to starve
+  all routes into 429s. Diagnosis traps to remember: (a) the app looks
+  healthy — responses arrive fine, only REPORT lines reveal the 60s
+  durations; (b) traffic-source correlations (stale tabs, keep-alive
+  sockets) are red herrings when the only steady traffic is also the
+  only visible victim; (c) "route logged success + invocation still
+  timed out" means the hang is after handler completion. Fix:
+  `allowExitOnIdle: true` on the pg Pool (unrefs idle socket + reap
+  timer; re-refs on checkout — warm socket still reused across
+  invocations). Rule going forward: anything added to the Lambda that
+  holds a persistent handle (sockets, timers, agents, watchers) must be
+  unref'd when idle, or every invocation pays 60s. The handler shell
+  now logs `[req] METHOD /path` + `handled in Xms` (no PII) and carries
+  a watchdog (25s data routes / 55s chat + sis-import) that logs and
+  destroys the stream before the Lambda timeout, so any future hang is
+  attributable and slot-bounded.
+
 - **Verifying the influenced-mode failure path is hard to reproduce
   live.** When testing commit 4, DevTools "Offline" mode may serve
   cached responses for the claude-proxy URL, masking the
