@@ -185,8 +185,27 @@ layer; Supabase is auth-only pending Workstream I/Cognito. Workstream I Phase 1
   timeout burn is consuming slots TODAY (21 timeouts/15min with several Lumi
   tabs open); the separate slot-starvation investigation + the AWS
   concurrency-increase request are now urgent, not background.
-  Next: Phase 5 — SIS importer drops the Supabase admin API, writes
-  app_users rows; decide allowed_domains population.
+  **Phase 5 DONE (2026-07-02) — SIS importer off the Supabase admin API.**
+  `getOrCreateAuthUser` (Supabase /auth/v1/admin) is deleted; `ensurePerson`
+  now calls `ensureAppUser` — one `app_users` upsert (email → fresh lumi_id,
+  cognito_sub NULL; `(xmax=0)` keeps created/existing counters). Cognito
+  users appear lazily at first Google sign-in via Phase 2's email linking.
+  The importer needs NO auth provider at all. allowed_domains population
+  decided: **SIS format v1.1** adds optional `school.allowed_domains`
+  (bare lowercase domains; hard-validated; present = replace, absent =
+  never clobber; empty-after-import → response warning). schema_version
+  "1.0" and "1.1" both accepted. synthetic_data/schema.md updated.
+  sis-test-cleanup.py: Supabase step + SRK env dropped; deletes app_users
+  by sis_map identity instead. LIVE-VERIFIED: small.json+domains imported
+  (60 created, 1 round), idempotent re-import (0/60 existing), field-absent
+  re-import didn't clobber domains, both negatives 400, cleanup removed all
+  60 app_users + cascades with real data intact. Zero `auth/v1/admin` refs
+  remain; Supabase's ONLY remaining code path is verifySupabaseAuth
+  (moribund legacy fallback) + SUPABASE_* env vars — both die in Phase 6.
+  Next: Phase 6 — teardown (/admin/sql + ADMIN_TOKEN with replacement DB
+  access decision, SUPABASE_* env vars, verifySupabaseAuth, supabase CDN
+  refs in lumi.html, cleanup script, oauth-capture callback, CLAUDE.md
+  rewrite, then Hadi deletes the Supabase project).
 - **Slot-starvation incident: ROOT-CAUSED + FIXED (2026-07-02).** The silent
   60s zero-log timeouts (weeks old; starved the 10-slot account into live
   429s) were NOT hung requests: every invocation that touched the pg pool

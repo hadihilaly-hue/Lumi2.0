@@ -56,7 +56,8 @@ index by `id` as needed.
   "name": "Example High School",
   "term": "Spring 2026",
   "exported_at": "2026-05-23T17:42:09Z",
-  "schema_version": "1.0"
+  "schema_version": "1.1",
+  "allowed_domains": ["example-school.test"]
 }
 ```
 
@@ -65,7 +66,8 @@ index by `id` as needed.
 | `name`           | yes      | Human-readable school name. UTF-8.                                   |
 | `term`           | yes      | Free-form term label (e.g. `"Spring 2026"`, `"2025-2026 Q3"`). Echoed in every class for redundancy. |
 | `exported_at`    | yes      | ISO 8601 UTC timestamp of when this export was generated.            |
-| `schema_version` | yes      | Always `"1.0"` for this spec. See §12.                               |
+| `schema_version` | yes      | `"1.0"` or `"1.1"`. See §12.                                         |
+| `allowed_domains`| no (v1.1) | Bare lowercase email domains whose Google accounts may sign in to Lumi for this school (e.g. `["menloschool.org"]`). When present: non-empty array, each entry a bare domain (no `@`), replaces the school's stored domains. When absent: stored domains are left untouched; a school that has never set them cannot sign in until an admin does. |
 
 ---
 
@@ -249,7 +251,10 @@ An importer MUST reject any export that fails any of the following:
 5. Every `email` matches a basic email regex.
 6. Every `grade_level` is an integer in `[9, 12]`.
 7. `id` values are unique within their entity array.
-8. `school.schema_version` equals `"1.0"`.
+8. `school.schema_version` equals `"1.0"` or `"1.1"`. Additionally (v1.1),
+   `school.allowed_domains` — when present — must be a non-empty array of
+   bare domain strings (lowercased on import; entries containing `@` or not
+   matching `domain.tld` shape hard-fail).
 
 The synthetic generator additionally enforces a `course_name` ↔
 `course_code` bijection (any two classes that share a `course_name` MUST

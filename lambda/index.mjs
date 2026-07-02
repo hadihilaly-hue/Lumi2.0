@@ -1281,7 +1281,21 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
     const classes = Array.isArray(body.classes) ? body.classes : null;
     const enrollments = Array.isArray(body.enrollments) ? body.enrollments : null;
     if (!school.name || !school.term) errors.push("school.name and school.term are required");
-    if (school.schema_version !== "1.0") errors.push(`rule 8: unsupported schema_version ${JSON.stringify(school.schema_version ?? null)}`);
+    if (school.schema_version !== "1.0" && school.schema_version !== "1.1") errors.push(`rule 8: unsupported schema_version ${JSON.stringify(school.schema_version ?? null)}`);
+    // v1.1 optional field: bare lowercase sign-in domains for this school
+    // (feeds schools.allowed_domains → the Phase 4 domain gate).
+    if (school.allowed_domains !== undefined) {
+      const DOMAIN_RE = /^[a-z0-9.-]+\.[a-z]{2,}$/;
+      if (!Array.isArray(school.allowed_domains) || school.allowed_domains.length === 0) {
+        errors.push("school.allowed_domains must be a non-empty array of domain strings when present (omit the field to leave existing domains untouched)");
+      } else {
+        for (const d of school.allowed_domains) {
+          if (typeof d !== "string" || d.includes("@") || !DOMAIN_RE.test(d.toLowerCase())) {
+            errors.push(`school.allowed_domains entry ${JSON.stringify(d)} is not a bare domain (expected e.g. "menloschool.org")`);
+          }
+        }
+      }
+    }
     if (!teachers || !students || !classes || !enrollments) {
       errors.push("teachers[], students[], classes[], enrollments[] are all required arrays");
       return sendJson(400, { errors });
@@ -1367,44 +1381,42 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
     const teacherById = new Map(teachers.map(t => [t.id, t]));
     const progress = { teachers_created: 0, teachers_existing: 0, students_created: 0, students_existing: 0, profiles_stubs: 0, sections: 0, enrollments: 0 };
 
-    // Get-or-create one Supabase auth user; returns uuid. Conflict (email
-    // already registered) falls back to a magiclink generate to read the id.
-    const authAdmin = { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, "Content-Type": "application/json" };
-    async function getOrCreateAuthUser(email, fullName) {
-      const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
-        method: "POST",
-        headers: authAdmin,
-        body: JSON.stringify({ email, email_confirm: true, user_metadata: { full_name: fullName } }),
-        signal: AbortSignal.timeout(8000),
-      });
-      if (res.ok) return { id: (await res.json()).id, created: true };
-      const errText = await res.text();
-      if (/already|exists|registered/i.test(errText)) {
-        const link = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
-          method: "POST",
-          headers: authAdmin,
-          body: JSON.stringify({ type: "magiclink", email }),
-          signal: AbortSignal.timeout(8000),
-        });
-        if (link.ok) {
-          // GoTrue versions differ: user fields arrive either nested under
-          // `user` or flat at the top level of the generate_link response.
-          const j = await link.json();
-          const id = j.user?.id ?? j.id;
-          if (id) return { id, created: false };
-        }
-      }
-      throw new Error(`auth user create failed (${res.status})`);
+    // Get-or-create one identity in the app_users bridge (Workstream I
+    // Phase 5 — no auth provider involved; the Cognito user is created
+    // lazily at the person's first Google sign-in and linked by verified
+    // email, see verifyCognitoAuth). (xmax = 0) is true only for freshly
+    // inserted rows, which keeps the created/existing counters honest.
+    // People who share an email map to ONE identity (email is UNIQUE), and
+    // a person who already signed in keeps their cognito_sub untouched.
+    async function ensureAppUser(email) {
+      const result = await dbQuery(
+        `INSERT INTO public.app_users (email) VALUES ($1)
+         ON CONFLICT (email) DO UPDATE SET updated_at = now()
+         RETURNING lumi_id, (xmax = 0) AS created`,
+        [email]
+      );
+      return { id: result.rows[0].lumi_id, created: result.rows[0].created };
     }
 
     try {
-      // 1. school
+      // 1. school — allowed_domains written only when the export carries the
+      // v1.1 field (replace semantics); absent = never clobber manually-set
+      // domains, and brand-new schools keep the '{}' default.
+      const importDomains = school.allowed_domains?.map(d => d.toLowerCase());
       const schoolRow = await dbQuery(
-        `INSERT INTO public.schools (name) VALUES ($1)
-         ON CONFLICT (name) DO UPDATE SET updated_at = now() RETURNING id`,
-        [school.name]
+        importDomains
+          ? `INSERT INTO public.schools (name, allowed_domains) VALUES ($1, $2)
+             ON CONFLICT (name) DO UPDATE SET allowed_domains = EXCLUDED.allowed_domains, updated_at = now()
+             RETURNING id, allowed_domains`
+          : `INSERT INTO public.schools (name) VALUES ($1)
+             ON CONFLICT (name) DO UPDATE SET updated_at = now()
+             RETURNING id, allowed_domains`,
+        importDomains ? [school.name, importDomains] : [school.name]
       );
       const schoolId = schoolRow.rows[0].id;
+      if (!schoolRow.rows[0].allowed_domains?.length) {
+        warnings.push("school has no allowed_domains — imported people cannot sign in until it is set (v1.1 school.allowed_domains field, or manual update)");
+      }
 
       // 2. preload sis_map for idempotent resume
       const mapRows = await dbQuery(
@@ -1414,14 +1426,14 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
       const idMap = new Map(mapRows.rows.map(r => [`${r.entity_type}	${r.sis_id}`, r.lumi_id]));
 
       // 3. people (teachers first — few; then students — the bulk)
-      const ensurePerson = async (kind, person, fullName) => {
+      const ensurePerson = async (kind, person) => {
         const mapKey = `${kind}	${person.id}`;
         if (idMap.has(mapKey)) {
           progress[`${kind}s_existing`]++;
           return idMap.get(mapKey);
         }
-        const { id: uuid, created } = await getOrCreateAuthUser(person.email.toLowerCase(), fullName);
-        if (!uuid) throw new Error("auth user resolution returned no id");
+        const { id: uuid, created } = await ensureAppUser(person.email.toLowerCase());
+        if (!uuid) throw new Error("identity resolution returned no id");
         await dbQuery(
           `INSERT INTO public.sis_map (school_id, entity_type, sis_id, lumi_id, email)
            VALUES ($1,$2,$3,$4,$5) ON CONFLICT (school_id, entity_type, sis_id) DO NOTHING`,
@@ -1434,12 +1446,12 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
 
       for (const t of teachers) {
         if (overBudget()) return sendJson(200, { status: "partial", next: "teachers", progress, warnings });
-        await ensurePerson("teacher", t, `${t.first_name} ${t.last_name}`);
+        await ensurePerson("teacher", t);
       }
 
       for (const s of students) {
         if (overBudget()) return sendJson(200, { status: "partial", next: "students", progress, warnings });
-        const uuid = await ensurePerson("student", s, `${s.first_name} ${s.last_name}`);
+        const uuid = await ensurePerson("student", s);
         // profiles stub — never clobber a student's self-entered data
         await dbQuery(
           `INSERT INTO public.profiles (id, name, grade)
