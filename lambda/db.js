@@ -66,6 +66,16 @@ function getPool() {
       // query client-side and keep the socket alive between invocations.
       query_timeout: 8_000,
       keepAlive: true,
+      // ROOT-CAUSE FIX (2026-07-02): streamifyResponse invocations only
+      // finalize when the event loop drains, and an idle pooled client's
+      // ref'd socket kept it non-empty — so EVERY DB-touching invocation
+      // silently burned its full 60s timeout (holding 1 of the account's 10
+      // concurrency slots) even after responding in milliseconds. Confirmed
+      // by A/B test: 405-without-pg finalized in 51ms; GET /db-health with
+      // one query burned 60s. allowExitOnIdle unrefs idle clients so the
+      // loop can drain; the socket stays open and reusable across warm
+      // invocations either way.
+      allowExitOnIdle: true,
     });
     // Surface async pool errors without crashing the Lambda.
     pool.on('error', (err) => {

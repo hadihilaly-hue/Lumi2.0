@@ -187,6 +187,29 @@ layer; Supabase is auth-only pending Workstream I/Cognito. Workstream I Phase 1
   concurrency-increase request are now urgent, not background.
   Next: Phase 5 — SIS importer drops the Supabase admin API, writes
   app_users rows; decide allowed_domains population.
+- **Slot-starvation incident: ROOT-CAUSED + FIXED (2026-07-02).** The silent
+  60s zero-log timeouts (weeks old; starved the 10-slot account into live
+  429s) were NOT hung requests: every invocation that touched the pg pool
+  responded normally in ms, then sat un-finalized until the 60s Lambda
+  timeout — `awslambda.streamifyResponse` invocations only finalize when the
+  event loop drains, and the pool's ref'd keep-alive socket (added in the
+  2026-07-01 incident fix a146e4b — which is also when the timeouts began)
+  kept it non-empty. Proven by A/B: POST /db-health (405, no deps) REPORT
+  51ms; GET /db-health (one query) burned 60s. Fix: `allowExitOnIdle: true`
+  on the pg Pool (db.js) — idle clients unref their sockets; warm-container
+  reuse unaffected. Post-fix REPORTs: db-health 8.6ms, allowed-domains
+  127ms, full chat 1.16s — no timeouts. Side effect: billed duration drops
+  ~60x. Also shipped in the same investigation: [req]/[req done] entry/exit
+  logs + a 50s watchdog (method+path only, FERPA-safe) so any future hang is
+  attributable, and Bedrock client timeouts (connect 3s, socket-idle 25s) —
+  the SDK default had NONE, leaving chat + suggested-prompts unbounded.
+  Repro side notes: misbehaving clients (killed/slow/never-reading sockets)
+  do NOT hang invocations — responses buffer in the runtime relay. Ops
+  residue: `oauth-capture` (a 404 page) added to the Cognito app client
+  callbacks as a shim-free code-capture target for terminal PKCE testing —
+  remove at Phase 6 teardown. Lambda concurrency increase: lumi-deploy lacks
+  servicequotas perms — HADI ACTION: console → Service Quotas → AWS Lambda →
+  Concurrent executions (L-B99A9384) → request 1000.
 
 **Key identifiers:**
 - AWS account: 613136968914 (us-east-1)

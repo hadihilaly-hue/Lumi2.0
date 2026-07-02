@@ -51,7 +51,16 @@ const cognitoVerifier = (COGNITO_USER_POOL_ID && COGNITO_CLIENT_ID)
     })
   : null;
 
-const bedrockClient = new BedrockRuntimeClient({ region: AWS_REGION });
+// Timeouts (2026-07-02): the SDK default has NO socket timeout, so a stalled
+// Bedrock stream hung `for await (...response.body)` forever — one of the
+// unbounded awaits behind the silent 60s invocation timeouts. socketTimeout
+// is idle-time BETWEEN chunks; healthy token streams tick continuously, so
+// 25s of silence means the stream is dead. Errors land in the existing chat
+// catch (SSE error + end) and the chips route's fallback.
+const bedrockClient = new BedrockRuntimeClient({
+  region: AWS_REGION,
+  requestHandler: { connectionTimeout: 3_000, socketTimeout: 25_000 },
+});
 const s3Client = new S3Client({ region: AWS_REGION });
 
 // === Allowed sign-in domains (Workstream I Phase 4) ===
@@ -460,8 +469,29 @@ async function fetchTeacherNotes({ studentId, teacherProfileId }) {
 // /upload-url, /download-url -> JSON one-shot response
 // default (/, /chat) -> SSE streaming chat
 export const handler = awslambda.streamifyResponse(async (event, responseStream) => {
+  // Attribution instrumentation (2026-07-02 slot-starvation investigation):
+  // method + path ONLY — never query strings, bodies, tokens, or emails.
+  // The watchdog names any invocation still running at 50s, so a 60s
+  // Status:timeout REPORT is no longer unattributable.
+  const method = event.requestContext?.http?.method || "?";
+  const reqPath = event.requestContext?.http?.path || event.rawPath || "/";
+  const t0 = Date.now();
+  console.log("[req]", method, reqPath);
+  const wd = setTimeout(
+    () => console.error("[watchdog] 50s still running:", method, reqPath),
+    50_000
+  );
+  try {
+    return await handleRequest(event, responseStream);
+  } finally {
+    clearTimeout(wd);
+    console.log("[req done]", method, reqPath, `${Date.now() - t0}ms`);
+  }
+});
+
+async function handleRequest(event, responseStream) {
   const path = event.requestContext?.http?.path || event.rawPath || "/";
-  
+
   // One-shot JSON response helper. Wraps the stream with given status + JSON content-type.
   // IMPORTANT: only call once per request. After this, the stream is consumed.
   const sendJson = (statusCode, payload) => {
@@ -1615,4 +1645,4 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
     chatStream.write(`data: ${JSON.stringify({ error: err.message || "Stream error" })}\n\n`);
     chatStream.end();
   }
-});
+}
