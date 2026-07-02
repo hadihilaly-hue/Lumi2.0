@@ -85,13 +85,9 @@ async function isTeacher(email) {
 }
 
 // === Rate Limit ===
-// api_usage cutover flag (confirmed 2026-07-01): there is deliberately NO client-facing
-// /api-usage route — a JWT-authed POST would let any student forge usage rows. The
-// Lambda's own checkRateLimit + logUsage are the sole reader/writer. USE_RDS_USAGE=1
-// flips BOTH to RDS together at cutover; until then they stay on Supabase, which holds
-// the real usage history (an early flip would silently reset everyone's rate limits).
-const USE_RDS_USAGE = process.env.USE_RDS_USAGE === "1";
-
+// There is deliberately NO client-facing /api-usage route — a JWT-authed POST
+// would let any student forge usage rows. The Lambda's own checkRateLimit +
+// logUsage are the table's sole reader/writer (RDS since the 2026-07-01 cutover).
 async function checkRateLimit(userId, isTeacherUser) {
   const limit = isTeacherUser
     ? SCHOOL_CONFIG.teacherRateLimit
@@ -99,77 +95,30 @@ async function checkRateLimit(userId, isTeacherUser) {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
 
-  if (USE_RDS_USAGE) {
-    try {
-      const result = await dbQuery(
-        "SELECT count(*)::int AS n FROM public.api_usage WHERE user_id = $1 AND created_at >= $2",
-        [userId, today.toISOString()]
-      );
-      const count = result.rows[0].n;
-      return { allowed: count < limit, remaining: Math.max(0, limit - count), limit };
-    } catch (err) {
-      // Same fail-open posture as the Supabase path below.
-      console.error("checkRateLimit (rds) error:", err.code ?? err.message);
-      return { allowed: true, remaining: limit, limit };
-    }
-  }
-
   try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/api_usage?user_id=eq.${userId}&created_at=gte.${today.toISOString()}&select=count`,
-      {
-        method: "HEAD",
-        headers: {
-          "apikey": SUPABASE_SERVICE_ROLE_KEY,
-          "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-          "Prefer": "count=exact",
-        },
-        signal: AbortSignal.timeout(5000),
-      }
+    const result = await dbQuery(
+      "SELECT count(*)::int AS n FROM public.api_usage WHERE user_id = $1 AND created_at >= $2",
+      [userId, today.toISOString()]
     );
-    const range = res.headers.get("content-range") || "0/0";
-    const count = parseInt(range.split("/")[1] || "0", 10);
+    const count = result.rows[0].n;
     return { allowed: count < limit, remaining: Math.max(0, limit - count), limit };
   } catch (err) {
-    console.error("checkRateLimit error:", err);
+    // Fail open — a broken usage counter must not block chat.
+    console.error("checkRateLimit error:", err.code ?? err.message);
     return { allowed: true, remaining: limit, limit };
   }
 }
 
 // === Usage Logging ===
 async function logUsage({ userId, email, isTeacherUser, model, inputTokens, outputTokens }) {
-  if (USE_RDS_USAGE) {
-    try {
-      await dbQuery(
-        `INSERT INTO public.api_usage (user_id, user_email, is_teacher, model, input_tokens, output_tokens)
-              VALUES ($1, $2, $3, $4, $5, $6)`,
-        [userId, email.toLowerCase(), isTeacherUser, model, inputTokens, outputTokens]
-      );
-    } catch (err) {
-      console.error("logUsage (rds) error:", err.code ?? err.message);
-    }
-    return;
-  }
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/api_usage`, {
-      method: "POST",
-      headers: {
-        "apikey": SUPABASE_SERVICE_ROLE_KEY,
-        "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        "Content-Type": "application/json",
-      },
-      signal: AbortSignal.timeout(5000),
-      body: JSON.stringify({
-        user_id: userId,
-        user_email: email.toLowerCase(),
-        is_teacher: isTeacherUser,
-        model,
-        input_tokens: inputTokens,
-        output_tokens: outputTokens,
-      })
-    });
+    await dbQuery(
+      `INSERT INTO public.api_usage (user_id, user_email, is_teacher, model, input_tokens, output_tokens)
+            VALUES ($1, $2, $3, $4, $5, $6)`,
+      [userId, email.toLowerCase(), isTeacherUser, model, inputTokens, outputTokens]
+    );
   } catch (err) {
-    console.error("logUsage error:", err);
+    console.error("logUsage error:", err.code ?? err.message);
   }
 }
 
@@ -354,24 +303,14 @@ function buildTeacherNotesSection(notes) {
 
 // Fetch the calling student's notes for one class. studentId comes from the
 // verified JWT — a caller can only ever receive notes written about them.
-// useRds selects the store (pre-cutover real notes live in Supabase; the client
-// flag flips this at cutover). Every failure returns [] — chat is never blocked
-// — and multi-block collisions skip, matching the old client-side maybeSingle.
-async function fetchTeacherNotes({ studentId, teacherProfileId, useRds }) {
+// Every failure returns [] — chat is never blocked — and multi-block
+// collisions skip, matching the old client-side maybeSingle behavior.
+async function fetchTeacherNotes({ studentId, teacherProfileId }) {
   try {
-    const work = useRds
-      ? dbQuery(
-          "SELECT teacher_notes FROM public.class_enrollments WHERE student_id = $1 AND teacher_profile_id = $2",
-          [studentId, teacherProfileId]
-        ).then(r => r.rows.map(x => x.teacher_notes))
-      : fetch(
-          `${SUPABASE_URL}/rest/v1/class_enrollments?student_id=eq.${encodeURIComponent(studentId)}&teacher_profile_id=eq.${encodeURIComponent(teacherProfileId)}&select=teacher_notes`,
-          { headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` }, signal: AbortSignal.timeout(3000) }
-        ).then(async res => {
-          if (!res.ok) throw new Error(`supabase ${res.status}`);
-          const rows = await res.json();
-          return rows.map(x => x.teacher_notes);
-        });
+    const work = dbQuery(
+      "SELECT teacher_notes FROM public.class_enrollments WHERE student_id = $1 AND teacher_profile_id = $2",
+      [studentId, teacherProfileId]
+    ).then(r => r.rows.map(x => x.teacher_notes));
     const timeout = new Promise(resolve => setTimeout(() => resolve(null), 3000));
     const vals = await Promise.race([work, timeout]);
     if (vals === null) { console.warn("[notes] fetch timeout"); return []; }
@@ -1054,7 +993,6 @@ export const handler = awslambda.streamifyResponse(async (event, responseStream)
       const notes = await fetchTeacherNotes({
         studentId: user.id,
         teacherProfileId: qs.teacher_profile_id,
-        useRds: qs.use_rds === "1",
       });
       const notesText = notes.map(n => n.text || "").filter(Boolean).join("\n\n");
       if (!notesText) return sendJson(200, { mode: "fallback" });
@@ -1109,22 +1047,12 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
         throw new Error("chip shape invalid");
       }
       // Defense-in-depth privacy check (ported): reject chips leaking the
-      // student's email or profile name. Name is best-effort from whichever
-      // store the caller is on.
+      // student's email or profile name.
       const lowered = chips.map(c => c.toLowerCase());
       if (lowered.some(c => c.includes(user.email.toLowerCase()))) throw new Error("chip leaked student email");
       try {
-        let name = null;
-        if (qs.use_rds === "1") {
-          const r = await dbQuery("SELECT name FROM public.profiles WHERE id = $1", [user.id]);
-          name = r.rows[0]?.name || null;
-        } else {
-          const r = await fetch(
-            `${SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=name`,
-            { headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` } }
-          );
-          if (r.ok) name = (await r.json())[0]?.name || null;
-        }
+        const r = await dbQuery("SELECT name FROM public.profiles WHERE id = $1", [user.id]);
+        const name = r.rows[0]?.name || null;
         if (name && name.trim() && lowered.some(c => c.includes(name.trim().toLowerCase()))) {
           throw new Error("chip leaked student name");
         }
@@ -1481,10 +1409,10 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
     let notesSection = "";
     const inj = body.inject_teacher_notes;
     if (inj && typeof inj.teacher_profile_id === "string" && inj.teacher_profile_id) {
+      // inj.use_rds is accepted-and-ignored (legacy clients still send it).
       const notes = await fetchTeacherNotes({
         studentId: user.id,
         teacherProfileId: inj.teacher_profile_id,
-        useRds: !!inj.use_rds,
       });
       notesSection = buildTeacherNotesSection(notes);
       if (notesSection) console.log(`[notes] injected ${notes.length} note(s), ${notesSection.length} chars`);
