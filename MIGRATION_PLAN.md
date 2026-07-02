@@ -161,8 +161,23 @@ layer; Supabase is auth-only pending Workstream I/Cognito. Workstream I Phase 1
   trip. app_users still exactly 1 row. Ops note: GitHub Pages' deploy queue
   wedged twice (build ok, deployment_queued → 10min timeout, status page
   green) — `gh api -X POST repos/<r>/pages/builds` to retrigger; third
-  attempt deployed. Next: Phase 4 — per-school domain gate
-  (schools.allowed_domains) replacing SCHOOL_CONFIG.domain + isMenloEmail.
+  attempt deployed.
+  **Phase 4 DONE (2026-07-02) — per-school domain gate.** `schools` gained
+  `allowed_domains text[]` (migration/rds-school-domains.sql; Menlo seeded
+  with menloschool.org). Lambda: `getAllowedDomains()` (5-min container
+  cache, stale-on-error, fail-closed) + `isEmailAllowed()` (adminEmails
+  short-circuit = operator lockout protection); enforced (1) inside
+  verifyCognitoAuth BEFORE any app_users write — random Google accounts can
+  no longer mint identity rows — and (2) at the per-request route gate
+  (403 "school accounts only"), replacing the deleted SCHOOL_CONFIG.domain.
+  New public `GET /allowed-domains` feeds the sign-in UX; client
+  `isAllowedEmail()` (cognito-auth.js, replaces isMenloEmail) fails OPEN —
+  the server is the enforcement. SIS-imported schools sign in as soon as
+  their row's allowed_domains is populated — HOW it gets populated is a
+  Phase 5 decision (SIS v1 has no domain field: derive from imported emails
+  vs. manual admin SQL). Rollback: pre-phase Lambda zip + git revert.
+  Next: Phase 5 — SIS importer drops the Supabase admin API, writes
+  app_users rows; decide allowed_domains population.
 
 **Key identifiers:**
 - AWS account: 613136968914 (us-east-1)

@@ -74,7 +74,7 @@
       Sign in as Student
     </button>
 
-    <div class="signin-footer">Menlo School only · @menloschool.org accounts</div>
+    <div class="signin-footer">School accounts only</div>
   </div>
 </div>
 
@@ -110,16 +110,16 @@ function selectRole(role) {
 
   // If already signed in, redirect immediately
   const { data: { session } } = await sb.auth.getSession();
-  if (session?.user && isMenloEmail(session.user.email)) {
+  if (session?.user && await isAllowedEmail(session.user.email)) {
     window.location.href = 'app.html';
     return;
   }
 
   // After Google OAuth completes, onAuthStateChange fires and we redirect
-  sb.auth.onAuthStateChange((event, session) => {
+  sb.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session?.user) {
-      if (!isMenloEmail(session.user.email)) {
-        sessionStorage.setItem('lumi_auth_error', 'Access is limited to @menloschool.org accounts.');
+      if (!(await isAllowedEmail(session.user.email))) {
+        sessionStorage.setItem('lumi_auth_error', "Your school isn't set up with Lumi yet.");
         sb.auth.signOut(); // navigates: Cognito logout → back here → parked error shows
         return;
       }

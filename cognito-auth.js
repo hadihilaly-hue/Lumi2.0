@@ -1,7 +1,7 @@
 // ─── COGNITO AUTH (Workstream I, Phase 3) ─────────────────────────────────────
 // Drop-in replacement for supabase.js + auth.js. Exposes the same globals the
 // pages already consume: `sb` (with sb.auth.getSession / signInWithOAuth /
-// signOut / onAuthStateChange), `isMenloEmail`, `doSignOut`.
+// signOut / onAuthStateChange), `isAllowedEmail`, `doSignOut`.
 //
 // Flow: authorization code + PKCE against the Cognito hosted endpoints with
 // identity_provider=Google (users bounce straight to Google — no Cognito page).
@@ -268,8 +268,29 @@ const sb = {
 
 // ─── HELPERS (same surface auth.js provided) ──────────────────────────────────
 
-function isMenloEmail(email) {
-  return email && email.toLowerCase().endsWith('@menloschool.org');
+// Which email domains may use Lumi — served by the Lambda from
+// schools.allowed_domains (Workstream I Phase 4). This client check is UX
+// only (friendly error before any data loads); the Lambda enforces the gate.
+// Fails OPEN on fetch problems so a network blip can't brick the sign-in page.
+const LAMBDA_BASE_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws';
+let allowedDomainsPromise = null;
+
+async function isAllowedEmail(email) {
+  if (!email) return false;
+  allowedDomainsPromise ??= (async () => {
+    try {
+      const res = await fetch(`${LAMBDA_BASE_URL}/allowed-domains`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) return null;
+      return new Set((await res.json()).domains);
+    } catch {
+      return null;
+    }
+  })();
+  const domains = await allowedDomainsPromise;
+  if (!domains) return true; // fail open — server still enforces
+  return domains.has(email.toLowerCase().split('@').pop());
 }
 
 async function doSignOut() {

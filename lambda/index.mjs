@@ -9,11 +9,11 @@ import { query as dbQuery } from "./db.js";
 import { timingSafeEqual } from "node:crypto";
 
 // === School Configuration ===
-// TODO: Replace with school-config lookup from database for multi-tenant support.
-// Each school's row would include: domain, allowed_origins, default_provider, 
-// default_model, student_rate_limit, teacher_rate_limit, admin_emails.
+// Sign-in domains are data-driven since Workstream I Phase 4 — see
+// getAllowedDomains() (schools.allowed_domains). Still hardcoded here and
+// TODO for a future per-school config pass: allowed_origins,
+// default_provider, default_model, rate limits, admin_emails.
 const SCHOOL_CONFIG = {
-  domain: "@menloschool.org",
   adminEmails: new Set(["hadi.hilaly@menloschool.org"]),
   studentRateLimit: 100,
   teacherRateLimit: 500,
@@ -53,6 +53,38 @@ const cognitoVerifier = (COGNITO_USER_POOL_ID && COGNITO_CLIENT_ID)
 
 const bedrockClient = new BedrockRuntimeClient({ region: AWS_REGION });
 const s3Client = new S3Client({ region: AWS_REGION });
+
+// === Allowed sign-in domains (Workstream I Phase 4) ===
+// Union of schools.allowed_domains, cached per container for 5 minutes.
+// DB error → serve the stale cache if we ever had one, else fail CLOSED
+// (null → caller rejects). Admin emails bypass the domain check entirely so
+// an emptied schools table can never lock the operator out.
+const DOMAINS_TTL_MS = 5 * 60 * 1000;
+let domainsCache = null; // { set: Set<string>, fetchedAt: ms }
+
+async function getAllowedDomains() {
+  if (domainsCache && Date.now() - domainsCache.fetchedAt < DOMAINS_TTL_MS) {
+    return domainsCache.set;
+  }
+  try {
+    const result = await dbQuery(
+      "SELECT DISTINCT lower(d) AS d FROM public.schools, unnest(allowed_domains) AS d"
+    );
+    domainsCache = { set: new Set(result.rows.map(r => r.d)), fetchedAt: Date.now() };
+    return domainsCache.set;
+  } catch (err) {
+    console.error("getAllowedDomains error:", err.code ?? err.message);
+    return domainsCache?.set ?? null;
+  }
+}
+
+async function isEmailAllowed(email) {
+  const lower = email.toLowerCase();
+  if (SCHOOL_CONFIG.adminEmails.has(lower)) return true;
+  const domains = await getAllowedDomains();
+  if (!domains) return false; // fail closed
+  return domains.has(lower.split("@").pop());
+}
 
 // === Auth (Workstream I: dual-path) ===
 // verifyAuth dispatches on the token's UNVERIFIED iss claim. This is safe:
@@ -94,6 +126,13 @@ async function verifyCognitoAuth(token) {
     const email = claims.email?.toLowerCase();
     const emailVerified = claims.email_verified === true || claims.email_verified === "true";
     if (!email || !emailVerified) return null;
+
+    // Domain gate BEFORE any app_users read/write — a random Google account
+    // completing the Cognito flow must never mint an identity row.
+    if (!(await isEmailAllowed(email))) {
+      console.warn("[auth] cognito token from non-allowed domain — rejected");
+      return null;
+    }
 
     const cached = appUserCache.get(claims.sub);
     if (cached) return { id: cached.id, email };
@@ -451,6 +490,21 @@ export const handler = awslambda.streamifyResponse(async (event, responseStream)
     }
   }
 
+  // === Route: GET /allowed-domains (public, no auth) ===
+  // Sign-in-page UX: the client checks the just-signed-in email against this
+  // list to show a friendly "your school isn't set up" message. Enforcement
+  // is server-side (isEmailAllowed in verifyCognitoAuth + the route gate);
+  // this endpoint only discloses domains that the sign-in flow reveals anyway.
+  if (path === "/allowed-domains") {
+    const method = event.requestContext?.http?.method || "GET";
+    if (method !== "GET") {
+      return sendJson(405, { error: "Method not allowed" });
+    }
+    const domains = await getAllowedDomains();
+    if (!domains) return sendJson(503, { error: "domain config unavailable" });
+    return sendJson(200, { domains: [...domains].sort() });
+  }
+
   // --- Parse body ---
   let body = {};
   try {
@@ -531,8 +585,8 @@ export const handler = awslambda.streamifyResponse(async (event, responseStream)
   if (!user) return sendJson(401, { error: "Unauthorized" });
   
   // --- Domain check ---
-  if (!user.email.toLowerCase().endsWith(SCHOOL_CONFIG.domain)) {
-    return sendJson(403, { error: `Forbidden: ${SCHOOL_CONFIG.domain} only` });
+  if (!(await isEmailAllowed(user.email))) {
+    return sendJson(403, { error: "Forbidden: school accounts only" });
   }
 
   // === Route: /teacher-profile (GET, POST, PATCH) ===

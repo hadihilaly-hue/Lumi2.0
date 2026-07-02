@@ -6,7 +6,7 @@ let currentUser = null;
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { window.location.href = 'index.html'; return; }
 
-  if (!isMenloEmail(session.user.email)) {
+  if (!(await isAllowedEmail(session.user.email))) {
     await sb.auth.signOut();
     window.location.href = 'index.html';
     return;
