@@ -108,16 +108,6 @@ let currentUser = null;
 // ─── CLAUDE API PROXY ─────────────────────────────────────────────────────────
 const CLAUDE_PROXY_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/';
 
-// Dev/test flag — append ?lambda=1 to the URL to route teacher_profiles reads through
-// the RDS-backed Lambda (GET /teacher-profile) instead of Supabase. Read once on load,
-// stateless. No param = unchanged Supabase path. On the Lambda path, failures fail
-// VISIBLY (console.error everywhere; an error banner in the chat area for the main
-// tutor fetch) — NO silent fallback. RDS holds only test data; not a prod cutover.
-// See CLAUDE.md.
-// CUTOVER 2026-07-01: RDS is the default data layer. ?lambda=0 is the
-// rollback escape hatch back to Supabase (kept until post-cutover teardown).
-const USE_RDS = new URLSearchParams(window.location.search).get('lambda') !== '0';
-
 // Helper to make authenticated API calls to the Claude proxy
 async function fetchClaudeProxy(body, options = {}) {
   const { data: { session } } = await sb.auth.getSession();
@@ -574,25 +564,13 @@ async function loadTestModeSchedule() {
   if (!currentUser?.email) return;
   S.testSchedule = [];
   try {
+    // Fail-visible: on fetch failure, log and bail — never render stale data.
     let data;
-    if (USE_RDS) {
-      // Lambda path (?lambda=1): fail-visible, no Supabase fallback.
-      try {
-        data = await fetchTeacherProfilesByEmails([currentUser.email]);
-      } catch (err) {
-        console.error('[test-mode] Lambda teacher_profiles fetch failed (no fallback):', err);
-        return;
-      }
-    } else {
-      const res = await sb
-        .from('teacher_profiles')
-        .select('id, course_name, subject, done, welcome_message')
-        .eq('teacher_email', currentUser.email);
-      if (res.error || !res.data) {
-        console.warn('[test-mode] teacher_profiles fetch failed:', res.error?.message);
-        return;
-      }
-      data = res.data;
+    try {
+      data = await fetchTeacherProfilesByEmails([currentUser.email]);
+    } catch (err) {
+      console.error('[test-mode] teacher_profiles fetch failed:', err);
+      return;
     }
 
     // TM-3: also pull work samples so we can decide which classes are
@@ -604,22 +582,10 @@ async function loadTestModeSchedule() {
     const samplesByProfile = {};
     if (profileIds.length) {
       let sampleRows = null;
-      if (USE_RDS) {
-        try {
-          sampleRows = await rdsFetch(`work-samples?teacher_profile_ids=${profileIds.map(encodeURIComponent).join(',')}`);
-        } catch (err) {
-          console.warn('[test-mode] work_samples fetch failed:', err.message);
-        }
-      } else {
-        const res = await sb
-          .from('teacher_work_samples')
-          .select('teacher_profile_id, tier, description, photo_paths')
-          .in('teacher_profile_id', profileIds);
-        if (res.error) {
-          console.warn('[test-mode] work_samples fetch failed:', res.error.message);
-        } else {
-          sampleRows = res.data;
-        }
+      try {
+        sampleRows = await rdsFetch(`work-samples?teacher_profile_ids=${profileIds.map(encodeURIComponent).join(',')}`);
+      } catch (err) {
+        console.warn('[test-mode] work_samples fetch failed:', err.message);
       }
       (sampleRows || []).forEach(r => {
         (samplesByProfile[r.teacher_profile_id] ||= {})[r.tier] = r;
@@ -666,24 +632,15 @@ function syncScheduleToSupabase(schedule) {
   // TM-2: never write a teacher's synthetic schedule into their auth
   // user's profiles row — they're not a student.
   if (S.isTestMode) return;
-  if (USE_RDS) {
-    // Hardened (MIGRATION_HARDENING §2): awaited-in-promise with a real error
-    // surface instead of console-only fire-and-forget. No Supabase fallback.
-    rdsFetch('profiles', { method: 'POST', body: {
-      schedule,
-      schedule_updated_at: new Date().toISOString(),
-    } }).catch(err => {
-      console.warn('Schedule sync error:', err);
-      showToast('Could not sync your schedule — see console');
-    });
-  } else {
-    sb.from('profiles').upsert({
-      id: currentUser.id,
-      schedule,
-      schedule_updated_at: new Date().toISOString(),
-    })
-      .then(({ error }) => { if (error) console.warn('Schedule sync error:', error); });
-  }
+  // Hardened (MIGRATION_HARDENING §2): awaited-in-promise with a real error
+  // surface instead of console-only fire-and-forget.
+  rdsFetch('profiles', { method: 'POST', body: {
+    schedule,
+    schedule_updated_at: new Date().toISOString(),
+  } }).catch(err => {
+    console.warn('Schedule sync error:', err);
+    showToast('Could not sync your schedule — see console');
+  });
 
   // Upsert enrollment rows so teachers can see their roster and write per-student notes.
   // Looks up teacher_profile IDs first — skips classes whose teacher hasn't onboarded yet.
@@ -711,10 +668,8 @@ function syncEnrollments(schedule) {
   if (!pairs.length) return;
 
   const emails = [...new Set(pairs.map(p => p.email))];
-  const profilesP = USE_RDS
-    ? fetchTeacherProfilesByEmails(emails).then(data => ({ data, error: null }), error => ({ data: null, error }))
-    : sb.from('teacher_profiles').select('id, teacher_email, course_name').in('teacher_email', emails);
-  profilesP
+  fetchTeacherProfilesByEmails(emails)
+    .then(data => ({ data, error: null }), error => ({ data: null, error }))
     .then(({ data, error }) => {
       if (error) { console.error('Enrollment sync failed: could not load teacher profiles:', error); return; }
       // Build lookup: "email__course" → teacher_profile UUID
@@ -730,24 +685,14 @@ function syncEnrollments(schedule) {
         .filter(Boolean);
       if (!rows.length) return;
 
-      if (USE_RDS) {
-        // Hardened (§2): failure now surfaces to the user. student_id in each
-        // row is ignored server-side (always the JWT user).
-        rdsFetch('class-enrollments', { method: 'POST', body: rows })
-          .then(res => console.log('[enrollment] synced', res?.upserted ?? rows.length, 'enrollment(s)'))
-          .catch(err => {
-            console.error('Enrollment sync failed: upsert error:', err);
-            showToast('Could not sync your class enrollments — see console');
-          });
-      } else {
-        sb.from('class_enrollments')
-          .upsert(rows, { onConflict: 'student_id,teacher_profile_id,block' })
-          .then(({ error: upsertErr }) => {
-            if (upsertErr) console.error('Enrollment sync failed: upsert error:', upsertErr);
-            else console.log('[enrollment] synced', rows.length, 'enrollment(s)');
-          })
-          .catch(err => console.error('Enrollment sync failed:', err));
-      }
+      // Hardened (§2): failure now surfaces to the user. student_id in each
+      // row is ignored server-side (always the JWT user).
+      rdsFetch('class-enrollments', { method: 'POST', body: rows })
+        .then(res => console.log('[enrollment] synced', res?.upserted ?? rows.length, 'enrollment(s)'))
+        .catch(err => {
+          console.error('Enrollment sync failed: upsert error:', err);
+          showToast('Could not sync your class enrollments — see console');
+        });
     })
     .catch(err => console.error('Enrollment sync failed:', err));
 }
@@ -860,20 +805,11 @@ async function preloadProfileStatuses() {
   if (!emails.length) return;
   try {
     let data;
-    if (USE_RDS) {
-      try {
-        data = await fetchTeacherProfilesByEmails(emails);
-      } catch (err) {
-        console.error('[preloadProfileStatuses] Lambda fetch failed (no fallback):', err);
-        return;
-      }
-    } else {
-      const res = await sb
-        .from('teacher_profiles')
-        .select('teacher_email, course_name, done')
-        .in('teacher_email', emails);
-      if (res.error) { console.warn('[preloadProfileStatuses] error:', res.error); return; }
-      data = res.data;
+    try {
+      data = await fetchTeacherProfilesByEmails(emails);
+    } catch (err) {
+      console.error('[preloadProfileStatuses] fetch failed:', err);
+      return;
     }
     // Build a lookup: email__course -> done
     const lookup = {};
@@ -893,8 +829,8 @@ async function preloadProfileStatuses() {
 // Generic RDS Lambda fetch (Workstream G). Same auth idiom as
 // fetchTeacherProfileLambda below: Supabase JWT as Bearer, JSON in/out.
 // 404 -> null (not-found is a data state, not an error); any other non-2xx
-// throws so USE_RDS call sites fail VISIBLY — never silently fall back to
-// Supabase. `path` starts without a slash (CLAUDE_PROXY_URL ends with one);
+// throws so call sites fail VISIBLY — never silently swallow errors.
+// `path` starts without a slash (CLAUDE_PROXY_URL ends with one);
 // query params go in `path`, write payloads in `body`.
 async function rdsFetch(path, { method = 'GET', body } = {}) {
   const { data: { session } } = await sb.auth.getSession();
@@ -953,43 +889,23 @@ async function getTeacherProfile(teacherName, course) {
   const cacheKey = email + '__' + course;
   console.log('[getTeacherProfile] loading:', teacherName, course);
 
-  // Fetch the profile (5s timeout). With ?lambda=1 (USE_RDS) read from the
-  // RDS-backed Lambda and FAIL VISIBLY — console.error + an { __error } marker the chat
-  // consumer turns into a banner, and NO Supabase/cache fallback. Without the flag, the
-  // original Supabase path + in-memory cache fallback is unchanged. work_samples still
-  // reads from Supabase either way (not part of this swap).
+  // Fetch the profile (5s timeout) from the RDS-backed Lambda. FAIL VISIBLY —
+  // console.error + an { __error } marker the chat consumer turns into a banner.
   try {
     let data = null;
     const timeout = new Promise(resolve => setTimeout(() => resolve(undefined), 5000));
-    if (USE_RDS) {
-      let raced;
-      try {
-        raced = await Promise.race([fetchTeacherProfileLambda(email, course), timeout]);
-      } catch (err) {
-        console.error('[getTeacherProfile] Lambda fetch failed (?lambda=1, no fallback):', teacherName, course, err);
-        return { __error: true, message: err?.message || String(err) };
-      }
-      if (raced === undefined) {
-        console.error('[getTeacherProfile] Lambda timed out (?lambda=1, no fallback):', teacherName, course);
-        return { __error: true, message: 'Lambda request timed out (5s)' };
-      }
-      data = raced; // row object, or null on 404
-    } else {
-      const query = sb
-        .from('teacher_profiles')
-        .select('*')
-        .eq('teacher_email', email)
-        .eq('course_name', course)
-        .maybeSingle();
-      const raced = await Promise.race([query, timeout]);
-      if (raced === undefined) {
-        console.log('[getTeacherProfile] Supabase timed out');
-      } else {
-        const { data: d, error } = raced;
-        if (error) console.warn('[getTeacherProfile] query error:', error.message);
-        else data = d;
-      }
+    let raced;
+    try {
+      raced = await Promise.race([fetchTeacherProfileLambda(email, course), timeout]);
+    } catch (err) {
+      console.error('[getTeacherProfile] Lambda fetch failed:', teacherName, course, err);
+      return { __error: true, message: err?.message || String(err) };
     }
+    if (raced === undefined) {
+      console.error('[getTeacherProfile] Lambda timed out:', teacherName, course);
+      return { __error: true, message: 'Lambda request timed out (5s)' };
+    }
+    data = raced; // row object, or null on 404
     if (data) {
       console.log('[getTeacherProfile] hit, done:', data.done);
       // Q4: fetch teacher_work_samples rows for this profile (3s budget,
@@ -999,13 +915,9 @@ async function getTeacherProfile(teacherName, course) {
       data.workSamples = {};
       if (data.id) {
         try {
-          // Same 3s budget on both branches — never blocks profile usage.
-          const sQuery = USE_RDS
-            ? rdsFetch(`work-samples?teacher_profile_id=${encodeURIComponent(data.id)}`)
-                .then(rows => ({ data: rows || [], error: null }), error => ({ data: null, error }))
-            : sb.from('teacher_work_samples')
-                .select('*')
-                .eq('teacher_profile_id', data.id);
+          // 3s budget — never blocks profile usage.
+          const sQuery = rdsFetch(`work-samples?teacher_profile_id=${encodeURIComponent(data.id)}`)
+            .then(rows => ({ data: rows || [], error: null }), error => ({ data: null, error }));
           const sTimeout = new Promise(resolve => setTimeout(() => resolve(null), 3000));
           const sRes = await Promise.race([sQuery, sTimeout]);
           if (sRes && !sRes.error && Array.isArray(sRes.data)) {
@@ -1021,17 +933,16 @@ async function getTeacherProfile(teacherName, course) {
       if (!data.done) return { __notReady: true };
       return data;
     }
-    // ?lambda=1 returned no row (404): a definitive "not found" — do NOT fall back to
-    // the in-memory cache or Supabase (we're testing the live RDS path).
-    if (USE_RDS) {
-      console.log('[getTeacherProfile] Lambda: no profile for', email, course);
-      return null;
-    }
+    // No row (404) is a definitive "not found" — do NOT fall back to the
+    // in-memory cache.
+    console.log('[getTeacherProfile] Lambda: no profile for', email, course);
+    return null;
   } catch (e) {
     console.warn('[getTeacherProfile] profile fetch failed:', e);
   }
 
-  // Supabase-path fallback to in-memory cache (seeded profiles). Not reached on ?lambda=1.
+  // Fallback to the in-memory cache (seeded profiles) — only reached if the
+  // fetch threw unexpectedly above.
   const cached = _profileCache[cacheKey];
   if (cached) {
     console.log('[getTeacherProfile] using cached profile');
@@ -1218,22 +1129,9 @@ async function loadConvsFromSupabase() {
   if (!currentUser) return;
   try {
     // TM-2: filter by is_teacher_test so test convs never appear in
-    // the student sidebar (and vice versa). Both branches go through
-    // the same auth.uid() = user_id scoping (RLS or Lambda-side).
-    let data;
-    if (USE_RDS) {
-      data = await rdsFetch(`conversations?is_teacher_test=${!!S.isTestMode}`);
-    } else {
-      const res = await sb
-        .from('conversations')
-        .select('id, title, messages, teacher, course, created_at, updated_at')
-        .eq('user_id', currentUser.id)
-        .eq('is_teacher_test', !!S.isTestMode)
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (res.error) return;
-      data = res.data;
-    }
+    // the student sidebar (and vice versa). The Lambda scopes rows to
+    // the JWT user server-side.
+    const data = await rdsFetch(`conversations?is_teacher_test=${!!S.isTestMode}`);
     if (!data || !data.length) return;
 
     const convs = {};
@@ -1302,36 +1200,17 @@ async function _doSyncConv(convId) {
   if (conv.sbId) {
     // Already exists — update. Lambda PATCH scopes to the JWT user server-side
     // and 404s on an unowned/unknown id (surfaced via the rdsFetch null → warn).
-    if (USE_RDS) {
-      try {
-        const res = await rdsFetch('conversations', { method: 'PATCH', body: { id: conv.sbId, ...row } });
-        if (!res) console.warn('Supabase update error:', 'conversation not found (404)');
-      } catch (err) { console.warn('Supabase update error:', err); }
-    } else {
-      const { error } = await sb
-        .from('conversations')
-        .update(row)
-        .eq('id', conv.sbId)
-        .eq('user_id', currentUser.id);
-      if (error) console.warn('Supabase update error:', error);
-    }
+    try {
+      const res = await rdsFetch('conversations', { method: 'PATCH', body: { id: conv.sbId, ...row } });
+      if (!res) console.warn('Conversation update error:', 'conversation not found (404)');
+    } catch (err) { console.warn('Conversation update error:', err); }
   } else {
     // New conversation — insert and capture the UUID
     let newId = null;
-    if (USE_RDS) {
-      try {
-        const res = await rdsFetch('conversations', { method: 'POST', body: row });
-        newId = res?.id || null;
-      } catch (err) { console.warn('Supabase insert error:', err); return; }
-    } else {
-      const { data, error } = await sb
-        .from('conversations')
-        .insert(row)
-        .select('id')
-        .single();
-      if (error) { console.warn('Supabase insert error:', error); return; }
-      newId = data?.id || null;
-    }
+    try {
+      const res = await rdsFetch('conversations', { method: 'POST', body: row });
+      newId = res?.id || null;
+    } catch (err) { console.warn('Conversation insert error:', err); return; }
     if (newId) {
       // Store sbId back into local storage
       const c2 = getConvs();
@@ -1346,20 +1225,12 @@ function deleteConvFromSupabase(convId) {
   const convs = getConvs();
   const sbId  = convs[convId]?.sbId;
   if (!sbId) return;
-  if (USE_RDS) {
-    // Hardened (§2): failure now surfaces to the user, not just the console.
-    rdsFetch(`conversations?id=${encodeURIComponent(sbId)}`, { method: 'DELETE' })
-      .catch(err => {
-        console.warn('Supabase delete error:', err);
-        showToast('Could not delete the conversation on the server — see console');
-      });
-  } else {
-    sb.from('conversations')
-      .delete()
-      .eq('id', sbId)
-      .eq('user_id', currentUser.id)
-      .then(({ error }) => { if (error) console.warn('Supabase delete error:', error); });
-  }
+  // Hardened (§2): failure now surfaces to the user, not just the console.
+  rdsFetch(`conversations?id=${encodeURIComponent(sbId)}`, { method: 'DELETE' })
+    .catch(err => {
+      console.warn('Conversation delete error:', err);
+      showToast('Could not delete the conversation on the server — see console');
+    });
 }
 
 // Sync user profile (name, grade, accumulated values) to Supabase
@@ -1396,16 +1267,11 @@ function syncProfileToSupabase() {
     study_style,
     onboarding_complete,
   };
-  if (USE_RDS) {
-    // Hardened (§2): real error surface, no silent fallback. id comes from the JWT.
-    rdsFetch('profiles', { method: 'POST', body: profileRow }).catch(err => {
-      console.warn('Supabase profile sync error:', err);
-      showToast('Could not sync your profile — see console');
-    });
-  } else {
-    sb.from('profiles').upsert({ id: currentUser.id, ...profileRow })
-      .then(({ error }) => { if (error) console.warn('Supabase profile sync error:', error); });
-  }
+  // Hardened (§2): real error surface. id comes from the JWT.
+  rdsFetch('profiles', { method: 'POST', body: profileRow }).catch(err => {
+    console.warn('Profile sync error:', err);
+    showToast('Could not sync your profile — see console');
+  });
 }
 
 // Load profile from Supabase on new device (only if localStorage has no name)
@@ -1417,20 +1283,9 @@ async function loadProfileFromSupabase() {
   if (S.isTestMode) return;
   const hasName = !!localStorage.getItem('lumi_name');
   try {
-    let data;
-    if (USE_RDS) {
-      // GET /profiles returns the caller's row as a single object; null on 404
-      // (no profile yet — same exit as the Supabase error/no-data path).
-      data = await rdsFetch('profiles');
-    } else {
-      const res = await sb
-        .from('profiles')
-        .select('name, grade, values_profile, schedule, learning_style, pain_points, typical_activities, homework_start_time, study_style, onboarding_complete')
-        .eq('id', currentUser.id)
-        .single();
-      if (res.error) return;
-      data = res.data;
-    }
+    // GET /profiles returns the caller's row as a single object; null on 404
+    // (no profile yet).
+    const data = await rdsFetch('profiles');
     if (!data) return;
     // Always restore name/grade (overwrite if Supabase is newer)
     if (!hasName && data.name)  localStorage.setItem('lumi_name',  data.name);
@@ -1644,13 +1499,12 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
 
   // Per-student teacher notes are injected SERVER-SIDE (the chat Lambda
   // replaces the <<LUMI_TEACHER_NOTES>> marker) — notes never reach the
-  // browser. The client only records WHICH class to inject for. use_rds
-  // steers the Lambda's notes source so it flips with the flag at cutover.
+  // browser. The client only records WHICH class to inject for.
   // TM-2: in test mode the "student" is the teacher themselves — no notes,
   // no injection request.
   S.tutorCtx.notesInjection = null;
   if (profile && !profile.__notReady && profile.id && currentUser && !S.isTestMode) {
-    S.tutorCtx.notesInjection = { teacher_profile_id: profile.id, use_rds: USE_RDS };
+    S.tutorCtx.notesInjection = { teacher_profile_id: profile.id };
   }
 
   // Q4: load graded work-sample images. Single-source-of-truth gate —
@@ -1677,17 +1531,17 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
   const dName = teacherDisplayName(teacher, profile);
 
   if (profile?.__error) {
-    // R4 fail-visible: the Lambda (?lambda=1) fetch failed. Show a small banner in the
+    // R4 fail-visible: the Lambda fetch failed. Show a small banner in the
     // chat area instead of the misleading "teacher hasn't set up" message.
-    console.error('[openTutor] teacher-profile fetch failed (?lambda=1):', teacher, course, profile.message);
+    console.error('[openTutor] teacher-profile fetch failed:', teacher, course, profile.message);
     const errBanner = document.createElement('div');
     errBanner.className = 'lambda-error-banner';
     errBanner.style.cssText = 'margin:12px;padding:10px 14px;border:1px solid #c0392b;background:#fdecea;color:#902;border-radius:8px;font-size:13px;line-height:1.45';
-    errBanner.textContent = `⚠️ Couldn't load ${course} from the RDS Lambda (?lambda=1): ${profile.message}. Test path only — check the console, or remove ?lambda=1 to use Supabase.`;
+    errBanner.textContent = `⚠️ Couldn't load ${course}: ${profile.message}. Check the console for details.`;
     messagesEl.appendChild(errBanner);
     S.tutorCtx.teacherProfile = null;
     msgInput.disabled = true;
-    msgInput.placeholder = 'Profile fetch failed (test path) — see console';
+    msgInput.placeholder = 'Profile fetch failed — see console';
     $('sendBtn').disabled = true;
   } else if (profile?.__notReady) {
     greeting = `${firstName} hasn't finished setting up their Lumi profile yet — their interview is still in progress. Check back soon, or try General Chat in the meantime.`;
@@ -2434,8 +2288,7 @@ async function prepareSuggestedPrompts() {
   if (inj?.teacher_profile_id) {
     try {
       const path = `suggested-prompts?teacher_profile_id=${encodeURIComponent(inj.teacher_profile_id)}`
-        + `&course=${encodeURIComponent(ctx.course || '')}`
-        + (inj.use_rds ? '&use_rds=1' : '');
+        + `&course=${encodeURIComponent(ctx.course || '')}`;
       const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000));
       const res = await Promise.race([rdsFetch(path), timeout]);
       if (res?.mode === 'influenced' && Array.isArray(res.prompts) && res.prompts.length === 3) {
@@ -3232,11 +3085,7 @@ async function obSaveFullProfile() {
     onboarding_complete: true,
   };
   try {
-    if (USE_RDS) {
-      await rdsFetch('profiles', { method: 'POST', body: obRow });
-    } else {
-      await sb.from('profiles').upsert({ id: currentUser.id, ...obRow });
-    }
+    await rdsFetch('profiles', { method: 'POST', body: obRow });
   } catch (e) {
     // Hardened (§2): onboarding continues, but the failure is now user-visible.
     console.warn('Profile save error:', e);
@@ -3739,7 +3588,7 @@ function wireListeners() {
 
   $('clearMemBtn').addEventListener('click', async () => {
     if (confirm('Are you sure? This will erase all conversations and memory.')) {
-      // Delete from Supabase (both tables, for this user)
+      // Delete server-side data (both tables, for this user)
       if (currentUser) {
         try {
           const profileReset = {
@@ -3747,15 +3596,11 @@ function wireListeners() {
             values_profile: { values: [], goals: [], interests: [] },
           };
           await Promise.all([
-            USE_RDS
-              ? rdsFetch('conversations?all=true', { method: 'DELETE' })
-              : sb.from('conversations').delete().eq('user_id', currentUser.id),
-            USE_RDS
-              ? rdsFetch('profiles', { method: 'POST', body: profileReset })
-              : sb.from('profiles').upsert({ id: currentUser.id, ...profileReset }),
+            rdsFetch('conversations?all=true', { method: 'DELETE' }),
+            rdsFetch('profiles', { method: 'POST', body: profileReset }),
           ]);
         } catch (e) {
-          console.warn('Supabase clear failed:', e);
+          console.warn('Server memory clear failed:', e);
           showToast('Could not clear server memory — see console');
         }
       }
@@ -4464,11 +4309,7 @@ async function syncStudyStyleToSupabase(style) {
   // fields into the teacher's auth user record.
   if (S.isTestMode) return;
   try {
-    if (USE_RDS) {
-      await rdsFetch('profiles', { method: 'POST', body: { study_style: style } });
-    } else {
-      await sb.from('profiles').upsert({ id: currentUser.id, study_style: style });
-    }
+    await rdsFetch('profiles', { method: 'POST', body: { study_style: style } });
   } catch (e) {
     // Hardened (§2): this was app.js's only fully-silent catch; now logged + toasted.
     console.warn('Study style sync error:', e);
@@ -4872,13 +4713,10 @@ async function getTeacherProfileCached(course, teacherName) {
   // Check the main profile cache first (seeded profiles)
   if (_profileCache[key]) { _hwProfileCache[key] = _profileCache[key]; return _profileCache[key]; }
   try {
-    const data = USE_RDS
-      ? await fetchTeacherProfileLambda(email, course)
-      : (await sb.from('teacher_profiles').select('*')
-          .eq('teacher_email', email).eq('course_name', course).maybeSingle()).data;
+    const data = await fetchTeacherProfileLambda(email, course);
     _hwProfileCache[key] = data || null;
   } catch (err) {
-    if (USE_RDS) console.error('[getTeacherProfileCached] Lambda fetch failed (no fallback):', course, err);
+    console.error('[getTeacherProfileCached] Lambda fetch failed:', course, err);
     _hwProfileCache[key] = null;
   }
   return _hwProfileCache[key];
@@ -5802,33 +5640,23 @@ function syncHwToSupabase() {
     is_complete: !!t.isComplete,
   }));
   if (!rows.length) {
-    if (USE_RDS) {
-      // Hardened (§2/§3): the empty-list wipe was the codebase's only fully
-      // silent destructive write — now logged AND toasted on failure.
-      rdsFetch('homework-tasks?all=true', { method: 'DELETE' }).catch(err => {
-        console.warn('[syncHw] delete error:', err);
-        showToast('Could not sync homework — see console');
-      });
-    } else {
-      sb.from('homework_tasks').delete().eq('user_id', currentUser.id)
-        .then(({ error }) => { if (error) console.warn('[syncHw] delete error:', error); });
-    }
-    return;
-  }
-  if (USE_RDS) {
-    // user_id in each row is ignored server-side (always the JWT user).
-    rdsFetch('homework-tasks', { method: 'POST', body: rows }).then(res => {
-      if (res && res.upserted !== rows.length) {
-        console.warn('[syncHw] upsert error:', `only ${res.upserted}/${rows.length} rows written (foreign id skipped)`);
-      }
-    }).catch(err => {
-      console.warn('[syncHw] upsert error:', err);
+    // Hardened (§2/§3): the empty-list wipe was the codebase's only fully
+    // silent destructive write — now logged AND toasted on failure.
+    rdsFetch('homework-tasks?all=true', { method: 'DELETE' }).catch(err => {
+      console.warn('[syncHw] delete error:', err);
       showToast('Could not sync homework — see console');
     });
-  } else {
-    sb.from('homework_tasks').upsert(rows, { onConflict: 'id' })
-      .then(({ error }) => { if (error) console.warn('[syncHw] upsert error:', error); });
+    return;
   }
+  // user_id in each row is ignored server-side (always the JWT user).
+  rdsFetch('homework-tasks', { method: 'POST', body: rows }).then(res => {
+    if (res && res.upserted !== rows.length) {
+      console.warn('[syncHw] upsert error:', `only ${res.upserted}/${rows.length} rows written (foreign id skipped)`);
+    }
+  }).catch(err => {
+    console.warn('[syncHw] upsert error:', err);
+    showToast('Could not sync homework — see console');
+  });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -6618,17 +6446,7 @@ function loadProjectsFromSupabase() {
 async function loadHwFromSupabase() {
   if (!currentUser) return;
   try {
-    let data;
-    if (USE_RDS) {
-      data = await rdsFetch('homework-tasks');
-    } else {
-      const res = await sb
-        .from('homework_tasks')
-        .select('*')
-        .eq('user_id', currentUser.id);
-      if (res.error) { console.warn('[loadHw] error:', res.error); return; }
-      data = res.data;
-    }
+    const data = await rdsFetch('homework-tasks');
     if (!data || !data.length) return;
     const tasks = data.map(row => ({
       id: row.id,
