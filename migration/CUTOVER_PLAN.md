@@ -26,6 +26,11 @@
 >   T5 (docs), T7 (no local dumps ever existed) — done. T1 (/admin/sql +
 >   ADMIN_TOKEN) and T6 (Supabase project deletion) ride with the Cognito
 >   workstream, which also owns verifyAuth + the importer's auth-user calls.
+> - **T1 EXECUTED 2026-07-02** (Workstream I Phase 6): /admin/sql +
+>   ADMIN_TOKEN deleted; replaced by the Lambda's IAM-gated direct-invoke
+>   admin branch. **T6**: project paused 2026-07-02; deletion by Hadi after
+>   ~a week of clean Cognito-only running. Workstream I complete — this
+>   closes the migration.
 
 Original runbook below, kept for reference. Companion docs:
 `migration/SMOKE_TEST.md` (post-flip validation), `MIGRATION_HARDENING.md`,

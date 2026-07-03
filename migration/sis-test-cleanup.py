@@ -9,33 +9,41 @@ the importer writes app_users identity rows, not Supabase/Cognito users):
      class_enrollments + sections)
   4. RDS schools row (cascades sis_map + any remaining sections)
 
-Env: ADMIN_TOKEN (Lambda /admin/sql token).
-Idempotent — safe to re-run. Delete this script together with /admin/sql at
-post-cutover teardown (it depends on that endpoint).
+Runs SQL through the Lambda's DIRECT-INVOKE admin branch (`aws lambda
+invoke` with an adminSql payload) — the public /admin/sql endpoint was
+deleted in Workstream I Phase 6. Requires AWS CLI credentials with
+lambda:InvokeFunction on lumi-claude-proxy (the lumi-deploy default
+profile has it). Idempotent — safe to re-run.
 """
-import json, os, time, urllib.request, urllib.error
+import json, subprocess, tempfile, time, os
 
-LAMBDA = "https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws"
-ADMIN = os.environ["ADMIN_TOKEN"]
+FUNCTION = "lumi-claude-proxy"
+REGION = "us-east-1"
 SCHOOL_NAME = "Example High School"
 PROTECT = {"3587c875-ddc8-4e0b-b65f-ff3677d7ccce"}  # hadi — never delete
 
-def rds_sql(sql, params=None, attempts=5):
-    body = json.dumps({"sql": sql, **({"params": params} if params is not None else {})}).encode()
+def rds_sql(sql, params=None, attempts=3):
+    payload = json.dumps({"adminSql": sql, **({"params": params} if params is not None else {})})
     for i in range(attempts):
-        req = urllib.request.Request(LAMBDA + "/admin/sql", data=body, method="POST", headers={
-            "Authorization": f"Bearer {ADMIN}", "Content-Type": "application/json"})
+        with tempfile.NamedTemporaryFile(mode="r", suffix=".json", delete=False) as outf:
+            outpath = outf.name
         try:
-            with urllib.request.urlopen(req, timeout=90) as r:
-                out = json.load(r)
+            subprocess.run(
+                ["aws", "lambda", "invoke", "--function-name", FUNCTION, "--region", REGION,
+                 "--cli-binary-format", "raw-in-base64-out", "--payload", payload, outpath],
+                check=True, capture_output=True, timeout=90)
+            with open(outpath) as f:
+                out = json.load(f)
             if "error" in out:
                 raise RuntimeError(out)
             time.sleep(0.3)
             return out
-        except urllib.error.HTTPError as e:
-            if e.code == 429 and i < attempts - 1:
+        except subprocess.CalledProcessError as e:
+            if b"TooManyRequestsException" in e.stderr and i < attempts - 1:
                 time.sleep(2 ** (i + 1)); continue
-            raise
+            raise RuntimeError(e.stderr.decode()[:300])
+        finally:
+            os.unlink(outpath)
 
 # 1. collect identities (BEFORE the schools cascade removes sis_map)
 rows = rds_sql("SELECT DISTINCT lumi_id, entity_type FROM sis_map m JOIN schools sc ON sc.id = m.school_id WHERE sc.name = $1", [SCHOOL_NAME])["rows"]

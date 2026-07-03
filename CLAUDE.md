@@ -55,11 +55,12 @@ gives direct answers, only guides reasoning.
   teacher.html; admin.html inlines its single fetch). Failures surface
   VISIBLY (console.error + showToast at hardened writes; chat-area banner
   for the main tutor fetch) — there is no fallback store. Auth is AWS
-  Cognito via `cognito-auth.js` (Workstream I Phase 3 cutover, 2026-07-02);
-  the `sb.auth.*` surface survives as the shim's API. Supabase's project
-  exists only for the SIS importer's user creation until Phase 5–6 teardown.
-  Teacher notes are injected server-side by the chat Lambda and never reach
-  the client (see "Per-student teacher notes injection").
+  Cognito via `cognito-auth.js` (Workstream I, complete 2026-07-02);
+  the `sb.auth.*` surface survives as the shim's API. **Supabase is fully
+  retired** — zero references in running code; the project is paused
+  pending final deletion. Teacher notes are injected server-side by the
+  chat Lambda and never reach the client (see "Per-student teacher notes
+  injection").
   `migration/SMOKE_TEST.md` and `migration/CUTOVER_PLAN.md` are historical
   records of the executed cutover.
 - Guides students through the subject WITHOUT giving direct answers
@@ -244,16 +245,20 @@ gives direct answers, only guides reasoning.
   in app.js fetches signed URLs in parallel via `POST /download-url`,
   then fetches each image blob, converts to base64, and sends them
   to Claude as vision content blocks — same end shape as before,
-  only the signed-URL source changed. **Auth chain:** Supabase JWT
-  → Lambda `verifyAuth` → Menlo domain check (teachers-only on
-  upload, any authenticated user on download). Written from
+  only the signed-URL source changed. **Auth chain:** Cognito ID token
+  → Lambda `verifyAuth` (local JWKS + app_users) → allowed-domains
+  check (teachers-only on upload, any authenticated user on
+  download). Written from
   `saveTeacherProfile()` in teacher.html; read from openWizard's
   thumbnail batch and from `loadWorkSampleImages()` in app.js.
 
 ### RDS Lambda data routes (Workstream F — complete 2026-07-01)
 All six route groups live on `lumi-claude-proxy` (source: `lambda/index.mjs`),
 each verified end-to-end with a real authed browser session against RDS.
-Shared contract: `verifyAuth` (Supabase JWT) → @menloschool.org domain gate →
+Shared contract: `verifyAuth` (Cognito ID token, verified LOCALLY via
+aws-jwt-verify's module-cached JWKS, then cognito_sub → preserved lumi uuid
+via the `app_users` bridge) → allowed-domains gate (schools.allowed_domains,
+5-min container cache; adminEmails bypass) →
 per-route authz replicating the old RLS (RLS_AUDIT.md) → parameterized query
 via `db.js` → raw row(s) on success / `{error}` + status on failure → logs
 carry `err.code` only, never PII. Identity is ALWAYS taken from the JWT and
@@ -285,19 +290,25 @@ spoofed ids.
 - jsonb params are JSON.stringify'd in routes (node-postgres turns JS arrays
   into PG array literals otherwise); text[] columns pass raw arrays.
 
-### SIS importer (Workstream D — shipped 2026-07-01)
+### SIS importer (Workstream D — shipped 2026-07-01; auth-provider-free since Workstream I Phase 5)
 - **`POST /sis-import`** on the Lambda ingests one school's roster in the
-  canonical v1.0 format (synthetic_data/schema.md). Admin-only
+  canonical v1.0/v1.1 format (synthetic_data/schema.md). Admin-only
   (SCHOOL_CONFIG.adminEmails). Validation-first: all 8 §9 rules hard-fail
   (400 + structured error list, nothing written); course_code bijection,
   cross-type email reuse, zero-enrollment classes, and zero-class teachers
-  surface as warnings.
-- **Write pipeline (all idempotent):** school upsert → Supabase auth users
-  via admin API (get-or-create; existing emails resolve via generate_link —
-  people who share an email map to ONE auth identity) + `sis_map` rows →
-  profiles stubs (COALESCE — never clobbers self-entered data) →
-  teacher_profiles stubs (done=false; existing rows never un-onboarded) →
-  `sections` rows → class_enrollments (teacher_notes untouched).
+  surface as warnings. v1.1 adds optional `school.allowed_domains` (bare
+  lowercase domains, hard-validated): present = replaces the school's
+  sign-in domains, absent = never clobbers; empty-after-import surfaces a
+  warning that imported people can't sign in yet.
+- **Write pipeline (all idempotent; NO auth provider involved):** school
+  upsert (incl. allowed_domains when present) → `app_users` identity rows
+  (email → fresh lumi uuid, cognito_sub NULL; people who share an email map
+  to ONE identity; a Cognito user appears lazily at the person's first
+  Google sign-in and links by verified email — see verifyCognitoAuth) +
+  `sis_map` rows → profiles stubs (COALESCE — never clobbers self-entered
+  data) → teacher_profiles stubs (done=false; existing rows never
+  un-onboarded) → `sections` rows → class_enrollments (teacher_notes
+  untouched).
 - **Sections/block bridge:** the SIS models sections with integer periods;
   the app runs on Menlo-style block letters. Full section fidelity lands in
   the `sections` table (migration/rds-sis-tables.sql) and each section gets
@@ -311,11 +322,11 @@ spoofed ids.
   (zero new rows) + the four §9 reject cases.
 - **Known v1 limitations:** re-exports UPSERT but do not PRUNE rows missing
   from the new export (stale enrollments persist — same problem-class as
-  dropped-class cleanup); imported people can't sign in until the
-  @menloschool.org domain gate is replaced in the Cognito workstream.
+  dropped-class cleanup).
 - Test artifacts: migration/sis-test-cleanup.py removes a synthetic school
-  end-to-end (auth users included); it depends on /admin/sql — delete both
-  together at teardown.
+  end-to-end (app_users identity rows included); it runs SQL through the
+  Lambda's direct-invoke admin branch (`aws lambda invoke` with an adminSql
+  payload — IAM-gated; the lumi-deploy profile has InvokeFunction).
 
 ### System Prompt Architecture
 - Built dynamically from teacher profile object at session start
@@ -549,8 +560,8 @@ spoofed ids.
   - **Syllabi storage migrated to AWS S3 (commit 506eed9, 2026-05-19).**
     Bucket `lumi-syllabi-613136968914` (us-east-1). Access is gated
     by the Lambda's IAM execution role (`S3LumiStorage` inline policy)
-    plus the Lambda's own auth checks — Supabase JWT verify → teacher
-    row check → `@menloschool.org` domain check — before it will sign
+    plus the Lambda's own auth checks — Cognito ID token verify →
+    teacher row check → allowed-domains check — before it will sign
     a URL. CORS on the S3 bucket is restricted to the GitHub Pages
     origin. Pre-signed URLs expire after 5 minutes. The old reference
     migration `supabase/migrations/20260430_syllabi_bucket.sql` is
@@ -563,8 +574,8 @@ spoofed ids.
     to auto-expire unreferenced objects.
   - **Work-samples storage migrated to AWS S3 (commit 8d2c3d8, 2026-05-20).**
     Bucket `lumi-work-samples` (us-east-1). Access pattern identical
-    to syllabi: Lambda's IAM execution role + auth chain (Supabase JWT
-    verify → teacher row check → `@menloschool.org` domain check)
+    to syllabi: Lambda's IAM execution role + auth chain (Cognito ID
+    token verify → teacher row check → allowed-domains check)
     gate pre-signed URL issuance. CORS restricted to the GitHub Pages
     origin. Pre-signed URLs valid for 1 hour (longer than syllabi
     because the runtime vision pipeline needs headroom for parallel
@@ -805,8 +816,8 @@ spoofed ids.
 - **Pages:** index.html (sign-in), app.html (student chat), teacher.html
   (teacher onboarding), admin.html, lumi.html
 - **Styling:** style.css (primary, ~75 KB) + styles.css (~18 KB); Inter font via Google Fonts
-- **Auth:** AWS Cognito (pool `lumi-users`, us-east-1) with Google as the sole IdP — code+PKCE via `cognito-auth.js` (repo root; exposes the old `sb.auth.*` surface, so call sites still read like supabase-js). `session.access_token` = the Cognito ID token; the Lambda resolves it to the preserved lumi uuid via `app_users`. Client + Lambda still restrict to @menloschool.org emails until the per-school domain gate (Workstream I Phase 4). supabase.js/auth.js are deleted; the Supabase project survives only for the SIS importer's user creation + final teardown (Phases 5–6).
-- **Database:** AWS RDS Postgres (`lumi-db`) behind the `lumi-claude-proxy` Lambda — per-route JWT authz replaced RLS (see "RDS Lambda data routes"). Supabase is AUTH-ONLY (`sb.auth.*` via supabase.js CDN client) until the Cognito migration; supabase_setup.sql is historical.
+- **Auth:** AWS Cognito (pool `lumi-users` / `us-east-1_C0xhKzu94`, app client `lumi-web`, hosted domain `lumi-auth-613136968914`) with Google as the sole IdP — code+PKCE via `cognito-auth.js` (repo root; exposes the old `sb.auth.*` surface, so call sites still read like supabase-js). `session.access_token` = the Cognito ID token; the Lambda verifies it locally (aws-jwt-verify, module-cached JWKS — zero per-request egress) and resolves it to the preserved lumi uuid via the `app_users` bridge (link-by-verified-email on first sign-in). Sign-in domains are data-driven off `schools.allowed_domains` (client UX check via `GET /allowed-domains` fails open; server enforcement in verifyCognitoAuth + the route gate fails closed; SCHOOL_CONFIG.adminEmails bypass). **Supabase is fully retired** (Workstream I complete 2026-07-02): zero references in running code, project paused pending deletion; supabase_setup.sql + supabase/ + RLS_AUDIT.md are historical records.
+- **Database:** AWS RDS Postgres (`lumi-db`) behind the `lumi-claude-proxy` Lambda — per-route JWT authz replaced RLS (see "RDS Lambda data routes"). Direct DB access for migrations/ops: the Lambda's direct-invoke admin branch ONLY (`aws lambda invoke --payload '{"adminSql":..., "params":[...]}'` — IAM-gated, unreachable via the function URL; replaced the deleted /admin/sql + ADMIN_TOKEN at teardown).
 - **AI API:** Anthropic Messages API via AWS Lambda lumi-claude-proxy
   (Function URL: https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/).
   The proxy validates JWT auth, enforces a 2500 max_tokens
@@ -825,4 +836,4 @@ spoofed ids.
     a separate cleanup commit — do not call it.
 - **Markdown rendering:** Custom lightweight renderer in app.js (no library)
 - **Hosting:** GitHub Pages (static deploy)
-- **Schema:** See supabase_setup.sql for full table definitions and RLS policies
+- **Schema:** `migration/rds-schema.sql` (+ `rds-sis-tables.sql`, `rds-app-users.sql`, `rds-school-domains.sql`) is the live RDS schema; supabase_setup.sql is the historical Supabase-era definition (RLS included) — do not apply it anywhere

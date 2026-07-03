@@ -6,7 +6,6 @@ import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { query as dbQuery } from "./db.js";
-import { timingSafeEqual } from "node:crypto";
 
 // === School Configuration ===
 // Sign-in domains are data-driven since Workstream I Phase 4 — see
@@ -30,14 +29,12 @@ const BUCKETS = {
 };
 const UPLOAD_URL_EXPIRY = 300;     // 5 minutes — short window for PUT
 const DOWNLOAD_URL_EXPIRY = 3600;  // 1 hour — covers teacher edit sessions and image fetches
-// === AWS / Supabase Config ===
+// === AWS Config ===
 const AWS_REGION = "us-east-1";
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // === Cognito Config (Workstream I) ===
 // Verifier is only constructed when both env vars are set, so deploying this
-// code before the env flip is inert — every token falls through to Supabase.
+// code without the env vars fails closed (verifyAuth logs + 401s).
 const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID;
 const COGNITO_CLIENT_ID = process.env.COGNITO_CLIENT_ID;
 const COGNITO_ISSUER = COGNITO_USER_POOL_ID
@@ -95,29 +92,16 @@ async function isEmailAllowed(email) {
   return domains.has(lower.split("@").pop());
 }
 
-// === Auth (Workstream I: dual-path) ===
-// verifyAuth dispatches on the token's UNVERIFIED iss claim. This is safe:
-// the selected verifier still fully checks signature/aud/exp/token_use, so a
-// forged iss only routes the token to a verifier that rejects it. Cognito
-// tokens verify LOCALLY against a module-cached JWKS (no per-request egress);
-// everything else takes the legacy Supabase path until the Phase 3 cutover.
+// === Auth (Cognito-only since Workstream I Phase 6 teardown) ===
+// Tokens verify LOCALLY against a module-cached JWKS — no per-request
+// egress. The legacy Supabase fallback is gone; the project is retired.
 async function verifyAuth(authHeader) {
   if (!authHeader?.startsWith("Bearer ")) return null;
-  const token = authHeader.slice(7);
-  if (cognitoVerifier && decodeJwtPayloadUnsafe(token)?.iss === COGNITO_ISSUER) {
-    return verifyCognitoAuth(token);
-  }
-  return verifySupabaseAuth(token);
-}
-
-// Payload decode WITHOUT verification — used only to pick a verifier.
-function decodeJwtPayloadUnsafe(token) {
-  try {
-    const part = token.split(".")[1];
-    return JSON.parse(Buffer.from(part, "base64url").toString("utf8"));
-  } catch {
+  if (!cognitoVerifier) {
+    console.error("[auth] COGNITO_USER_POOL_ID/COGNITO_CLIENT_ID not configured");
     return null;
   }
+  return verifyCognitoAuth(authHeader.slice(7));
 }
 
 // Cognito sub -> {id, email} resolved via app_users (identity bridge that
@@ -179,31 +163,6 @@ async function verifyCognitoAuth(token) {
     return { id: row.lumi_id, email };
   } catch (err) {
     console.error("verifyCognitoAuth error:", err.name ?? err.code ?? "unknown");
-    return null;
-  }
-}
-
-// === Legacy auth: verify Supabase JWT (removed at Phase 3 cutover +) ===
-// HARD TIMEOUT (2026-07-01 incident): this fetch previously had none, so a
-// stalled Lambda→Supabase connection hung the whole invocation to the 60s
-// Lambda timeout. With the account concurrency limit of 10, a handful of
-// hung requests starved EVERY route (429s). Fail fast to 401 instead —
-// clients see an auth error and retry; concurrency slots free in 5s.
-async function verifySupabaseAuth(token) {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "apikey": SUPABASE_SERVICE_ROLE_KEY,
-      },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data.email) return null;
-    return { id: data.id, email: data.email };
-  } catch (err) {
-    console.error("verifySupabaseAuth error:", err.name === "TimeoutError" ? "supabase auth timeout (5s)" : err);
     return null;
   }
 }
@@ -503,9 +462,39 @@ async function handleRequest(event, responseStream) {
     wrapped.end();
   };
 
+  // === Admin SQL via DIRECT INVOKE ONLY (replaced /admin/sql at Phase 6) ===
+  // Function URL events ALWAYS carry requestContext.http, so this shape is
+  // unreachable over HTTP — the only way in is `aws lambda invoke`, which
+  // IAM gates via lambda:InvokeFunction. Used for schema migrations, seeds,
+  // and verification queries (see migration/sis-test-cleanup.py).
+  if (!event.requestContext?.http && event.adminSql !== undefined) {
+    const t0 = Date.now();
+    if (typeof event.adminSql !== "string" || event.adminSql.length === 0) {
+      responseStream.write(JSON.stringify({ error: "adminSql must be a non-empty string" }));
+      responseStream.end();
+      return;
+    }
+    if (event.params !== undefined && !Array.isArray(event.params)) {
+      responseStream.write(JSON.stringify({ error: "params must be an array if provided" }));
+      responseStream.end();
+      return;
+    }
+    try {
+      const result = await dbQuery(event.adminSql, event.params);
+      // Log only outcome + shape, never SQL or params (could contain secrets/PII).
+      console.log(`admin-invoke ok ${Date.now() - t0}ms rows=${result.rowCount}`);
+      responseStream.write(JSON.stringify({ rows: result.rows, rowCount: result.rowCount }));
+    } catch (err) {
+      console.log(`admin-invoke fail ${Date.now() - t0}ms code=${err.code ?? "unknown"}`);
+      responseStream.write(JSON.stringify({ error: err.message, code: err.code ?? null }));
+    }
+    responseStream.end();
+    return;
+  }
+
   // === Route: GET /db-health (infra probe, no auth) ===
   // First consumer of db.js. Validates Lambda → VPC → RDS Proxy (IAM) → lumi-db path.
-  // Placed before auth/body parsing so it doesn't depend on Supabase being up.
+  // Placed before auth/body parsing so it works even if auth config is broken.
   if (path === "/db-health") {
     const method = event.requestContext?.http?.method || "GET";
     if (method !== "GET") {
@@ -541,71 +530,6 @@ async function handleRequest(event, responseStream) {
     body = JSON.parse(event.body || "{}");
   } catch {
     return sendJson(400, { error: "Invalid JSON" });
-  }
-
-  // === Route: POST /admin/sql ===
-  // ⚠️  TEMPORARY — REMOVE AFTER WORKSTREAM C SCHEMA MIGRATION COMPLETE.
-  // Arbitrary-SQL endpoint authed by ADMIN_TOKEN env var. Bypasses Supabase
-  // auth so migrations can run without bastion / SSM tunnel setup.
-  // Risk: token grants root-equivalent DB access. Rotate after, delete block.
-  if (path === "/admin/sql") {
-    const TEMP_WARNING = "temporary endpoint — remove after schema migration";
-    const method = event.requestContext?.http?.method || "POST";
-    if (method !== "POST") {
-      return sendJson(405, { error: "Method not allowed", warning: TEMP_WARNING });
-    }
-
-    const expectedToken = process.env.ADMIN_TOKEN;
-    if (!expectedToken) {
-      // Fail closed — never accept requests when token isn't configured.
-      return sendJson(500, { error: "ADMIN_TOKEN not configured", warning: TEMP_WARNING });
-    }
-
-    const headers = event.headers || {};
-    const authHeader = headers.authorization || headers.Authorization;
-    if (!authHeader?.startsWith("Bearer ")) {
-      return sendJson(401, { error: "Unauthorized", warning: TEMP_WARNING });
-    }
-    const providedToken = authHeader.slice(7);
-
-    // timingSafeEqual throws if buffer lengths differ — treat any throw as 401.
-    let tokenOk = false;
-    try {
-      const a = Buffer.from(providedToken);
-      const b = Buffer.from(expectedToken);
-      tokenOk = a.length === b.length && timingSafeEqual(a, b);
-    } catch {
-      tokenOk = false;
-    }
-    if (!tokenOk) {
-      return sendJson(401, { error: "Unauthorized", warning: TEMP_WARNING });
-    }
-
-    if (typeof body.sql !== "string" || body.sql.length === 0) {
-      return sendJson(400, { error: "Missing or invalid 'sql' field", warning: TEMP_WARNING });
-    }
-    if (body.params !== undefined && !Array.isArray(body.params)) {
-      return sendJson(400, { error: "'params' must be an array if provided", warning: TEMP_WARNING });
-    }
-
-    const t0 = Date.now();
-    try {
-      const result = await dbQuery(body.sql, Array.isArray(body.params) ? body.params : undefined);
-      // Log only outcome + shape, never SQL or params (could contain secrets/PII).
-      console.log(`admin/sql ok ${Date.now() - t0}ms rows=${result.rowCount}`);
-      return sendJson(200, {
-        rows: result.rows,
-        rowCount: result.rowCount,
-        warning: TEMP_WARNING,
-      });
-    } catch (err) {
-      console.log(`admin/sql fail ${Date.now() - t0}ms code=${err.code ?? "unknown"}`);
-      return sendJson(500, {
-        error: err.message,
-        code: err.code ?? null,
-        warning: TEMP_WARNING,
-      });
-    }
   }
 
   // --- Auth ---

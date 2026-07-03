@@ -202,10 +202,27 @@ layer; Supabase is auth-only pending Workstream I/Cognito. Workstream I Phase 1
   60 app_users + cascades with real data intact. Zero `auth/v1/admin` refs
   remain; Supabase's ONLY remaining code path is verifySupabaseAuth
   (moribund legacy fallback) + SUPABASE_* env vars — both die in Phase 6.
-  Next: Phase 6 — teardown (/admin/sql + ADMIN_TOKEN with replacement DB
-  access decision, SUPABASE_* env vars, verifySupabaseAuth, supabase CDN
-  refs in lumi.html, cleanup script, oauth-capture callback, CLAUDE.md
-  rewrite, then Hadi deletes the Supabase project).
+  **Phase 6 DONE (2026-07-02) — WORKSTREAM I COMPLETE. THE MIGRATION IS
+  COMPLETE.** Supabase has zero references in running code. Deleted:
+  verifySupabaseAuth + the iss-dispatch (verifyAuth is Cognito-only,
+  fail-closed without env), decodeJwtPayloadUnsafe, SUPABASE_URL/
+  SUPABASE_SERVICE_ROLE_KEY consts + env vars, POST /admin/sql +
+  ADMIN_TOKEN (env var deleted too), cognito-test.html, the oauth-capture +
+  cognito-test callback URLs. **Replacement DB access: the Lambda's
+  direct-invoke admin branch** — `aws lambda invoke --payload
+  '{"adminSql":...,"params":[...]}'`; unreachable over the function URL
+  (HTTP events always carry requestContext.http), IAM-gated via
+  lambda:InvokeFunction (lumi-deploy already had it).
+  migration/sis-test-cleanup.py rewired to the invoke path (self-tested
+  live). Verified: invoke SQL works; /admin/sql with the real old token →
+  plain 401 (no SQL execution); garbage Bearer → 401 in 0.4s (no egress);
+  db-health/allowed-domains green under the pruned env; live app smoke by
+  Hadi. Rollback artifacts in session scratchpad (pre-phase zip +
+  env-pre-phase6.json — the window closes when the Supabase project is
+  paused). CLAUDE.md rewritten to the Cognito-only reality.
+  **Hadi's closing actions: pause the Supabase project now (dashboard →
+  Project Settings → Pause), DELETE it after ~a week of clean running;
+  concurrency-increase request still pending in Service Quotas.**
 - **Slot-starvation incident: ROOT-CAUSED + FIXED (2026-07-02).** The silent
   60s zero-log timeouts (weeks old; starved the 10-slot account into live
   429s) were NOT hung requests: every invocation that touched the pg pool
