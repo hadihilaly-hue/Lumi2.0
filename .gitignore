@@ -3,6 +3,7 @@ teacher-config*.txt
 .env
 .env.*
 node_modules/
+.netlify/
 
 # Migration data dumps — may hold real student/teacher PII; never commit
 migration/*-data.sql
