@@ -13,3 +13,4 @@ migration/*-data.sql
 lambda/node_modules/
 lambda/*.zip
 .DS_Store
+__pycache__/
