@@ -1,9 +1,10 @@
 import { callAPI, fetchClaudeProxy } from './js/api.js';
 import { MENLO_CURRICULUM, SUBJECTS, SUBJECT_IDS, getTeachers, searchCurriculum } from './js/data.js';
 import { buildCompanionSystem, buildTutorSystem, getStudentName, setSidebarUserSubtitle, teacherDisplayName, teacherInitials, updateTestModeBanner } from './js/prompts.js';
-import { $, S, SB, _currentProjId, _introShownFor, _saveIntroShown, attachPreview, currentUser, fileInput, messagesEl, msgInput, pendingAttachment, sbNav, sbSearch, sendBtn, setCurrentProjId, setCurrentUser, setPendingAttachment, themeToggle, toast } from './js/state.js';
+import { $, S, SB, _currentProjId, _introShownFor, _saveIntroShown, attachPreview, currentUser, fileInput, messagesEl, msgInput, pendingAttachment, sbNav, sbSearch, sendBtn, setCurrentProjId, setCurrentUser, setPendingAttachment, themeToggle } from './js/state.js';
 import { deleteConvFromSupabase, genId, getConvs, getSchedule, loadConvsFromSupabase, loadProfileFromSupabase, loadTestModeSchedule, migrateOldData, saveConvs, saveCurrentConv, saveScheduleLocal, syncConvToSupabase, syncScheduleToSupabase } from './js/storage.js';
 import { TEACHER_EMAIL_MAP, _profileCache, _profileStatusCache, fetchTeacherProfileLambda, getTeacherProfile, loadWorkSampleImages, preloadProfileStatuses, rdsFetch } from './js/teachers.js';
+import { autoGrow, closeSettings, closeSidebar, escHtml, openSettings, openSidebar, showToast, updateSendBtn } from './js/ui.js';
 
 
 (async () => {
@@ -927,9 +928,6 @@ export function renderSidebar() {
     sbNav.appendChild(subjectEl);
   });
 }
-
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function showWelcome() {
   if (document.getElementById('welcome')) return;
@@ -2439,16 +2437,6 @@ function startApp() {
   if (tlBackdrop) tlBackdrop.addEventListener('click', closeTimelineModal);
 }
 
-function openSidebar()   { $('sidebar').classList.add('open');    $('sbOverlay').classList.add('open'); }
-function closeSidebar()  { $('sidebar').classList.remove('open'); $('sbOverlay').classList.remove('open'); }
-function openSettings()  { $('settingsDrawer').classList.add('open');    $('settingsOverlay').classList.add('open'); }
-function closeSettings() { $('settingsDrawer').classList.remove('open'); $('settingsOverlay').classList.remove('open'); }
-
-function updateSendBtn() {
-  sendBtn.disabled = (!msgInput.value.trim() && !pendingAttachment) || S.busy;
-}
-function autoGrow(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }
-
 // ─── START LUMI (companion greeting) ────────────────────────────────────────
 async function startLumi() {
   if (S.ready) return;
@@ -2923,15 +2911,6 @@ function makeTyping() {
 }
 
 function scrollBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
-
-let toastTimer;
-export function showToast(msg, type) {
-  toast.textContent = msg;
-  toast.className = 'toast' + (type === 'ok' ? ' ok' : '');
-  toast.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
-}
 
 // ─── HOMEWORK PLANNER ────────────────────────────────────────────────────────
 
