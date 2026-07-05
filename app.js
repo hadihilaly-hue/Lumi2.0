@@ -1396,7 +1396,7 @@ function migrateOldData() {
 }
 
 // ─── LOAD A CONVERSATION ──────────────────────────────────────────────────────
-function loadConv(id) {
+async function loadConv(id) {
   const conv = getConvs()[id];
   if (!conv) return;
   S.currentId     = id;
@@ -1425,6 +1425,57 @@ function loadConv(id) {
 
   scrollBottom();
   renderSidebar();
+
+  // AUDIT_FRONTEND H1: re-hydrate the teacher persona. Convs loaded from RDS
+  // (loadConvsFromSupabase) reconstruct tutorCtx from the teacher/course columns
+  // only — teacherProfile/notesInjection/workSamples are absent — so continuing
+  // the chat would silently fall back to generic AI. Fetch them now.
+  await hydrateTutorProfile();
+}
+
+// AUDIT_FRONTEND H1: fetch + attach the teacher persona (profile, notes
+// injection, work samples) onto the active S.tutorCtx. Mirrors the fetch half
+// of finishOpenTutor without the greeting/banner UI (loadConv already rendered
+// the existing thread). No-op when tutorCtx already carries a live profile
+// (e.g. convs restored from localStorage within the same session).
+async function hydrateTutorProfile() {
+  const ctx = S.tutorCtx;
+  if (!ctx || !ctx.teacher || !ctx.course) return;
+  if (ctx.teacherProfile) return; // already hydrated (localStorage path)
+
+  let profile = null;
+  try {
+    const profilePromise = getTeacherProfile(ctx.teacher, ctx.course);
+    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 5000));
+    profile = await Promise.race([profilePromise, timeoutPromise]);
+  } catch (e) {
+    console.warn('[loadConv] profile hydrate error:', e);
+    profile = null;
+  }
+  // Bail if the user switched to another class while we were awaiting — never
+  // write A's persona onto B's now-current chat (same guard class as H2).
+  if (S.tutorCtx !== ctx) return;
+
+  ctx.notesInjection = null;
+  if (profile && !profile.__notReady && !profile.__error && profile.id && currentUser && !S.isTestMode) {
+    ctx.notesInjection = { teacher_profile_id: profile.id };
+  }
+
+  ctx.workSamples = null;
+  if (profile && !profile.__notReady && !profile.__error && profile.workSamples) {
+    try {
+      const wsPromise = loadWorkSampleImages(profile);
+      const wsTimeout = new Promise(resolve => setTimeout(() => resolve(null), 8000));
+      ctx.workSamples = await Promise.race([wsPromise, wsTimeout]);
+    } catch (e) {
+      console.warn('[loadConv] work-sample hydrate failed:', e);
+      ctx.workSamples = null;
+    }
+    if (S.tutorCtx !== ctx) return;
+  }
+
+  ctx.teacherProfile = (profile && !profile.__error && !profile.__notReady) ? profile : null;
+  saveCurrentConv();
 }
 
 // ─── NEW CHAT ─────────────────────────────────────────────────────────────────
