@@ -1546,6 +1546,13 @@ function showIntroSlide(course, onGo) {
 }
 
 async function finishOpenTutor(subjectId, course, teacher, subjectName) {
+  // AUDIT_FRONTEND H2: capture the class this open is for. openTutor set
+  // S.tutorCtx to a fresh object synchronously right before calling us; if the
+  // user opens another class while we await below, S.tutorCtx is reassigned and
+  // every guard here bails so we never write this class's profile/banner/greeting
+  // onto the now-current chat.
+  const ctx = S.tutorCtx;
+
   // Fetch teacher profile — with 5s hard timeout so it never hangs
   let profile = null;
   try {
@@ -1557,6 +1564,7 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
     console.warn('[openTutor] profile fetch error:', e);
     profile = null;
   }
+  if (S.tutorCtx !== ctx) return; // class switched during the profile fetch
 
   // Per-student teacher notes are injected SERVER-SIDE (the chat Lambda
   // replaces the <<LUMI_TEACHER_NOTES>> marker) — notes never reach the
@@ -1578,11 +1586,14 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
     try {
       const wsPromise = loadWorkSampleImages(profile);
       const wsTimeout = new Promise(resolve => setTimeout(() => resolve(null), 8000));
-      S.tutorCtx.workSamples = await Promise.race([wsPromise, wsTimeout]);
+      const loaded = await Promise.race([wsPromise, wsTimeout]);
+      if (S.tutorCtx !== ctx) return; // class switched during work-sample load
+      S.tutorCtx.workSamples = loaded;
       const ms = Date.now() - wsStart;
       console.log(`[work_samples] loaded in ${ms}ms; mode=${S.tutorCtx.workSamples ? 'with' : 'without'} samples`);
     } catch (e) {
       console.warn('[work_samples] load failed:', e);
+      if (S.tutorCtx !== ctx) return;
       S.tutorCtx.workSamples = null;
     }
   }
@@ -1622,7 +1633,8 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
     msgInput.placeholder = `Say something to ${dName}\u2026`;
     $('sendBtn').disabled = false;
     await prepareSuggestedPrompts();
-    setTimeout(() => renderEmptyState(profile, course), 50);
+    if (S.tutorCtx !== ctx) return; // class switched while preparing prompts
+    setTimeout(() => { if (S.tutorCtx === ctx) renderEmptyState(profile, course); }, 50);
   } else {
     greeting = `\u26a0\ufe0f ${firstName} hasn't set up their Lumi profile for ${course} yet. Once they complete their setup interview, I'll be able to help you exactly the way ${firstName} teaches. In the meantime, you can use General Chat.`;
     S.tutorCtx.teacherProfile = null;
