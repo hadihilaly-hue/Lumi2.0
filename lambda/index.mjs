@@ -697,6 +697,41 @@ async function handleRequest(event, responseStream) {
     }
   }
 
+  // === Route: /consent (privacy-policy acceptance record) ===
+  // GET  -> { accepted: bool, accepted_at } for the JWT user.
+  // POST -> records acceptance (idempotent: sets app_users.privacy_accepted_at
+  //         only if still null), returns { accepted: true, accepted_at }.
+  // Identity is always the JWT (lumi_id) — a caller can only ever record/read
+  // their OWN consent. Auditable per-account consent record for the first-run
+  // privacy gate.
+  if (path === "/consent") {
+    const method = event.requestContext?.http?.method || "GET";
+    try {
+      if (method === "GET") {
+        const row = (await dbQuery(
+          "SELECT privacy_accepted_at FROM public.app_users WHERE lumi_id = $1", [user.id]
+        )).rows[0];
+        const at = row?.privacy_accepted_at ?? null;
+        return sendJson(200, { accepted: !!at, accepted_at: at });
+      }
+      if (method === "POST") {
+        const row = (await dbQuery(
+          `UPDATE public.app_users
+              SET privacy_accepted_at = COALESCE(privacy_accepted_at, now()), updated_at = now()
+            WHERE lumi_id = $1
+            RETURNING privacy_accepted_at`, [user.id]
+        )).rows[0];
+        if (!row) return sendJson(404, { error: "no identity row" });
+        console.log("[consent] recorded acceptance");
+        return sendJson(200, { accepted: true, accepted_at: row.privacy_accepted_at });
+      }
+      return sendJson(405, { error: "Method not allowed" });
+    } catch (err) {
+      console.error("consent error:", safeErr(err));
+      return sendJson(500, { error: "consent failed" });
+    }
+  }
+
   // === Route: /teacher-profile (GET, POST, PATCH) ===
   // Authed (verifyAuth) + domain-gated above.
   //
