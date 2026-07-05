@@ -181,15 +181,40 @@ async function verifyCognitoAuth(token) {
 // Cutover 2026-07-01: reads RDS (teacher_profiles is authoritative there).
 // Fail-closed to "not a teacher" on DB error — same posture as the old
 // Supabase REST path.
+//
+// AUDIT_LAMBDA_PERF #1: isTeacher runs on every chat (hot path), /suggested-prompts,
+// and /upload-url — the only cacheable one of the ~3 serial chat-path round-trips.
+// Container-scoped cache keyed by lowercased email with a short TTL (status flips
+// only when a teacher completes onboarding). Bounded with FIFO eviction like
+// appUserCache. Invalidated on teacher-profile POST/PATCH so a teacher who just
+// finished setup isn't stuck as "not a teacher" for the TTL window.
+const TEACHER_CACHE_TTL_MS = 120000;
+const TEACHER_CACHE_MAX = 1000;
+const teacherStatusCache = new Map(); // lowercased email -> { value: bool, exp: ms }
+
+function invalidateTeacherStatus(email) {
+  teacherStatusCache.delete(email.toLowerCase());
+}
+
 async function isTeacher(email) {
-  if (SCHOOL_CONFIG.adminEmails.has(email.toLowerCase())) return true;
+  const key = email.toLowerCase();
+  if (SCHOOL_CONFIG.adminEmails.has(key)) return true;
+
+  const now = Date.now();
+  const hit = teacherStatusCache.get(key);
+  if (hit && hit.exp > now) return hit.value;
 
   try {
     const result = await dbQuery(
       "SELECT 1 FROM public.teacher_profiles WHERE teacher_email = $1 AND done = true LIMIT 1",
-      [email.toLowerCase()]
+      [key]
     );
-    return result.rowCount > 0;
+    const value = result.rowCount > 0;
+    if (teacherStatusCache.size >= TEACHER_CACHE_MAX) {
+      teacherStatusCache.delete(teacherStatusCache.keys().next().value);
+    }
+    teacherStatusCache.set(key, { value, exp: now + TEACHER_CACHE_TTL_MS });
+    return value;
   } catch (err) {
     console.error("isTeacher error:", safeErr(err));
     return false;
@@ -666,6 +691,7 @@ async function handleRequest(event, responseStream) {
              RETURNING *`,
           [user.email.toLowerCase(), body.course_name, ...vals]
         );
+        invalidateTeacherStatus(user.email); // AUDIT_LAMBDA_PERF #1: done may have flipped
         return sendJson(200, result.rows[0]);
       }
 
@@ -683,6 +709,7 @@ async function handleRequest(event, responseStream) {
           [user.email.toLowerCase(), body.course_name, ...vals]
         );
         if (result.rowCount === 0) return sendJson(404, { error: "No teacher profile found" });
+        invalidateTeacherStatus(user.email); // AUDIT_LAMBDA_PERF #1: done may have flipped
         return sendJson(200, result.rows[0]);
       }
 
