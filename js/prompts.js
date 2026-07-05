@@ -1,4 +1,4 @@
-import { activeHwForClass, getStudyStyle, hwContext } from '../app.js';
+import { activeHwForClass, getStudyStyle, hwContext } from './homework.js';
 import { S } from './state.js';
 import { getSchedule } from './storage.js';
 

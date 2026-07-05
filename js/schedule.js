@@ -1,5 +1,5 @@
-import { getStudyStyle, saveStudyStyle, syncStudyStyleToSupabase } from '../app.js';
 import { MENLO_CURRICULUM } from './data.js';
+import { getStudyStyle, saveStudyStyle, syncStudyStyleToSupabase } from './homework.js';
 import { setSidebarUserSubtitle } from './prompts.js';
 import { renderSidebar } from './sidebar.js';
 import { $ } from './state.js';
