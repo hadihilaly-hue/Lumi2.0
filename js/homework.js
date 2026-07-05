@@ -1,5 +1,5 @@
-import { dateDiffDays, deleteProject, fmtDateShort, getProjects, showProjectPlanModal, showWorkTypeChooser } from '../app.js';
 import { lookupSubjectForCourse, openTutor } from './conversation.js';
+import { dateDiffDays, deleteProject, fmtDateShort, getProjects, showProjectPlanModal, showWorkTypeChooser } from './projects.js';
 import { teacherDisplayName } from './prompts.js';
 import { addLongPress, renderSidebar } from './sidebar.js';
 import { $, S, currentUser } from './state.js';
