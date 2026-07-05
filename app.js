@@ -790,6 +790,18 @@ const TEACHER_EMAIL_MAP = {
   "Jennifer Jordt":         "jjordt@menloschool.org",
   "Richard Harris":         "rharris@menloschool.org",
   "Test Teacher":            "hadi.hilaly@menloschool.org",
+  // ── SYNTHETIC voice-test personas (fake domain @lumidemo.test; NOT real
+  //    Menlo staff). Seeded via synthetic_data/seed_personas.py; a demo
+  //    student schedule is loaded via seed_demo_student.py. Remove this block
+  //    + run cleanup_personas.py to fully revert.
+  "Dale Ferraro":           "dferraro@lumidemo.test",
+  "Priya Ramaswamy":        "pramaswamy@lumidemo.test",
+  "Nadia Okonkwo":          "nokonkwo@lumidemo.test",
+  "Thomas Beck":            "tbeck@lumidemo.test",
+  "Carmen Alvarado":        "calvarado@lumidemo.test",
+  "Kevin Zhou":             "kzhou@lumidemo.test",
+  "Greg Halloran":          "ghalloran@lumidemo.test",
+  "Rick Santos":            "rsantos@lumidemo.test",
 };
 
 // ── Teacher profile system — single source of truth: Supabase ──
