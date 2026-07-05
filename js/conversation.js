@@ -1,5 +1,6 @@
-import { prepareSuggestedPrompts, renderEmptyState, renderMsg, renderPinnedWelcome, scrollBottom, showWelcome, startLumi } from '../app.js';
+import { renderMsg, renderPinnedWelcome, scrollBottom, startLumi } from '../app.js';
 import { MENLO_CURRICULUM, SUBJECTS, SUBJECT_IDS } from './data.js';
+import { prepareSuggestedPrompts, renderEmptyState, showWelcome } from './emptystate.js';
 import { getStudentName, teacherDisplayName, updateTestModeBanner } from './prompts.js';
 import { clearSearch, renderSidebar } from './sidebar.js';
 import { $, S, SB, _introShownFor, _saveIntroShown, currentUser, messagesEl, msgInput } from './state.js';
