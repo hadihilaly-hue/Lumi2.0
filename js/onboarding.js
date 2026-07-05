@@ -1,4 +1,5 @@
 import { fetchClaudeProxy } from './api.js';
+import { CONFIG } from './config.js';
 import { MENLO_CURRICULUM } from './data.js';
 import { connectGoogleCalendar, saveStudyStyle, setCalendarConnected } from './homework.js';
 import { $, currentUser } from './state.js';
@@ -258,7 +259,7 @@ async function startObConversation() {
 
   try {
     const res = await fetchClaudeProxy({
-      model: 'claude-sonnet-4-20250514',
+      model: CONFIG.models.chat,
       max_tokens: 2500,
       system: buildOnboardingSystem(),
       messages: [{ role: 'user', content: seedMsg }],
@@ -277,7 +278,7 @@ async function startObConversation() {
     if (profileData) obApplyProfile(profileData);
   } catch (e) {
     obHideTyping();
-    obRenderMsg('lumi', "Hey! I'm Lumi — your Menlo study buddy. I'm having a bit of trouble connecting. Please check your API key in settings and refresh the page.", true);
+    obRenderMsg('lumi', "Hey! I'm Lumi — your Menlo study buddy. I'm having trouble connecting right now — check your internet connection and refresh the page to try again.", true);
   }
   OB.busy = false;
   const btn = $('obSend');
@@ -301,7 +302,7 @@ async function obSend() {
 
   try {
     const res = await fetchClaudeProxy({
-      model: 'claude-sonnet-4-20250514',
+      model: CONFIG.models.chat,
       max_tokens: 2500,
       system: buildOnboardingSystem(),
       messages: OB.messages,

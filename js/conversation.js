@@ -71,11 +71,14 @@ async function hydrateTutorProfile() {
   if (!ctx || !ctx.teacher || !ctx.course) return;
   if (ctx.teacherProfile) return; // already hydrated (localStorage path)
 
+  // AUDIT_FRONTEND F4: await getTeacherProfile directly — it is already bounded
+  // by its own internal 5s timeout. The former outer 5s Promise.race could fire
+  // first and resolve null, dropping a valid profile that lands at 5-8s (work
+  // samples add up to 3s) and forcing this resumed chat back to generic AI on a
+  // slow-but-successful hydrate.
   let profile = null;
   try {
-    const profilePromise = getTeacherProfile(ctx.teacher, ctx.course);
-    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 5000));
-    profile = await Promise.race([profilePromise, timeoutPromise]);
+    profile = await getTeacherProfile(ctx.teacher, ctx.course);
   } catch (e) {
     console.warn('[loadConv] profile hydrate error:', e);
     profile = null;
@@ -181,12 +184,16 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
   // onto the now-current chat.
   const ctx = S.tutorCtx;
 
-  // Fetch teacher profile — with 5s hard timeout so it never hangs
+  // Fetch teacher profile. AUDIT_FRONTEND F4: await getTeacherProfile directly —
+  // it already bounds itself with an internal 5s timeout and returns an
+  // { __error } marker on failure/timeout. The former outer 5s Promise.race here
+  // re-raced that with a timeout resolving to null, which could win and discard
+  // the marker: a slow-but-failed fetch then rendered as "teacher hasn't set up"
+  // instead of the error banner below, and a valid profile resolving at 5-8s
+  // (work-sample rows add up to 3s) could be dropped to null entirely.
   let profile = null;
   try {
-    const profilePromise = getTeacherProfile(teacher, course);
-    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 5000));
-    profile = await Promise.race([profilePromise, timeoutPromise]);
+    profile = await getTeacherProfile(teacher, course);
     console.log('[openTutor] profile:', profile ? 'found' : 'none');
   } catch (e) {
     console.warn('[openTutor] profile fetch error:', e);
