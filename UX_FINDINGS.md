@@ -34,17 +34,14 @@ Line numbers refer to the working tree on this branch after the UX commits.
 ### S1 — teacher.html "Student mode" toggle navigates into app.html
 - **File:** `teacher.html` ~line 651 (`#tTestModeToggle`) → `app.html?mode=test`;
   back-link banner ~line 670 → `app.html?mode=test`.
-- **UX work done here:** the toggle and the back-to-test banner referenced CSS
-  classes (`.t-test-mode-*`, `.t-back-to-test-*`) that **had no styling at all**
-  — they rendered unstyled. I added presentational CSS for them (in the
-  teacher.html commit) so the control looks like the intended switch.
+- **Styling note:** these classes (`.t-test-mode-*`, `.t-back-to-test-*`) ARE
+  already styled — in the shared `style.css` (lines ~976–1035, warm accent,
+  knob slides on hover). I made **no** changes to them (an earlier draft added
+  redundant CSS to teacher.html on a wrong assumption; it was reverted).
 - **Deferred / coordination note:** the actual test-mode *behavior* (reading
   `?mode=test`, flipping the sessionStorage flag at the student-app boot path)
   lives in `app.html` / `app.js`, which are **out of scope** and under active
-  work/review elsewhere ("Test Mode" review). I did **not** touch that logic. If
-  the toggle should reflect on/off state (the knob doesn't currently move —
-  it's a link, not a stateful switch), that state lives in the student app and
-  should be wired by whoever owns test mode.
+  work/review elsewhere ("Test Mode" review). I did **not** touch that logic.
 
 ---
 
