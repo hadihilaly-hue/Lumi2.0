@@ -1,4 +1,4 @@
-import { lookupSubjectForCourse } from '../app.js';
+import { lookupSubjectForCourse } from './conversation.js';
 import { setSidebarUserSubtitle } from './prompts.js';
 import { S, currentUser } from './state.js';
 import { TEACHER_EMAIL_MAP, fetchTeacherProfilesByEmails, rdsFetch } from './teachers.js';

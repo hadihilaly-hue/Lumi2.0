@@ -1,4 +1,5 @@
-import { initScheduleSetup, loadConv, lookupSubjectForCourse, openGeneralChat, openTutor, renderHwSidebar, showWelcome } from '../app.js';
+import { initScheduleSetup, renderHwSidebar, showWelcome } from '../app.js';
+import { loadConv, lookupSubjectForCourse, openGeneralChat, openTutor } from './conversation.js';
 import { SUBJECTS, getTeachers, searchCurriculum } from './data.js';
 import { S, SB, messagesEl, sbNav, sbSearch } from './state.js';
 import { deleteConvFromSupabase, genId, getConvs, getSchedule, saveConvs, saveCurrentConv, syncConvToSupabase } from './storage.js';
