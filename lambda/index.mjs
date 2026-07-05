@@ -1631,7 +1631,6 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
     let notesSection = "";
     const inj = body.inject_teacher_notes;
     if (inj && typeof inj.teacher_profile_id === "string" && inj.teacher_profile_id) {
-      // inj.use_rds is accepted-and-ignored (legacy clients still send it).
       const notes = await fetchTeacherNotes({
         studentId: user.id,
         teacherProfileId: inj.teacher_profile_id,
