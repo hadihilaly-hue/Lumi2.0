@@ -603,9 +603,13 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="cognito-auth.js"></script>
 <script>
-  // Cache-bust: force fresh app.js load every time
+  // app.js is an ES module (split into ./js/*.js). Load as type=module so its
+  // imports resolve. No cache-bust query: module identity is keyed by URL, and
+  // the js/*.js modules import back from ./app.js during the split — a query
+  // string would fork app.js into two instances and double-run the auth guard.
   const s = document.createElement('script');
-  s.src = 'app.js?t=' + Date.now();
+  s.type = 'module';
+  s.src = 'app.js';
   document.body.appendChild(s);
 </script>
 </body>
