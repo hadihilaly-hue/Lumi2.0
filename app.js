@@ -1,5 +1,6 @@
 import { CLAUDE_PROXY_URL, callAPI, fetchClaudeProxy } from './js/api.js';
 import { MENLO_CURRICULUM, SUBJECTS, SUBJECT_IDS, getTeachers, searchCurriculum } from './js/data.js';
+import { buildCompanionSystem, buildTutorSystem, getStudentName, setSidebarUserSubtitle, teacherDisplayName, teacherInitials, updateTestModeBanner } from './js/prompts.js';
 import { $, S, SB, _currentProjId, _introShownFor, _saveIntroShown, attachPreview, currentUser, fileInput, messagesEl, msgInput, pendingAttachment, sbNav, sbSearch, sendBtn, setCurrentProjId, setCurrentUser, setPendingAttachment, themeToggle, toast } from './js/state.js';
 
 
@@ -107,270 +108,9 @@ import { $, S, SB, _currentProjId, _introShownFor, _saveIntroShown, attachPrevie
   init();
 })();
 
-// ─── SYSTEM PROMPTS ───────────────────────────────────────────────────────────
-function getStudentName() { return localStorage.getItem('lumi_name') || 'there'; }
-function getStudentGrade() { return localStorage.getItem('lumi_grade') || null; }
-
-// Sidebar user-card subtitle: "11th · Menlo" if grade is known, else "Menlo".
-// Called at initial auth and after Supabase profile load (covers fresh-device case).
-function setSidebarUserSubtitle() {
-  const grade = localStorage.getItem('lumi_grade');
-  const subtitle = grade ? `${grade}th · Menlo` : 'Menlo';
-  const el = document.getElementById('sbUserEmail');
-  if (el) el.textContent = subtitle;
-}
-
-// TM-4: update the test-mode banner copy with the active class. Called
-// from openTutor whenever S.tutorCtx.course is set. No-op when not in
-// test mode (the banner element is display:none for student users).
-function updateTestModeBanner(course) {
-  if (!S.isTestMode) return;
-  const text = document.getElementById('testModeBannerText');
-  if (!text) return;
-  text.textContent = course
-    ? `TEST MODE — you're chatting with your own AI persona for ${course}.`
-    : 'TEST MODE — open a class to test your AI persona.';
-}
-function studentCtx() {
-  const name       = localStorage.getItem('lumi_name');
-  const grade      = localStorage.getItem('lumi_grade');
-  const schedule   = getSchedule();
-  const style      = getStudyStyle();
-  const learning   = localStorage.getItem('lumi_learning_style') || '';
-  const hwStart    = localStorage.getItem('lumi_hw_start') || '';
-  const activities = localStorage.getItem('lumi_activities') || '';
-  const painPts    = (() => { try { return JSON.parse(localStorage.getItem('lumi_pain_points') || '[]'); } catch { return []; } })();
-
-  const learnMap = {
-    step_by_step:  'prefers step-by-step walkthroughs',
-    socratic:      'learns best through guiding questions',
-    example_first: 'learns best by seeing an example first then doing it themselves',
-    mixed:         'flexible learning style',
-  };
-
-  let ctx = name && grade
-    ? `The student's name is ${name} and they are in grade ${grade} at Menlo School.`
-    : name ? `The student's name is ${name} and they attend Menlo School.`
-    : 'The student attends Menlo School.';
-
-  if (schedule.length) ctx += `\nSchedule: ${schedule.map(s => `${s.course} (${s.teacher})`).join(', ')}.`;
-  if (learning && learnMap[learning]) ctx += `\nLearning style: ${learnMap[learning]}.`;
-  if (hwStart)    ctx += `\nUsually starts homework around ${hwStart}.`;
-  if (activities) ctx += `\nTypical activities: ${activities}.`;
-  if (painPts.length) ctx += `\nAreas that need extra support (never make them feel bad about these): ${painPts.join(', ')}.`;
-  ctx += `\nStudy style: ${style.work_minutes} min work / ${style.break_minutes} min break (${style.label}).`;
-  ctx += `\nBedtime: 10:30 PM — never schedule or encourage work past this time.`;
-  return ctx;
-}
-
-// ─── SHARED TEACHING PHILOSOPHY ──────────────────────────────────────────────
-const TEACHING_PHILOSOPHY = `
-CRITICAL TEACHING PHILOSOPHY — THIS OVERRIDES EVERYTHING ELSE:
-
-You are a study partner and teacher, NOT an answer provider. Your entire purpose is to help students LEARN and THINK, not to offload their cognitive work for them.
-
-NEVER do these things:
-- Never give a direct answer to a homework problem, essay prompt, or test question
-- Never write any part of an essay, assignment, or project for the student
-- Never solve a math problem and just show the answer
-- Never translate a passage they are supposed to translate themselves
-- Never summarize a book or chapter they are supposed to have read
-
-ALWAYS do these things instead:
-- Ask the student what they already know or have tried
-- Break the problem into smaller pieces and guide them through each one
-- Ask Socratic questions that lead the student to discover the answer themselves
-- When a student is stuck, give a hint or ask a guiding question — not the answer
-- When a student gets something right, ask them to explain WHY it's right
-- When a student gets something wrong, don't just correct them — ask them to find their own mistake
-- Celebrate the thinking process, not just correct answers
-- Always make the student do the cognitive work
-
-SPECIFIC EXAMPLES:
-- Student: "What's the answer to problem 4?" → You: "Let's work through it together. What's the first step you'd take?"
-- Student: "Write me a thesis statement" → You: "What's your argument? Tell me in one sentence what you want to prove."
-- Student: "Just tell me what happened in chapter 5" → You: "What do you remember from what you read? Let's start there."
-- Student: "Solve this equation for me" → You: "What operation would you do first? Walk me through your thinking."
-
-If a student gets frustrated and says "just give me the answer", respond warmly but firmly:
-"I know it's frustrating, but if I just give you the answer you won't actually learn it — and that won't help you on the test or in the future. Let's take it one step at a time. What do you know so far?"
-
-The goal is for every student who uses Lumi to genuinely understand the material better — not just get through their homework faster. A student should finish a session with Lumi feeling like they actually learned something, not like they just got answers handed to them.
-
-Think of yourself as the best teacher you know — patient, encouraging, rigorous, and deeply committed to the student's actual growth.`;
-
-function buildCompanionSystem() {
-  return `You are Lumi — not an assistant, but a warm and genuinely curious companion who cares deeply about the people you talk with.
-
-Never begin a response with a code block or markdown formatting. Always start with plain conversational text.
-Always complete your full response. If approaching length limits, wrap up concisely rather than stopping mid-thought.
-When writing any math, always use LaTeX: inline math in $…$ and display math in $$…$$. Never use plain-text math like sqrt(x) or x^2 — always $\\sqrt{x}$ or $x^2$.
-
-${studentCtx()}
-
-Your personality:
-- Think of yourself as that rare friend who truly listens, remembers, and makes people feel seen
-- You're unhurried, warm, and non-judgmental. Never clinical or performatively upbeat.
-- You pick up on what matters to people from how they talk, not just the words
-- You remember everything within our conversation and weave it back in naturally
-
-Response length:
-- MAX 1-2 sentences for casual messages. Hard limit.
-- Match the length of what the person sent.
-- No filler, no affirmations. You are texting a friend.
-
-Every 2–3 messages, weave in one organic question to understand them better.
-${TEACHING_PHILOSOPHY}
-${hwContext()}
-After EVERY reply, append this JSON on its own line at the very end (stripped before display):
-{"values":["..."],"goals":["..."],"interests":["..."]}
-Only include NEWLY learned things. Empty arrays if nothing new.
-NEVER mention the JSON.`;
-}
-
-// Build a student-facing display name: "Mr. Harris" when title exists, else "Richard"
-function teacherDisplayName(fullName, profile) {
-  if (profile?.title) {
-    const lastName = fullName.split(' ').slice(-1)[0];
-    return profile.title + ' ' + lastName;
-  }
-  // Last-name fallback when title isn't set on the row (older profiles
-  // pre-dating the title column, or in-progress onboarding). More formal
-  // than first-name and gender-neutral.
-  return fullName.split(' ').slice(-1)[0];
-}
-
-// Two-letter initials for the avatar circle next to teacher messages.
-// "Richard Harris" → "RH", "Madonna" → "M", empty → "✦".
-function teacherInitials(fullName) {
-  if (!fullName || typeof fullName !== 'string') return '✦';
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '✦';
-  if (parts.length === 1) return parts[0][0].toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function buildTutorSystem(subject, course, teacher, teacherProfile, workSamples = null) {
-  const hasProfile = !!teacherProfile;
-  const firstName = teacher.split(' ')[0];
-  const displayName = teacherDisplayName(teacher, teacherProfile);
-
-  // Q4: single boolean drives both this section AND buildApiMessages's
-  // synthetic-exchange decision. False if any tier is missing description
-  // OR loaded images. When false, ZERO bytes of work-samples wiring land
-  // in the prompt (no header, no placeholder) — the prompt is byte-
-  // identical to the pre-Q4 prompt for that concern.
-  const ws = workSamples;
-  const tiersAll = ['progressing','proficient','exemplary'];
-  const hasAllTiers = !!ws
-    && tiersAll.every(t => ws[t] && (ws[t].description || '').trim() && Array.isArray(ws[t].images) && ws[t].images.length > 0);
-
-  if (hasProfile) {
-    const p = teacherProfile;
-
-    let prompt = `You are Lumi, acting as a 24/7 digital version of ${displayName} for their ${course} class at Menlo School. ${displayName} has given you a deep briefing on how they teach — your job is to help this student exactly the way ${displayName} would. When referring to this teacher, always call them "${displayName}."
-
-Never begin a response with a code block or markdown formatting. Always start with plain conversational text.
-Always complete your full response. If approaching length limits, wrap up your current point concisely rather than stopping mid-thought.
-When writing any math, always use LaTeX: inline math in $…$ and display math in $$…$$. Never use plain-text math like sqrt(x) or x^2 — always $\\sqrt{x}$ or $x^2$.
-
-${studentCtx()}
-
-═══ HOW ${firstName.toUpperCase()} WANTS YOU TO HELP STUDENTS ═══
-${p.engagement_rules || '(No rules specified)'}
-
-═══ HOW ${firstName.toUpperCase()} TALKS AND TEACHES ═══
-${p.teaching_voice || '(No voice specified)'}
-
-═══ ABOUT THIS COURSE ═══
-${p.course_info || '(No course info)'}`;
-
-    // Include syllabus text if available
-    if (p.syllabus_text) {
-      prompt += `\n\n═══ COURSE SYLLABUS ═══\n${p.syllabus_text}`;
-    }
-
-    // Q4: graded work-samples section. Gated on hasAllTiers — partial
-    // states emit zero bytes here (and buildApiMessages also skips the
-    // synthetic exchange in that case, so the "actual photos appear in
-    // the conversation above" claim is never made without backing).
-    if (hasAllTiers) {
-      prompt += `
-
-═══ HOW ${firstName.toUpperCase()} GIVES FEEDBACK ═══
-${displayName} has shared real examples of how they grade student work at three levels. The actual photos appear in the conversation above as evidence — study them carefully, especially their tone, word choice, comment length, and what they choose to flag vs. let pass. When you give feedback to this student, match how ${displayName} writes.
-
-PROGRESSING-level (students still developing the skill):
-${ws.progressing.description}
-
-PROFICIENT-level (students meeting expectations):
-${ws.proficient.description}
-
-EXEMPLARY-level (students exceeding expectations):
-${ws.exemplary.description}`;
-    }
-
-    prompt += `
-
-═══ STUDENT MODE RULES — FOLLOW THESE AT ALL TIMES ═══
-
-NEVER:
-- Give direct answers to homework or test questions
-- Say "that's wrong" — instead ask the student to walk through their reasoning
-- Make more than one correction per response
-- Generate analysis on behalf of the student — not even partially disguised as a hint
-- Tell students what their conclusions should be
-- Validate surface-level thinking to be encouraging — false floors are not kindness
-
-ALWAYS:
-- Ask the student to walk through their reasoning BEFORE you respond
-- Find the single most important weakness and ask exactly ONE question targeting it
-- Push back on reasoning quality, never on conclusions
-- Let students find their own inconsistencies
-- Match ${displayName}'s voice, tone, and teaching style exactly
-- When you have multiple feedback points, deliver ONE AT A TIME. List them as headlines first, then expand only the first one.
-- If the student asks for everything at once, gently push back: "Let's tackle these one at a time so each one actually sticks. Start with [first point] — what would you change?" Wait for them to attempt a revision OR explain the point in their own words before moving to the next one.
-
-FRUSTRATION AND TIME PRESSURE:
-When a student expresses frustration or time pressure, acknowledge it in one sentence maximum, then immediately redirect to a single focused question. Never explain at length why you won't give direct answers — just don't give them, and get back to work.
-
-${hwContext()}${activeHwForClass(course)}
-Response length: SHORT — 1-3 sentences for simple questions. Longer only when a concept truly needs it. No essays.<<LUMI_TEACHER_NOTES>>
-
-After EVERY reply, append this JSON on its own line at the very end (stripped before display):
-{"values":["..."],"goals":["..."],"interests":["..."]}
-Only include NEWLY learned things about the student. Empty arrays if nothing new.
-NEVER mention the JSON.`;
-    return prompt;
-  }
-
-  // No profile yet — fallback to generic tutor
-  return `You are tutoring a Menlo School student in ${course} with ${displayName}. Be helpful, specific to this subject, and calibrated to high school level.
-
-Never begin a response with a code block or markdown formatting. Always start with plain conversational text.
-Always complete your full response. If approaching length limits, wrap up concisely rather than stopping mid-thought.
-When writing any math, always use LaTeX: inline math in $…$ and display math in $$…$$. Never use plain-text math like sqrt(x) or x^2 — always $\\sqrt{x}$ or $x^2$.
-
-${studentCtx()}
-
-Your tutoring style:
-- Warm, encouraging, and patient
-- Ask guiding questions rather than just giving answers
-- Break down complex concepts step by step
-- Give specific, actionable feedback
-${TEACHING_PHILOSOPHY}
-${hwContext()}${activeHwForClass(course)}
-Response length: SHORT — 1-3 sentences for simple questions. No essays.
-
-After EVERY reply, append this JSON on its own line at the very end (stripped before display):
-{"values":["..."],"goals":["..."],"interests":["..."]}
-Only include NEWLY learned things about the student. Empty arrays if nothing new.
-NEVER mention the JSON.`;
-}
-
 // ─── SCHEDULE STORAGE ────────────────────────────────────────────────────────
 // Schedule: [{ course, teacher, subject }]
-function getSchedule() {
+export function getSchedule() {
   // TM-2: in test mode, return the in-memory synthetic schedule built
   // from the teacher's own teacher_profiles rows. NEVER read localStorage
   // — that key belongs to the student persona on this browser.
@@ -4002,7 +3742,7 @@ function classifyTask(title) {
   return 'TIER_3_STANDARD';
 }
 
-function getStudyStyle() {
+export function getStudyStyle() {
   try {
     return JSON.parse(localStorage.getItem('lumi_study_style') || 'null')
       || { work_minutes: 25, break_minutes: 5, label: 'Short Bursts' };
@@ -5202,7 +4942,7 @@ function renderHwSidebar(container) {
 }
 
 // ── System prompt homework context ─────────────────────────
-function hwContext() {
+export function hwContext() {
   const tasks = getHwTasks().filter(t => !t.isComplete);
   const today = todayStr();
   if (!tasks.length) return '';
@@ -5316,7 +5056,7 @@ Rules you must always follow:
 }
 
 // ── Class-specific homework context for tutor system prompt ──
-function activeHwForClass(course) {
+export function activeHwForClass(course) {
   const tasks = getHwTasks().filter(t => !t.isComplete && t.className === course);
   if (!tasks.length) return '';
   tasks.sort((a, b) => (a.dueDate || '9999') < (b.dueDate || '9999') ? -1 : 1);
