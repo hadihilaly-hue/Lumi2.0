@@ -58,6 +58,16 @@ const bedrockClient = new BedrockRuntimeClient({
   region: AWS_REGION,
   requestHandler: { connectionTimeout: 3_000, socketTimeout: 25_000 },
 });
+
+// === Logging redaction helper (compliance: single choke point) ===
+// Turn any error into a CloudWatch-safe string. NEVER log the raw error object:
+// it can carry request bodies, prompt text, S3 keys, SQL, or JWT context. All
+// route error logging goes through safeErr(); log identity/status/timing/counts
+// alongside it — never emails, tokens, teacher-notes, or row data.
+function safeErr(err) {
+  if (err == null) return "unknown";
+  return String(err.code ?? err.name ?? err.message ?? "unknown");
+}
 const s3Client = new S3Client({ region: AWS_REGION });
 
 // === Allowed sign-in domains (Workstream I Phase 4) ===
@@ -79,7 +89,7 @@ async function getAllowedDomains() {
     domainsCache = { set: new Set(result.rows.map(r => r.d)), fetchedAt: Date.now() };
     return domainsCache.set;
   } catch (err) {
-    console.error("getAllowedDomains error:", err.code ?? err.message);
+    console.error("getAllowedDomains error:", safeErr(err));
     return domainsCache?.set ?? null;
   }
 }
@@ -181,7 +191,7 @@ async function isTeacher(email) {
     );
     return result.rowCount > 0;
   } catch (err) {
-    console.error("isTeacher error:", err.code ?? err.message);
+    console.error("isTeacher error:", safeErr(err));
     return false;
   }
 }
@@ -206,7 +216,7 @@ async function checkRateLimit(userId, isTeacherUser) {
     return { allowed: count < limit, remaining: Math.max(0, limit - count), limit };
   } catch (err) {
     // Fail open — a broken usage counter must not block chat.
-    console.error("checkRateLimit error:", err.code ?? err.message);
+    console.error("checkRateLimit error:", safeErr(err));
     return { allowed: true, remaining: limit, limit };
   }
 }
@@ -220,7 +230,7 @@ async function logUsage({ userId, email, isTeacherUser, model, inputTokens, outp
       [userId, email.toLowerCase(), isTeacherUser, model, inputTokens, outputTokens]
     );
   } catch (err) {
-    console.error("logUsage error:", err.code ?? err.message);
+    console.error("logUsage error:", safeErr(err));
   }
 }
 
@@ -419,7 +429,7 @@ async function fetchTeacherNotes({ studentId, teacherProfileId }) {
     if (vals.length > 1) { console.warn(`[notes] multi-block collision (${vals.length} rows) — skipped`); return []; }
     return parseNotes(vals[0] ?? null);
   } catch (err) {
-    console.warn("[notes] fetch failed:", err.code ?? err.message);
+    console.warn("[notes] fetch failed:", safeErr(err));
     return [];
   }
 }
@@ -476,6 +486,18 @@ async function handleRequest(event, responseStream) {
     }
     if (event.params !== undefined && !Array.isArray(event.params)) {
       responseStream.write(JSON.stringify({ error: "params must be an array if provided" }));
+      responseStream.end();
+      return;
+    }
+    // Defense-in-depth (compliance): this path is already IAM-gated
+    // (lambda:InvokeFunction) and HTTP-unreachable — that IAM gate is the
+    // primary lockdown. If ADMIN_INVOKE_SECRET is configured, ALSO require it
+    // in the event payload, so a stolen IAM session alone is insufficient.
+    // Unset = IAM-only (unchanged), so existing ops tooling keeps working
+    // until the secret is provisioned (then update sis-test-cleanup.py etc.).
+    if (process.env.ADMIN_INVOKE_SECRET && event.adminSecret !== process.env.ADMIN_INVOKE_SECRET) {
+      console.log("admin-invoke denied: bad/missing adminSecret");
+      responseStream.write(JSON.stringify({ error: "forbidden" }));
       responseStream.end();
       return;
     }
@@ -644,7 +666,7 @@ async function handleRequest(event, responseStream) {
       return sendJson(405, { error: "Method not allowed" });
     } catch (err) {
       // No email / row data / token in logs — code or message only.
-      console.error("teacher-profile error:", err.code ?? err.message);
+      console.error("teacher-profile error:", safeErr(err));
       return sendJson(500, { error: "Database error" });
     }
   }
@@ -698,7 +720,7 @@ async function handleRequest(event, responseStream) {
 
       return sendJson(405, { error: "Method not allowed" });
     } catch (err) {
-      console.error("profiles error:", err.code ?? err.message);
+      console.error("profiles error:", safeErr(err));
       return sendJson(500, { error: "Database error" });
     }
   }
@@ -784,7 +806,7 @@ async function handleRequest(event, responseStream) {
 
       return sendJson(405, { error: "Method not allowed" });
     } catch (err) {
-      console.error("conversations error:", err.code ?? err.message);
+      console.error("conversations error:", safeErr(err));
       return sendJson(500, { error: "Database error" });
     }
   }
@@ -872,7 +894,7 @@ async function handleRequest(event, responseStream) {
       return sendJson(405, { error: "Method not allowed" });
     } catch (err) {
       if (err.badRequest) return sendJson(400, { error: err.message });
-      console.error("homework-tasks error:", err.code ?? err.message);
+      console.error("homework-tasks error:", safeErr(err));
       return sendJson(500, { error: "Database error" });
     }
   }
@@ -960,7 +982,7 @@ async function handleRequest(event, responseStream) {
 
       return sendJson(405, { error: "Method not allowed" });
     } catch (err) {
-      console.error("work-samples error:", err.code ?? err.message);
+      console.error("work-samples error:", safeErr(err));
       return sendJson(500, { error: "Database error" });
     }
   }
@@ -1018,7 +1040,7 @@ async function handleRequest(event, responseStream) {
       } catch (err) {
         // 23503 = FK violation (teacher_profile_id doesn't exist) — client data problem.
         if (err.code === "23503") return sendJson(400, { error: "Unknown teacher_profile_id" });
-        console.error("class-enrollments error:", err.code ?? err.message);
+        console.error("class-enrollments error:", safeErr(err));
         return sendJson(500, { error: "Database error" });
       }
     }
@@ -1047,7 +1069,7 @@ async function handleRequest(event, responseStream) {
         );
         return sendJson(200, result.rows[0]);
       } catch (err) {
-        console.error("class-enrollments error:", err.code ?? err.message);
+        console.error("class-enrollments error:", safeErr(err));
         return sendJson(500, { error: "Database error" });
       }
     }
@@ -1075,7 +1097,7 @@ async function handleRequest(event, responseStream) {
       );
       return sendJson(200, result.rows);
     } catch (err) {
-      console.error("class-enrollments error:", err.code ?? err.message);
+      console.error("class-enrollments error:", safeErr(err));
       return sendJson(500, { error: "Database error" });
     }
   }
@@ -1168,7 +1190,7 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
       console.log("[suggested-prompts] mode=influenced");
       return sendJson(200, { mode: "influenced", prompts: chips });
     } catch (err) {
-      console.warn("[suggested-prompts] generation failed:", err.code ?? err.message);
+      console.warn("[suggested-prompts] generation failed:", safeErr(err));
       return sendJson(200, { mode: "fallback" });
     }
   }
@@ -1465,7 +1487,7 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
       console.log(`[sis-import] complete: ${teachers.length}t/${students.length}s/${classes.length}c/${enrollments.length}e; created t=${progress.teachers_created} s=${progress.students_created}; ${warnings.length} warning(s)`);
       return sendJson(200, { status: "complete", school_id: schoolId, progress, warnings });
     } catch (err) {
-      console.error("sis-import error:", err.code ?? err.message);
+      console.error("sis-import error:", safeErr(err));
       return sendJson(500, { error: "Import failed — safe to re-POST (all writes idempotent)", detail: err.code ?? err.message, progress, warnings });
     }
   }
@@ -1483,7 +1505,7 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
       const uploadUrl = await generateUploadURL({ bucketType: bucket, key, contentType });
       return sendJson(200, { uploadUrl, key });
     } catch (err) {
-      console.error("upload-url error:", err);
+      console.error("upload-url error:", safeErr(err));
       return sendJson(500, { error: err.message });
     }
   }
@@ -1497,7 +1519,7 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
       const downloadUrl = await generateDownloadURL({ bucketType: bucket, key });
       return sendJson(200, { downloadUrl });
     } catch (err) {
-      console.error("download-url error:", err);
+      console.error("download-url error:", safeErr(err));
       return sendJson(500, { error: err.message });
     }
   }
@@ -1511,7 +1533,7 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
       return sendJson(429, { error: `Rate limit exceeded (${rateLimit.limit}/day)` });
     }
   } catch (err) {
-    console.error("Pre-chat error:", err);
+    console.error("Pre-chat error:", safeErr(err));
     return sendJson(500, { error: err.message });
   }
   
@@ -1577,7 +1599,7 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
       outputTokens,
     });
   } catch (err) {
-    console.error("Chat stream error:", err);
+    console.error("Chat stream error:", safeErr(err));
     chatStream.write(`data: ${JSON.stringify({ error: err.message || "Stream error" })}\n\n`);
     chatStream.end();
   }
