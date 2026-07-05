@@ -24,7 +24,6 @@ export function lookupSubjectForCourse(courseName) {
 }
 
 // ─── LOAD A CONVERSATION ──────────────────────────────────────────────────────
-export function loadConv(id) {
 export async function loadConv(id) {
   const conv = getConvs()[id];
   if (!conv) return;
