@@ -837,3 +837,30 @@ spoofed ids.
 - **Markdown rendering:** Custom lightweight renderer in app.js (no library)
 - **Hosting:** GitHub Pages (static deploy)
 - **Schema:** `migration/rds-schema.sql` (+ `rds-sis-tables.sql`, `rds-app-users.sql`, `rds-school-domains.sql`) is the live RDS schema; supabase_setup.sql is the historical Supabase-era definition (RLS included) — do not apply it anywhere
+
+---
+
+## Compliance & Data Governance (FERPA / SOPIPA / AB 1584)
+
+Ongoing hardening pass to make Lumi structurally ready for K-12 privacy law before
+scaled student use at Menlo. Phased; each phase is reviewed and committed separately.
+
+- **`docs/COMPLIANCE.md` is the source of truth** for the data inventory (every PII/
+  education-record element: where collected, where stored, retention, who can access),
+  the data-flow map (browser → Lambda → RDS/Bedrock; no direct browser→Bedrock; teacher
+  notes injected server-side; no live Supabase path), the subprocessor list, the Bedrock
+  no-training/in-region citation (verified against live AWS docs), and an honest Known
+  Gaps list. Keep it PII-free — describe categories/columns, never real names/emails.
+- **Phase 1 shipped (2026-07-04):** `docs/COMPLIANCE.md` created; temporary
+  `DIAGNOSTIC_REPORT.md` folded in and deleted.
+- **Key facts established in the Phase 0 diagnostic** (carry forward):
+  - **No `deleted_at` / soft-delete / retention on any table.** No deletion mechanism
+    exists yet. `conversations.messages` already persists student chat content today.
+  - **Lambda backend is clean of hardcoded secrets** (RDS IAM auth, Cognito JWKS, no
+    Secrets Manager in use). `/admin/sql` has **no HTTP route** — reachable only via the
+    IAM-gated direct-invoke `adminSql` branch (`lambda/index.mjs:470`).
+  - **Real staff PII is committed to the public repos** (`admin.html` staff directory,
+    `app.js` `MENLO_CURRICULUM` + admin email) in HEAD + history — Phase 2 scope; history
+    rewrite only with explicit owner approval.
+  - 4 Lambda log sites dumped full error objects (`lambda/index.mjs:1486/1500/1514/1580`)
+    — Phase 2 redaction target; no central log helper existed.
