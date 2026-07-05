@@ -625,13 +625,25 @@ async function handleRequest(event, responseStream) {
         }
         const targetEmail = (qs.teacher_email || user.email).toLowerCase();
         const courseName = qs.course_name || null;
+        // AUDIT_LAMBDA_BUGS H3: the default read is still cross-teacher (students
+        // legitimately fetch their teacher's persona — engagement_rules,
+        // teaching_voice, course_info, syllabus_text, welcome_message, prompts),
+        // but a non-owner must not receive the S3 key columns (syllabus_file_path,
+        // syllabus_paths). Those keys are the discoverable input to /download-url
+        // (H2) and are never read by the student client. Owners keep SELECT *.
+        const isOwnerRead = targetEmail === user.email.toLowerCase();
+        const selectCols = isOwnerRead
+          ? "*"
+          : "id, teacher_email, course_name, course_code, engagement_rules, teaching_voice, " +
+            "course_info, syllabus_text, syllabus_uploaded_at, share_course_info, done, " +
+            "suggested_prompts, welcome_message, title, created_at, updated_at";
         const result = courseName
           ? await dbQuery(
-              "SELECT * FROM public.teacher_profiles WHERE teacher_email = $1 AND course_name = $2 ORDER BY course_name",
+              `SELECT ${selectCols} FROM public.teacher_profiles WHERE teacher_email = $1 AND course_name = $2 ORDER BY course_name`,
               [targetEmail, courseName]
             )
           : await dbQuery(
-              "SELECT * FROM public.teacher_profiles WHERE teacher_email = $1 ORDER BY course_name",
+              `SELECT ${selectCols} FROM public.teacher_profiles WHERE teacher_email = $1 ORDER BY course_name`,
               [targetEmail]
             );
         if (result.rowCount === 0) return sendJson(404, { error: "No teacher profile found" });
