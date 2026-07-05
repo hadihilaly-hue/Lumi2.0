@@ -535,19 +535,67 @@ test('POST /upload-url signs a key namespaced to the JWT user id (not a body-sup
 
 // =============================== /download-url ==============================
 
-// AUDIT_LAMBDA_BUGS H2: this route has NO ownership/teacher check — any
-// authenticated user can sign a GET for any key. This test PINS that current
-// behavior so a future fix (re-adding the owner check) will visibly flip it.
-test('POST /download-url signs a URL for any authenticated user [pins H2: no ownership check]', async () => {
+// AUDIT_LAMBDA_BUGS H2: /download-url must not sign a syllabus URL for a key the
+// caller does not own. This previously PINNED the broken "signs any key" behavior;
+// it is flipped here to assert the fix (403 + no sign for a non-owned syllabus key).
+test('POST /download-url refuses a syllabus key the caller does not own (H2 fix)', async () => {
   const { handler } = await loadHandler();
-  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId, isTeacher: false }) });
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
   const r = await invoke(handler, {
     method: 'POST', path: '/download-url', token: tokenFor(STUDENT),
     body: { bucket: 'syllabi', key: 'teachers/some-other-teacher/general/1-file.pdf' },
   });
+  assert.equal(r.statusCode, 403);
+  assert.equal(ctx.signRequests.length, 0, 'no URL signed for a non-owned syllabus key');
+});
+
+test('POST /download-url signs a syllabus URL for the key owner (H2)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: TEACHER.userId }) });
+  const key = `teachers/${TEACHER.userId}/general/1-file.pdf`;
+  const r = await invoke(handler, {
+    method: 'POST', path: '/download-url', token: tokenFor(TEACHER),
+    body: { bucket: 'syllabi', key },
+  });
   assert.equal(r.statusCode, 200);
-  assert.equal(r.json().downloadUrl, ctx.signedUrl);
-  assert.equal(ctx.signRequests[0].command.Key, 'teachers/some-other-teacher/general/1-file.pdf');
+  assert.equal(ctx.signRequests.length, 1);
+  assert.equal(ctx.signRequests[0].command.Key, key);
+});
+
+test('POST /download-url lets an admin sign any syllabus key (H2 admin bypass)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: ADMIN.userId, domains: [] }) });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/download-url', token: tokenFor(ADMIN),
+    body: { bucket: 'syllabi', key: 'teachers/some-other-teacher/general/1-file.pdf' },
+  });
+  assert.equal(r.statusCode, 200);
+  assert.equal(ctx.signRequests.length, 1);
+});
+
+// work-samples download is intentionally open to any authed caller (the runtime
+// vision pipeline fetches a teacher's work-sample photos for enrolled students).
+test('POST /download-url still signs work-sample keys for any authed caller (documented)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
+  const key = 'teachers/some-teacher/algebra/proficient/1-photo.jpg';
+  const r = await invoke(handler, {
+    method: 'POST', path: '/download-url', token: tokenFor(STUDENT),
+    body: { bucket: 'work-samples', key },
+  });
+  assert.equal(r.statusCode, 200);
+  assert.equal(ctx.signRequests[0].command.Key, key);
+});
+
+test('POST /download-url 400s on an unknown bucket', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/download-url', token: tokenFor(STUDENT),
+    body: { bucket: 'evil', key: 'teachers/x/y/z.pdf' },
+  });
+  assert.equal(r.statusCode, 400);
+  assert.equal(ctx.signRequests.length, 0);
 });
 
 test('POST /download-url 400s without bucket/key', async () => {
