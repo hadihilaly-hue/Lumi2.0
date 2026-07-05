@@ -181,15 +181,40 @@ async function verifyCognitoAuth(token) {
 // Cutover 2026-07-01: reads RDS (teacher_profiles is authoritative there).
 // Fail-closed to "not a teacher" on DB error — same posture as the old
 // Supabase REST path.
+//
+// AUDIT_LAMBDA_PERF #1: isTeacher runs on every chat (hot path), /suggested-prompts,
+// and /upload-url — the only cacheable one of the ~3 serial chat-path round-trips.
+// Container-scoped cache keyed by lowercased email with a short TTL (status flips
+// only when a teacher completes onboarding). Bounded with FIFO eviction like
+// appUserCache. Invalidated on teacher-profile POST/PATCH so a teacher who just
+// finished setup isn't stuck as "not a teacher" for the TTL window.
+const TEACHER_CACHE_TTL_MS = 120000;
+const TEACHER_CACHE_MAX = 1000;
+const teacherStatusCache = new Map(); // lowercased email -> { value: bool, exp: ms }
+
+function invalidateTeacherStatus(email) {
+  teacherStatusCache.delete(email.toLowerCase());
+}
+
 async function isTeacher(email) {
-  if (SCHOOL_CONFIG.adminEmails.has(email.toLowerCase())) return true;
+  const key = email.toLowerCase();
+  if (SCHOOL_CONFIG.adminEmails.has(key)) return true;
+
+  const now = Date.now();
+  const hit = teacherStatusCache.get(key);
+  if (hit && hit.exp > now) return hit.value;
 
   try {
     const result = await dbQuery(
       "SELECT 1 FROM public.teacher_profiles WHERE teacher_email = $1 AND done = true LIMIT 1",
-      [email.toLowerCase()]
+      [key]
     );
-    return result.rowCount > 0;
+    const value = result.rowCount > 0;
+    if (teacherStatusCache.size >= TEACHER_CACHE_MAX) {
+      teacherStatusCache.delete(teacherStatusCache.keys().next().value);
+    }
+    teacherStatusCache.set(key, { value, exp: now + TEACHER_CACHE_TTL_MS });
+    return value;
   } catch (err) {
     console.error("isTeacher error:", safeErr(err));
     return false;
@@ -423,8 +448,19 @@ async function fetchTeacherNotes({ studentId, teacherProfileId }) {
       "SELECT teacher_notes FROM public.class_enrollments WHERE student_id = $1 AND teacher_profile_id = $2",
       [studentId, teacherProfileId]
     ).then(r => r.rows.map(x => x.teacher_notes));
-    const timeout = new Promise(resolve => setTimeout(() => resolve(null), 3000));
-    const vals = await Promise.race([work, timeout]);
+    // AUDIT_LAMBDA_BUGS H4: keep a handle to the loser timer and clear it after
+    // the race so it can't keep the event loop alive (streamifyResponse only
+    // finalizes when the loop drains — a dangling timer burns a concurrency slot
+    // for the full 3s after the response is already sent). .unref() as a belt
+    // in case work rejects before the clear.
+    let notesTimer;
+    const timeout = new Promise(resolve => { notesTimer = setTimeout(() => resolve(null), 3000); notesTimer.unref?.(); });
+    let vals;
+    try {
+      vals = await Promise.race([work, timeout]);
+    } finally {
+      clearTimeout(notesTimer);
+    }
     if (vals === null) { console.warn("[notes] fetch timeout"); return []; }
     if (vals.length > 1) { console.warn(`[notes] multi-block collision (${vals.length} rows) — skipped`); return []; }
     return parseNotes(vals[0] ?? null);
@@ -614,13 +650,25 @@ async function handleRequest(event, responseStream) {
         }
         const targetEmail = (qs.teacher_email || user.email).toLowerCase();
         const courseName = qs.course_name || null;
+        // AUDIT_LAMBDA_BUGS H3: the default read is still cross-teacher (students
+        // legitimately fetch their teacher's persona — engagement_rules,
+        // teaching_voice, course_info, syllabus_text, welcome_message, prompts),
+        // but a non-owner must not receive the S3 key columns (syllabus_file_path,
+        // syllabus_paths). Those keys are the discoverable input to /download-url
+        // (H2) and are never read by the student client. Owners keep SELECT *.
+        const isOwnerRead = targetEmail === user.email.toLowerCase();
+        const selectCols = isOwnerRead
+          ? "*"
+          : "id, teacher_email, course_name, course_code, engagement_rules, teaching_voice, " +
+            "course_info, syllabus_text, syllabus_uploaded_at, share_course_info, done, " +
+            "suggested_prompts, welcome_message, title, created_at, updated_at";
         const result = courseName
           ? await dbQuery(
-              "SELECT * FROM public.teacher_profiles WHERE teacher_email = $1 AND course_name = $2 ORDER BY course_name",
+              `SELECT ${selectCols} FROM public.teacher_profiles WHERE teacher_email = $1 AND course_name = $2 ORDER BY course_name`,
               [targetEmail, courseName]
             )
           : await dbQuery(
-              "SELECT * FROM public.teacher_profiles WHERE teacher_email = $1 ORDER BY course_name",
+              `SELECT ${selectCols} FROM public.teacher_profiles WHERE teacher_email = $1 ORDER BY course_name`,
               [targetEmail]
             );
         if (result.rowCount === 0) return sendJson(404, { error: "No teacher profile found" });
@@ -643,6 +691,7 @@ async function handleRequest(event, responseStream) {
              RETURNING *`,
           [user.email.toLowerCase(), body.course_name, ...vals]
         );
+        invalidateTeacherStatus(user.email); // AUDIT_LAMBDA_PERF #1: done may have flipped
         return sendJson(200, result.rows[0]);
       }
 
@@ -660,6 +709,7 @@ async function handleRequest(event, responseStream) {
           [user.email.toLowerCase(), body.course_name, ...vals]
         );
         if (result.rowCount === 0) return sendJson(404, { error: "No teacher profile found" });
+        invalidateTeacherStatus(user.email); // AUDIT_LAMBDA_PERF #1: done may have flipped
         return sendJson(200, result.rows[0]);
       }
 
@@ -685,7 +735,16 @@ async function handleRequest(event, responseStream) {
     const method = event.requestContext?.http?.method || "GET";
     try {
       if (method === "GET") {
-        const result = await dbQuery("SELECT * FROM public.profiles WHERE id = $1", [user.id]);
+        // AUDIT_LAMBDA_PERF #4: explicit column list instead of SELECT * so the
+        // google_calendar_token PII (never read by the frontend — it only reads
+        // the calendar_connected boolean) stays server-side.
+        const result = await dbQuery(
+          `SELECT id, name, grade, values_profile, created_at, schedule, schedule_updated_at,
+                  semester_banner_dismissed_at, study_style, calendar_connected, learning_style,
+                  pain_points, typical_activities, onboarding_complete, homework_start_time
+             FROM public.profiles WHERE id = $1`,
+          [user.id]
+        );
         if (result.rowCount === 0) return sendJson(404, { error: "No profile found" });
         return sendJson(200, result.rows[0]);
       }
@@ -1159,10 +1218,17 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
           if (chunk.type === "content_block_delta" && chunk.delta?.text) text += chunk.delta.text;
         }
       })();
-      await Promise.race([
-        generate,
-        new Promise((_, reject) => setTimeout(() => reject(new Error("generation timeout")), 8000)),
-      ]);
+      // AUDIT_LAMBDA_BUGS H4: clear the loser timeout so it can't keep the event
+      // loop alive and burn a concurrency slot after the response is sent.
+      let genTimer;
+      try {
+        await Promise.race([
+          generate,
+          new Promise((_, reject) => { genTimer = setTimeout(() => reject(new Error("generation timeout")), 8000); genTimer.unref?.(); }),
+        ]);
+      } finally {
+        clearTimeout(genTimer);
+      }
 
       const match = text.match(/\[[\s\S]*\]/);
       if (!match) throw new Error("no JSON array");
@@ -1431,25 +1497,42 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
         profileIdByKey.set(gkey, res.rows[0].id);
       }
 
-      // 5. sections
-      for (const c of classes) {
+      // 5. sections — AUDIT_LAMBDA_PERF #2: batched multi-VALUES upserts (was one
+      // awaited INSERT per class → a 200-class school = 200 serial round-trips).
+      // Conflict key (school_id, sis_id) is unique across `classes` (validation
+      // rule 3 rejects duplicate class ids), so no row can conflict twice within
+      // a chunk. Chunked at 100 with the same per-chunk overBudget checkpoint, so
+      // partial-resume (next:"sections") and idempotency are preserved.
+      const SECTION_CHUNK = 100;
+      for (let i = 0; i < classes.length; i += SECTION_CHUNK) {
         if (overBudget()) return sendJson(200, { status: "partial", next: "sections", progress, warnings });
-        const gkey = `${c.teacher_id}	${c.course_name}`;
-        await dbQuery(
+        const chunk = classes.slice(i, i + SECTION_CHUNK);
+        const values = [];
+        const tuples = chunk.map((c, rowIdx) => {
+          const gkey = `${c.teacher_id}	${c.course_name}`;
+          values.push(
+            schoolId, c.id, profileIdByKey.get(gkey), c.name, c.course_name,
+            c.course_code ?? null, c.subject, c.term, c.period ?? null, c.room ?? null,
+            Array.isArray(c.meeting_days) ? c.meeting_days : [], blockByClassId.get(c.id)
+          );
+          const base = rowIdx * 12;
+          return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, ` +
+                 `$${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}, $${base + 12})`;
+        });
+        const res = await dbQuery(
           `INSERT INTO public.sections (school_id, sis_id, teacher_profile_id, name, course_name,
                                         course_code, subject, term, period, room, meeting_days, block)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+           VALUES ${tuples.join(", ")}
            ON CONFLICT (school_id, sis_id) DO UPDATE SET
              teacher_profile_id = EXCLUDED.teacher_profile_id, name = EXCLUDED.name,
              course_name = EXCLUDED.course_name, course_code = EXCLUDED.course_code,
              subject = EXCLUDED.subject, term = EXCLUDED.term, period = EXCLUDED.period,
              room = EXCLUDED.room, meeting_days = EXCLUDED.meeting_days,
-             block = EXCLUDED.block, updated_at = now()`,
-          [schoolId, c.id, profileIdByKey.get(gkey), c.name, c.course_name,
-           c.course_code ?? null, c.subject, c.term, c.period ?? null, c.room ?? null,
-           Array.isArray(c.meeting_days) ? c.meeting_days : [], blockByClassId.get(c.id)]
+             block = EXCLUDED.block, updated_at = now()
+           RETURNING id`,
+          values
         );
-        progress.sections++;
+        progress.sections += res.rowCount;
       }
 
       // 6. enrollments — batched multi-VALUES upserts (same pattern as /homework-tasks)
