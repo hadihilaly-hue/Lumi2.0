@@ -69,7 +69,9 @@ should re-apply the H1/H2 feature on top of this split separately.
 
 When this branch was created off `main`, the working tree already had uncommitted
 edits by the user, unrelated to the split:
-- `app.html`: one-line CSS tweak on the `#teacherModeLink` border (`rgba(...)` →
-  `var(--accent-glow)`). Rides along in the commit that changes the `app.html` loader.
+- `app.html`: a one-line CSS tweak on the `#teacherModeLink` border (`rgba(...)` →
+  `var(--accent-glow)`) was in the working tree. It is **out of scope for this refactor
+  and was reverted** to main's value so `app.html`'s only change here is the ES-module
+  loader. Its owner can re-apply it alongside the matching `teacher.html` tweaks.
 - `teacher.html`: CSS-var tweaks — **left untouched / never staged** (out of scope).
 - `AUDIT_FRONTEND.md`: untracked — left untouched.
