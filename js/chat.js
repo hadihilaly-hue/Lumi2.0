@@ -1,5 +1,6 @@
 import { callAPI, fetchClaudeProxy } from './api.js';
-import { getProjects, todayStr } from '../app.js';
+import { getProjects } from '../app.js';
+import { todayStr } from './homework.js';
 import { buildCompanionSystem, buildTutorSystem, teacherDisplayName, teacherInitials } from './prompts.js';
 import { renderSidebar } from './sidebar.js';
 import { $, S, _currentProjId, attachPreview, fileInput, messagesEl, msgInput, pendingAttachment, setPendingAttachment } from './state.js';

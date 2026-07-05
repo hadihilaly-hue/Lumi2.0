@@ -1,6 +1,6 @@
 import { fetchClaudeProxy } from './api.js';
-import { connectGoogleCalendar, saveStudyStyle, setCalendarConnected } from '../app.js';
 import { MENLO_CURRICULUM } from './data.js';
+import { connectGoogleCalendar, saveStudyStyle, setCalendarConnected } from './homework.js';
 import { $, currentUser } from './state.js';
 import { rdsFetch } from './teachers.js';
 import { showToast } from './ui.js';

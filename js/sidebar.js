@@ -1,7 +1,7 @@
-import { renderHwSidebar } from '../app.js';
 import { loadConv, lookupSubjectForCourse, openGeneralChat, openTutor } from './conversation.js';
 import { SUBJECTS, getTeachers, searchCurriculum } from './data.js';
 import { showWelcome } from './emptystate.js';
+import { renderHwSidebar } from './homework.js';
 import { initScheduleSetup } from './schedule.js';
 import { S, SB, messagesEl, sbNav, sbSearch } from './state.js';
 import { deleteConvFromSupabase, genId, getConvs, getSchedule, saveConvs, saveCurrentConv, syncConvToSupabase } from './storage.js';
