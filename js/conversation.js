@@ -24,6 +24,7 @@ export function lookupSubjectForCourse(courseName) {
 }
 
 // ─── LOAD A CONVERSATION ──────────────────────────────────────────────────────
+export function loadConv(id) {
 export async function loadConv(id) {
   const conv = getConvs()[id];
   if (!conv) return;
@@ -214,6 +215,7 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
     try {
       const wsPromise = loadWorkSampleImages(profile);
       const wsTimeout = new Promise(resolve => setTimeout(() => resolve(null), 8000));
+      S.tutorCtx.workSamples = await Promise.race([wsPromise, wsTimeout]);
       const loaded = await Promise.race([wsPromise, wsTimeout]);
       if (S.tutorCtx !== ctx) return; // class switched during work-sample load
       S.tutorCtx.workSamples = loaded;
@@ -261,6 +263,7 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
     msgInput.placeholder = `Say something to ${dName}\u2026`;
     $('sendBtn').disabled = false;
     await prepareSuggestedPrompts();
+    setTimeout(() => renderEmptyState(profile, course), 50);
     if (S.tutorCtx !== ctx) return; // class switched while preparing prompts
     setTimeout(() => { if (S.tutorCtx === ctx) renderEmptyState(profile, course); }, 50);
   } else {

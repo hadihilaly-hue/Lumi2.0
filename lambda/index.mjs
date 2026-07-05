@@ -1615,6 +1615,7 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
           return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, ` +
                  `$${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}, $${base + 12})`;
         });
+        const res = await dbQuery(
         // sections has a composite PK (school_id, sis_id) and no id column, so
         // no RETURNING; every row upserts (INSERT or DO UPDATE), so the processed
         // count is exactly chunk.length — matching the old per-row progress.sections++.
@@ -1627,6 +1628,11 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
              course_name = EXCLUDED.course_name, course_code = EXCLUDED.course_code,
              subject = EXCLUDED.subject, term = EXCLUDED.term, period = EXCLUDED.period,
              room = EXCLUDED.room, meeting_days = EXCLUDED.meeting_days,
+             block = EXCLUDED.block, updated_at = now()
+           RETURNING id`,
+          values
+        );
+        progress.sections += res.rowCount;
              block = EXCLUDED.block, updated_at = now()`,
           values
         );
@@ -1784,3 +1790,26 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
     chatStream.end();
   }
 }
+
+// === Test-only surface (added for lambda/test; no runtime behavior change) =====
+// The Lambda entrypoint is `handler`; nothing in the deploy path imports this.
+// It exposes internal pure/near-pure helpers so the unit suite can exercise them
+// directly (rate limiting, usage logging, column allowlists, S3 key building,
+// notes parsing). Keeping it as one named export avoids touching any call site.
+export const __test__ = {
+  checkRateLimit,
+  logUsage,
+  isTeacher,
+  isEmailAllowed,
+  getAllowedDomains,
+  fetchTeacherNotes,
+  buildS3Key,
+  pickColumns,
+  parseNotes,
+  buildTeacherNotesSection,
+  safeErr,
+  TEACHER_PROFILE_COLS,
+  PROFILE_COLS,
+  CONVERSATION_COLS,
+  HOMEWORK_TASK_COLS,
+};

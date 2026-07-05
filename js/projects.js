@@ -720,6 +720,13 @@ function handleStartWorking() {
   }, 100);
 }
 
+// ── Sync projects to Supabase ────────────────────────────
+
+// Projects are stored in localStorage only (no Supabase column exists)
+export function syncProjectsToSupabase() {
+  // no-op: projects live in localStorage only
+}
+
 export function deleteProject(projId, anchorEl) {
   const doDelete = () => {
     // Remove from projects
@@ -776,6 +783,11 @@ export function clearCompletedProjects() {
   syncHwToSupabase();
   renderSidebar();
   showToast(`${completed.length} completed project${completed.length > 1 ? 's' : ''} cleared`);
+}
+
+// Projects are stored in localStorage only (no Supabase column exists)
+export function loadProjectsFromSupabase() {
+  // no-op: projects live in localStorage only
 }
 
 // hw_tasks column does not exist in profiles table — localStorage only
