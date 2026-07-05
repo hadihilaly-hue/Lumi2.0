@@ -21,7 +21,7 @@ test('POST /teacher-profile forces teacher_email from the JWT, ignoring the body
   const { handler } = await loadHandler();
   const ctx = resetContext({
     dbRouter: makeRouter({
-      userId: TEACHER.userId, isTeacher: true,
+      userId: TEACHER.userId, isTeacher: true, provisionedTeacher: true,
       onRoute: (t) => /INSERT INTO public\.teacher_profiles/.test(t) ? res([{ id: 'tp1' }]) : res([]),
     }),
   });
@@ -41,7 +41,7 @@ test('PATCH /teacher-profile scopes the UPDATE to the caller JWT email', async (
   const { handler } = await loadHandler();
   const ctx = resetContext({
     dbRouter: makeRouter({
-      userId: TEACHER.userId, isTeacher: true,
+      userId: TEACHER.userId, isTeacher: true, provisionedTeacher: true,
       onRoute: (t) => /UPDATE public\.teacher_profiles/.test(t) ? res([{ id: 'tp1' }]) : res([]),
     }),
   });
@@ -111,6 +111,77 @@ test('GET /teacher-profile owner read (own email) uses SELECT *', async () => {
   const q = findQuery(ctx, /FROM public\.teacher_profiles WHERE teacher_email = \$1/);
   assert.match(q.text, /SELECT \* FROM public\.teacher_profiles/);
   assert.equal(q.params[0], TEACHER.email); // self
+});
+
+// AUDIT_LAMBDA_BUGS H1: teacher status must not be self-asserted. A caller with
+// no server-controlled teacher standing (not admin, no sis_map teacher row, no
+// existing/seeded teacher_profiles row) cannot create a teacher profile — so
+// they cannot set done=true and self-promote.
+test('POST /teacher-profile rejects a non-provisioned caller (H1: no self-promotion via done=true)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId, provisionedTeacher: false,
+      onRoute: (t) => /INSERT INTO public\.teacher_profiles/.test(t) ? res([{ id: 'tp1' }]) : res([]),
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/teacher-profile', token: tokenFor(STUDENT),
+    body: { course_name: 'Fake Class', done: true },
+  });
+  assert.equal(r.statusCode, 403);
+  // Nothing was written — the self-promotion INSERT never ran.
+  assert.equal(findQuery(ctx, /INSERT INTO public\.teacher_profiles/), undefined);
+});
+
+test('POST /teacher-profile allows a provisioned teacher (roster / seeded profile)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: TEACHER.userId, provisionedTeacher: true,
+      onRoute: (t) => /INSERT INTO public\.teacher_profiles/.test(t) ? res([{ id: 'tp1' }]) : res([]),
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/teacher-profile', token: tokenFor(TEACHER),
+    body: { course_name: 'Algebra', done: true },
+  });
+  assert.equal(r.statusCode, 200);
+  const q = findQuery(ctx, /INSERT INTO public\.teacher_profiles/);
+  assert.ok(q, 'the upsert runs for an authorized teacher');
+  assert.equal(q.params[0], TEACHER.email);
+});
+
+test('PATCH /teacher-profile rejects a non-provisioned caller (H1)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId, provisionedTeacher: false,
+      onRoute: (t) => /UPDATE public\.teacher_profiles/.test(t) ? res([{ id: 'tp1' }]) : res([]),
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'PATCH', path: '/teacher-profile', token: tokenFor(STUDENT),
+    body: { course_name: 'Algebra', done: true },
+  });
+  assert.equal(r.statusCode, 403);
+  assert.equal(findQuery(ctx, /UPDATE public\.teacher_profiles/), undefined);
+});
+
+test('POST /teacher-profile: an admin is always authorized (adminEmails bypass)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: ADMIN.userId, domains: [], provisionedTeacher: false,
+      onRoute: (t) => /INSERT INTO public\.teacher_profiles/.test(t) ? res([{ id: 'tp1' }]) : res([]),
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/teacher-profile', token: tokenFor(ADMIN),
+    body: { course_name: 'Algebra', done: true },
+  });
+  assert.equal(r.statusCode, 200);
+  assert.ok(findQuery(ctx, /INSERT INTO public\.teacher_profiles/));
 });
 
 // ================================ /profiles =================================

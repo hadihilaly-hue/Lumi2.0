@@ -42,6 +42,9 @@ export function makeRouter(opts = {}) {
     userId = STUDENT.userId,
     domains = [DOMAIN],
     isTeacher = false,
+    // AUDIT_LAMBDA_BUGS H1: server-controlled teacher-write authorization
+    // (sis_map roster teacher OR an existing/seeded teacher_profiles row).
+    provisionedTeacher = false,
     usageCount = 0,
     profileName = null,
     appUserExists = true,
@@ -66,6 +69,13 @@ export function makeRouter(opts = {}) {
     }
     if (/FROM public\.teacher_profiles WHERE teacher_email = \$1 AND done = true/.test(text)) {
       return isTeacher ? result([{ ok: 1 }]) : result([]);
+    }
+    // isProvisionedTeacher (H1): roster-teacher lookup + existing-profile lookup.
+    if (/FROM public\.sis_map WHERE lumi_id = \$1 AND entity_type = 'teacher'/.test(text)) {
+      return provisionedTeacher ? result([{ ok: 1 }]) : result([]);
+    }
+    if (/FROM public\.teacher_profiles WHERE teacher_email = \$1 LIMIT 1/.test(text)) {
+      return provisionedTeacher ? result([{ ok: 1 }]) : result([]);
     }
     if (/count\(\*\)::int AS n FROM public\.api_usage/.test(text)) {
       return result([{ n: usageCount }]);

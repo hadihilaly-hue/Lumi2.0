@@ -224,6 +224,47 @@ async function isTeacher(email) {
   }
 }
 
+// === Teacher WRITE authorization (AUDIT_LAMBDA_BUGS H1) ===
+// isTeacher() reads teacher_profiles.done — but that column is client-writable
+// through POST /teacher-profile, so any student could insert a row for their own
+// email with done=true and self-promote to "teacher" everywhere the boundary is
+// checked (/upload-url S3 PUTs, the 500/day rate tier, selectable-persona
+// visibility). Teacher status must derive from data the SERVER controls, never
+// from the request.
+//
+// A caller may create/edit a teacher profile iff one of these holds:
+//   1. admin (SCHOOL_CONFIG.adminEmails), or
+//   2. roster teacher — a sis_map row (entity_type='teacher') for this lumi_id,
+//      written ONLY by the admin-only /sis-import, or
+//   3. already provisioned — an existing teacher_profiles row for this email (an
+//      admin/SIS-seeded stub, or a prior authorized onboarding).
+//
+// Not circular: a fresh student satisfies none of the three, so they can never
+// mint the FIRST teacher_profiles row (the self-promotion vector). The
+// existing-row clause only grandfathers rows the server itself provisioned. Once
+// the write is gated, teacher_profiles.done is trustworthy and isTeacher (the
+// read side, used by /upload-url + the rate tier) rests on server-controlled data.
+// Fail-closed to "not authorized" on DB error — same posture as isTeacher.
+async function isProvisionedTeacher(user) {
+  const email = user.email.toLowerCase();
+  if (SCHOOL_CONFIG.adminEmails.has(email)) return true;
+  try {
+    const roster = await dbQuery(
+      "SELECT 1 FROM public.sis_map WHERE lumi_id = $1 AND entity_type = 'teacher' LIMIT 1",
+      [user.id]
+    );
+    if (roster.rowCount > 0) return true;
+    const provisioned = await dbQuery(
+      "SELECT 1 FROM public.teacher_profiles WHERE teacher_email = $1 LIMIT 1",
+      [email]
+    );
+    return provisioned.rowCount > 0;
+  } catch (err) {
+    console.error("isProvisionedTeacher error:", safeErr(err));
+    return false;
+  }
+}
+
 // === Rate Limit ===
 // There is deliberately NO client-facing /api-usage route — a JWT-authed POST
 // would let any student forge usage rows. The Lambda's own checkRateLimit +
@@ -810,6 +851,11 @@ async function handleRequest(event, responseStream) {
         if (typeof body.course_name !== "string" || !body.course_name.trim()) {
           return sendJson(400, { error: "Missing course_name" });
         }
+        // AUDIT_LAMBDA_BUGS H1: gate teacher-profile creation on server-controlled
+        // teacher authorization so `done` cannot be self-asserted by a student.
+        if (!(await isProvisionedTeacher(user))) {
+          return sendJson(403, { error: "Not authorized to create a teacher profile" });
+        }
         const { cols, vals } = pickColumns(body, TEACHER_PROFILE_COLS);
         const insertCols = ["teacher_email", "course_name", ...cols];
         const placeholders = insertCols.map((_, i) => `$${i + 1}`);
@@ -829,6 +875,11 @@ async function handleRequest(event, responseStream) {
       if (method === "PATCH") {
         if (typeof body.course_name !== "string" || !body.course_name.trim()) {
           return sendJson(400, { error: "Missing course_name" });
+        }
+        // AUDIT_LAMBDA_BUGS H1: same server-controlled gate as POST — `done` is a
+        // PATCH-able column, so an edit path must not become a self-promotion path.
+        if (!(await isProvisionedTeacher(user))) {
+          return sendJson(403, { error: "Not authorized to edit a teacher profile" });
         }
         const { cols, vals } = pickColumns(body, TEACHER_PROFILE_COLS);
         if (cols.length === 0) return sendJson(400, { error: "No updatable fields" });
