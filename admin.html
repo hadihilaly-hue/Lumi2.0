@@ -59,9 +59,9 @@ body { overflow: auto; display: block; }
 }
 .a-stat-num  { font-size: 26px; font-weight: 700; letter-spacing: -.5px; line-height: 1; margin-bottom: 4px; }
 .a-stat-label{ font-size: 11px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
-.a-stat-num.green  { color: #34d399; }
-.a-stat-num.yellow { color: #fbbf24; }
-.a-stat-num.red    { color: #ef4444; }
+.a-stat-num.green  { color: #0F7A52; }
+.a-stat-num.yellow { color: #8A5A00; }
+.a-stat-num.red    { color: #C62828; }
 
 /* ─── SEARCH ───────────────────────────────────────────────────────────────── */
 .a-search-row { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
@@ -81,7 +81,7 @@ body { overflow: auto; display: block; }
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 14px; margin-bottom: 10px; overflow: hidden; transition: border-color .15s;
 }
-.a-teacher-card:hover { border-color: rgba(123,105,245,.3); }
+.a-teacher-card:hover { border-color: var(--accent); }
 .a-teacher-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 18px; cursor: pointer; user-select: none; gap: 12px;
@@ -89,7 +89,7 @@ body { overflow: auto; display: block; }
 .a-teacher-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .a-teacher-avatar {
   width: 34px; height: 34px; border-radius: 50%; background: var(--accent-soft);
-  border: 1px solid rgba(123,105,245,.25); display: flex; align-items: center;
+  border: 1px solid var(--accent-glow); display: flex; align-items: center;
   justify-content: center; font-size: 13px; font-weight: 600; color: var(--accent);
   flex-shrink: 0;
 }
@@ -120,9 +120,9 @@ body { overflow: auto; display: block; }
 .a-status-dot.in_progress { background: #fbbf24; box-shadow: 0 0 4px rgba(251,191,36,.5); }
 .a-status-dot.complete    { background: #34d399; box-shadow: 0 0 4px rgba(52,211,153,.5); }
 .a-status-label { font-size: 11.5px; font-weight: 500; }
-.a-status-label.not_started { color: #ef4444; }
-.a-status-label.in_progress { color: #fbbf24; }
-.a-status-label.complete    { color: #34d399; }
+.a-status-label.not_started { color: #C62828; }
+.a-status-label.in_progress { color: #8A5A00; }
+.a-status-label.complete    { color: #0F7A52; }
 .a-class-updated { font-size: 10.5px; color: var(--text-faint); flex-shrink: 0; }
 
 /* ─── EMPTY ────────────────────────────────────────────────────────────────── */
@@ -133,6 +133,25 @@ body { overflow: auto; display: block; }
   #adminHeader { padding: 14px 16px; }
   #adminBody { padding: 20px 14px 60px; }
 }
+
+/* ─── A11Y ─────────────────────────────────────────────────────
+   Visible keyboard focus for the expandable teacher header
+   (made a button in JS) — WCAG 2.4.7. */
+.a-teacher-header:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* Per-teacher status summary in the email line. Darkened for AA
+   contrast on the light card; bright again in dark mode. */
+.a-sum.complete { color: #0F7A52; }
+.a-sum.progress { color: #8A5A00; }
+.a-sum.not      { color: #C62828; }
+:root.dark-mode .a-status-label.not_started,
+:root.dark-mode .a-sum.not      { color: #ef4444; }
+:root.dark-mode .a-status-label.in_progress,
+:root.dark-mode .a-sum.progress { color: #fbbf24; }
+:root.dark-mode .a-status-label.complete,
+:root.dark-mode .a-sum.complete { color: #34d399; }
+:root.dark-mode .a-stat-num.green  { color: #34d399; }
+:root.dark-mode .a-stat-num.yellow { color: #fbbf24; }
+:root.dark-mode .a-stat-num.red    { color: #ef4444; }
 </style>
 </head>
 <body>
@@ -154,7 +173,7 @@ body { overflow: auto; display: block; }
     </div>
     <div class="a-hdr-right">
       <span class="a-refresh-info" id="refreshInfo">Auto-refreshes every 60s</span>
-      <a href="teacher.html" style="font-size:12px;font-weight:500;color:var(--accent);text-decoration:none;padding:6px 12px;border:1px solid rgba(123,105,245,.3);border-radius:7px;background:var(--accent-soft)">🍎 Teacher Portal</a>
+      <a href="teacher.html" style="font-size:12px;font-weight:500;color:var(--accent);text-decoration:none;padding:6px 12px;border:1px solid var(--accent-glow);border-radius:7px;background:var(--accent-soft)">🍎 Teacher Portal</a>
       <button class="a-signout" onclick="doSignOut()">Sign out</button>
     </div>
   </div>
@@ -183,7 +202,7 @@ body { overflow: auto; display: block; }
 
     <!-- SEARCH -->
     <div class="a-search-row">
-      <input class="a-search" id="teacherSearch" type="text" placeholder="Search teachers…" oninput="renderDashboard()">
+      <input class="a-search" id="teacherSearch" type="text" placeholder="Search teachers…" aria-label="Search teachers" oninput="renderDashboard()">
     </div>
     <div class="a-section-label" id="teacherCount">All teachers</div>
 
@@ -552,14 +571,14 @@ function renderDashboard() {
 
     const initials = teacher.name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
     const summaryParts = [];
-    if (nComplete > 0)  summaryParts.push(`<span style="color:#34d399">${nComplete} complete</span>`);
-    if (nProgress > 0)  summaryParts.push(`<span style="color:#fbbf24">${nProgress} in progress</span>`);
-    if (nNot > 0)       summaryParts.push(`<span style="color:#ef4444">${nNot} not started</span>`);
+    if (nComplete > 0)  summaryParts.push(`<span class="a-sum complete">${nComplete} complete</span>`);
+    if (nProgress > 0)  summaryParts.push(`<span class="a-sum progress">${nProgress} in progress</span>`);
+    if (nNot > 0)       summaryParts.push(`<span class="a-sum not">${nNot} not started</span>`);
 
     const card = document.createElement('div');
     card.className = 'a-teacher-card';
     card.innerHTML = `
-      <div class="a-teacher-header" onclick="toggleTeacher('${escHtml(email)}')">
+      <div class="a-teacher-header" role="button" tabindex="0" aria-expanded="${isOpen}" aria-label="${escHtml(teacher.name)}, show class details" onclick="toggleTeacher('${escHtml(email)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTeacher('${escHtml(email)}')}">
         <div class="a-teacher-header-left">
           <div class="a-teacher-avatar">${initials}</div>
           <div>

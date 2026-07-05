@@ -25,6 +25,7 @@ export function lookupSubjectForCourse(courseName) {
 
 // ─── LOAD A CONVERSATION ──────────────────────────────────────────────────────
 export function loadConv(id) {
+export async function loadConv(id) {
   const conv = getConvs()[id];
   if (!conv) return;
   S.currentId     = id;
@@ -53,6 +54,57 @@ export function loadConv(id) {
 
   scrollBottom();
   renderSidebar();
+
+  // AUDIT_FRONTEND H1: re-hydrate the teacher persona. Convs loaded from RDS
+  // (loadConvsFromSupabase) reconstruct tutorCtx from the teacher/course columns
+  // only — teacherProfile/notesInjection/workSamples are absent — so continuing
+  // the chat would silently fall back to generic AI. Fetch them now.
+  await hydrateTutorProfile();
+}
+
+// AUDIT_FRONTEND H1: fetch + attach the teacher persona (profile, notes
+// injection, work samples) onto the active S.tutorCtx. Mirrors the fetch half
+// of finishOpenTutor without the greeting/banner UI (loadConv already rendered
+// the existing thread). No-op when tutorCtx already carries a live profile
+// (e.g. convs restored from localStorage within the same session).
+async function hydrateTutorProfile() {
+  const ctx = S.tutorCtx;
+  if (!ctx || !ctx.teacher || !ctx.course) return;
+  if (ctx.teacherProfile) return; // already hydrated (localStorage path)
+
+  let profile = null;
+  try {
+    const profilePromise = getTeacherProfile(ctx.teacher, ctx.course);
+    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 5000));
+    profile = await Promise.race([profilePromise, timeoutPromise]);
+  } catch (e) {
+    console.warn('[loadConv] profile hydrate error:', e);
+    profile = null;
+  }
+  // Bail if the user switched to another class while we were awaiting — never
+  // write A's persona onto B's now-current chat (same guard class as H2).
+  if (S.tutorCtx !== ctx) return;
+
+  ctx.notesInjection = null;
+  if (profile && !profile.__notReady && !profile.__error && profile.id && currentUser && !S.isTestMode) {
+    ctx.notesInjection = { teacher_profile_id: profile.id };
+  }
+
+  ctx.workSamples = null;
+  if (profile && !profile.__notReady && !profile.__error && profile.workSamples) {
+    try {
+      const wsPromise = loadWorkSampleImages(profile);
+      const wsTimeout = new Promise(resolve => setTimeout(() => resolve(null), 8000));
+      ctx.workSamples = await Promise.race([wsPromise, wsTimeout]);
+    } catch (e) {
+      console.warn('[loadConv] work-sample hydrate failed:', e);
+      ctx.workSamples = null;
+    }
+    if (S.tutorCtx !== ctx) return;
+  }
+
+  ctx.teacherProfile = (profile && !profile.__error && !profile.__notReady) ? profile : null;
+  saveCurrentConv();
 }
 
 // ─── NEW CHAT ─────────────────────────────────────────────────────────────────
@@ -123,6 +175,13 @@ function showIntroSlide(course, onGo) {
 }
 
 async function finishOpenTutor(subjectId, course, teacher, subjectName) {
+  // AUDIT_FRONTEND H2: capture the class this open is for. openTutor set
+  // S.tutorCtx to a fresh object synchronously right before calling us; if the
+  // user opens another class while we await below, S.tutorCtx is reassigned and
+  // every guard here bails so we never write this class's profile/banner/greeting
+  // onto the now-current chat.
+  const ctx = S.tutorCtx;
+
   // Fetch teacher profile — with 5s hard timeout so it never hangs
   let profile = null;
   try {
@@ -134,6 +193,7 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
     console.warn('[openTutor] profile fetch error:', e);
     profile = null;
   }
+  if (S.tutorCtx !== ctx) return; // class switched during the profile fetch
 
   // Per-student teacher notes are injected SERVER-SIDE (the chat Lambda
   // replaces the <<LUMI_TEACHER_NOTES>> marker) — notes never reach the
@@ -156,10 +216,14 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
       const wsPromise = loadWorkSampleImages(profile);
       const wsTimeout = new Promise(resolve => setTimeout(() => resolve(null), 8000));
       S.tutorCtx.workSamples = await Promise.race([wsPromise, wsTimeout]);
+      const loaded = await Promise.race([wsPromise, wsTimeout]);
+      if (S.tutorCtx !== ctx) return; // class switched during work-sample load
+      S.tutorCtx.workSamples = loaded;
       const ms = Date.now() - wsStart;
       console.log(`[work_samples] loaded in ${ms}ms; mode=${S.tutorCtx.workSamples ? 'with' : 'without'} samples`);
     } catch (e) {
       console.warn('[work_samples] load failed:', e);
+      if (S.tutorCtx !== ctx) return;
       S.tutorCtx.workSamples = null;
     }
   }
@@ -200,6 +264,8 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
     $('sendBtn').disabled = false;
     await prepareSuggestedPrompts();
     setTimeout(() => renderEmptyState(profile, course), 50);
+    if (S.tutorCtx !== ctx) return; // class switched while preparing prompts
+    setTimeout(() => { if (S.tutorCtx === ctx) renderEmptyState(profile, course); }, 50);
   } else {
     greeting = `\u26a0\ufe0f ${firstName} hasn't set up their Lumi profile for ${course} yet. Once they complete their setup interview, I'll be able to help you exactly the way ${firstName} teaches. In the meantime, you can use General Chat.`;
     S.tutorCtx.teacherProfile = null;

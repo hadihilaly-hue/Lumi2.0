@@ -4,6 +4,7 @@ import { showWelcome } from './js/emptystate.js';
 import { _calEvents, addHwTask, advancePlannerBlock, buildStudyPlan, buildStudyPlanWithCalendar, checkDailyHwPrompt, closeHwAddModal, closeHwBackdrop, closeHwPlanModal, closeHwPopup, closeTimelineModal, genHwId, getHwTasks, loadCalendarEvents, renderHwPopupTasks, setCalendarConnected, showHwAddModal, showHwPlanModal, showHwPopup, startPlannerStrip, todayStr, updateCalUi, wireCalListeners } from './js/homework.js';
 import { initOnboarding } from './js/onboarding.js';
 import { _projPendingFile, clearAllChats, clearCompletedProjects, clearProjFile, closeProjectCreateModal, closeProjectPlanModal, closeWorkTypeChooser, createProject, getProjects, injectProjectTasksToHomework, loadHwFromSupabase, loadProjectsFromSupabase, renderProjectPlan, showProjectCreateModal, showWorkTypeChooser, syncProjectsToSupabase, wireProjDropzone } from './js/projects.js';
+import { _projPendingFile, clearAllChats, clearCompletedProjects, clearProjFile, closeProjectCreateModal, closeProjectPlanModal, closeWorkTypeChooser, createProject, getProjects, injectProjectTasksToHomework, loadHwFromSupabase, renderProjectPlan, showProjectCreateModal, showWorkTypeChooser, wireProjDropzone } from './js/projects.js';
 import { setSidebarUserSubtitle } from './js/prompts.js';
 import { checkSemesterBanner, initScheduleSetup } from './js/schedule.js';
 import { activeDropdownEl, closeOpenMenu, renderSearchDropdown, renderSidebar, showInlineConfirm } from './js/sidebar.js';
@@ -437,7 +438,6 @@ function wireHwListeners() {
       setCurrentProjId(project.id);
       console.log('Set current project:', project.id);
       renderProjectPlan(project);
-      syncProjectsToSupabase();
     }, 600);
   });
 

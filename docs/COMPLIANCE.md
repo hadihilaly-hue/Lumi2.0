@@ -152,18 +152,21 @@ account and Region (us-east-1). Per AWS's published policy:
 
 - **No signed NDPA/DPA and no MOA with the school.** No AB 1584 data-privacy agreement
   with Menlo is in place; no Data Processing Addendum executed for the subprocessor chain.
-- **No student-data deletion mechanism yet.** No table has a `deleted_at` column and there
-  is no retention/erasure pipeline. FERPA inspection/amendment and AB 1584 deletion rights
-  are not yet operationally supported for student data. (Phase 4 delivers the pattern for
-  teacher-owned data; Phase 5 designs it for student data.) **Note:** a
-  `conversations.messages` store already exists and already persists student conversation
-  content — so this is data that *would need* deletion support, not a hypothetical.
+- **Deletion: shipped for account-owned data (Phase 4); student-scoped erasure still
+  pending.** Every PII table now has a `deleted_at` column, and an authenticated user can
+  export (`GET /my-data`) and delete (`POST /delete-my-account`) their own data with
+  immediate access revocation + a 30-day grace before hard delete (see §6). What remains:
+  an *administrator-initiated* "delete student X" flow and a per-student export for
+  parent/guardian FERPA requests — designed in `docs/PERSISTENCE_SPEC.md` (Phase 5), not
+  yet built. The `conversations.messages` store already persists student content today, so
+  that erasure path is needed, not hypothetical.
 - **Real staff PII committed to public repos.** A staff name→email directory is hardcoded
   in `admin.html` and `app.js` (tracked, on public GitHub remotes) — present in HEAD and
   in history. Removal + a history-scrub decision are addressed in Phase 2 (history rewrite
   only with explicit owner approval).
-- **CloudWatch log hygiene.** Phase 0 found 4 log sites emitting full error objects
-  (potential request/prompt leakage); fixed in Phase 2 via a central redaction helper. No
+- **CloudWatch log hygiene.** Phase 2a fixed the 4 log sites that emitted full error
+  objects — all error logging now routes through a single `safeErr()` redaction helper
+  (deployed + verified: authed requests leave no email/JWT/body in logs). Still open: no
   CloudWatch log-group retention limit is set (default never-expire).
 - **`profiles.google_calendar_token` stored in plaintext at rest.** A live third-party
   OAuth token; warrants encryption-at-rest and a revocation-on-delete plan.
@@ -173,3 +176,47 @@ account and Region (us-east-1). Per AWS's published policy:
   deleted from S3 (no delete endpoint); low-volume known limitation.
 - **No signed Supabase-key rotation record.** Supabase is retired but formal
   credential-rotation/attestation is not documented.
+
+---
+
+## 6. Data-subject rights: access & deletion (Phase 4)
+
+Two authenticated routes on the Lambda demonstrate the FERPA/AB 1584 access + deletion
+pattern on data that already exists (account-owned rows). Identity is always taken from
+the JWT; a caller can only ever touch their own rows.
+
+- **`GET /my-data`** — returns a JSON export of every row tied to the caller's identity
+  (`app_users`, `profiles`, `teacher_profiles`, `teacher_work_samples`, `conversations`,
+  `homework_tasks`, the caller's own `class_enrollments`, `api_usage`). **`teacher_notes`
+  is deliberately excluded** — those are observations *other people* wrote about the
+  caller, not the caller's own record.
+- **`POST /delete-my-account`** — requires body `{"confirm":"DELETE"}` (a stray POST
+  cannot nuke an account). Stamps `deleted_at = now()` across all the caller's rows.
+  Because `app_users.deleted_at` is checked on every authenticated request
+  (`verifyCognitoAuth`), access is **revoked immediately** — verified live: a valid token
+  returns 401 the instant after deletion. Data is retained for a **30-day grace period**
+  and hard-deleted after.
+
+### Hard-delete procedure (documented SQL, not a cron)
+
+No new infrastructure. After the 30-day grace, run this once (via the IAM-gated admin
+invoke, `aws lambda invoke … '{"adminSql": "…"}'`) to permanently remove soft-deleted
+rows. Order matters: dependent rows before identity rows.
+
+```sql
+DELETE FROM public.teacher_work_samples ws USING public.teacher_profiles tp
+  WHERE ws.teacher_profile_id = tp.id
+    AND tp.deleted_at IS NOT NULL AND tp.deleted_at < now() - interval '30 days';
+DELETE FROM public.teacher_profiles  WHERE deleted_at IS NOT NULL AND deleted_at < now() - interval '30 days';
+DELETE FROM public.class_enrollments WHERE deleted_at IS NOT NULL AND deleted_at < now() - interval '30 days';
+DELETE FROM public.conversations     WHERE deleted_at IS NOT NULL AND deleted_at < now() - interval '30 days';
+DELETE FROM public.homework_tasks    WHERE deleted_at IS NOT NULL AND deleted_at < now() - interval '30 days';
+DELETE FROM public.profiles          WHERE deleted_at IS NOT NULL AND deleted_at < now() - interval '30 days';
+DELETE FROM public.app_users         WHERE deleted_at IS NOT NULL AND deleted_at < now() - interval '30 days';
+```
+
+To **restore** a soft-deleted account within the grace window, set `deleted_at = NULL`
+on the same rows (scoped to that person's `lumi_id` / email).
+
+Schema: `migration/rds-add-deleted-at.sql` (applied 2026-07-04). Conversation/message
+content is **never** logged — deletion counts only (`[delete-account] … rows={…}`).

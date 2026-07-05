@@ -33,13 +33,29 @@
 .role-btn-icon  { font-size: 22px; line-height: 1; }
 .role-btn-label { font-size: 13px; font-weight: 600; }
 .role-btn-sub   { font-size: 11px; color: var(--text-muted); }
+
+/* ─── A11Y: visible keyboard focus ──────────────────────────── */
+.role-btn:focus-visible,
+.signin-google-btn:focus-visible,
+.signin-footer a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Error text: #ff8585 fails AA on the light cream card (~2.2:1).
+   Use a dark red in light mode; keep the light red for the dark card. */
+.signin-error { color: #B3261E; }
+:root.dark-mode .signin-error { color: #ff8585; }
+/* Respect reduced-motion for the breathing orb (WCAG 2.2.2 / 2.3.3) */
+@media (prefers-reduced-motion: reduce) {
+  .signin-orb { animation: none; }
+}
 </style>
 </head>
 <body class="signin-page">
 
 <div class="signin-container">
   <div class="signin-logo">
-    <div class="signin-orb">✦</div>
+    <div class="signin-orb" aria-hidden="true">✦</div>
     <div class="signin-name">Lumi</div>
     <div class="signin-school">Menlo School</div>
   </div>
@@ -48,16 +64,16 @@
     <div class="signin-card-title">Welcome back</div>
     <div class="signin-card-sub">Choose how you're signing in today</div>
 
-    <div class="signin-error" id="signinError"></div>
+    <div class="signin-error" id="signinError" role="alert"></div>
 
     <!-- Role picker -->
-    <div class="role-picker" id="rolePicker">
-      <button class="role-btn selected" id="roleStudent" onclick="selectRole('student')">
+    <div class="role-picker" id="rolePicker" role="group" aria-label="Choose your role">
+      <button class="role-btn selected" id="roleStudent" aria-pressed="true" onclick="selectRole('student')">
         <span class="role-btn-icon">🎒</span>
         <span class="role-btn-label">Student</span>
         <span class="role-btn-sub">Study with Lumi</span>
       </button>
-      <button class="role-btn" id="roleTeacher" onclick="selectRole('teacher')">
+      <button class="role-btn" id="roleTeacher" aria-pressed="false" onclick="selectRole('teacher')">
         <span class="role-btn-icon">🍎</span>
         <span class="role-btn-label">Teacher</span>
         <span class="role-btn-sub">Set up your classes</span>
@@ -74,7 +90,7 @@
       Sign in as Student
     </button>
 
-    <div class="signin-footer">School accounts only</div>
+    <div class="signin-footer">School accounts only · <a href="privacy.html" style="color:inherit;text-decoration:underline">Privacy</a></div>
   </div>
 </div>
 
@@ -91,8 +107,12 @@ let selectedRole = 'student';
 
 function selectRole(role) {
   selectedRole = role;
-  document.getElementById('roleStudent').classList.toggle('selected', role === 'student');
-  document.getElementById('roleTeacher').classList.toggle('selected', role === 'teacher');
+  const studentBtn = document.getElementById('roleStudent');
+  const teacherBtn = document.getElementById('roleTeacher');
+  studentBtn.classList.toggle('selected', role === 'student');
+  teacherBtn.classList.toggle('selected', role === 'teacher');
+  studentBtn.setAttribute('aria-pressed', String(role === 'student'));
+  teacherBtn.setAttribute('aria-pressed', String(role === 'teacher'));
   const btn = document.getElementById('signinBtn');
   btn.innerHTML = GOOGLE_SVG + (role === 'teacher' ? ' Sign in as Teacher' : ' Sign in as Student');
 }

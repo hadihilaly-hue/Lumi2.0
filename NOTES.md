@@ -75,3 +75,19 @@ edits by the user, unrelated to the split:
   loader. Its owner can re-apply it alongside the matching `teacher.html` tweaks.
 - `teacher.html`: CSS-var tweaks — **left untouched / never staged** (out of scope).
 - `AUDIT_FRONTEND.md`: untracked — left untouched.
+## Base
+
+This split is generated from the current `main` `app.js`, so it **includes** the
+AUDIT_FRONTEND "H1/H2" audit fixes (`hydrateTutorProfile` + class-switch guards in
+`loadConv`/`finishOpenTutor`) that landed on `main` via PR #9. They are carried through
+the split verbatim (into `js/conversation.js`); no special handling. The split is
+regenerated deterministically, so re-basing onto a newer `main` is a re-run, not a
+manual merge.
+
+## Pre-existing unrelated edits (not part of this refactor)
+
+- `app.html`: a one-line CSS tweak on the `#teacherModeLink` border (`rgba(...)` →
+  `var(--accent-glow)`) exists as separate uncommitted work by another agent. It is out
+  of scope and **not included** here — `app.html`'s only change on this branch is the
+  ES-module loader.
+- `teacher.html`: matching CSS-var tweaks — **left untouched** (out of scope).

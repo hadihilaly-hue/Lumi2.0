@@ -68,9 +68,10 @@ body { overflow: auto; display: block; }
 .t-signin-foot { margin-top: 16px; font-size: 11.5px; color: var(--text-faint); }
 .t-error {
   display: none; background: rgba(255,80,80,.08); border: 1px solid rgba(255,80,80,.22);
-  border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #ff8585;
+  border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #B3261E;
   margin-bottom: 16px; text-align: left;
 }
+:root.dark-mode .t-error { color: #ff8585; }
 
 /* ─── UNKNOWN VIEW ─────────────────────────────────────────── */
 #unknownView {
@@ -147,7 +148,7 @@ body { overflow: auto; display: block; }
 }
 .t-card:hover {
   border-color: var(--accent); background: var(--surface-2);
-  transform: translateY(-1px); box-shadow: 0 6px 20px rgba(123,105,245,.12);
+  transform: translateY(-1px); box-shadow: 0 6px 20px var(--accent-glow);
 }
 .t-card-subject {
   font-size: 10px; font-weight: 600; color: var(--accent);
@@ -227,7 +228,7 @@ body { overflow: auto; display: block; }
   display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;
 }
 .wizard-sub-prompt {
-  padding: 6px 12px; background: var(--accent-soft); border: 1px solid rgba(123,105,245,.2);
+  padding: 6px 12px; background: var(--accent-soft); border: 1px solid var(--accent-glow);
   border-radius: 20px; font-size: 12px; color: var(--accent); font-weight: 500;
 }
 .wizard-examples-toggle {
@@ -337,8 +338,8 @@ body { overflow: auto; display: block; }
   border-radius: 8px; font-size: 13px;
 }
 .syllabus-file-row.pending {
-  background: rgba(123,105,245,.06);
-  border-color: rgba(123,105,245,.2);
+  background: var(--accent-soft);
+  border-color: var(--accent-glow);
 }
 .syllabus-file-icon { font-size: 16px; flex-shrink: 0; }
 .syllabus-file-name-cell {
@@ -425,8 +426,8 @@ body { overflow: auto; display: block; }
 
 /* ─── TEMPLATE BANNER ─────────────────────────────────────── */
 .template-banner {
-  display: none; background: rgba(123,105,245,.08);
-  border: 1px solid rgba(123,105,245,.2); border-radius: 12px;
+  display: none; background: var(--accent-soft);
+  border: 1px solid var(--accent-glow); border-radius: 12px;
   padding: 16px 18px; margin-bottom: 20px;
 }
 .template-banner.show { display: block; }
@@ -590,6 +591,29 @@ body { overflow: auto; display: block; }
 }
 .t-note-input-row textarea:focus { border-color: var(--accent); }
 .t-note-input-row button { flex: 0 0 auto; }
+
+/* ─── A11Y: keyboard focus + reduced motion + status contrast ── */
+/* Click-only list items are given role=button + tabindex in JS;
+   these give them a visible keyboard focus ring (WCAG 2.4.7). */
+.t-card:focus-visible,
+.t-student-class-header:focus-visible,
+.t-block-row:focus-visible,
+.t-roster-item:focus-visible,
+.syllabus-upload-area:focus-visible,
+.wizard-mic-btn:focus-visible,
+.t-filter-pill:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+#tClassSearch:focus { border-color: var(--accent); }
+/* Status-pill text: brighten/darken per theme so 11.5px labels reach
+   AA contrast against the tinted pill on the light card (WCAG 1.4.3). */
+.t-card-status.complete { color: #0F7A52; }
+.t-card-status.partial  { color: #8A5A00; }
+:root.dark-mode .t-card-status.complete { color: #34d399; }
+:root.dark-mode .t-card-status.partial  { color: #fbbf24; }
+@media (prefers-reduced-motion: reduce) {
+  .t-logo-mark, .wizard-mic-btn.recording { animation: none; }
+}
 </style>
 </head>
 <body>
@@ -609,7 +633,7 @@ body { overflow: auto; display: block; }
     </div>
     <div class="t-signin-title">Sign in to set up your classes</div>
     <div class="t-signin-sub">Use your @menloschool.org email</div>
-    <div class="t-error" id="tSigninError"></div>
+    <div class="t-error" id="tSigninError" role="alert"></div>
     <button class="t-google-btn" id="tSigninBtn">
       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -677,11 +701,11 @@ body { overflow: auto; display: block; }
     </div>
     <div class="t-section-label">Your Classes</div>
     <div id="tFilterBar" style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-      <input type="text" id="tClassSearch" placeholder="Search classes…" style="flex:1;max-width:220px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;color:var(--text);outline:none">
+      <input type="text" id="tClassSearch" placeholder="Search classes…" aria-label="Search classes" style="flex:1;max-width:220px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;color:var(--text)">
       <div style="display:flex;gap:6px">
-        <button class="t-filter-pill active" data-status="all" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--accent-soft);color:var(--accent);transition:all .15s">All</button>
-        <button class="t-filter-pill" data-status="not_started" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);transition:all .15s">Not Started</button>
-        <button class="t-filter-pill" data-status="complete" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);transition:all .15s">Complete</button>
+        <button type="button" class="t-filter-pill active" data-status="all" aria-pressed="true" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--accent-soft);color:var(--accent);transition:all .15s">All</button>
+        <button type="button" class="t-filter-pill" data-status="not_started" aria-pressed="false" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);transition:all .15s">Not Started</button>
+        <button type="button" class="t-filter-pill" data-status="complete" aria-pressed="false" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);transition:all .15s">Complete</button>
       </div>
     </div>
     <div class="t-cards-grid" id="classCards"></div>
@@ -726,7 +750,7 @@ body { overflow: auto; display: block; }
   <div class="t-notechat-body">
     <div id="noteChatMessages" class="t-note-messages"></div>
     <div class="t-note-input-row">
-      <textarea id="noteChatInput" rows="2" placeholder="Type an observation..."></textarea>
+      <textarea id="noteChatInput" rows="2" aria-label="Add an observation about this student" placeholder="Type an observation..."></textarea>
       <button id="noteChatSend" class="wizard-next-btn" disabled>Send</button>
     </div>
   </div>
@@ -792,9 +816,9 @@ body { overflow: auto; display: block; }
         </div>
       </div>
       <div class="wizard-textarea-wrap">
-        <textarea class="wizard-textarea" id="engagementRulesInput" placeholder="Describe how you want Lumi to work with your students…"></textarea>
-        <button class="wizard-mic-btn" onclick="toggleMic('engagementRulesInput')">
-          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        <textarea class="wizard-textarea" id="engagementRulesInput" aria-label="How you want students to engage with Lumi" placeholder="Describe how you want Lumi to work with your students…"></textarea>
+        <button type="button" class="wizard-mic-btn" aria-label="Dictate your answer with the microphone" onclick="toggleMic('engagementRulesInput')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
         </button>
       </div>
       <div class="wizard-word-count" id="engagementRulesCount">0 / 50 words minimum</div>
@@ -828,9 +852,9 @@ body { overflow: auto; display: block; }
         </div>
       </div>
       <div class="wizard-textarea-wrap">
-        <textarea class="wizard-textarea" id="teachingVoiceInput" placeholder="Describe your teaching style and voice…"></textarea>
-        <button class="wizard-mic-btn" onclick="toggleMic('teachingVoiceInput')">
-          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        <textarea class="wizard-textarea" id="teachingVoiceInput" aria-label="What your teaching voice sounds like" placeholder="Describe your teaching style and voice…"></textarea>
+        <button type="button" class="wizard-mic-btn" aria-label="Dictate your answer with the microphone" onclick="toggleMic('teachingVoiceInput')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
         </button>
       </div>
       <div class="wizard-word-count" id="teachingVoiceCount">0 / 50 words minimum</div>
@@ -863,7 +887,9 @@ body { overflow: auto; display: block; }
       <!-- Syllabus Upload (multi-file, up to 20 PDFs) -->
       <div class="syllabus-file-list" id="syllabusFileList"></div>
       <div class="syllabus-upload-area" id="syllabusUploadArea"
+           role="button" tabindex="0" aria-label="Upload syllabus PDFs, up to 20"
            onclick="document.getElementById('syllabusFileInput').click()"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"
            ondragover="handleSyllabusDragOver(event)"
            ondragleave="handleSyllabusDragLeave(event)"
            ondrop="handleSyllabusDrop(event)">
@@ -888,9 +914,9 @@ body { overflow: auto; display: block; }
         </div>
       </div>
       <div class="wizard-textarea-wrap">
-        <textarea class="wizard-textarea" id="courseInfoInput" placeholder="Describe your course structure, topics, and common student challenges…"></textarea>
-        <button class="wizard-mic-btn" onclick="toggleMic('courseInfoInput')">
-          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        <textarea class="wizard-textarea" id="courseInfoInput" aria-label="What students need to know about your course" placeholder="Describe your course structure, topics, and common student challenges…"></textarea>
+        <button type="button" class="wizard-mic-btn" aria-label="Dictate your answer with the microphone" onclick="toggleMic('courseInfoInput')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
         </button>
       </div>
       <div class="wizard-word-count" id="courseInfoCount">0 / 50 words minimum</div>
@@ -919,9 +945,9 @@ body { overflow: auto; display: block; }
         </div>
       </div>
       <div class="wizard-textarea-wrap">
-        <textarea class="wizard-textarea" id="welcomeMessageInput" placeholder="Hey — welcome to your class…"></textarea>
-        <button class="wizard-mic-btn" onclick="toggleMic('welcomeMessageInput')">
-          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        <textarea class="wizard-textarea" id="welcomeMessageInput" aria-label="Welcome message students see first" placeholder="Hey — welcome to your class…"></textarea>
+        <button type="button" class="wizard-mic-btn" aria-label="Dictate your answer with the microphone" onclick="toggleMic('welcomeMessageInput')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
         </button>
       </div>
       <div class="wizard-word-count" id="welcomeMessageCount">0 / 600 characters</div>
@@ -948,7 +974,7 @@ body { overflow: auto; display: block; }
         </button>
         <input type="file" id="tierFiles-progressing" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('progressing', event)">
         <div class="tier-converting" id="tierConverting-progressing">Converting HEIC photo…</div>
-        <textarea class="tier-textarea" id="tierDesc-progressing" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
+        <textarea class="tier-textarea" id="tierDesc-progressing" aria-label="Grading notes for the Progressing level" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
       </div>
 
       <div class="tier-card" data-tier="proficient">
@@ -960,7 +986,7 @@ body { overflow: auto; display: block; }
         </button>
         <input type="file" id="tierFiles-proficient" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('proficient', event)">
         <div class="tier-converting" id="tierConverting-proficient">Converting HEIC photo…</div>
-        <textarea class="tier-textarea" id="tierDesc-proficient" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
+        <textarea class="tier-textarea" id="tierDesc-proficient" aria-label="Grading notes for the Proficient level" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
       </div>
 
       <div class="tier-card" data-tier="exemplary">
@@ -972,7 +998,7 @@ body { overflow: auto; display: block; }
         </button>
         <input type="file" id="tierFiles-exemplary" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('exemplary', event)">
         <div class="tier-converting" id="tierConverting-exemplary">Converting HEIC photo…</div>
-        <textarea class="tier-textarea" id="tierDesc-exemplary" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
+        <textarea class="tier-textarea" id="tierDesc-exemplary" aria-label="Grading notes for the Exemplary level" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
       </div>
 
       <div class="wizard-nav">
@@ -1058,7 +1084,7 @@ body { overflow: auto; display: block; }
 </div>
 
 <!-- TOAST -->
-<div class="t-toast" id="toast"></div>
+<div class="t-toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="cognito-auth.js"></script>
 <script>
@@ -1414,6 +1440,19 @@ function wireSigninBtn() {
   });
 }
 
+// A11y: make a click-only element operable for keyboard users —
+// exposes it as a button, makes it focusable, and activates on
+// Enter/Space (WCAG 2.1.1 Keyboard, 4.1.2 Name/Role/Value).
+function keyActivate(el, fn, label) {
+  el.setAttribute('role', 'button');
+  el.tabIndex = 0;
+  if (label) el.setAttribute('aria-label', label);
+  el.addEventListener('click', fn);
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(e); }
+  });
+}
+
 // ─── HOME VIEW ────────────────────────────────────────────────────────────────
 async function bootHome() {
   const meta = tUser.user_metadata || {};
@@ -1428,6 +1467,7 @@ async function bootHome() {
   if (meta.avatar_url) {
     const img = document.createElement('img');
     img.src = meta.avatar_url;
+    img.alt = '';
     avatarEl.appendChild(img);
   } else {
     avatarEl.textContent = firstName[0].toUpperCase();
@@ -1445,10 +1485,12 @@ async function bootHome() {
         p.classList.remove('active');
         p.style.background = 'var(--surface)';
         p.style.color = 'var(--text-muted)';
+        p.setAttribute('aria-pressed', 'false');
       });
       pill.classList.add('active');
       pill.style.background = 'var(--accent-soft)';
       pill.style.color = 'var(--accent)';
+      pill.setAttribute('aria-pressed', 'true');
       renderClassCards();
     });
   });
@@ -1599,12 +1641,12 @@ function renderClassCards() {
         </div>` : ''}
       <div style="margin-top:8px;font-size:12px;font-weight:600;color:var(--accent)">${escHtml(btnLabel)} →</div>
     `;
-    card.addEventListener('click', (e) => {
-      const samplesEl = e.target.closest('[data-add-samples]');
-      const welcomeEl = e.target.closest('[data-add-welcome]');
+    keyActivate(card, (e) => {
+      const samplesEl = e.target?.closest?.('[data-add-samples]');
+      const welcomeEl = e.target?.closest?.('[data-add-welcome]');
       const jumpStep = welcomeEl ? 4 : samplesEl ? 5 : null;
       openWizard(course, subject, jumpStep ? { jumpToStep: jumpStep } : {});
-    });
+    }, `${course}, ${statusLabel} — open setup`);
     grid.appendChild(card);
   });
 }
@@ -2263,7 +2305,7 @@ function useTemplate() {
   const notice = document.createElement('div');
   notice.className = 'template-notice';
   notice.innerHTML = '📋 Using shared course info. Upload your own PDFs below if you want Lumi to use them as syllabus context.';
-  notice.style.cssText = 'padding:12px 16px;background:rgba(123,105,245,.08);border:1px solid rgba(123,105,245,.2);border-radius:8px;font-size:13px;color:var(--text);margin-bottom:16px;';
+  notice.style.cssText = 'padding:12px 16px;background:var(--accent-soft);border:1px solid var(--accent-glow);border-radius:8px;font-size:13px;color:var(--text);margin-bottom:16px;';
   const uploadArea = document.querySelector('.syllabus-upload-area');
   if (uploadArea && !document.querySelector('.template-notice')) {
     uploadArea.parentNode.insertBefore(notice, uploadArea);
@@ -2692,10 +2734,11 @@ function renderMyStudents() {
         <span class="t-student-class-chevron">▸</span>
       </div>
     `;
-    header.addEventListener('click', () => {
+    keyActivate(header, () => {
       tExpandedCourse = (tExpandedCourse === profile.course_name) ? null : profile.course_name;
       renderMyStudents();
-    });
+    }, `${profile.course_name}, ${enrollments.length} student${enrollments.length === 1 ? '' : 's'}`);
+    header.setAttribute('aria-expanded', String(tExpandedCourse === profile.course_name));
     card.appendChild(header);
 
     if (tExpandedCourse === profile.course_name) {
@@ -2718,10 +2761,10 @@ function renderMyStudents() {
             <div class="t-block-row-label">Block ${escHtml(block)}</div>
             <div class="t-block-row-count">${n} student${n === 1 ? '' : 's'}</div>
           `;
-          row.addEventListener('click', (ev) => {
-            ev.stopPropagation();
+          keyActivate(row, (ev) => {
+            ev?.stopPropagation?.();
             openRoster(profile.id, block);
-          });
+          }, `Block ${block}, ${n} student${n === 1 ? '' : 's'} — view roster`);
           blockList.appendChild(row);
         });
       }
@@ -2770,7 +2813,7 @@ function renderRoster() {
     const row = document.createElement('div');
     row.className = 't-roster-item';
     row.textContent = e.student_name || 'Unknown Student';
-    row.addEventListener('click', () => openNoteChat(e.id));
+    keyActivate(row, () => openNoteChat(e.id), `${e.student_name || 'Unknown Student'} — open notes`);
     list.appendChild(row);
   });
 }

@@ -1,149 +1,115 @@
-# Lumi — Menlo School AI Companion
+# Lumi — AI Teaching-Voice Tutor
 
-A multi-file web app with Google OAuth (Supabase), per-user cloud storage, and a conversation history system. Deployed as a static site on GitHub Pages.
+Lumi is an AI tutoring web app that replicates a specific teacher's teaching
+style for 24/7 student support. Teachers onboard through a guided wizard; Lumi
+extracts their pedagogy and then guides students through their subject **without
+giving direct answers** — it always asks students to reason first.
+
+It is a **static site** (no build step, no framework) deployed on GitHub Pages,
+backed by an AWS Lambda that fronts an RDS Postgres database and Amazon Bedrock
+(Claude). There are **no secrets in the frontend** — the browser never holds an
+API key or a database credential.
+
+> **Architecture deep-dive:** see [`CLAUDE.md`](CLAUDE.md). It is the
+> authoritative reference for the data model, the Lambda routes, the system-
+> prompt construction, and feature history. This README is the short version.
+> For data-governance / FERPA details see [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md).
 
 ---
 
-## Project Structure
+## Architecture at a glance
 
 ```
-lumi/
-  index.html   Sign-in page (Google OAuth)
-  app.html     Main Lumi app
-  auth.js      Supabase auth helpers
-  app.js       App logic + Supabase sync
-  style.css    Shared styles
-  README.md    This file
+Browser (GitHub Pages static site)
+  │   Cognito ID token (Google sign-in via cognito-auth.js)
+  ▼
+AWS Lambda  "lumi-claude-proxy"  (lambda/index.mjs)
+  │   • verifies the JWT locally (aws-jwt-verify, cached JWKS)
+  │   • allowed-domains + per-route authz (replaced Supabase RLS)
+  │   • per-user daily rate limits, usage logging
+  ├── RDS Postgres  "lumi-db"     (all app data — parameterized queries via db.js)
+  └── Amazon Bedrock              (Claude — streamed chat + lightweight tasks)
 ```
 
----
-
-## Setup Guide
-
-### 1. Create a Supabase Project
-
-1. Go to [supabase.com](https://supabase.com) → **New project**
-2. Choose a name (e.g. `lumi-menlo`) and set a database password
-3. Wait for the project to spin up
-
----
-
-### 2. Enable Google OAuth
-
-1. In your Supabase project → **Authentication → Providers → Google**
-2. Toggle **Enable Sign in with Google**
-3. Go to [console.cloud.google.com](https://console.cloud.google.com):
-   - Create a project (or reuse one)
-   - **APIs & Services → Credentials → Create OAuth 2.0 Client ID**
-   - Application type: **Web application**
-   - Authorized redirect URIs — add your Supabase callback URL:
-     ```
-     https://YOUR_PROJECT_ID.supabase.co/auth/v1/callback
-     ```
-4. Copy the **Client ID** and **Client Secret** back into Supabase → Google provider → Save
+- **Auth:** AWS Cognito (Google as the sole IdP), code + PKCE. `cognito-auth.js`
+  exposes an `sb.auth.*` shim so call sites still read like the old supabase-js
+  API. `session.access_token` is the Cognito **ID token**; the Lambda verifies it
+  and maps it to a stable Lumi user id via the `app_users` bridge.
+- **Data:** the frontend never talks to the database directly. All reads/writes
+  go through a per-file `rdsFetch(path, {method, body})` helper → Lambda data
+  routes (`/teacher-profile`, `/profiles`, `/conversations`, `/homework-tasks`,
+  `/class-enrollments`, `/work-samples`, `/sis-import`). Identity is always taken
+  from the JWT, never from the request body.
+- **AI:** the Lambda relays chat to **Bedrock** and forces a single model
+  (`SCHOOL_CONFIG.defaultModel`); the client-supplied `body.model` is ignored. It
+  clamps `max_tokens` to 2500 and applies daily rate limits (500 teachers / 100
+  students). Student chat is streamed (SSE).
+- **Storage:** syllabus PDFs and graded-work photos live in private S3 buckets;
+  the browser only ever gets short-lived pre-signed URLs from the Lambda.
 
 ---
 
-### 3. Add Your Supabase Keys to `auth.js`
-
-Open `auth.js` and replace the placeholder values:
-
-```js
-const SUPABASE_URL     = 'https://YOUR_PROJECT_ID.supabase.co';
-const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY_HERE';
-```
-
-Find these in: Supabase dashboard → **Project Settings → API**
-- **Project URL** → `SUPABASE_URL`
-- **anon / public** key → `SUPABASE_ANON_KEY`
-
----
-
-### 4. Create Database Tables
-
-In Supabase → **SQL Editor**, run:
-
-```sql
--- User profiles
-create table profiles (
-  id         uuid references auth.users on delete cascade primary key,
-  name       text,
-  grade      text,
-  updated_at timestamptz default now()
-);
-
--- Conversations
-create table conversations (
-  id             text primary key,
-  user_id        uuid references auth.users on delete cascade not null,
-  title          text,
-  preview        text,
-  messages_json  jsonb default '[]',
-  values_json    jsonb default '[]',
-  goals_json     jsonb default '[]',
-  interests_json jsonb default '[]',
-  exchange_count int default 0,
-  tutor_ctx      jsonb,
-  created_at     timestamptz default now(),
-  updated_at     timestamptz default now()
-);
-
--- Row Level Security
-alter table profiles      enable row level security;
-alter table conversations enable row level security;
-
-create policy "Users manage own profile" on profiles
-  for all using (auth.uid() = id) with check (auth.uid() = id);
-
-create policy "Users manage own conversations" on conversations
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-```
-
----
-
-### 5. Set Allowed Redirect URLs in Supabase
-
-Go to **Authentication → URL Configuration** and add:
+## Project structure
 
 ```
-https://YOUR_GITHUB_USERNAME.github.io/YOUR_REPO_NAME/app.html
-http://localhost:8080/app.html
+index.html        Sign-in page (Google via Cognito)
+app.html          Student chat app
+app.js            Student-app logic (chat, schedule, sync via rdsFetch)
+teacher.html      Teacher onboarding wizard + roster
+admin.html        SIS admin console
+privacy.html      Privacy page
+cognito-auth.js   Cognito PKCE auth (exposes the sb.auth.* shim)
+style.css         The single live stylesheet
+lambda/           AWS Lambda proxy (index.mjs, db.js, package.json)
+migration/        Live RDS schema (rds-schema.sql + rds-*.sql) and ops docs
+docs/             COMPLIANCE.md, PERSISTENCE_SPEC.md, archive/ (migration records)
+synthetic_data/   Synthetic SIS + persona data and seeding/test scripts
+CLAUDE.md         Architecture reference (authoritative)
 ```
 
-(Replace with your actual GitHub Pages URL)
+Note: `lumi.html` is a **legacy, orphaned** self-contained copy of the old
+student app and is not linked from anything — the live app is `app.html` →
+`app.js`.
 
 ---
 
-### 6. Deploy to GitHub Pages
+## Database
+
+The live schema is **`migration/rds-schema.sql`** (plus `rds-sis-tables.sql`,
+`rds-app-users.sql`, `rds-school-domains.sql`). It is plain PostgreSQL — no
+Supabase extensions, no RLS, no `auth.*` references; per-route authz in the
+Lambda replaces what RLS used to enforce.
+
+`supabase_setup.sql` and `migration/supabase-schema.sql` are kept only as
+**historical** records of the retired Supabase era — do not apply them.
+
+Direct DB access for migrations/ops goes through the Lambda's IAM-gated
+direct-invoke admin branch (`aws lambda invoke` with an `adminSql` payload);
+there is no admin SQL HTTP route.
+
+---
+
+## Local development
+
+Lumi is a static site, so serving the repo root is enough to load the UI:
 
 ```bash
-git add index.html app.html auth.js app.js style.css README.md
-git commit -m "Add Lumi multi-file Supabase app"
-git push origin main
+python3 -m http.server 8080
+# then open http://localhost:8080/index.html
 ```
 
-Then in your GitHub repo → **Settings → Pages**:
-- Source: `main` branch, root `/`
-- Save → your site will be live at `https://USERNAME.github.io/REPO/`
+Sign-in, data, and chat all require the deployed Cognito pool + Lambda (there is
+no local backend); a locally served page still authenticates against the real
+Cognito/Lambda endpoints. The Lambda's Function URL and Cognito identifiers are
+documented in `CLAUDE.md` (Stack Notes).
 
-The sign-in page is `index.html` — set that as your entry point.
-
----
-
-## How It Works
-
-| Feature | Implementation |
-|---|---|
-| Auth | Supabase Google OAuth, `@menloschool.org` domain check |
-| Session | Supabase session persists across refreshes |
-| Conversations | localStorage (fast cache) + Supabase (source of truth) |
-| New device | Loads from Supabase on first visit |
-| Sync | Fire-and-forget upsert on every save |
-| Sign out | Clears session, redirects to `index.html` |
-| Non-Menlo user | Rejected with helpful error message |
+There is **no client-side Anthropic API key** — all model calls are proxied and
+authorized server-side. Do not add a key to the frontend.
 
 ---
 
-## Adding Your Anthropic API Key
+## Deploy
 
-The Claude API key is entered in Settings inside the app. It is stored in `localStorage` only — never sent to any server other than Anthropic's API directly.
+The site is served by **GitHub Pages** from the repository root; pushing to the
+deployment branch publishes it. The Lambda (`lambda/`) is deployed separately to
+AWS. The sign-in entry point is `index.html`.

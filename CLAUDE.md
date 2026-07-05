@@ -56,9 +56,12 @@ gives direct answers, only guides reasoning.
   VISIBLY (console.error + showToast at hardened writes; chat-area banner
   for the main tutor fetch) — there is no fallback store. Auth is AWS
   Cognito via `cognito-auth.js` (Workstream I, complete 2026-07-02);
-  the `sb.auth.*` surface survives as the shim's API. **Supabase is fully
-  retired** — zero references in running code; the project is paused
-  pending final deletion. Teacher notes are injected server-side by the
+  the `sb.auth.*` surface survives as the shim's API. **No live Supabase
+  calls/clients/deps remain** (all data I/O goes through `rdsFetch` →
+  Lambda); the paused Supabase project awaits final deletion. Note: many
+  `*Supabase` function names (e.g. `syncScheduleToSupabase`,
+  `loadProfileFromSupabase`) survive in app.js as cosmetic legacy naming —
+  they all route to the Lambda now. Teacher notes are injected server-side by the
   chat Lambda and never reach the client (see "Per-student teacher notes
   injection").
   `migration/SMOKE_TEST.md` and `migration/CUTOVER_PLAN.md` are historical
@@ -76,31 +79,44 @@ gives direct answers, only guides reasoning.
 ## Data Architecture
 
 ### Teacher Profile Object (RDS: teacher_profiles table)
-- Lookup key: teacher_email + class_name (unique constraint on combo)
+- Lookup key: teacher_email + course_name (unique constraint
+  `teacher_profiles_teacher_email_course_name_key` on the combo)
 - Same teacher can have multiple rows, one per class they teach
-- Fields: teacher_email, class_name, subject, title (honorific — Mr./
-  Mrs./Ms./Mx./Dr., written by the onboarding wizard; added in
-  20250420_teacher_title.sql, do not re-add), done, teaching_style,
-  excellence_criteria, grading_philosophy, common_mistakes (jsonb),
-  explanation_methods, key_values, class_specific_notes,
-  teacher_voice, welcome_message (Phase 5b — pinned welcome card body,
-  added in 20260429_teacher_welcome_message.sql, nullable), messages_json
-  (jsonb), created_at, updated_at
-- RLS: teachers manage own rows (matched by auth email), all
-  authenticated users can read (so student sessions can fetch profiles)
+- Columns (live schema — `migration/rds-schema.sql`): id, created_at,
+  updated_at, teacher_email, course_name (NOT NULL), course_code
+  (optional SIS catalog code), engagement_rules, teaching_voice,
+  course_info, syllabus_file_path, syllabus_text, syllabus_uploaded_at,
+  share_course_info, done, suggested_prompts (jsonb — write-only; see
+  "Per-class suggested prompts"), welcome_message (Phase 5b — pinned
+  welcome card body, nullable), title (honorific Mr./Mrs./Ms./Mx./Dr.,
+  written by the onboarding wizard), syllabus_paths (text[]).
+- **The old Supabase-era fields no longer exist** — `subject`,
+  `class_name`, `teaching_style`, `excellence_criteria`,
+  `grading_philosophy`, `common_mistakes`, `explanation_methods`,
+  `key_values`, `class_specific_notes`, `messages_json` were all dropped;
+  the onboarding wizard writes the flat columns listed above. (Historical
+  names appear only in `supabase_setup.sql`.)
+- Authz: enforced in the Lambda `/teacher-profile` routes — any
+  authenticated user may read (student sessions fetch profiles); writes
+  require the JWT email to match `teacher_email`. The Supabase RLS that
+  formerly enforced this was stripped at the RDS cutover.
 
 ### Class Enrollments (RDS: class_enrollments table)
 - Tracks which students are in which classes, with per-student teacher notes
 - Columns:
   - id (uuid, PK)
-  - student_id (uuid, FK → auth.users)
-  - teacher_profile_id (uuid, FK → teacher_profiles.id)
+  - student_id (uuid, NOT NULL) — identity column; the Supabase FK to
+    auth.users was dropped at the RDS cutover (kept as plain uuid)
+  - teacher_profile_id (uuid, FK → teacher_profiles.id, ON DELETE CASCADE)
   - block (text, nullable) — Menlo section letter A–G. CHECK constraint
     `class_enrollments_block_check` enforces the range. Nullable only
     exists so the column could be added before backfill; going forward
     the UI requires a letter and syncEnrollments skips entries without
     one.
   - teacher_notes (text, nullable) — running teacher observations
+  - student_name (text, nullable) — cached display name (SIS import /
+    conflict-update arm)
+  - term (text, nullable) — free-form SIS term label (e.g. "Spring 2026")
   - created_at, updated_at (timestamptz)
 - Unique constraint: (student_id, teacher_profile_id, block). Block is
   part of identity because a future teacher roster needs to group
@@ -113,7 +129,10 @@ gives direct answers, only guides reasoning.
   classes table. teacher_profiles already has a unique (teacher_email,
   course_name), so each row IS a class. If a dedicated classes table is
   ever needed, that is its own refactor, not a drive-by.
-- RLS (5 policies):
+- RLS (5 policies) — **historical Supabase model, stripped in RDS.** All
+  RLS was dropped at the cutover; the Lambda `/class-enrollments` routes
+  below now replicate this authz server-side (RLS_AUDIT.md is the snapshot
+  they were ported from):
   - student_read_own (SELECT): auth.uid() = student_id
   - student_insert_own (INSERT): auth.uid() = student_id — required so
     the student-side upsert from syncEnrollments() can write
@@ -127,12 +146,13 @@ gives direct answers, only guides reasoning.
     teacher_profiles row (matched by auth email)
   - teacher_update_class (UPDATE): same ownership check — scoped to
     teacher_notes edits
-- Trigger: `protect_teacher_notes_trigger` (BEFORE UPDATE) rejects any
-  update that changes teacher_notes unless the caller's email matches
-  the teacher_profiles.teacher_email for the linked class. This is the
-  surgical guard that keeps student_update_own from becoming a write
-  path into teacher_notes. Defined in
-  20260424_student_update_policy_and_notes_protection.sql.
+- Trigger: `protect_teacher_notes_trigger` (BEFORE UPDATE) — **historical;
+  dropped in the RDS schema** (it depended on `auth.jwt()`; see the
+  `migration/rds-schema.sql` header). In Supabase it rejected any update
+  that changed teacher_notes unless the caller's email matched the
+  teacher_profiles.teacher_email for the linked class. Write-protection is
+  now enforced in the Lambda `PATCH /class-enrollments` route (2-step
+  email-ownership check) instead.
 - Enrollment rows are written by syncEnrollments() in app.js, called at
   the end of syncScheduleToSupabase() after the student finalizes their
   schedule. It looks up teacher_profiles by (teacher_email, course_name)
@@ -174,25 +194,27 @@ gives direct answers, only guides reasoning.
   conflict-update arm can only touch student_name/updated_at, so teacher_notes
   is structurally unwritable by students) and `PATCH /class-enrollments`
   (teacher note save — 2-step email ownership check, 403 non-owner). Both
-  wired into the frontend behind `USE_RDS`. No DELETE route — no RLS policy
-  to port; dropped-class cleanup is still the pre-Menlo TODO.
+  wired into the frontend. No DELETE route — no RLS policy to port;
+  dropped-class cleanup is still the pre-Menlo TODO.
 - **✅ Server-side prompt injection (shipped 2026-07-01).** The student
   notes-injection read is GONE from the client entirely. The chat Lambda
   replaces the `<<LUMI_TEACHER_NOTES>>` marker the client emits in its system
-  prompt with a server-built notes section (student identity from the JWT;
-  `inject_teacher_notes.use_rds` selects RDS vs Supabase so the source flips
-  with the flag at cutover). Notes never reach the browser for any purpose —
-  chips moved server-side too (`GET /suggested-prompts`). See "Per-student
-  teacher notes injection" under System Prompt Architecture.
+  prompt with a server-built notes section (student identity from the JWT).
+  The notes source is RDS unconditionally; the legacy
+  `inject_teacher_notes.use_rds` field is still accepted from old clients but
+  ignored (the Supabase branch is gone). Notes never reach the browser for any
+  purpose — chips moved server-side too (`GET /suggested-prompts`). See
+  "Per-student teacher notes injection" under System Prompt Architecture.
 
 ### Other RDS Tables
 - **profiles** — student user profiles (id, name, grade, values_profile jsonb)
 - **conversations** — chat history (id, user_id, title, messages jsonb,
-  teacher, course, is_teacher_test boolean (Teacher Test Mode TM-1 —
-  added in 20260429_2_teacher_test_mode.sql; default false; flips
-  to true for conversations created while a teacher is in test
-  mode), created_at, updated_at)
-- Both have RLS scoped to auth.uid()
+  teacher, course, is_teacher_test boolean (Teacher Test Mode TM-1;
+  default false; flips to true for conversations created while a teacher
+  is in test mode), created_at, updated_at)
+- Both had Supabase RLS scoped to auth.uid(); in RDS that isolation is
+  enforced in the Lambda `/profiles` and `/conversations` routes (JWT
+  sub). Live definitions: `migration/rds-schema.sql`.
 
 ### teacher_work_samples (Q4)
 - Stores per-tier graded student-work photos + descriptions, one row
@@ -207,8 +229,9 @@ gives direct answers, only guides reasoning.
 - RLS mirrors teacher_profiles ownership: any authenticated user can
   SELECT (students need it at feedback time); INSERT/UPDATE/DELETE
   require the JWT email to match the linked teacher_profiles.teacher
-  _email via a JOIN check. Defined in
-  20260427_teacher_work_samples.sql.
+  _email via a JOIN check. **This RLS is the historical Supabase model,
+  stripped in RDS** — the live table lives in `migration/rds-schema.sql`
+  and the same authz is now enforced in the Lambda `/work-samples` route.
 - Writes happen in teacher.html `saveTeacherProfile()` after the
   teacher_profiles upsert returns the row id. Reads happen in
   app.js `getTeacherProfile()` and are converted to base64 images
@@ -262,8 +285,8 @@ via the `app_users` bridge) → allowed-domains gate (schools.allowed_domains,
 per-route authz replicating the old RLS (RLS_AUDIT.md) → parameterized query
 via `db.js` → raw row(s) on success / `{error}` + status on failure → logs
 carry `err.code` only, never PII. Identity is ALWAYS taken from the JWT and
-never from the request body (MIGRATION_HARDENING.md §1) — verified live with
-spoofed ids.
+never from the request body (docs/archive/MIGRATION_HARDENING.md §1) — verified
+live with spoofed ids.
 - **/teacher-profile** GET (default; `?template_for_course=` for
   checkForTemplate; `?scope=all` admin-gated to SCHOOL_CONFIG.adminEmails —
   deliberately narrower than the old any-authenticated auth_read) +
@@ -283,9 +306,9 @@ spoofed ids.
   `?teacher_profile_ids=`) + POST/DELETE (2-step JOIN-by-email authz: 403
   non-owner, 404 missing profile — fail-visible where RLS was silently empty).
 - **api_usage: NO client route by design** (forgeable). `checkRateLimit` +
-  `logUsage` inside the Lambda gained RDS branches gated on `USE_RDS_USAGE=1`
-  (env var, unset until cutover so live rate limits keep reading Supabase's
-  real history; both must flip together).
+  `logUsage` inside the Lambda query `public.api_usage` in RDS
+  **unconditionally** — the `USE_RDS_USAGE` env-var gate and the Supabase
+  branch were both removed at cutover.
 - Function URL CORS AllowMethods now `GET, POST, PATCH, DELETE`.
 - jsonb params are JSON.stringify'd in routes (node-postgres turns JS arrays
   into PG array literals otherwise); text[] columns pass raw arrays.
@@ -347,11 +370,11 @@ spoofed ids.
   section; the marker is ALWAYS stripped even when no injection is
   requested (stray-marker defense).
 - `finishOpenTutor()` no longer queries class_enrollments at all. It sets
-  `S.tutorCtx.notesInjection = { teacher_profile_id, use_rds }` (null when
+  `S.tutorCtx.notesInjection = { teacher_profile_id }` (null when
   no profile.id or in test mode — the TM-2 guard survives), and `callAPI`
-  passes it as `inject_teacher_notes` in the chat body. `use_rds` steers
-  the Lambda's notes source (RDS dbQuery vs Supabase REST via service
-  key) so the source flips with the USE_RDS flag at cutover.
+  passes it as `inject_teacher_notes` in the chat body. The Lambda reads
+  notes from RDS unconditionally (`fetchTeacherNotes` → `dbQuery`); any
+  legacy `use_rds` field a stale client still sends is accepted and ignored.
 - Server-side authz: student identity comes from the verified JWT —
   a caller can only ever receive notes written about them. Server logs
   carry counts/lengths only (`[notes] injected n note(s), m chars`),
@@ -374,8 +397,8 @@ spoofed ids.
   of commit 4 (generation moved SERVER-SIDE 2026-07-01), chip text is
   sourced via a **2-tier precedence**:
   1. `S.tutorCtx.notesInjection` set → `GET /suggested-prompts` on the
-     Lambda, which reads this student's notes server-side (JWT-scoped;
-     `use_rds` selects the store) and generates three chips (one
+     Lambda, which reads this student's notes server-side (JWT-scoped,
+     from RDS) and generates three chips (one
      generic, one neutral topic-influenced, one curiosity-framed
      topic-influenced) via Bedrock — **notes never reach the browser**.
      Server validates shape (3 strings ≤80 chars) + email/name leak
@@ -444,8 +467,8 @@ spoofed ids.
   - A chip > 80 chars
   - A chip contains the student email or full name (privacy guard)
 - **`teacher_profiles.suggested_prompts` is now dormant on the
-  read side.** The 20250417 migration added the column; teacher.html
-  still WRITES it during onboarding (`generateSuggestedPrompts()`
+  read side.** The column (jsonb, in `migration/rds-schema.sql`) is still
+  WRITTEN by teacher.html during onboarding (`generateSuggestedPrompts()`
   ~line 1605). After commit 4 the student-side render no longer
   consults it, and production data confirms the column is unused
   in practice (Mr. Harris's row is NULL). **Cleanup item — not
@@ -518,10 +541,10 @@ spoofed ids.
   doesn't accept it; teacher.html converts HEIC → JPEG client-side
   via the heic2any CDN script before upload). Initially Supabase
   Storage; migrated to AWS S3 via Lambda signed URLs in Day 4 of the
-  AWS migration (commit 8d2c3d8). Defined in
-  `supabase/migrations/20260427_teacher_work_samples.sql` (table
-  definition still valid; the bucket + RLS policies portion is now
-  historical).
+  AWS migration (commit 8d2c3d8). The live table is in
+  `migration/rds-schema.sql` (the original Supabase migration
+  `20260427_teacher_work_samples.sql` and its bucket/RLS policies are no
+  longer in the tree).
 - **Banner for existing teachers.** Profiles that are `done: true` but
   missing one or more tiers show a yellow callout inside the home-card
   saying "New step added — please add a few graded work samples".
@@ -548,25 +571,23 @@ spoofed ids.
   a time and to push back warmly when the student asks for everything
   at once. These are universal (not gated on workSamples) — every
   profile-branch prompt gets them.
-- **Cleanup items left untouched (do not bundle into Q4 follow-ups).**
-  - `netlify/functions/anthropic.mjs` is dead since the Supabase
-    Edge Function migration in commit 22a3dd5 — remove in its own
-    cleanup commit.
-  - `supabase/functions/claude-proxy/index.ts` is now fully dead code
-    — chat moved to Lambda in commit 5247f0b (Week 1), syllabi storage
-    in 506eed9 (Day 3), work-samples storage in 8d2c3d8 (Day 4).
-    Nothing in the codebase calls Supabase Storage for either bucket
-    anymore. Queued for cleanup deletion.
+- **Cleanup items (status as of this doc refresh).**
+  - `netlify/functions/anthropic.mjs` — **already removed** (the whole
+    `netlify/` dir is gone from the tree).
+  - `supabase/functions/claude-proxy/index.ts` — **already removed** (the
+    whole `supabase/` dir is gone). Chat moved to Lambda in commit 5247f0b
+    (Week 1), syllabi storage in 506eed9 (Day 3), work-samples storage in
+    8d2c3d8 (Day 4). Nothing in the codebase calls Supabase Storage anymore.
   - **Syllabi storage migrated to AWS S3 (commit 506eed9, 2026-05-19).**
     Bucket `lumi-syllabi-613136968914` (us-east-1). Access is gated
     by the Lambda's IAM execution role (`S3LumiStorage` inline policy)
     plus the Lambda's own auth checks — Cognito ID token verify →
     teacher row check → allowed-domains check — before it will sign
     a URL. CORS on the S3 bucket is restricted to the GitHub Pages
-    origin. Pre-signed URLs expire after 5 minutes. The old reference
-    migration `supabase/migrations/20260430_syllabi_bucket.sql` is
-    now stale (it described a Supabase Storage config we never
-    actually used) — leave untracked or delete in a follow-up cleanup.
+    origin. Pre-signed URLs expire after 5 minutes. (The old reference
+    migration `supabase/migrations/20260430_syllabi_bucket.sql`, which
+    described a Supabase Storage config never actually used, is no longer
+    in the tree.)
     **TODO:** Lambda has no `/delete-objects` endpoint yet, so files
     a teacher removes from their list become S3 orphans. Acceptable
     at current scale (cents/month). Fix options when prioritized: add
@@ -580,11 +601,11 @@ spoofed ids.
     origin. Pre-signed URLs valid for 1 hour (longer than syllabi
     because the runtime vision pipeline needs headroom for parallel
     per-image fetches at chat-open). HEIC conversion stays client-side
-    via heic2any — the bucket only ever sees JPEG/PNG/WebP. The
-    original bucket + RLS policies portion of
-    `supabase/migrations/20260427_teacher_work_samples.sql` is now
-    stale at the storage layer (the table definition itself is still
-    valid). **TODO:** Lambda has no `/delete-objects` endpoint yet,
+    via heic2any — the bucket only ever sees JPEG/PNG/WebP. (The
+    original Supabase migration `20260427_teacher_work_samples.sql` and
+    its bucket + RLS policies are no longer in the tree; the live table
+    lives in `migration/rds-schema.sql`.) **TODO:** Lambda has no
+    `/delete-objects` endpoint yet,
     so files a teacher removes from a tier become S3 orphans (~3×
     the rate of syllabi orphans because deletes happen per-tier
     inside the save loop). Same fix options as syllabi: add
@@ -626,11 +647,13 @@ spoofed ids.
   - Phase 6 — input-bar polish, feedback-label drop, purple-residue
     grep + tokenisation, switch from static `?v=N` to dynamic
     `?t=Date.now()` cache-busting (see Stack Notes).
-- **Cache-busting convention (Phase 6).** All HTML pages that load
-  `style.css` now use the same dynamic pattern app.js has used since
-  the start: `<script>document.write('<link rel="stylesheet"
+- **Cache-busting convention (Phase 6).** app.html, teacher.html,
+  admin.html, and privacy.html use the dynamic pattern app.js has used
+  since the start: `<script>document.write('<link rel="stylesheet"
   href="style.css?t=' + Date.now() + '">');</script>`. Every page
-  load gets a fresh URL so browsers can't serve cached CSS. The static
+  load gets a fresh URL so browsers can't serve cached CSS.
+  **Exception:** `index.html` still uses the static `style.css?v=21`
+  pattern (the migration was not applied there). The static
   `?v=N` pattern caused a Phase-4 cache-stale incident that cost a
   full debugging cycle — the dynamic pattern eliminates that risk.
   Trade-off: zero browser-side caching of CSS. Acceptable for a
@@ -667,9 +690,10 @@ spoofed ids.
   auth.uid() with `is_teacher_test=true` so they never bleed into
   student data or admin analytics.
 - **Schema.** `is_teacher_test BOOLEAN NOT NULL DEFAULT FALSE` on
-  conversations (TM-1, 20260429_2_teacher_test_mode.sql). No RLS
-  changes — existing `auth.uid() = user_id` policy isolates teacher's
-  test conversations naturally.
+  conversations (TM-1; live in `migration/rds-schema.sql`). No authz
+  changes — the per-user JWT-sub scoping in the Lambda `/conversations`
+  route (formerly the `auth.uid() = user_id` RLS policy) isolates a
+  teacher's test conversations naturally.
 - **URL conventions.**
   - `app.html?mode=test` — entry point. Boot detection in app.js
     flips `S.isTestMode = true` for the tab and mirrors to
@@ -743,7 +767,7 @@ spoofed ids.
 
 ## Existing Teacher Profiles
 - Democratic Backsliding — Global Issues (Menlo School)
-  Stored in Supabase. DO NOT re-hardcode in app.js.
+  Stored in RDS (`teacher_profiles`). DO NOT re-hardcode in app.js.
 
 ---
 
@@ -863,26 +887,38 @@ spoofed ids.
 - **Type:** Static site (no build step, no bundler)
 - **Frontend:** Vanilla HTML/CSS/JS — no framework
 - **Pages:** index.html (sign-in), app.html (student chat), teacher.html
-  (teacher onboarding), admin.html, lumi.html
-- **Styling:** style.css (primary, ~75 KB) + styles.css (~18 KB); Inter font via Google Fonts
-- **Auth:** AWS Cognito (pool `lumi-users` / `us-east-1_C0xhKzu94`, app client `lumi-web`, hosted domain `lumi-auth-613136968914`) with Google as the sole IdP — code+PKCE via `cognito-auth.js` (repo root; exposes the old `sb.auth.*` surface, so call sites still read like supabase-js). `session.access_token` = the Cognito ID token; the Lambda verifies it locally (aws-jwt-verify, module-cached JWKS — zero per-request egress) and resolves it to the preserved lumi uuid via the `app_users` bridge (link-by-verified-email on first sign-in). Sign-in domains are data-driven off `schools.allowed_domains` (client UX check via `GET /allowed-domains` fails open; server enforcement in verifyCognitoAuth + the route gate fails closed; SCHOOL_CONFIG.adminEmails bypass). **Supabase is fully retired** (Workstream I complete 2026-07-02): zero references in running code, project paused pending deletion; supabase_setup.sql + supabase/ + RLS_AUDIT.md are historical records.
+  (teacher onboarding), admin.html (SIS admin console), privacy.html.
+  `lumi.html` is a **legacy, orphaned** self-contained copy of the old
+  student app — not linked from any page/JS and does not load style.css;
+  the live student app is app.html → app.js.
+- **Styling:** style.css is the single live stylesheet (~90 KB), loaded by
+  index/app/teacher/admin/privacy; Inter font via Google Fonts. `styles.css`
+  (~18 KB) is orphaned — no Lumi page loads it.
+- **Auth:** AWS Cognito (pool `lumi-users` / `us-east-1_C0xhKzu94`, app client `lumi-web`, hosted domain `lumi-auth-613136968914`) with Google as the sole IdP — code+PKCE via `cognito-auth.js` (repo root; exposes the old `sb.auth.*` surface, so call sites still read like supabase-js). `session.access_token` = the Cognito ID token; the Lambda verifies it locally (aws-jwt-verify, module-cached JWKS — zero per-request egress) and resolves it to the preserved lumi uuid via the `app_users` bridge (link-by-verified-email on first sign-in). Sign-in domains are data-driven off `schools.allowed_domains` (client UX check via `GET /allowed-domains` fails open; server enforcement in verifyCognitoAuth + the route gate fails closed; SCHOOL_CONFIG.adminEmails bypass). **Supabase is retired** (Workstream I complete 2026-07-02): no live Supabase calls/clients/deps remain (though vestigial `*Supabase` function names persist in app.js — cosmetic), project paused pending deletion; `supabase_setup.sql` + `RLS_AUDIT.md` remain in-tree as historical records (the `supabase/` dir itself is gone).
 - **Database:** AWS RDS Postgres (`lumi-db`) behind the `lumi-claude-proxy` Lambda — per-route JWT authz replaced RLS (see "RDS Lambda data routes"). Direct DB access for migrations/ops: the Lambda's direct-invoke admin branch ONLY (`aws lambda invoke --payload '{"adminSql":..., "params":[...]}'` — IAM-gated, unreachable via the function URL; replaced the deleted /admin/sql + ADMIN_TOKEN at teardown).
-- **AI API:** Anthropic Messages API via AWS Lambda lumi-claude-proxy
+- **AI API:** Claude via **Amazon Bedrock** (streamed with
+  `InvokeModelWithResponseStreamCommand`) behind AWS Lambda lumi-claude-proxy
   (Function URL: https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/).
-  The proxy validates JWT auth, enforces a 2500 max_tokens
-  ceiling, restricts to an ALLOWED_MODELS whitelist, applies per-user
-  daily rate limits (500/day teachers, 100/day students), logs token
-  usage to `api_usage`, then relays the body to Anthropic (via Bedrock)
-  without modifying system prompts or messages. Image content blocks are
-  passed through unchanged.
-  - Student tutoring & teacher onboarding: claude-sonnet-4-20250514 (max_tokens: 2500)
-  - Lightweight classification tasks: claude-haiku-4-5 (conversation
-    title generation: max_tokens 20; suggested-prompt chip
-    generation, commit 4: max_tokens 200, temperature 0.7, 5s
-    timeout)
-  - Streaming enabled for student chat (ReadableStream + getReader)
-  - The older `netlify/functions/anthropic.mjs` is dead code awaiting
-    a separate cleanup commit — do not call it.
+  The proxy validates JWT auth, clamps max_tokens to a 2500 ceiling
+  (`Math.min(body.max_tokens, 2500)`), applies per-user daily rate limits
+  (500/day teachers, 100/day students), logs token usage to `api_usage`,
+  then relays to Bedrock. Image content blocks pass through unchanged.
+  - **Model is forced by the Lambda.** Every proxied call uses
+    `SCHOOL_CONFIG.defaultModel` = `global.anthropic.claude-sonnet-4-6`
+    (a Bedrock global inference profile). There is **no ALLOWED_MODELS
+    whitelist**, and the client's `body.model` is **ignored** — the client
+    strings `claude-sonnet-4-20250514` (chat/onboarding, app.js) and
+    `claude-haiku-4-5` (conversation-title generation, max_tokens 20;
+    teacher.html) are still sent but have no effect on which model runs.
+  - **The Lambda DOES modify the system prompt** on the chat route: it
+    replaces the `<<LUMI_TEACHER_NOTES>>` marker with a server-built notes
+    section (and always strips a stray marker). `messages` are passed
+    through untouched.
+  - `provider` defaults to `"claude"`; the `gemini`/`gpt` branches exist
+    but throw "not yet implemented".
+  - Server-side chip generation (`GET /suggested-prompts`) also runs through
+    the same forced model (`callClaude`, max_tokens 300, 8s server timeout).
+  - Streaming enabled for student chat (ReadableStream + getReader).
 - **Markdown rendering:** Custom lightweight renderer in app.js (no library)
 - **Hosting:** GitHub Pages (static deploy)
 - **Schema:** `migration/rds-schema.sql` (+ `rds-sis-tables.sql`, `rds-app-users.sql`, `rds-school-domains.sql`) is the live RDS schema; supabase_setup.sql is the historical Supabase-era definition (RLS included) — do not apply it anywhere
@@ -902,6 +938,26 @@ scaled student use at Menlo. Phased; each phase is reviewed and committed separa
   Gaps list. Keep it PII-free — describe categories/columns, never real names/emails.
 - **Phase 1 shipped (2026-07-04):** `docs/COMPLIANCE.md` created; temporary
   `DIAGNOSTIC_REPORT.md` folded in and deleted.
+- **Phase 2a shipped (2026-07-04):** Lambda log redaction — a single `safeErr(err)`
+  helper is the choke point for all route error logging (the 4 full-error-object dumps
+  are gone). `/admin/sql` documented as IAM-gated + HTTP-unreachable (the real lockdown)
+  with an OPTIONAL `ADMIN_INVOKE_SECRET` in-payload gate (off unless the env var is set).
+  Deployed + verified (authed fetch + CloudWatch clean). **Phase 2b (remove hardcoded
+  `MENLO_CURRICULUM`/`TEACHER_EMAIL_MAP` staff PII + git-history scrub) is DEFERRED** —
+  it collides with the active `refactor/split-app-js` worktree editing the same `app.js`;
+  revisit once that refactor merges. History scrub still owner-approved but not yet run.
+- **Phase 3 shipped (2026-07-04):** `privacy.html` (draft, SOPIPA/COPPA posted policy),
+  linked from the sign-in footer; populated from `docs/COMPLIANCE.md`, marked DRAFT
+  (not legally reviewed), placeholder contact + effective date.
+- **Phase 4 shipped (2026-07-04):** soft-delete `deleted_at` added to all 7 PII tables
+  (`migration/rds-add-deleted-at.sql`). `GET /my-data` (JWT-scoped export, `teacher_notes`
+  excluded) + `POST /delete-my-account` (`{"confirm":"DELETE"}`, 30-day grace).
+  `verifyCognitoAuth` reads `app_users.deleted_at` every request → immediate revocation
+  (identity-cache early-return removed). Hard-delete SQL procedure documented in
+  `docs/COMPLIANCE.md` §6. Deployed + verified live incl. the reversible
+  delete→401→restore→200 test. **This work is on branch `compliance/phases` (both
+  remotes), not yet merged to `main`** — pending PR, kept off `main` to avoid the
+  multi-agent working-tree churn.
 - **Phase 5 spec drafted (2026-07-04):** `docs/PERSISTENCE_SPEC.md` — design doc ONLY,
   nothing built. Cross-session student memory. **DECIDED: rolling-summary MVP** (Option B) —
   one short auto-generated progress note per (student, class), the **third personalization
@@ -916,8 +972,10 @@ scaled student use at Menlo. Phased; each phase is reviewed and committed separa
   Retention default 365 days (school-contract dependent). Open questions for the school:
   retention, who may view notes, under-16 opt-in consent, discard-vs-retain.
 - **Key facts established in the Phase 0 diagnostic** (carry forward):
-  - **No `deleted_at` / soft-delete / retention on any table.** No deletion mechanism
-    exists yet. `conversations.messages` already persists student chat content today.
+  - **`deleted_at` / soft-delete** — was absent at Phase 0; **added to all 7 PII tables
+    in Phase 4** with self-service export/delete + immediate revocation. Admin-initiated
+    "delete student X" + per-student export remain (Phase 5 design). `conversations.messages`
+    already persists student chat content today.
   - **Lambda backend is clean of hardcoded secrets** (RDS IAM auth, Cognito JWKS, no
     Secrets Manager in use). `/admin/sql` has **no HTTP route** — reachable only via the
     IAM-gated direct-invoke `adminSql` branch (`lambda/index.mjs:470`).
