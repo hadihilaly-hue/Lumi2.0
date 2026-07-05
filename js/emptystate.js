@@ -1,6 +1,6 @@
-import { dateDiffDays } from '../app.js';
 import { loadConv, openGeneralChat } from './conversation.js';
 import { getHwTasks } from './homework.js';
+import { dateDiffDays } from './projects.js';
 import { getStudentName } from './prompts.js';
 import { renderSidebar } from './sidebar.js';
 import { S, SB, messagesEl, msgInput } from './state.js';
