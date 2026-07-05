@@ -603,6 +603,32 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="cognito-auth.js"></script>
 <script>
+/* First-run privacy consent gate. If the signed-in user hasn't accepted the
+   privacy policy yet, route to the consent screen and come back here. Runs
+   before app.js; a no-op once accepted (localStorage fast-path). Fail-open on
+   transient errors so a flaky network can't lock anyone out. */
+(function () {
+  const LAMBDA = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws';
+  async function gate(session) {
+    if (!session || !session.user || !session.user.email) return;
+    const email = session.user.email.toLowerCase();
+    if (localStorage.getItem('lumi_privacy_ok') === email) return;
+    try {
+      const r = await fetch(LAMBDA + '/consent', { headers: { Authorization: 'Bearer ' + session.access_token } });
+      if (!r.ok) return;
+      const j = await r.json();
+      if (j.accepted) { localStorage.setItem('lumi_privacy_ok', email); return; }
+      const dest = (location.pathname.split('/').pop() || 'app.html');
+      location.replace('privacy.html?consent=1&next=' + encodeURIComponent(dest));
+    } catch (e) { /* fail open */ }
+  }
+  (async function () {
+    try { const s = (await sb.auth.getSession()).data.session; if (s && s.user) { gate(s); return; } } catch (e) {}
+    sb.auth.onAuthStateChange((ev, s) => { if (ev === 'SIGNED_IN') gate(s); });
+  })();
+})();
+</script>
+<script>
   // app.js is an ES module (split into ./js/*.js). Load as type=module so its
   // imports resolve. No cache-bust query: module identity is keyed by URL, and
   // the js/*.js modules import back from ./app.js during the split — a query

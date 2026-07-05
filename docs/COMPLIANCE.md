@@ -197,6 +197,22 @@ the JWT; a caller can only ever touch their own rows.
   returns 401 the instant after deletion. Data is retained for a **30-day grace period**
   and hard-deleted after.
 
+### First-run consent gate (SOPIPA/COPPA notice-and-consent)
+
+Before entering the app, a signed-in user must accept the privacy policy once. The
+consent screen (`privacy.html?consent=1&next=<page>`) shows the full policy and enables
+its **"I understand & agree"** button only after the reader scrolls to the bottom; on
+click it records consent and forwards to the destination.
+
+- **`GET /consent`** → `{ accepted, accepted_at }` for the JWT user.
+- **`POST /consent`** → records acceptance (idempotent: `COALESCE`, so re-posting never
+  overwrites the original timestamp). Auditable per-account consent record on
+  `app_users.privacy_accepted_at` (`migration/rds-add-privacy-consent.sql`).
+- **Enforcement:** `app.html` + `teacher.html` run a small gate on load — an un-consented
+  signed-in user is redirected to the consent screen. Fail-open on transient error (a
+  flaky network can't lock anyone out); the record is still enforced on the next load.
+  The OAuth flow itself is unchanged.
+
 ### Hard-delete procedure (documented SQL, not a cron)
 
 No new infrastructure. After the 30-day grace, run this once (via the IAM-gated admin

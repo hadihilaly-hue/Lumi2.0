@@ -54,6 +54,28 @@
   th { color: var(--text-muted); font-weight: 600; }
   .pp-foot { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-faint); font-size: 12.5px; }
   code, .pp-ph { background: var(--surface-2); border-radius: 4px; padding: 1px 6px; font-size: 13px; }
+
+  /* First-run consent bar — only shown in ?consent=1 mode (body.consent-mode). */
+  .consent-bar { display: none; }
+  body.consent-mode .consent-bar {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    background: var(--surface); border-top: 1px solid var(--border);
+    box-shadow: 0 -6px 24px rgba(0,0,0,.10);
+    padding: 14px 24px; justify-content: center;
+  }
+  body.consent-mode .pp-wrap { padding-bottom: 150px; } /* clear the fixed bar */
+  .consent-bar-inner {
+    width: 100%; max-width: 760px; display: flex; align-items: center;
+    justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  }
+  .consent-hint { font-size: 13px; color: var(--text-muted); }
+  .consent-btn {
+    font-family: inherit; font-size: 14px; font-weight: 600; color: #fff;
+    background: var(--accent); border: none; border-radius: 10px;
+    padding: 12px 22px; cursor: pointer; white-space: nowrap;
+  }
+  .consent-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .consent-btn:not(:disabled):hover { filter: brightness(1.08); }
 </style>
 </head>
 <body class="privacy-page">
@@ -160,5 +182,77 @@
     (<code>docs/COMPLIANCE.md</code>) and is pending legal review. Not legal advice.
   </div>
 </div>
+
+<!-- First-run consent bar (only active via privacy.html?consent=1&next=...) -->
+<div class="consent-bar" role="region" aria-label="Privacy consent">
+  <div class="consent-bar-inner">
+    <span class="consent-hint" id="consentHint">Please scroll to the bottom to continue.</span>
+    <button class="consent-btn" id="consentBtn" disabled>I understand &amp; agree</button>
+  </div>
+</div>
+
+<script src="cognito-auth.js"></script>
+<script>
+(function () {
+  const params = new URLSearchParams(location.search);
+  if (params.get('consent') !== '1') return;   // normal read-only policy view
+
+  document.body.classList.add('consent-mode');
+  const LAMBDA = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws';
+  const rawNext = params.get('next') || 'app.html';
+  const next = /^[a-z0-9_-]+\.html$/i.test(rawNext) ? rawNext : 'app.html';  // no open redirects
+  const btn = document.getElementById('consentBtn');
+  const hint = document.getElementById('consentHint');
+
+  // Enable the button only once the reader reaches the bottom of the policy.
+  // Robust to the body-vs-html scroll container (this page scrolls on body):
+  // read both, and never enable before layout is ready (dimensions non-zero).
+  function atBottom() {
+    const doc = document.documentElement, body = document.body;
+    const scrollTop = window.scrollY || doc.scrollTop || body.scrollTop || 0;
+    const scrollHeight = Math.max(doc.scrollHeight, body.scrollHeight);
+    const clientHeight = window.innerHeight || doc.clientHeight || 0;
+    if (clientHeight === 0 || scrollHeight === 0) return false; // not laid out yet
+    return (scrollHeight - scrollTop - clientHeight) < 64;
+  }
+  function maybeEnable() {
+    if (!btn.disabled) return;
+    if (atBottom()) { btn.disabled = false; hint.textContent = 'Thanks — you can agree to continue.'; }
+  }
+  window.addEventListener('scroll', maybeEnable, { passive: true });
+  window.addEventListener('resize', maybeEnable);
+  setTimeout(maybeEnable, 400);  // short policies / already-at-bottom
+
+  (async function () {
+    let session = null;
+    try { session = (await sb.auth.getSession()).data.session; } catch (e) {}
+    if (!session || !session.user) { location.replace('index.html'); return; }  // must be signed in
+    const token = session.access_token;
+    const email = (session.user.email || '').toLowerCase();
+
+    // Already accepted (e.g. reached here by hand) → straight through.
+    try {
+      const r = await fetch(LAMBDA + '/consent', { headers: { Authorization: 'Bearer ' + token } });
+      if (r.ok && (await r.json()).accepted) {
+        localStorage.setItem('lumi_privacy_ok', email);
+        location.replace(next); return;
+      }
+    } catch (e) {}
+
+    btn.addEventListener('click', async () => {
+      btn.disabled = true; btn.textContent = 'Saving…';
+      try {
+        const r = await fetch(LAMBDA + '/consent', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+        if (!r.ok) throw new Error('consent ' + r.status);
+        localStorage.setItem('lumi_privacy_ok', email);
+        location.replace(next);
+      } catch (e) {
+        btn.disabled = false; btn.textContent = 'I understand & agree';
+        hint.textContent = 'Something went wrong — please try again.';
+      }
+    });
+  })();
+})();
+</script>
 </body>
 </html>
