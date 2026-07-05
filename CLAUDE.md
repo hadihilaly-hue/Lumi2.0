@@ -853,6 +853,19 @@ scaled student use at Menlo. Phased; each phase is reviewed and committed separa
   Gaps list. Keep it PII-free — describe categories/columns, never real names/emails.
 - **Phase 1 shipped (2026-07-04):** `docs/COMPLIANCE.md` created; temporary
   `DIAGNOSTIC_REPORT.md` folded in and deleted.
+- **Phase 5 spec drafted (2026-07-04):** `docs/PERSISTENCE_SPEC.md` — design doc ONLY,
+  nothing built. Cross-session student memory. **DECIDED: rolling-summary MVP** (Option B) —
+  one short auto-generated progress note per (student, class), the **third personalization
+  layer** on top of teacher profile (layer 1) + per-student teacher notes (layer 2). Note is
+  ≤350 tokens, revised each session via a Bedrock (Haiku) call, injected server-side at chat
+  start, never reaches the browser. New `student_progress_notes` table ships with `deleted_at`
+  from day one; deletion reuses the Phase 4 soft-delete → 30-day grace → hard-delete pattern
+  ("delete student X" = one cascade); `/my-data`-style per-student JSON export; note/transcript
+  content never logged (Phase 2 redaction helper). **DECISION PENDING — HADI:** discard raw
+  transcripts after summarizing (default; smallest FERPA surface, forecloses retrieval) vs.
+  retain (enables the documented Option C pgvector + Titan Embeddings retrieval upgrade path).
+  Retention default 365 days (school-contract dependent). Open questions for the school:
+  retention, who may view notes, under-16 opt-in consent, discard-vs-retain.
 - **Key facts established in the Phase 0 diagnostic** (carry forward):
   - **No `deleted_at` / soft-delete / retention on any table.** No deletion mechanism
     exists yet. `conversations.messages` already persists student chat content today.
