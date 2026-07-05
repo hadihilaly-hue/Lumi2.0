@@ -423,8 +423,19 @@ async function fetchTeacherNotes({ studentId, teacherProfileId }) {
       "SELECT teacher_notes FROM public.class_enrollments WHERE student_id = $1 AND teacher_profile_id = $2",
       [studentId, teacherProfileId]
     ).then(r => r.rows.map(x => x.teacher_notes));
-    const timeout = new Promise(resolve => setTimeout(() => resolve(null), 3000));
-    const vals = await Promise.race([work, timeout]);
+    // AUDIT_LAMBDA_BUGS H4: keep a handle to the loser timer and clear it after
+    // the race so it can't keep the event loop alive (streamifyResponse only
+    // finalizes when the loop drains — a dangling timer burns a concurrency slot
+    // for the full 3s after the response is already sent). .unref() as a belt
+    // in case work rejects before the clear.
+    let notesTimer;
+    const timeout = new Promise(resolve => { notesTimer = setTimeout(() => resolve(null), 3000); notesTimer.unref?.(); });
+    let vals;
+    try {
+      vals = await Promise.race([work, timeout]);
+    } finally {
+      clearTimeout(notesTimer);
+    }
     if (vals === null) { console.warn("[notes] fetch timeout"); return []; }
     if (vals.length > 1) { console.warn(`[notes] multi-block collision (${vals.length} rows) — skipped`); return []; }
     return parseNotes(vals[0] ?? null);
@@ -1159,10 +1170,17 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
           if (chunk.type === "content_block_delta" && chunk.delta?.text) text += chunk.delta.text;
         }
       })();
-      await Promise.race([
-        generate,
-        new Promise((_, reject) => setTimeout(() => reject(new Error("generation timeout")), 8000)),
-      ]);
+      // AUDIT_LAMBDA_BUGS H4: clear the loser timeout so it can't keep the event
+      // loop alive and burn a concurrency slot after the response is sent.
+      let genTimer;
+      try {
+        await Promise.race([
+          generate,
+          new Promise((_, reject) => { genTimer = setTimeout(() => reject(new Error("generation timeout")), 8000); genTimer.unref?.(); }),
+        ]);
+      } finally {
+        clearTimeout(genTimer);
+      }
 
       const match = text.match(/\[[\s\S]*\]/);
       if (!match) throw new Error("no JSON array");
