@@ -902,6 +902,26 @@ scaled student use at Menlo. Phased; each phase is reviewed and committed separa
   Gaps list. Keep it PII-free — describe categories/columns, never real names/emails.
 - **Phase 1 shipped (2026-07-04):** `docs/COMPLIANCE.md` created; temporary
   `DIAGNOSTIC_REPORT.md` folded in and deleted.
+- **Phase 2a shipped (2026-07-04):** Lambda log redaction — a single `safeErr(err)`
+  helper is the choke point for all route error logging (the 4 full-error-object dumps
+  are gone). `/admin/sql` documented as IAM-gated + HTTP-unreachable (the real lockdown)
+  with an OPTIONAL `ADMIN_INVOKE_SECRET` in-payload gate (off unless the env var is set).
+  Deployed + verified (authed fetch + CloudWatch clean). **Phase 2b (remove hardcoded
+  `MENLO_CURRICULUM`/`TEACHER_EMAIL_MAP` staff PII + git-history scrub) is DEFERRED** —
+  it collides with the active `refactor/split-app-js` worktree editing the same `app.js`;
+  revisit once that refactor merges. History scrub still owner-approved but not yet run.
+- **Phase 3 shipped (2026-07-04):** `privacy.html` (draft, SOPIPA/COPPA posted policy),
+  linked from the sign-in footer; populated from `docs/COMPLIANCE.md`, marked DRAFT
+  (not legally reviewed), placeholder contact + effective date.
+- **Phase 4 shipped (2026-07-04):** soft-delete `deleted_at` added to all 7 PII tables
+  (`migration/rds-add-deleted-at.sql`). `GET /my-data` (JWT-scoped export, `teacher_notes`
+  excluded) + `POST /delete-my-account` (`{"confirm":"DELETE"}`, 30-day grace).
+  `verifyCognitoAuth` reads `app_users.deleted_at` every request → immediate revocation
+  (identity-cache early-return removed). Hard-delete SQL procedure documented in
+  `docs/COMPLIANCE.md` §6. Deployed + verified live incl. the reversible
+  delete→401→restore→200 test. **This work is on branch `compliance/phases` (both
+  remotes), not yet merged to `main`** — pending PR, kept off `main` to avoid the
+  multi-agent working-tree churn.
 - **Phase 5 spec drafted (2026-07-04):** `docs/PERSISTENCE_SPEC.md` — design doc ONLY,
   nothing built. Cross-session student memory. **DECIDED: rolling-summary MVP** (Option B) —
   one short auto-generated progress note per (student, class), the **third personalization
@@ -916,8 +936,10 @@ scaled student use at Menlo. Phased; each phase is reviewed and committed separa
   Retention default 365 days (school-contract dependent). Open questions for the school:
   retention, who may view notes, under-16 opt-in consent, discard-vs-retain.
 - **Key facts established in the Phase 0 diagnostic** (carry forward):
-  - **No `deleted_at` / soft-delete / retention on any table.** No deletion mechanism
-    exists yet. `conversations.messages` already persists student chat content today.
+  - **`deleted_at` / soft-delete** — was absent at Phase 0; **added to all 7 PII tables
+    in Phase 4** with self-service export/delete + immediate revocation. Admin-initiated
+    "delete student X" + per-student export remain (Phase 5 design). `conversations.messages`
+    already persists student chat content today.
   - **Lambda backend is clean of hardcoded secrets** (RDS IAM auth, Cognito JWKS, no
     Secrets Manager in use). `/admin/sql` has **no HTTP route** — reachable only via the
     IAM-gated direct-invoke `adminSql` branch (`lambda/index.mjs:470`).

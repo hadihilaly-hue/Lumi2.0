@@ -114,11 +114,10 @@ async function verifyAuth(authHeader) {
   return verifyCognitoAuth(authHeader.slice(7));
 }
 
-// Cognito sub -> {id, email} resolved via app_users (identity bridge that
-// preserves the Supabase-era uuids all RDS tables key on). Container-scope
-// cache: the mapping is immutable once linked, so no TTL needed.
-const APP_USER_CACHE_MAX = 500;
-const appUserCache = new Map();
+// Cognito sub -> lumi_id resolved via app_users (identity bridge that preserves
+// the Supabase-era uuids all RDS tables key on). NOT cached: account-deletion
+// revocation (deleted_at) must take effect immediately, which requires a
+// per-request DB check — a single indexed lookup on the UNIQUE cognito_sub.
 
 async function verifyCognitoAuth(token) {
   try {
@@ -137,16 +136,19 @@ async function verifyCognitoAuth(token) {
       return null;
     }
 
-    const cached = appUserCache.get(claims.sub);
-    if (cached) return { id: cached.id, email };
-
-    // Fast path: known sub. (Also covers Google-side email changes — the
-    // stored app_users.email goes stale, which is fine: authz everywhere in
-    // this file keys on the JWT email, not the stored one.)
+    // Known sub. (Also covers Google-side email changes — the stored
+    // app_users.email goes stale, which is fine: authz everywhere in this file
+    // keys on the JWT email, not the stored one.) deleted_at is read on every
+    // request so a soft-deleted account is denied immediately (compliance).
     let row = (await dbQuery(
-      "SELECT lumi_id FROM public.app_users WHERE cognito_sub = $1",
+      "SELECT lumi_id, deleted_at FROM public.app_users WHERE cognito_sub = $1",
       [claims.sub]
     )).rows[0];
+
+    if (row && row.deleted_at) {
+      console.warn("[auth] soft-deleted account — access denied");
+      return null;
+    }
 
     if (!row) {
       // First sign-in: link by verified email to a pre-created row (seed or
@@ -156,7 +158,7 @@ async function verifyCognitoAuth(token) {
          ON CONFLICT (email) DO UPDATE
            SET cognito_sub = COALESCE(public.app_users.cognito_sub, EXCLUDED.cognito_sub),
                updated_at = now()
-         RETURNING lumi_id, cognito_sub`,
+         RETURNING lumi_id, cognito_sub, deleted_at`,
         [claims.sub, email]
       )).rows[0];
       if (row.cognito_sub !== claims.sub) {
@@ -164,12 +166,13 @@ async function verifyCognitoAuth(token) {
         console.error("[auth] app_users email/sub collision — refusing token");
         return null;
       }
+      // A deleted account must not be silently resurrected by signing in again.
+      if (row.deleted_at) {
+        console.warn("[auth] soft-deleted account — access denied");
+        return null;
+      }
     }
 
-    if (appUserCache.size >= APP_USER_CACHE_MAX) {
-      appUserCache.delete(appUserCache.keys().next().value);
-    }
-    appUserCache.set(claims.sub, { id: row.lumi_id });
     return { id: row.lumi_id, email };
   } catch (err) {
     console.error("verifyCognitoAuth error:", err.name ?? err.code ?? "unknown");
@@ -563,6 +566,99 @@ async function handleRequest(event, responseStream) {
   // --- Domain check ---
   if (!(await isEmailAllowed(user.email))) {
     return sendJson(403, { error: "Forbidden: school accounts only" });
+  }
+
+  // === Route: GET /my-data (FERPA data-access export) ===
+  // The authenticated caller receives a JSON export of every row tied to their
+  // identity, scoped strictly to the JWT (id + email). teacher_notes are
+  // deliberately EXCLUDED (notes others wrote about the caller), and no other
+  // person's rows are ever returned.
+  if (path === "/my-data") {
+    const method = event.requestContext?.http?.method || "GET";
+    if (method !== "GET") return sendJson(405, { error: "Method not allowed" });
+    try {
+      const uid = user.id, em = user.email;
+      const q = (sql, params) => dbQuery(sql, params).then(r => r.rows);
+      const [app_user, profile, teacher_profiles, work_samples, conversations, homework_tasks, enrollments, api_usage] = await Promise.all([
+        q("SELECT lumi_id, email, created_at, updated_at, deleted_at FROM public.app_users WHERE lumi_id = $1", [uid]),
+        q("SELECT * FROM public.profiles WHERE id = $1", [uid]),
+        q("SELECT * FROM public.teacher_profiles WHERE teacher_email = $1", [em]),
+        q(`SELECT ws.* FROM public.teacher_work_samples ws
+             JOIN public.teacher_profiles tp ON tp.id = ws.teacher_profile_id
+            WHERE tp.teacher_email = $1`, [em]),
+        q("SELECT * FROM public.conversations WHERE user_id = $1", [uid]),
+        q("SELECT * FROM public.homework_tasks WHERE user_id = $1", [uid]),
+        // teacher_notes column intentionally omitted (compliance decision).
+        q(`SELECT id, student_id, teacher_profile_id, block, student_name, term,
+                  created_at, updated_at, deleted_at
+             FROM public.class_enrollments WHERE student_id = $1`, [uid]),
+        q("SELECT id, model, input_tokens, output_tokens, created_at FROM public.api_usage WHERE user_id = $1", [uid]),
+      ]);
+      return sendJson(200, {
+        generated_at: new Date().toISOString(),
+        subject: { lumi_id: uid, email: em },
+        note: "teacher_notes are intentionally excluded from this export.",
+        data: {
+          app_user, profile, teacher_profiles,
+          teacher_work_samples: work_samples,
+          conversations, homework_tasks,
+          class_enrollments: enrollments, api_usage,
+        },
+      });
+    } catch (err) {
+      console.error("my-data error:", safeErr(err));
+      return sendJson(500, { error: "export failed" });
+    }
+  }
+
+  // === Route: POST /delete-my-account (FERPA/AB 1584 deletion) ===
+  // Soft delete: stamps deleted_at across all of the caller's rows. Setting
+  // app_users.deleted_at makes verifyCognitoAuth deny the account on the very
+  // next request (immediate revocation). A documented SQL procedure hard-deletes
+  // after a 30-day grace (see docs/COMPLIANCE.md). An explicit confirmation is
+  // required so a stray POST cannot nuke an account.
+  if (path === "/delete-my-account") {
+    const method = event.requestContext?.http?.method || "POST";
+    if (method !== "POST") return sendJson(405, { error: "Method not allowed" });
+    if (body?.confirm !== "DELETE") {
+      return sendJson(400, { error: 'Confirmation required: POST {"confirm":"DELETE"}' });
+    }
+    try {
+      const uid = user.id, em = user.email;
+      const counts = {};
+      const softDelete = async (label, sql, params) => {
+        counts[label] = (await dbQuery(sql, params)).rowCount;
+      };
+      // Data rows first; app_users LAST (once its deleted_at is set the account
+      // can no longer authenticate).
+      await softDelete("teacher_work_samples",
+        `UPDATE public.teacher_work_samples ws SET deleted_at = now()
+           FROM public.teacher_profiles tp
+          WHERE ws.teacher_profile_id = tp.id AND tp.teacher_email = $1 AND ws.deleted_at IS NULL`, [em]);
+      await softDelete("teacher_profiles",
+        "UPDATE public.teacher_profiles SET deleted_at = now() WHERE teacher_email = $1 AND deleted_at IS NULL", [em]);
+      await softDelete("profiles",
+        "UPDATE public.profiles SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL", [uid]);
+      await softDelete("conversations",
+        "UPDATE public.conversations SET deleted_at = now() WHERE user_id = $1 AND deleted_at IS NULL", [uid]);
+      await softDelete("homework_tasks",
+        "UPDATE public.homework_tasks SET deleted_at = now() WHERE user_id = $1 AND deleted_at IS NULL", [uid]);
+      await softDelete("class_enrollments",
+        "UPDATE public.class_enrollments SET deleted_at = now() WHERE student_id = $1 AND deleted_at IS NULL", [uid]);
+      await softDelete("app_users",
+        "UPDATE public.app_users SET deleted_at = now() WHERE lumi_id = $1 AND deleted_at IS NULL", [uid]);
+      const graceUntil = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
+      console.log(`[delete-account] soft-deleted; rows=${JSON.stringify(counts)}`);
+      return sendJson(200, {
+        status: "deleted",
+        message: "Account soft-deleted; access is revoked immediately. Data is permanently removed after a 30-day grace period.",
+        grace_until: graceUntil,
+        rows_affected: counts,
+      });
+    } catch (err) {
+      console.error("delete-my-account error:", safeErr(err));
+      return sendJson(500, { error: "deletion failed" });
+    }
   }
 
   // === Route: /teacher-profile (GET, POST, PATCH) ===
