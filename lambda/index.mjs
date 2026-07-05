@@ -1497,25 +1497,44 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
         profileIdByKey.set(gkey, res.rows[0].id);
       }
 
-      // 5. sections
-      for (const c of classes) {
+      // 5. sections — AUDIT_LAMBDA_PERF #2: batched multi-VALUES upserts (was one
+      // awaited INSERT per class → a 200-class school = 200 serial round-trips).
+      // Conflict key (school_id, sis_id) is unique across `classes` (validation
+      // rule 3 rejects duplicate class ids), so no row can conflict twice within
+      // a chunk. Chunked at 100 with the same per-chunk overBudget checkpoint, so
+      // partial-resume (next:"sections") and idempotency are preserved.
+      const SECTION_CHUNK = 100;
+      for (let i = 0; i < classes.length; i += SECTION_CHUNK) {
         if (overBudget()) return sendJson(200, { status: "partial", next: "sections", progress, warnings });
-        const gkey = `${c.teacher_id}	${c.course_name}`;
+        const chunk = classes.slice(i, i + SECTION_CHUNK);
+        const values = [];
+        const tuples = chunk.map((c, rowIdx) => {
+          const gkey = `${c.teacher_id}	${c.course_name}`;
+          values.push(
+            schoolId, c.id, profileIdByKey.get(gkey), c.name, c.course_name,
+            c.course_code ?? null, c.subject, c.term, c.period ?? null, c.room ?? null,
+            Array.isArray(c.meeting_days) ? c.meeting_days : [], blockByClassId.get(c.id)
+          );
+          const base = rowIdx * 12;
+          return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, ` +
+                 `$${base + 7}, $${base + 8}, $${base + 9}, $${base + 10}, $${base + 11}, $${base + 12})`;
+        });
+        // sections has a composite PK (school_id, sis_id) and no id column, so
+        // no RETURNING; every row upserts (INSERT or DO UPDATE), so the processed
+        // count is exactly chunk.length — matching the old per-row progress.sections++.
         await dbQuery(
           `INSERT INTO public.sections (school_id, sis_id, teacher_profile_id, name, course_name,
                                         course_code, subject, term, period, room, meeting_days, block)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+           VALUES ${tuples.join(", ")}
            ON CONFLICT (school_id, sis_id) DO UPDATE SET
              teacher_profile_id = EXCLUDED.teacher_profile_id, name = EXCLUDED.name,
              course_name = EXCLUDED.course_name, course_code = EXCLUDED.course_code,
              subject = EXCLUDED.subject, term = EXCLUDED.term, period = EXCLUDED.period,
              room = EXCLUDED.room, meeting_days = EXCLUDED.meeting_days,
              block = EXCLUDED.block, updated_at = now()`,
-          [schoolId, c.id, profileIdByKey.get(gkey), c.name, c.course_name,
-           c.course_code ?? null, c.subject, c.term, c.period ?? null, c.room ?? null,
-           Array.isArray(c.meeting_days) ? c.meeting_days : [], blockByClassId.get(c.id)]
+          values
         );
-        progress.sections++;
+        progress.sections += chunk.length;
       }
 
       // 6. enrollments — batched multi-VALUES upserts (same pattern as /homework-tasks)
