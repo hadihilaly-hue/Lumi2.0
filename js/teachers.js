@@ -1,5 +1,5 @@
 import { CLAUDE_PROXY_URL } from './api.js';
-import { renderSidebar } from '../app.js';
+import { renderSidebar } from './sidebar.js';
 import { getSchedule } from './storage.js';
 
 
