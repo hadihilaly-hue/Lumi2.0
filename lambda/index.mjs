@@ -735,7 +735,16 @@ async function handleRequest(event, responseStream) {
     const method = event.requestContext?.http?.method || "GET";
     try {
       if (method === "GET") {
-        const result = await dbQuery("SELECT * FROM public.profiles WHERE id = $1", [user.id]);
+        // AUDIT_LAMBDA_PERF #4: explicit column list instead of SELECT * so the
+        // google_calendar_token PII (never read by the frontend — it only reads
+        // the calendar_connected boolean) stays server-side.
+        const result = await dbQuery(
+          `SELECT id, name, grade, values_profile, created_at, schedule, schedule_updated_at,
+                  semester_banner_dismissed_at, study_style, calendar_connected, learning_style,
+                  pain_points, typical_activities, onboarding_complete, homework_start_time
+             FROM public.profiles WHERE id = $1`,
+          [user.id]
+        );
         if (result.rowCount === 0) return sendJson(404, { error: "No profile found" });
         return sendJson(200, result.rows[0]);
       }
