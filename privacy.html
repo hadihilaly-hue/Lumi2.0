@@ -17,10 +17,15 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script>document.write('<link rel="stylesheet" href="style.css?t=' + Date.now() + '">');</script>
 <style>
+  /* style.css locks the app shell (html,body{height:100%;overflow:hidden}
+     and body{display:flex;height:100vh}). Undo that here so this document
+     scrolls normally — same override teacher.html uses. */
+  html { height: auto; overflow-y: auto; }
   body.privacy-page {
     background: var(--bg); color: var(--text);
     font-family: 'Inter', system-ui, sans-serif;
     margin: 0; line-height: 1.6;
+    display: block; height: auto; min-height: 100vh; overflow-y: auto;
   }
   .pp-wrap { max-width: 760px; margin: 0 auto; padding: 48px 24px 96px; }
   .pp-logo { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
