@@ -1,5 +1,6 @@
-import { activeHwForClass, getSchedule, getStudyStyle, hwContext } from '../app.js';
+import { activeHwForClass, getStudyStyle, hwContext } from '../app.js';
 import { S } from './state.js';
+import { getSchedule } from './storage.js';
 
 
 // ─── SYSTEM PROMPTS ───────────────────────────────────────────────────────────
