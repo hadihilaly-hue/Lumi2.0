@@ -31,6 +31,11 @@ import time
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
 from personas import PERSONAS, SMOKE_QUESTIONS, display_name, quality_by_email  # noqa: E402
 
+# Drop the agent-proxy placeholder AWS_* env vars so boto3 uses ~/.aws/credentials
+# (they otherwise shadow the file and cause InvalidClientTokenId).
+for _k in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"):
+    os.environ.pop(_k, None)
+
 import boto3  # noqa: E402
 
 REGION = "us-east-1"

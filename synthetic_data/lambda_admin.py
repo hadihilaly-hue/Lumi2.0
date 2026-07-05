@@ -11,7 +11,15 @@ Returns the Lambda's {rows, rowCount}. Raises RuntimeError on a Lambda-side
 {error} or a throttling exhaustion.
 """
 import json
+import os
 import time
+
+# The remote-exec environment ships placeholder AWS_* env vars (an agent-proxy
+# artifact) that boto3 reads BEFORE ~/.aws/credentials and that make every AWS
+# call fail with InvalidClientTokenId. Drop them so the shared credentials file
+# is used. AWS_CA_BUNDLE / region are intentionally left intact.
+for _k in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"):
+    os.environ.pop(_k, None)
 
 import boto3
 
