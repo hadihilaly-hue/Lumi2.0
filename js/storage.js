@@ -1,7 +1,8 @@
-import { lookupSubjectForCourse, showToast } from '../app.js';
+import { lookupSubjectForCourse } from '../app.js';
 import { setSidebarUserSubtitle } from './prompts.js';
 import { S, currentUser } from './state.js';
 import { TEACHER_EMAIL_MAP, fetchTeacherProfilesByEmails, rdsFetch } from './teachers.js';
+import { showToast } from './ui.js';
 
 
 // ─── SCHEDULE STORAGE ────────────────────────────────────────────────────────
