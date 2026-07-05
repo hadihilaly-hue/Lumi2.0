@@ -1,5 +1,5 @@
-// ─── AUTH GUARD ───────────────────────────────────────────────────────────────
-let currentUser = null;
+import { $, S, SB, _currentProjId, _introShownFor, _saveIntroShown, attachPreview, currentUser, fileInput, messagesEl, msgInput, pendingAttachment, sbNav, sbSearch, sendBtn, setCurrentProjId, setCurrentUser, setPendingAttachment, themeToggle, toast } from './js/state.js';
+
 
 (async () => {
   // Simple auth check — getSession() reads from localStorage, no network needed
@@ -12,7 +12,7 @@ let currentUser = null;
     return;
   }
 
-  currentUser = session.user;
+  setCurrentUser(session.user);
 
   // TM-2: teacher-test-mode boot detection. ?mode=test on the URL flips
   // the flag for this tab; sessionStorage stickiness keeps it across
@@ -1067,57 +1067,6 @@ async function loadWorkSampleImages(profile) {
   if (tiers.some(tier => result[tier].images.length === 0)) return null;
   return result;
 }
-
-// ─── STATE ────────────────────────────────────────────────────────────────────
-const S = {
-  currentId:     null,
-  messages:      [],
-  values:        new Set(),
-  goals:         new Set(),
-  interests:     new Set(),
-  exchangeCount: 0,
-  ready:         false,
-  busy:          false,
-  tutorCtx:      null,   // { subjectId, subjectName, course, teacher } or null
-  // TM-2: teacher-test-mode flags. Boot detection sets isTestMode from
-  // ?mode=test URL param + sessionStorage stickiness. testSchedule is
-  // synthesized from teacher_profiles (NEVER written to localStorage to
-  // avoid cross-user pollution on shared browsers). testConvs is the
-  // in-memory conversation cache used in test mode (filtered to
-  // is_teacher_test=true; never touches lumi_convs localStorage).
-  isTestMode:    false,
-  testSchedule:  [],
-  testConvs:     {},
-};
-
-const SB = {
-  mode:            'all',   // 'all' | 'general' | 'tutor'
-  expandedSubject: null,
-  expandedCourse:  null,
-  activeTeacher:   null,
-  showAllClasses:  false,
-};
-
-// ─── ELEMENTS ─────────────────────────────────────────────────────────────────
-const $ = id => document.getElementById(id);
-const messagesEl    = $('messages');
-const msgInput      = $('msgInput');
-const sendBtn       = $('sendBtn');
-const toast         = $('toast');
-const attachPreview = $('attachPreview');
-const fileInput     = $('fileInput');
-const sbNav         = $('sbNav');
-const sbSearch      = $('sbSearch');
-const themeToggle   = $('themeToggle');
-// API key is now server-side (Netlify function); no client-side key needed
-
-let pendingAttachment = null;
-
-// Tracks which classes have shown the intro slide (persisted across sessions)
-const _introShownFor = new Set(
-  (() => { try { return JSON.parse(localStorage.getItem('lumi_intro_shown') || '[]'); } catch { return []; } })()
-);
-function _saveIntroShown() { localStorage.setItem('lumi_intro_shown', JSON.stringify([..._introShownFor])); }
 
 // ─── SUPABASE SYNC ────────────────────────────────────────────────────────────
 
@@ -3736,7 +3685,7 @@ function fmtBytes(b) {
 }
 
 function clearAttachment() {
-  pendingAttachment = null;
+  setPendingAttachment(null);
   fileInput.value   = '';
   attachPreview.innerHTML = '';
   attachPreview.classList.remove('visible');
@@ -3781,7 +3730,7 @@ function handleFileSelect(file) {
   reader.onload = e => {
     const base64    = e.target.result.split(',')[1];
     const mediaType = file.type || 'text/plain';
-    pendingAttachment = { file, base64, mediaType, isImage, isText };
+    setPendingAttachment({ file, base64, mediaType, isImage, isText });
     showAttachPreview(file, base64, mediaType, isImage);
     updateSendBtn();
   };
@@ -5965,10 +5914,8 @@ function closeProjectCreateModal() {
   setTimeout(() => { modal.style.display = 'none'; }, 200);
 }
 
-let _currentProjId = null; // tracks which project the plan modal is showing
-
 function showProjectPlanModal(project) {
-  _currentProjId = project.id;
+  setCurrentProjId(project.id);
   const modal = $('projPlanModal');
   modal.style.display = 'flex';
   modal.style.flexDirection = 'column';
@@ -5979,7 +5926,7 @@ function showProjectPlanModal(project) {
 function closeProjectPlanModal() {
   const modal = $('projPlanModal');
   modal.classList.remove('open');
-  _currentProjId = null;
+  setCurrentProjId(null);
   setTimeout(() => { modal.style.display = 'none'; }, 200);
 }
 
@@ -6346,13 +6293,13 @@ function handleStartWorking() {
         // Attach rubric file if one was uploaded with the project
         if (proj.rubricFile) {
           const att = proj.rubricFile;
-          pendingAttachment = {
+          setPendingAttachment({
             file: { name: att.name, size: 0, type: att.mediaType },
             base64: att.base64,
             mediaType: att.mediaType,
             isImage: !!att.isImage,
             isText: !!att.isText
-          };
+          });
           showAttachPreview({ name: att.name, size: 0 }, att.base64, att.mediaType, !!att.isImage);
           console.log('Rubric attached:', att.name);
         }
@@ -6589,7 +6536,7 @@ function wireHwListeners() {
     // Small delay for the loading animation to feel real
     setTimeout(() => {
       const project = createProject(title, course, entry.teacher || '', dueDate, requirements, fileData);
-      _currentProjId = project.id;
+      setCurrentProjId(project.id);
       console.log('Set current project:', project.id);
       renderProjectPlan(project);
       syncProjectsToSupabase();
