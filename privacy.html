@@ -1,0 +1,159 @@
+<!--
+  ============================================================================
+  DRAFT — NOT LEGALLY REVIEWED.
+  This privacy policy is a good-faith draft generated from docs/COMPLIANCE.md.
+  It MUST be reviewed by a qualified adult / attorney before any real student
+  use. Do not represent this page in-app as legally reviewed or final. The
+  contact address and effective date are PLACEHOLDERS to be filled in before
+  launch.
+  ============================================================================
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lumi — Privacy Policy (Draft)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script>document.write('<link rel="stylesheet" href="style.css?t=' + Date.now() + '">');</script>
+<style>
+  body.privacy-page {
+    background: var(--bg); color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    margin: 0; line-height: 1.6;
+  }
+  .pp-wrap { max-width: 760px; margin: 0 auto; padding: 48px 24px 96px; }
+  .pp-logo { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+  .pp-orb { color: var(--accent); font-size: 20px; }
+  .pp-name { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+  .pp-school { color: var(--text-muted); font-size: 13px; }
+  h1 { font-size: 28px; letter-spacing: -.02em; margin: 24px 0 4px; }
+  .pp-sub { color: var(--text-muted); font-size: 14px; margin-bottom: 28px; }
+  .pp-draft {
+    background: var(--accent-soft); border: 1px solid var(--accent-glow);
+    border-radius: 12px; padding: 14px 16px; margin-bottom: 32px;
+    font-size: 13.5px; color: var(--text);
+  }
+  .pp-draft strong { color: var(--accent); }
+  h2 {
+    font-size: 18px; margin: 34px 0 10px; letter-spacing: -.01em;
+    border-bottom: 1px solid var(--border); padding-bottom: 6px;
+  }
+  h3 { font-size: 15px; margin: 20px 0 6px; }
+  p, li { font-size: 14.5px; color: var(--text); }
+  ul { padding-left: 20px; }
+  li { margin-bottom: 6px; }
+  a { color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text-muted); font-weight: 600; }
+  .pp-foot { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-faint); font-size: 12.5px; }
+  code, .pp-ph { background: var(--surface-2); border-radius: 4px; padding: 1px 6px; font-size: 13px; }
+</style>
+</head>
+<body class="privacy-page">
+<div class="pp-wrap">
+
+  <div class="pp-logo">
+    <span class="pp-orb">✦</span>
+    <span class="pp-name">Lumi</span>
+    <span class="pp-school">Menlo School</span>
+  </div>
+
+  <h1>Privacy Policy</h1>
+  <div class="pp-sub">Effective date: <span class="pp-ph">[PLACEHOLDER — set before launch]</span></div>
+
+  <div class="pp-draft">
+    <strong>Draft — not yet legally reviewed.</strong> This policy describes how Lumi
+    is designed to handle data. It is a good-faith draft pending review by qualified
+    counsel before use with real students. Contact details below are placeholders.
+  </div>
+
+  <h2>1. Who we are &amp; what Lumi does</h2>
+  <p>
+    Lumi is an educational tool that helps students learn by guiding their reasoning
+    in the teaching style of their own teachers. It is provided for use by a school
+    and its students and teachers. Sign-in is restricted to school-issued Google
+    accounts on approved domains.
+  </p>
+
+  <h2>2. What we collect</h2>
+  <p>We collect only what is needed to provide the educational service:</p>
+  <table>
+    <thead><tr><th>Category</th><th>Examples</th></tr></thead>
+    <tbody>
+      <tr><td>Account identity</td><td>Name and school email (via Google sign-in)</td></tr>
+      <tr><td>Student profile</td><td>Grade, learning preferences, study style, class schedule, and goals you choose to enter</td></tr>
+      <tr><td>Learning activity</td><td>Your conversations with Lumi, homework tasks you add, and your class enrollments</td></tr>
+      <tr><td>Teacher-authored content</td><td>For teachers: teaching-voice settings, course info, uploaded syllabi, and graded work samples used to shape feedback</td></tr>
+      <tr><td>Operational metadata</td><td>Usage counts for rate-limiting and reliability (no message content in logs)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>3. How we use it</h2>
+  <ul>
+    <li><strong>Educational purpose only.</strong> Data is used solely to provide and improve the tutoring experience for the school.</li>
+    <li>We do <strong>not sell</strong> personal information.</li>
+    <li>We do <strong>not use</strong> student or teacher data for advertising, and we do not build advertising profiles.</li>
+    <li>We do <strong>not use</strong> your data to train foundation models. AI responses are generated through AWS Bedrock, which
+      <a href="https://aws.amazon.com/bedrock/faqs/" target="_blank" rel="noopener">does not use inputs or outputs to train models</a>
+      and does not share them with model providers; content stays in the AWS region where it is processed.</li>
+  </ul>
+
+  <h2>4. Where it is stored</h2>
+  <p>
+    Data is stored in Amazon Web Services in the United States (region <code>us-east-1</code>),
+    encrypted in transit and at rest. Uploaded files (syllabi, work-sample photos) are held in
+    private storage accessible only through authenticated, short-lived links.
+  </p>
+
+  <h2>5. Service providers (subprocessors)</h2>
+  <table>
+    <thead><tr><th>Provider</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td>Amazon Web Services</td><td>Hosting, database, file storage, and AI inference (via Amazon Bedrock)</td></tr>
+      <tr><td>Anthropic (via AWS Bedrock)</td><td>Foundation models that generate tutoring responses — accessed only through Bedrock</td></tr>
+      <tr><td>Google</td><td>Sign-in (OAuth); provides name and email at authentication</td></tr>
+      <tr><td>GitHub Pages</td><td>Serves the app's static files only; no student or teacher records are stored there</td></tr>
+    </tbody>
+  </table>
+
+  <h2>6. Your rights: access, correction &amp; deletion</h2>
+  <p>
+    You may request to inspect the data associated with your account, to correct it, or to have
+    it deleted. Deletion revokes access and removes your records after a short grace period.
+    To make a request, contact
+    <a class="pp-ph" href="mailto:privacy@example.com">[privacy-contact@your-school.example — PLACEHOLDER]</a>.
+  </p>
+
+  <h2>7. Students under 18 &amp; parental rights (FERPA)</h2>
+  <p>
+    Lumi is intended for use within a school and processes student data on the school's behalf as a
+    school official with a legitimate educational interest, consistent with the Family Educational
+    Rights and Privacy Act (FERPA). Education records created in Lumi (including a student's
+    conversations) belong to the school's record.
+  </p>
+  <ul>
+    <li><strong>Parents/guardians of students under 18</strong>, and eligible students 18 or older, may ask
+      the school to inspect, review, or request correction of the student's records.</li>
+    <li>The school directs how student records are handled and may request export or deletion on a
+      student's behalf.</li>
+    <li>Requests are made through the school and the contact above.</li>
+  </ul>
+  <p>
+    Lumi is not directed to children under 13 and is provided through the school; it is not intended
+    for general consumer or public sign-up.
+  </p>
+
+  <h2>8. Changes to this policy</h2>
+  <p>
+    If this policy changes materially, the school will be notified before the change takes effect.
+  </p>
+
+  <div class="pp-foot">
+    Lumi · Menlo School · This draft was generated from the project's internal data inventory
+    (<code>docs/COMPLIANCE.md</code>) and is pending legal review. Not legal advice.
+  </div>
+</div>
+</body>
+</html>
