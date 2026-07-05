@@ -3755,7 +3755,6 @@ function startApp() {
 
   preloadProfileStatuses(); // fetch teacher profile statuses for sidebar badges (non-blocking)
   loadHwFromSupabase().then(async () => {
-    await loadProjectsFromSupabase();
     injectProjectTasksToHomework();
     await loadCalendarEvents();
     renderSidebar();
@@ -6439,13 +6438,6 @@ function handleStartWorking() {
   }, 100);
 }
 
-// ── Sync projects to Supabase ────────────────────────────
-
-// Projects are stored in localStorage only (no Supabase column exists)
-function syncProjectsToSupabase() {
-  // no-op: projects live in localStorage only
-}
-
 function deleteProject(projId, anchorEl) {
   const doDelete = () => {
     // Remove from projects
@@ -6502,11 +6494,6 @@ function clearCompletedProjects() {
   syncHwToSupabase();
   renderSidebar();
   showToast(`${completed.length} completed project${completed.length > 1 ? 's' : ''} cleared`);
-}
-
-// Projects are stored in localStorage only (no Supabase column exists)
-function loadProjectsFromSupabase() {
-  // no-op: projects live in localStorage only
 }
 
 // hw_tasks column does not exist in profiles table — localStorage only
@@ -6655,7 +6642,6 @@ function wireHwListeners() {
       _currentProjId = project.id;
       console.log('Set current project:', project.id);
       renderProjectPlan(project);
-      syncProjectsToSupabase();
     }, 600);
   });
 
