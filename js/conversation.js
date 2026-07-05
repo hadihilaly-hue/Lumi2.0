@@ -1,4 +1,4 @@
-import { renderMsg, renderPinnedWelcome, scrollBottom, startLumi } from '../app.js';
+import { renderMsg, renderPinnedWelcome, scrollBottom, startLumi } from './chat.js';
 import { MENLO_CURRICULUM, SUBJECTS, SUBJECT_IDS } from './data.js';
 import { prepareSuggestedPrompts, renderEmptyState, showWelcome } from './emptystate.js';
 import { getStudentName, teacherDisplayName, updateTestModeBanner } from './prompts.js';

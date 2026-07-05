@@ -1,4 +1,4 @@
-import { doSend } from '../app.js';
+import { doSend } from './chat.js';
 import { $, msgInput } from './state.js';
 import { autoGrow, showToast, updateSendBtn } from './ui.js';
 
