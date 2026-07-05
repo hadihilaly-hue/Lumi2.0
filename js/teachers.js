@@ -1,5 +1,6 @@
 import { CLAUDE_PROXY_URL } from './api.js';
-import { getSchedule, renderSidebar } from '../app.js';
+import { renderSidebar } from '../app.js';
+import { getSchedule } from './storage.js';
 
 
 // Maps teacher display name → real @menloschool.org email (mirrors teacher.html)
