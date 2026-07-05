@@ -3,88 +3,42 @@ import { renderSidebar } from './sidebar.js';
 import { getSchedule } from './storage.js';
 
 
-// Maps teacher display name → real @menloschool.org email (mirrors teacher.html)
-export const TEACHER_EMAIL_MAP = {
-  "Rachel Blumenthal":      "rblumenthal@menloschool.org",
-  "Whitney Newton":         "wnewton@menloschool.org",
-  "Margaret Ramsey":        "mramsey@menloschool.org",
-  "Andrew Warren":          "awarren@menloschool.org",
-  "Jay Bush":               "jbush@menloschool.org",
-  "Lily Chan":              "lchan@menloschool.org",
-  "Rebecca Gertmenian":     "rgertmenian@menloschool.org",
-  "Meghann Schroers-Martin":"mschroers-martin@menloschool.org",
-  "Tom Garvey":             "tgarvey@menloschool.org",
-  "Oscar King":             "oking@menloschool.org",
-  "Maura Sincoff":          "msincoff@menloschool.org",
-  "Cara Plamondon":         "cplamondon@menloschool.org",
-  "Bridgett Longust":       "blongust@menloschool.org",
-  "Sabahat Adil":           "sadil@menloschool.org",
-  "Franco Cruz-Ochoa":      "fcruz-ochoa@menloschool.org",
-  "Katharine Hanson":       "khanson@menloschool.org",
-  "Nicholas Merlesena":     "nmerlesena@menloschool.org",
-  "Miles Bennett-Smith":    "mbennett-smith@menloschool.org",
-  "Glenn Davis":            "gdavis@menloschool.org",
-  "Trevor McNeil":          "tmcneil@menloschool.org",
-  "Joseph Mitchell":        "jmitchell@menloschool.org",
-  "Jack Bowen":             "jbowen@menloschool.org",
-  "Dylan Citrin Cummins":   "dcitrin-cummins@menloschool.org",
-  "Charles Hanson":         "chanson@menloschool.org",
-  "Matthew Nelson":         "mnelson@menloschool.org",
-  "John Schafer":           "jschafer@menloschool.org",
-  "Peter Brown":            "pbrown@menloschool.org",
-  "Christine Walters":      "cwalters@menloschool.org",
-  "Rebecca Akers":          "rakers@menloschool.org",
-  "Joe Rabison":            "jrabison@menloschool.org",
-  "Sujata Ganpule":         "sganpule@menloschool.org",
-  "Randall Joss":           "rjoss@menloschool.org",
-  "Nandhini Namasivayam":   "nnamasivayam@menloschool.org",
-  "Jacqueline Arreaga":     "jarreaga@menloschool.org",
-  "Danielle Jensen":        "djensen@menloschool.org",
-  "Yu-Loung Chang":         "ychang@menloschool.org",
-  "Dave Lowell":            "dlowell@menloschool.org",
-  "Reeve Garrett":          "rgarrett@menloschool.org",
-  "Jude Loeffler":          "jloeffler@menloschool.org",
-  "Dennis Millstein":       "dmillstein@menloschool.org",
-  "Douglas Kiang":          "dkiang@menloschool.org",
-  "Zachary Blickensderfer": "zblickensderfer@menloschool.org",
-  "Chrissy Orangio":        "corangio@menloschool.org",
-  "Laura Huntley":          "lhuntley@menloschool.org",
-  "Mary McKenna":           "mmckenna@menloschool.org",
-  "Zachary Eagleton":       "zeagleton@menloschool.org",
-  "Eugenia McCauley":       "emccauley@menloschool.org",
-  "Nina Arnberg":           "narnberg@menloschool.org",
-  "Zane Moore":             "zmoore@menloschool.org",
-  "Matthew Varvir":         "mvarvir@menloschool.org",
-  "Todd Hardie":            "thardie@menloschool.org",
-  "Cristina Weaver":        "cweaver@menloschool.org",
-  "Tatyana Buxton":         "tbuxton@menloschool.org",
-  "James Dann":             "jdann@menloschool.org",
-  "James Formato":          "jformato@menloschool.org",
-  "Leo Jaimez":             "ljaimez@menloschool.org",
-  "Janet Tennyson":         "jtennyson@menloschool.org",
-  "Adolfo Guevara":         "aguevara@menloschool.org",
-  "Perla Amaral":           "pamaral@menloschool.org",
-  "Patricia Frias":         "pfrias@menloschool.org",
-  "Marie Sajja":            "msajja@menloschool.org",
-  "Corinne Chung":          "cchung@menloschool.org",
-  "Rita Yeh":               "ryeh@menloschool.org",
-  "Mingjung Chen":          "mchen@menloschool.org",
-  "Jennifer Jordt":         "jjordt@menloschool.org",
-  "Richard Harris":         "rharris@menloschool.org",
-  "Test Teacher":            "hadi.hilaly@menloschool.org",
-  // ── SYNTHETIC voice-test personas (fake domain @lumidemo.test; NOT real
-  //    Menlo staff). Seeded via synthetic_data/seed_personas.py; a demo
-  //    student schedule is loaded via seed_demo_student.py. Remove this block
-  //    + run cleanup_personas.py to fully revert.
-  "Dale Ferraro":           "dferraro@lumidemo.test",
-  "Priya Ramaswamy":        "pramaswamy@lumidemo.test",
-  "Nadia Okonkwo":          "nokonkwo@lumidemo.test",
-  "Thomas Beck":            "tbeck@lumidemo.test",
-  "Carmen Alvarado":        "calvarado@lumidemo.test",
-  "Kevin Zhou":             "kzhou@lumidemo.test",
-  "Greg Halloran":          "ghalloran@lumidemo.test",
-  "Rick Santos":            "rsantos@lumidemo.test",
-};
+// Teacher access config — SINGLE SOURCE OF TRUTH is teacher-directory.js, a classic
+// <script> loaded before this module (app.html) and by teacher.html/admin.html
+// so every page shares ONE definition (AUDIT_FRONTEND H3/F1). This module simply
+// re-exports the globals it publishes; edit the list in teacher-directory.js.
+// (Reading a classic-script global from a module mirrors the existing `sb`
+// pattern from cognito-auth.js.)
+if (!globalThis.TEACHER_EMAIL_MAP) {
+  console.error('[teachers] teacher-directory.js was not loaded before app.js — TEACHER_EMAIL_MAP is empty. Check the <script src="teacher-directory.js"> tag in app.html.');
+}
+export const TEACHER_EMAIL_MAP = globalThis.TEACHER_EMAIL_MAP || {};
+export const ALLOWED_TEACHER_EMAILS = globalThis.ALLOWED_TEACHER_EMAILS || [];
+
+// Teacher-mode LINK gate (app.html "Switch to Teacher Mode"). Single call-site
+// helper so app.js imports the decision instead of hardcoding its own email
+// list — the finding F1 fix (two gates were maintained in separate files).
+export function isTeacherModeAllowed(email) {
+  if (!email) return false;
+  const e = email.toLowerCase();
+  return ALLOWED_TEACHER_EMAILS.some(a => a.toLowerCase() === e);
+}
+
+// ── Test-mode teacher overlay (AUDIT_FRONTEND F2) ────────────────────────────
+// In test mode the signed-in teacher's own display name → email pairing used to
+// be written straight into the shared TEACHER_EMAIL_MAP at runtime, which
+// pollutes shared config and would collide if the teacher's Google full_name
+// equals a real curriculum name. Keep it in a SEPARATE overlay instead; every
+// name→email lookup goes through resolveTeacherEmail (overlay first, then the
+// shared map), so behavior is unchanged but the shared map is never mutated.
+const _testModeEmailMap = {};
+export function setTestModeTeacher(name, email) {
+  if (name && email) _testModeEmailMap[name] = email;
+}
+export function resolveTeacherEmail(name) {
+  if (!name) return undefined;
+  return _testModeEmailMap[name] || TEACHER_EMAIL_MAP[name];
+}
 
 // ── Teacher profile system — single source of truth: Supabase ──
 // Seed profiles are pushed to Supabase on load; _profileCache is the in-memory fallback.
@@ -94,7 +48,7 @@ export const _profileStatusCache = {}; // { 'course::teacher': 'ready' | 'pendin
 export async function preloadProfileStatuses() {
   const schedule = getSchedule();
   if (!schedule.length) return;
-  const emails = [...new Set(schedule.map(s => TEACHER_EMAIL_MAP[s.teacher]).filter(Boolean))];
+  const emails = [...new Set(schedule.map(s => resolveTeacherEmail(s.teacher)).filter(Boolean))];
   if (!emails.length) return;
   try {
     let data;
@@ -109,7 +63,7 @@ export async function preloadProfileStatuses() {
     (data || []).forEach(row => { lookup[row.teacher_email + '__' + row.course_name] = row.done; });
     // Map each scheduled class
     schedule.forEach(({ course, teacher }) => {
-      const email = TEACHER_EMAIL_MAP[teacher];
+      const email = resolveTeacherEmail(teacher);
       const key = course + '::' + teacher;
       if (!email) { _profileStatusCache[key] = 'pending'; return; }
       const done = lookup[email + '__' + course];
@@ -177,7 +131,7 @@ export async function fetchTeacherProfilesByEmails(emails) {
 // Returns profile if complete, { __notReady } if in progress, null if not found.
 export async function getTeacherProfile(teacherName, course) {
   if (!teacherName || !course) return null;
-  const email = TEACHER_EMAIL_MAP[teacherName];
+  const email = resolveTeacherEmail(teacherName);
   if (!email) { console.warn('[getTeacherProfile] no email for:', teacherName); return null; }
   const cacheKey = email + '__' + course;
   console.log('[getTeacherProfile] loading:', teacherName, course);

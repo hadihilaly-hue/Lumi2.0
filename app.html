@@ -602,6 +602,10 @@
 <!-- Scripts at bottom so the loading screen renders immediately -->
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="cognito-auth.js"></script>
+<!-- Teacher access config (single source of truth). Classic, blocking script so
+     it runs BEFORE the deferred app.js module and its imports evaluate — same
+     load pattern as cognito-auth.js's `sb`. js/teachers.js reads these globals. -->
+<script src="teacher-directory.js"></script>
 <script>
 /* First-run privacy consent gate. If the signed-in user hasn't accepted the
    privacy policy yet, route to the consent screen and come back here. Runs

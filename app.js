@@ -9,7 +9,7 @@ import { checkSemesterBanner, initScheduleSetup } from './js/schedule.js';
 import { activeDropdownEl, closeOpenMenu, renderSearchDropdown, renderSidebar, showInlineConfirm } from './js/sidebar.js';
 import { $, S, SB, currentUser, fileInput, msgInput, sbSearch, sendBtn, setCurrentProjId, setCurrentUser, themeToggle } from './js/state.js';
 import { genId, getSchedule, loadConvsFromSupabase, loadProfileFromSupabase, loadTestModeSchedule, migrateOldData } from './js/storage.js';
-import { preloadProfileStatuses, rdsFetch } from './js/teachers.js';
+import { isTeacherModeAllowed, preloadProfileStatuses, rdsFetch } from './js/teachers.js';
 import { autoGrow, closeSettings, closeSidebar, openSettings, openSidebar, showToast, updateSendBtn } from './js/ui.js';
 import { initVoice, wireVoiceListeners } from './js/voice.js';
 
@@ -108,9 +108,11 @@ import { initVoice, wireVoiceListeners } from './js/voice.js';
   // TM-2: synthesize the teacher's own classes into S.testSchedule.
   if (S.isTestMode) await loadTestModeSchedule();
 
-  // Show Teacher Mode link only for allowed teacher emails
-  const ALLOWED_TEACHER_EMAILS = ['hadi.hilaly@menloschool.org'];
-  if (ALLOWED_TEACHER_EMAILS.includes(email.toLowerCase())) {
+  // Show Teacher Mode link only for allowed teacher emails. The allowlist is the
+  // single source in teacher-directory.js (re-exported via js/teachers.js), shared
+  // with teacher.html's access model so the link gate and the page gate no
+  // longer live as independent literals in separate files (AUDIT_FRONTEND F1).
+  if (isTeacherModeAllowed(email)) {
     const link = document.getElementById('teacherModeLink');
     if (link) link.style.display = 'block';
   }

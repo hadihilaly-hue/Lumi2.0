@@ -1087,6 +1087,7 @@ body { overflow: auto; display: block; }
 <div class="t-toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="cognito-auth.js"></script>
+<script src="teacher-directory.js"></script>
 <script>
 /* First-run privacy consent gate (see app.html for notes). Routes an
    un-consented signed-in teacher to the consent screen, then back here. */
@@ -1264,85 +1265,9 @@ const MENLO_CURRICULUM = {
   }
 };
 
-const TEACHER_EMAIL_MAP = {
-  "Rachel Blumenthal": "rblumenthal@menloschool.org",
-  "Whitney Newton": "wnewton@menloschool.org",
-  "Margaret Ramsey": "mramsey@menloschool.org",
-  "Andrew Warren": "awarren@menloschool.org",
-  "Jay Bush": "jbush@menloschool.org",
-  "Lily Chan": "lchan@menloschool.org",
-  "Rebecca Gertmenian": "rgertmenian@menloschool.org",
-  "Meghann Schroers-Martin": "mschroers-martin@menloschool.org",
-  "Tom Garvey": "tgarvey@menloschool.org",
-  "Oscar King": "oking@menloschool.org",
-  "Maura Sincoff": "msincoff@menloschool.org",
-  "Cara Plamondon": "cplamondon@menloschool.org",
-  "Bridgett Longust": "blongust@menloschool.org",
-  "Sabahat Adil": "sadil@menloschool.org",
-  "Franco Cruz-Ochoa": "fcruz-ochoa@menloschool.org",
-  "Katharine Hanson": "khanson@menloschool.org",
-  "Nicholas Merlesena": "nmerlesena@menloschool.org",
-  "Miles Bennett-Smith": "mbennett-smith@menloschool.org",
-  "Glenn Davis": "gdavis@menloschool.org",
-  "Trevor McNeil": "tmcneil@menloschool.org",
-  "Joseph Mitchell": "jmitchell@menloschool.org",
-  "Jack Bowen": "jbowen@menloschool.org",
-  "Dylan Citrin Cummins": "dcitrin-cummins@menloschool.org",
-  "Charles Hanson": "chanson@menloschool.org",
-  "Matthew Nelson": "mnelson@menloschool.org",
-  "John Schafer": "jschafer@menloschool.org",
-  "Peter Brown": "pbrown@menloschool.org",
-  "Christine Walters": "cwalters@menloschool.org",
-  "Rebecca Akers": "rakers@menloschool.org",
-  "Joe Rabison": "jrabison@menloschool.org",
-  "Sujata Ganpule": "sganpule@menloschool.org",
-  "Randall Joss": "rjoss@menloschool.org",
-  "Nandhini Namasivayam": "nnamasivayam@menloschool.org",
-  "Jacqueline Arreaga": "jarreaga@menloschool.org",
-  "Danielle Jensen": "djensen@menloschool.org",
-  "Yu-Loung Chang": "ychang@menloschool.org",
-  "Dave Lowell": "dlowell@menloschool.org",
-  "Reeve Garrett": "rgarrett@menloschool.org",
-  "Jude Loeffler": "jloeffler@menloschool.org",
-  "Dennis Millstein": "dmillstein@menloschool.org",
-  "Douglas Kiang": "dkiang@menloschool.org",
-  "Zachary Blickensderfer": "zblickensderfer@menloschool.org",
-  "Chrissy Orangio": "corangio@menloschool.org",
-  "Laura Huntley": "lhuntley@menloschool.org",
-  "Mary McKenna": "mmckenna@menloschool.org",
-  "Zachary Eagleton": "zeagleton@menloschool.org",
-  "Eugenia McCauley": "emccauley@menloschool.org",
-  "Nina Arnberg": "narnberg@menloschool.org",
-  "Zane Moore": "zmoore@menloschool.org",
-  "Matthew Varvir": "mvarvir@menloschool.org",
-  "Todd Hardie": "thardie@menloschool.org",
-  "Cristina Weaver": "cweaver@menloschool.org",
-  "Tatyana Buxton": "tbuxton@menloschool.org",
-  "James Dann": "jdann@menloschool.org",
-  "James Formato": "jformato@menloschool.org",
-  "Leo Jaimez": "ljaimez@menloschool.org",
-  "Janet Tennyson": "jtennyson@menloschool.org",
-  "Adolfo Guevara": "aguevara@menloschool.org",
-  "Perla Amaral": "pamaral@menloschool.org",
-  "Patricia Frias": "pfrias@menloschool.org",
-  "Marie Sajja": "msajja@menloschool.org",
-  "Corinne Chung": "cchung@menloschool.org",
-  "Rita Yeh": "ryeh@menloschool.org",
-  "Mingjung Chen": "mchen@menloschool.org",
-  "Jennifer Jordt": "jjordt@menloschool.org",
-  "Richard Harris": "rharris@menloschool.org",
-  "Test Teacher": "hadi.hilaly@menloschool.org",
-  // SYNTHETIC voice-test personas (fake @lumidemo.test; NOT real Menlo staff).
-  // Mirrors app.js. Seeded/removed via synthetic_data/{seed,cleanup}_personas.py.
-  "Dale Ferraro": "dferraro@lumidemo.test",
-  "Priya Ramaswamy": "pramaswamy@lumidemo.test",
-  "Nadia Okonkwo": "nokonkwo@lumidemo.test",
-  "Thomas Beck": "tbeck@lumidemo.test",
-  "Carmen Alvarado": "calvarado@lumidemo.test",
-  "Kevin Zhou": "kzhou@lumidemo.test",
-  "Greg Halloran": "ghalloran@lumidemo.test",
-  "Rick Santos": "rsantos@lumidemo.test",
-};
+// Teacher email list — single source of truth is teacher-directory.js
+// (loaded above; shared with app.html + admin/teacher pages). AUDIT H3.
+const TEACHER_EMAIL_MAP = window.TEACHER_EMAIL_MAP;
 
 // Build TEACHER_DATABASE keyed by email
 function buildTeacherDatabase() {
