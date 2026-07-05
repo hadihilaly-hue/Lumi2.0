@@ -131,3 +131,69 @@ test('/suggested-prompts reads the caller notes JWT-scoped; falls back when ther
   const q = findQuery(ctx, /SELECT teacher_notes FROM public\.class_enrollments/);
   assert.equal(q.params[0], STUDENT.userId, 'notes keyed to the JWT user id');
 });
+
+test('/suggested-prompts returns 3 influenced chips when notes + model output are valid', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { handler } = await loadHandler();
+  resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId, usageCount: 0, profileName: 'Sam',
+      onRoute: (text) => /SELECT teacher_notes FROM public\.class_enrollments/.test(text)
+        ? res([{ teacher_notes: JSON.stringify([{ timestamp: 1, text: 'working on factoring' }]) }])
+        : res([]),
+    }),
+    // Model streams a JSON array of exactly 3 chip strings.
+    bedrock: {
+      chunks: [
+        { type: 'message_start', message: { usage: { input_tokens: 20 } } },
+        { type: 'content_block_delta', delta: { text: '["Help me with homework", "Try some factoring?", "How do I factor quadratics?"]' } },
+        { type: 'message_delta', usage: { output_tokens: 30 } },
+      ],
+    },
+  });
+  const r = await invoke(handler, {
+    method: 'GET', path: '/suggested-prompts', token: tokenFor(STUDENT),
+    query: { teacher_profile_id: 'tp1', course: 'Algebra' },
+  });
+  assert.equal(r.statusCode, 200);
+  const out = r.json();
+  assert.equal(out.mode, 'influenced');
+  assert.equal(out.prompts.length, 3);
+});
+
+test('/suggested-prompts falls back (not error) when the caller is rate-limited', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { handler } = await loadHandler();
+  resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId, usageCount: 100, // over the student cap
+      onRoute: (text) => /SELECT teacher_notes FROM public\.class_enrollments/.test(text)
+        ? res([{ teacher_notes: JSON.stringify([{ timestamp: 1, text: 'note' }]) }])
+        : res([]),
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'GET', path: '/suggested-prompts', token: tokenFor(STUDENT),
+    query: { teacher_profile_id: 'tp1' },
+  });
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.json().mode, 'fallback');
+});
+
+test('/chat emits an SSE error event (not a crash) when the model call fails', async () => {
+  const { handler } = await loadHandler();
+  resetContext({
+    dbRouter: makeRouter({ userId: STUDENT.userId, usageCount: 0 }),
+    bedrock: { throw: new Error('bedrock unavailable') },
+  });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/chat', token: tokenFor(STUDENT),
+    body: { messages: [{ role: 'user', content: 'hi' }] },
+  });
+  // The stream was already opened (200 SSE), so the failure surfaces as an
+  // in-band error event and the stream is closed.
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.headers['Content-Type'], 'text/event-stream');
+  assert.match(r.body, /"error"/);
+  assert.ok(r.ended, 'stream should be closed after the error');
+});

@@ -496,3 +496,81 @@ test('unsupported method on a data route returns 405', async () => {
   const r = await invoke(handler, { method: 'DELETE', path: '/profiles', token: tokenFor(STUDENT) });
   assert.equal(r.statusCode, 405);
 });
+
+// ------------------- additional user-scoping / validation --------------------
+
+test('GET /conversations scopes the read to the JWT user id', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId,
+      onRoute: (t) => /FROM public\.conversations/.test(t) ? res([{ id: 'c1' }]) : res([]),
+    }),
+  });
+  await invoke(handler, { method: 'GET', path: '/conversations', token: tokenFor(STUDENT) });
+  const q = findQuery(ctx, /FROM public\.conversations\s+WHERE user_id = \$1/);
+  assert.ok(q);
+  assert.equal(q.params[0], STUDENT.userId);
+});
+
+test('PATCH /homework-tasks scopes the UPDATE by (id, user_id)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId,
+      onRoute: (t) => /UPDATE public\.homework_tasks/.test(t) ? res([{ id: 'h1' }]) : res([]),
+    }),
+  });
+  await invoke(handler, {
+    method: 'PATCH', path: '/homework-tasks', token: tokenFor(STUDENT),
+    body: { id: 'h1', is_complete: true },
+  });
+  const q = findQuery(ctx, /UPDATE public\.homework_tasks/);
+  assert.match(q.text, /WHERE id = \$1 AND user_id = \$2/);
+  assert.equal(q.params[0], 'h1');
+  assert.equal(q.params[1], STUDENT.userId);
+});
+
+test('DELETE /homework-tasks?all=true wipes only the caller rows', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId, onRoute: () => res([]) }) });
+  await invoke(handler, {
+    method: 'DELETE', path: '/homework-tasks', token: tokenFor(STUDENT), query: { all: 'true' },
+  });
+  const q = findQuery(ctx, /DELETE FROM public\.homework_tasks/);
+  assert.match(q.text, /WHERE user_id = \$1$/);
+  assert.deepEqual(q.params, [STUDENT.userId]);
+});
+
+test('POST /class-enrollments rejects an invalid block letter (400, no write)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/class-enrollments', token: tokenFor(STUDENT),
+    body: [{ teacher_profile_id: 'tp1', block: 'Z', student_name: 'Sam' }],
+  });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /block must be A-G/);
+  assert.equal(findQuery(ctx, /INSERT INTO public\.class_enrollments/), undefined);
+});
+
+test('POST /homework-tasks rejects more than 200 tasks (400)', async () => {
+  const { handler } = await loadHandler();
+  resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
+  const tasks = Array.from({ length: 201 }, (_, i) => ({ id: `h${i}`, title: 't' }));
+  const r = await invoke(handler, {
+    method: 'POST', path: '/homework-tasks', token: tokenFor(STUDENT), body: tasks,
+  });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /Too many tasks/);
+});
+
+test('a valid JSON body is required (400 on malformed JSON)', async () => {
+  const { handler } = await loadHandler();
+  resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/profiles', token: tokenFor(STUDENT), rawBody: '{not json',
+  });
+  assert.equal(r.statusCode, 400);
+  assert.equal(r.json().error, 'Invalid JSON');
+});
