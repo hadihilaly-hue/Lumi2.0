@@ -31,7 +31,7 @@ const PAYLOAD = {
 // and /sis-import never calls isTeacher.
 function sisRouter() {
   return (text, params) => {
-    if (/SELECT lumi_id FROM public\.app_users WHERE cognito_sub/.test(text)) return res([{ lumi_id: ADMIN.userId }]);
+    if (/SELECT lumi_id.* FROM public\.app_users WHERE cognito_sub/.test(text)) return res([{ lumi_id: ADMIN.userId }]);
     if (/INSERT INTO public\.schools/.test(text)) return res([{ id: 'school-1', allowed_domains: ['menloschool.org'] }]);
     if (/FROM public\.sis_map WHERE school_id/.test(text)) return res([]); // no prior import
     // ensureAppUser: RETURNING lumi_id, (xmax = 0) AS created. params[0] is the email.

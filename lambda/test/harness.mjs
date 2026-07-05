@@ -56,7 +56,8 @@ export function makeRouter(opts = {}) {
       if (domains === null) throw new Error('simulated domains DB error');
       return result(domains.map((d) => ({ d: d.toLowerCase() })));
     }
-    if (/SELECT lumi_id FROM public\.app_users WHERE cognito_sub/.test(text)) {
+    if (/SELECT lumi_id.* FROM public\.app_users WHERE cognito_sub/.test(text)) {
+      // Query selects `lumi_id, deleted_at`; deleted_at absent => not soft-deleted.
       return appUserExists ? result([{ lumi_id: userId }]) : result([]);
     }
     if (/INSERT INTO public\.app_users/.test(text)) {
