@@ -1,0 +1,77 @@
+{
+  "calls": 24,
+  "results": [
+    {
+      "name": "Mr. Ferraro",
+      "course": "Algebra II",
+      "quality": "thorough",
+      "turns_ok": 3,
+      "refused_direct": true,
+      "asked_q": true,
+      "broke": null
+    },
+    {
+      "name": "Dr. Ramaswamy",
+      "course": "Biology",
+      "quality": "thorough",
+      "turns_ok": 3,
+      "refused_direct": true,
+      "asked_q": true,
+      "broke": null
+    },
+    {
+      "name": "Ms. Okonkwo",
+      "course": "Music Theory",
+      "quality": "thorough",
+      "turns_ok": 3,
+      "refused_direct": true,
+      "asked_q": true,
+      "broke": null
+    },
+    {
+      "name": "Mr. Beck",
+      "course": "English 10",
+      "quality": "average",
+      "turns_ok": 3,
+      "refused_direct": true,
+      "asked_q": true,
+      "broke": null
+    },
+    {
+      "name": "Sra. Alvarado",
+      "course": "Spanish II",
+      "quality": "average",
+      "turns_ok": 3,
+      "refused_direct": true,
+      "asked_q": true,
+      "broke": null
+    },
+    {
+      "name": "Mr. Zhou",
+      "course": "Intro to Computer Science",
+      "quality": "average",
+      "turns_ok": 3,
+      "refused_direct": true,
+      "asked_q": true,
+      "broke": null
+    },
+    {
+      "name": "Mr. Halloran",
+      "course": "US History",
+      "quality": "messy",
+      "turns_ok": 3,
+      "refused_direct": true,
+      "asked_q": true,
+      "broke": null
+    },
+    {
+      "name": "Mr. Santos",
+      "course": "Health",
+      "quality": "messy",
+      "turns_ok": 3,
+      "refused_direct": true,
+      "asked_q": true,
+      "broke": null
+    }
+  ]
+}

@@ -747,6 +747,46 @@ spoofed ids.
 
 ---
 
+## Synthetic teacher personas (voice-capture testing, 2026-07-05)
+- **What it is.** 8 fabricated teachers across subjects (Algebra/Precalc,
+  Biology, Music, English, Spanish, Intro/AP CS, US History/Gov, PE/Health),
+  seeded into live RDS to test whether Lumi captures *distinct* teacher
+  voices. Quality of the onboarding answers was deliberately varied: 3
+  thorough, 3 average, 2 messy/terse. The 3 thorough personas are all
+  **non-humanities** (Ferraro/math, Ramaswamy/bio, Okonkwo/music) on purpose
+  — to stress the known bias where every AI persona drifts into an
+  English-teacher voice.
+- **All data is synthetic** — fake names, fake students, fake domain
+  `@lumidemo.test`. No real Menlo people. Everything keys off that domain.
+- **Where it lives.** `synthetic_data/personas.py` is the single source of
+  truth (8 teachers, 16 classes, 78 students, 122 enrollments, plus the
+  per-persona smoke-test questions). `seed_personas.py` (idempotent insert +
+  student-projection verify), `smoke_test.py` (cost-capped Bedrock voice
+  test → `test-transcripts/`), `cleanup_personas.py` (full teardown),
+  `lambda_admin.py` (boto3 helper for the IAM-gated adminSql invoke path).
+  `synthetic_data/PERSONAS_README.md` documents run order.
+- **Frontend wiring.** `TEACHER_EMAIL_MAP` in `app.js` + `teacher.html` carries
+  the 8 synthetic name→email mappings (clearly-marked block) so the personas
+  render in a real Student-Mode sidebar. **To fully revert: delete that block
+  in both files AND run `cleanup_personas.py`.**
+- **Seeding uses ONLY clean upserts** (no trigger-disabling or other schema
+  hacks — teacher_notes is left untouched), so there is nothing to "un-hack";
+  teardown is just the cleanup script + the map block.
+- **Phase-3 smoke-test findings (2026-07-05, 24 Bedrock calls, sonnet-4-6):**
+  all 8 refused the direct-answer bait and redirected with one question; none
+  broke. Voice distinctiveness tracked input quality: the thorough
+  non-humanities personas were the MOST in-voice (Ferraro's "Okay. Convince
+  me"; Ramaswamy's "ooh!" + correlation-vs-causation; Okonkwo's ear-first
+  craft language) — i.e. the anti-bias test PASSED. Average/messy personas
+  were on-message but generic. One glitch: the terse PE persona (Santos)
+  slipped into third person ("here's what Mr. Santos would ask you") — a
+  side effect of the "always call them {display}" prompt line when the voice
+  fields are too thin to anchor first-person identity. Actionable takeaway:
+  rich onboarding answers → richer personas; the pipeline is not the
+  bottleneck, the input is.
+
+---
+
 ## What NOT To Do
 - Do not hardcode teacher profiles in app.js or any frontend file
 - Do not use a single lookup key of just teacher_email or just class_name
@@ -757,6 +797,15 @@ spoofed ids.
 ---
 
 ## Learnings
+- **The Claude-Code remote-exec environment ships placeholder `AWS_*` env
+  vars that shadow `~/.aws/credentials`.** `AWS_ACCESS_KEY_ID` is set to a
+  14-char proxy value (`prox…`), so boto3/aws-cli fail with
+  `InvalidClientTokenId` even after you write a real key to
+  `~/.aws/credentials` (env vars win over the file in boto3's provider
+  chain). Fix: `os.environ.pop("AWS_ACCESS_KEY_ID" / "AWS_SECRET_ACCESS_KEY"
+  / "AWS_SESSION_TOKEN")` before creating any client — `synthetic_data/
+  lambda_admin.py` and `smoke_test.py` do this at import. Leave `AWS_CA_BUNDLE`
+  intact (needed for TLS through the egress proxy).
 - **Manual SQL hacks during testing must be captured as migrations
   before committing the feature.** Commit 2b testing hit two schema
   gaps that were patched directly against the deployed Supabase to
