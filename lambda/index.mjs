@@ -1687,3 +1687,26 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
     chatStream.end();
   }
 }
+
+// === Test-only surface (added for lambda/test; no runtime behavior change) =====
+// The Lambda entrypoint is `handler`; nothing in the deploy path imports this.
+// It exposes internal pure/near-pure helpers so the unit suite can exercise them
+// directly (rate limiting, usage logging, column allowlists, S3 key building,
+// notes parsing). Keeping it as one named export avoids touching any call site.
+export const __test__ = {
+  checkRateLimit,
+  logUsage,
+  isTeacher,
+  isEmailAllowed,
+  getAllowedDomains,
+  fetchTeacherNotes,
+  buildS3Key,
+  pickColumns,
+  parseNotes,
+  buildTeacherNotesSection,
+  safeErr,
+  TEACHER_PROFILE_COLS,
+  PROFILE_COLS,
+  CONVERSATION_COLS,
+  HOMEWORK_TASK_COLS,
+};
