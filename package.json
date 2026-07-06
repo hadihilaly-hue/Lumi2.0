@@ -1,0 +1,10 @@
+{
+  "name": "lumi-frontend",
+  "version": "1.0.0",
+  "description": "Lumi AI tutoring app — frontend. Offline node:test suite for the pure-logic ES modules under js/.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --import ./test/register.mjs --test \"test/*.test.mjs\""
+  }
+}
