@@ -888,9 +888,9 @@ live with spoofed ids.
 - **Frontend:** Vanilla HTML/CSS/JS — no framework
 - **Pages:** index.html (sign-in), app.html (student chat), teacher.html
   (teacher onboarding), admin.html (SIS admin console), privacy.html.
-  `lumi.html` is a **legacy, orphaned** self-contained copy of the old
-  student app — not linked from any page/JS and does not load style.css;
-  the live student app is app.html → app.js.
+  The live student app is app.html → app.js. (The legacy orphaned `lumi.html`
+  copy was deleted in Compliance Phase 2b — it was unlinked dead code carrying
+  hardcoded staff names.)
 - **Styling:** style.css is the single live stylesheet (~90 KB), loaded by
   index/app/teacher/admin/privacy; Inter font via Google Fonts. `styles.css`
   (~18 KB) is orphaned — no Lumi page loads it.

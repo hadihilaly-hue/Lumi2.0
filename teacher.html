@@ -1289,7 +1289,8 @@ function buildTeacherDatabase() {
       if (!allClasses.includes(course)) allClasses.push(course);
     }
   }
-  db['hadi.hilaly@menloschool.org'] = { name: 'Hadi Hilaly', classes: allClasses };
+  // Compliance Phase 2b: admin identity comes from teacher-directory.js.
+  db[window.ADMIN_EMAIL] = { name: window.ADMIN_NAME, classes: allClasses };
   return db;
 }
 const TEACHER_DATABASE = buildTeacherDatabase();
