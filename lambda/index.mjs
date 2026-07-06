@@ -614,8 +614,9 @@ async function handleRequest(event, responseStream) {
   // === Route: GET /allowed-domains (public, no auth) ===
   // Sign-in-page UX: the client checks the just-signed-in email against this
   // list to show a friendly "your school isn't set up" message. Enforcement
-  // is server-side (isEmailAllowed in verifyCognitoAuth + the route gate);
-  // this endpoint only discloses domains that the sign-in flow reveals anyway.
+  // is server-side (isEmailAllowed in verifyCognitoAuth, which fails closed
+  // before any identity/route work); this endpoint only discloses domains that
+  // the sign-in flow reveals anyway.
   if (path === "/allowed-domains") {
     const method = event.requestContext?.http?.method || "GET";
     if (method !== "GET") {
@@ -634,16 +635,17 @@ async function handleRequest(event, responseStream) {
     return sendJson(400, { error: "Invalid JSON" });
   }
 
-  // --- Auth ---
+  // --- Auth (+ domain gate) ---
+  // AUDIT_LAMBDA_PERF #5: verifyAuth -> verifyCognitoAuth already enforces the
+  // allowed-domains gate BEFORE returning a user (it must, so a random Google
+  // account never mints an app_users identity row). Since that is now the only
+  // auth path (Supabase retired), a non-null `user` already implies an allowed
+  // domain — the second isEmailAllowed() call that used to live here was
+  // redundant, so it is gone (deduplicated).
   const headers = event.headers || {};
   const authHeader = headers.authorization || headers.Authorization;
   const user = await verifyAuth(authHeader);
   if (!user) return sendJson(401, { error: "Unauthorized" });
-  
-  // --- Domain check ---
-  if (!(await isEmailAllowed(user.email))) {
-    return sendJson(403, { error: "Forbidden: school accounts only" });
-  }
 
   // === Route: GET /my-data (FERPA data-access export) ===
   // The authenticated caller receives a JSON export of every row tied to their
