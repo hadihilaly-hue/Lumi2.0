@@ -134,6 +134,19 @@ export async function getTeacherProfile(teacherName, course) {
   const email = resolveTeacherEmail(teacherName);
   if (!email) { console.warn('[getTeacherProfile] no email for:', teacherName); return null; }
   const cacheKey = email + '__' + course;
+
+  // AUDIT_FRONTEND F3: serve a warm cache entry instead of re-hitting the Lambda
+  // on every open of the same class (previously N opens = N round-trips; the
+  // cache below at "_profileCache[cacheKey] = data" was only ever read on a
+  // thrown-error fallback). Only short-circuit a fully-hydrated, READY profile
+  // (workSamples loaded AND done) — a not-yet-ready profile always re-fetches so
+  // a teacher who finishes onboarding mid-session is picked up on the next open.
+  const warm = _profileCache[cacheKey];
+  if (warm && warm.done && warm.workSamples) {
+    console.log('[getTeacherProfile] warm cache hit:', teacherName, course);
+    return warm;
+  }
+
   console.log('[getTeacherProfile] loading:', teacherName, course);
 
   // Fetch the profile (5s timeout) from the RDS-backed Lambda. FAIL VISIBLY —
