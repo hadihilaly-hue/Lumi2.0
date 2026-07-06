@@ -848,3 +848,120 @@ test('a valid JSON body is required (400 on malformed JSON)', async () => {
   assert.equal(r.statusCode, 400);
   assert.equal(r.json().error, 'Invalid JSON');
 });
+
+// ================= FERPA erasure + export (self-service + admin) =============
+// Phase 4 shipped /my-data and /delete-my-account with NO route tests; the admin
+// target flow (Phase 5 gap) reuses the same extracted helpers. These cover both.
+
+test('POST /delete-my-account requires confirm:"DELETE" (400)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
+  const r = await invoke(handler, { method: 'POST', path: '/delete-my-account', token: tokenFor(STUDENT), body: {} });
+  assert.equal(r.statusCode, 400);
+  assert.equal(findQuery(ctx, /UPDATE public\.app_users SET deleted_at/), undefined);
+});
+
+test('POST /delete-my-account soft-deletes the caller (cascade, app_users by JWT id)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId, onRoute: () => res([]) }) });
+  const r = await invoke(handler, { method: 'POST', path: '/delete-my-account', token: tokenFor(STUDENT), body: { confirm: 'DELETE' } });
+  assert.equal(r.statusCode, 200);
+  const appUsers = findQuery(ctx, /UPDATE public\.app_users SET deleted_at/);
+  assert.equal(appUsers.params[0], STUDENT.userId); // stamped for the JWT id, not the body
+  assert.ok(findQuery(ctx, /UPDATE public\.class_enrollments SET deleted_at/));
+});
+
+test('GET /my-data exports the caller\'s rows scoped to the JWT id', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId, onRoute: () => res([]) }) });
+  const r = await invoke(handler, { method: 'GET', path: '/my-data', token: tokenFor(STUDENT) });
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.json().subject.lumi_id, STUDENT.userId);
+  assert.match(r.json().note, /teacher_notes are intentionally excluded/);
+});
+
+test('POST /admin/delete-student denies a non-admin (403, nothing deleted)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/admin/delete-student', token: tokenFor(STUDENT),
+    body: { confirm: 'DELETE', email: 'jane@menloschool.org' },
+  });
+  assert.equal(r.statusCode, 403);
+  assert.equal(findQuery(ctx, /UPDATE public\.app_users SET deleted_at/), undefined);
+});
+
+test('POST /admin/delete-student requires confirm:"DELETE" (400)', async () => {
+  const { handler } = await loadHandler();
+  resetContext({ dbRouter: makeRouter({ userId: ADMIN.userId }) });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/admin/delete-student', token: tokenFor(ADMIN), body: { email: 'jane@menloschool.org' },
+  });
+  assert.equal(r.statusCode, 400);
+});
+
+test('POST /admin/delete-student 404s an unknown target', async () => {
+  const { handler } = await loadHandler();
+  resetContext({
+    dbRouter: makeRouter({ userId: ADMIN.userId, onRoute: () => res([]) }), // resolveSubject finds nobody
+  });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/admin/delete-student', token: tokenFor(ADMIN),
+    body: { confirm: 'DELETE', email: 'ghost@menloschool.org' },
+  });
+  assert.equal(r.statusCode, 404);
+});
+
+test('POST /admin/delete-student soft-deletes the RESOLVED target (not the admin)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: ADMIN.userId,
+      onRoute: (t) => /FROM public\.app_users WHERE lower\(email\)/.test(t)
+        ? res([{ lumi_id: 'uuid-jane', email: 'jane@menloschool.org' }]) : res([]),
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/admin/delete-student', token: tokenFor(ADMIN),
+    body: { confirm: 'DELETE', email: 'Jane@Menloschool.org' }, // case-insensitive
+  });
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.json().subject.lumi_id, 'uuid-jane');
+  // Cascade runs against the TARGET id, never the admin's id.
+  assert.equal(findQuery(ctx, /UPDATE public\.app_users SET deleted_at/).params[0], 'uuid-jane');
+  assert.equal(findQuery(ctx, /UPDATE public\.class_enrollments SET deleted_at/).params[0], 'uuid-jane');
+});
+
+test('GET /admin/student-data denies a non-admin (403)', async () => {
+  const { handler } = await loadHandler();
+  resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
+  const r = await invoke(handler, {
+    method: 'GET', path: '/admin/student-data', token: tokenFor(STUDENT), query: { email: 'jane@menloschool.org' },
+  });
+  assert.equal(r.statusCode, 403);
+});
+
+test('GET /admin/student-data requires a selector (400)', async () => {
+  const { handler } = await loadHandler();
+  resetContext({ dbRouter: makeRouter({ userId: ADMIN.userId }) });
+  const r = await invoke(handler, { method: 'GET', path: '/admin/student-data', token: tokenFor(ADMIN) });
+  assert.equal(r.statusCode, 400);
+});
+
+test('GET /admin/student-data returns the resolved target\'s export', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: ADMIN.userId,
+      onRoute: (t) => /FROM public\.app_users WHERE lower\(email\)/.test(t)
+        ? res([{ lumi_id: 'uuid-jane', email: 'jane@menloschool.org' }]) : res([]),
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'GET', path: '/admin/student-data', token: tokenFor(ADMIN), query: { email: 'jane@menloschool.org' },
+  });
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.json().subject.lumi_id, 'uuid-jane');
+  // Export queries hit the TARGET id.
+  assert.equal(findQuery(ctx, /FROM public\.profiles WHERE id = \$1/).params[0], 'uuid-jane');
+});

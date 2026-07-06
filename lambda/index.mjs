@@ -514,6 +514,79 @@ async function fetchTeacherNotes({ studentId, teacherProfileId }) {
   }
 }
 
+// === FERPA data-subject helpers (shared by self-service + admin routes) ===
+// Keyed on a resolved (uid = app_users.lumi_id, em = email) pair so the SAME
+// cascade/export runs whether the subject is the JWT caller (/my-data,
+// /delete-my-account) or an admin-specified target (/admin/student-data,
+// /admin/delete-student). One definition = no drift between the two paths.
+
+// Soft-delete every row belonging to (uid, em). Data rows first; app_users LAST
+// (once its deleted_at is set the account can no longer authenticate). Idempotent
+// — the `deleted_at IS NULL` guards make a re-run a no-op. Returns per-table counts.
+async function softDeleteUserRows(uid, em) {
+  const counts = {};
+  const softDelete = async (label, sql, params) => {
+    counts[label] = (await dbQuery(sql, params)).rowCount;
+  };
+  await softDelete("teacher_work_samples",
+    `UPDATE public.teacher_work_samples ws SET deleted_at = now()
+       FROM public.teacher_profiles tp
+      WHERE ws.teacher_profile_id = tp.id AND tp.teacher_email = $1 AND ws.deleted_at IS NULL`, [em]);
+  await softDelete("teacher_profiles",
+    "UPDATE public.teacher_profiles SET deleted_at = now() WHERE teacher_email = $1 AND deleted_at IS NULL", [em]);
+  await softDelete("profiles",
+    "UPDATE public.profiles SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL", [uid]);
+  await softDelete("conversations",
+    "UPDATE public.conversations SET deleted_at = now() WHERE user_id = $1 AND deleted_at IS NULL", [uid]);
+  await softDelete("homework_tasks",
+    "UPDATE public.homework_tasks SET deleted_at = now() WHERE user_id = $1 AND deleted_at IS NULL", [uid]);
+  await softDelete("class_enrollments",
+    "UPDATE public.class_enrollments SET deleted_at = now() WHERE student_id = $1 AND deleted_at IS NULL", [uid]);
+  await softDelete("app_users",
+    "UPDATE public.app_users SET deleted_at = now() WHERE lumi_id = $1 AND deleted_at IS NULL", [uid]);
+  return counts;
+}
+
+// Build the full FERPA export for (uid, em). teacher_notes are deliberately
+// EXCLUDED (observations OTHER people wrote about the subject, not the subject's
+// own record) — same policy as self-service /my-data. Rows are returned even when
+// soft-deleted so a guardian request during the 30-day grace still resolves.
+async function buildUserExport(uid, em) {
+  const q = (sql, params) => dbQuery(sql, params).then(r => r.rows);
+  const [app_user, profile, teacher_profiles, work_samples, conversations, homework_tasks, enrollments, api_usage] = await Promise.all([
+    q("SELECT lumi_id, email, created_at, updated_at, deleted_at FROM public.app_users WHERE lumi_id = $1", [uid]),
+    q("SELECT * FROM public.profiles WHERE id = $1", [uid]),
+    q("SELECT * FROM public.teacher_profiles WHERE teacher_email = $1", [em]),
+    q(`SELECT ws.* FROM public.teacher_work_samples ws
+         JOIN public.teacher_profiles tp ON tp.id = ws.teacher_profile_id
+        WHERE tp.teacher_email = $1`, [em]),
+    q("SELECT * FROM public.conversations WHERE user_id = $1", [uid]),
+    q("SELECT * FROM public.homework_tasks WHERE user_id = $1", [uid]),
+    // teacher_notes column intentionally omitted (compliance decision).
+    q(`SELECT id, student_id, teacher_profile_id, block, student_name, term,
+              created_at, updated_at, deleted_at
+         FROM public.class_enrollments WHERE student_id = $1`, [uid]),
+    q("SELECT id, model, input_tokens, output_tokens, created_at FROM public.api_usage WHERE user_id = $1", [uid]),
+  ]);
+  return {
+    app_user, profile, teacher_profiles,
+    teacher_work_samples: work_samples,
+    conversations, homework_tasks,
+    class_enrollments: enrollments, api_usage,
+  };
+}
+
+// Resolve an admin-supplied target to (uid, em). Accepts { student_id } or
+// { email }; returns null when no such identity exists. Email match is
+// case-insensitive (app_users stores lowercased emails).
+async function resolveSubject({ student_id, email }) {
+  const rows = student_id
+    ? (await dbQuery("SELECT lumi_id, email FROM public.app_users WHERE lumi_id = $1", [student_id])).rows
+    : (await dbQuery("SELECT lumi_id, email FROM public.app_users WHERE lower(email) = lower($1)", [email])).rows;
+  if (!rows.length) return null;
+  return { uid: rows[0].lumi_id, em: (rows[0].email || "").toLowerCase() };
+}
+
 // === Main Handler (path-routed) ===
 // /upload-url, /download-url -> JSON one-shot response
 // default (/, /chat) -> SSE streaming chat
@@ -657,32 +730,12 @@ async function handleRequest(event, responseStream) {
     if (method !== "GET") return sendJson(405, { error: "Method not allowed" });
     try {
       const uid = user.id, em = user.email;
-      const q = (sql, params) => dbQuery(sql, params).then(r => r.rows);
-      const [app_user, profile, teacher_profiles, work_samples, conversations, homework_tasks, enrollments, api_usage] = await Promise.all([
-        q("SELECT lumi_id, email, created_at, updated_at, deleted_at FROM public.app_users WHERE lumi_id = $1", [uid]),
-        q("SELECT * FROM public.profiles WHERE id = $1", [uid]),
-        q("SELECT * FROM public.teacher_profiles WHERE teacher_email = $1", [em]),
-        q(`SELECT ws.* FROM public.teacher_work_samples ws
-             JOIN public.teacher_profiles tp ON tp.id = ws.teacher_profile_id
-            WHERE tp.teacher_email = $1`, [em]),
-        q("SELECT * FROM public.conversations WHERE user_id = $1", [uid]),
-        q("SELECT * FROM public.homework_tasks WHERE user_id = $1", [uid]),
-        // teacher_notes column intentionally omitted (compliance decision).
-        q(`SELECT id, student_id, teacher_profile_id, block, student_name, term,
-                  created_at, updated_at, deleted_at
-             FROM public.class_enrollments WHERE student_id = $1`, [uid]),
-        q("SELECT id, model, input_tokens, output_tokens, created_at FROM public.api_usage WHERE user_id = $1", [uid]),
-      ]);
+      const data = await buildUserExport(uid, em);
       return sendJson(200, {
         generated_at: new Date().toISOString(),
         subject: { lumi_id: uid, email: em },
         note: "teacher_notes are intentionally excluded from this export.",
-        data: {
-          app_user, profile, teacher_profiles,
-          teacher_work_samples: work_samples,
-          conversations, homework_tasks,
-          class_enrollments: enrollments, api_usage,
-        },
+        data,
       });
     } catch (err) {
       console.error("my-data error:", safeErr(err));
@@ -703,29 +756,7 @@ async function handleRequest(event, responseStream) {
       return sendJson(400, { error: 'Confirmation required: POST {"confirm":"DELETE"}' });
     }
     try {
-      const uid = user.id, em = user.email;
-      const counts = {};
-      const softDelete = async (label, sql, params) => {
-        counts[label] = (await dbQuery(sql, params)).rowCount;
-      };
-      // Data rows first; app_users LAST (once its deleted_at is set the account
-      // can no longer authenticate).
-      await softDelete("teacher_work_samples",
-        `UPDATE public.teacher_work_samples ws SET deleted_at = now()
-           FROM public.teacher_profiles tp
-          WHERE ws.teacher_profile_id = tp.id AND tp.teacher_email = $1 AND ws.deleted_at IS NULL`, [em]);
-      await softDelete("teacher_profiles",
-        "UPDATE public.teacher_profiles SET deleted_at = now() WHERE teacher_email = $1 AND deleted_at IS NULL", [em]);
-      await softDelete("profiles",
-        "UPDATE public.profiles SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL", [uid]);
-      await softDelete("conversations",
-        "UPDATE public.conversations SET deleted_at = now() WHERE user_id = $1 AND deleted_at IS NULL", [uid]);
-      await softDelete("homework_tasks",
-        "UPDATE public.homework_tasks SET deleted_at = now() WHERE user_id = $1 AND deleted_at IS NULL", [uid]);
-      await softDelete("class_enrollments",
-        "UPDATE public.class_enrollments SET deleted_at = now() WHERE student_id = $1 AND deleted_at IS NULL", [uid]);
-      await softDelete("app_users",
-        "UPDATE public.app_users SET deleted_at = now() WHERE lumi_id = $1 AND deleted_at IS NULL", [uid]);
+      const counts = await softDeleteUserRows(user.id, user.email);
       const graceUntil = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
       console.log(`[delete-account] soft-deleted; rows=${JSON.stringify(counts)}`);
       return sendJson(200, {
@@ -737,6 +768,76 @@ async function handleRequest(event, responseStream) {
     } catch (err) {
       console.error("delete-my-account error:", safeErr(err));
       return sendJson(500, { error: "deletion failed" });
+    }
+  }
+
+  // === Route: POST /admin/delete-student (admin-initiated FERPA erasure) ===
+  // Admin-gated (SCHOOL_CONFIG.adminEmails). Soft-deletes every row belonging to a
+  // target subject — the SAME cascade + 30-day grace as /delete-my-account, but the
+  // subject is chosen by the admin (by email or student_id) rather than the JWT.
+  // Requires body {"confirm":"DELETE"} + a target selector. Idempotent (re-running
+  // stamps nothing). Logs actor + target lumi_id only — never emails/PII.
+  if (path === "/admin/delete-student") {
+    const method = event.requestContext?.http?.method || "POST";
+    if (method !== "POST") return sendJson(405, { error: "Method not allowed" });
+    if (!SCHOOL_CONFIG.adminEmails.has(user.email.toLowerCase())) {
+      return sendJson(403, { error: "Admins only" });
+    }
+    if (body?.confirm !== "DELETE") {
+      return sendJson(400, { error: 'Confirmation required: POST {"confirm":"DELETE", "email"|"student_id": ...}' });
+    }
+    if (!body.email && !body.student_id) {
+      return sendJson(400, { error: "Provide target email or student_id" });
+    }
+    try {
+      const subject = await resolveSubject({ student_id: body.student_id, email: body.email });
+      if (!subject) return sendJson(404, { error: "No such student" });
+      const counts = await softDeleteUserRows(subject.uid, subject.em);
+      const graceUntil = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
+      console.log(`[admin-delete] actor=${user.id} target=${subject.uid} rows=${JSON.stringify(counts)}`);
+      return sendJson(200, {
+        status: "deleted",
+        subject: { lumi_id: subject.uid },
+        message: "Student soft-deleted; access revoked immediately. Data is permanently removed after a 30-day grace period.",
+        grace_until: graceUntil,
+        rows_affected: counts,
+      });
+    } catch (err) {
+      console.error("admin-delete-student error:", safeErr(err));
+      return sendJson(500, { error: "deletion failed" });
+    }
+  }
+
+  // === Route: GET /admin/student-data (admin FERPA export for guardian requests) ===
+  // Admin-gated. Returns the same shape as /my-data for an admin-specified target
+  // (?email= or ?student_id=). teacher_notes stay excluded (see buildUserExport);
+  // rows are returned even when soft-deleted so a guardian request during the grace
+  // window still resolves. Response carries the target email (authorized admin read);
+  // logs carry ids only.
+  if (path === "/admin/student-data") {
+    const method = event.requestContext?.http?.method || "GET";
+    if (method !== "GET") return sendJson(405, { error: "Method not allowed" });
+    if (!SCHOOL_CONFIG.adminEmails.has(user.email.toLowerCase())) {
+      return sendJson(403, { error: "Admins only" });
+    }
+    const qs = event.queryStringParameters || {};
+    if (!qs.email && !qs.student_id) {
+      return sendJson(400, { error: "Provide ?email= or ?student_id=" });
+    }
+    try {
+      const subject = await resolveSubject({ student_id: qs.student_id, email: qs.email });
+      if (!subject) return sendJson(404, { error: "No such student" });
+      const data = await buildUserExport(subject.uid, subject.em);
+      console.log(`[admin-export] actor=${user.id} target=${subject.uid}`);
+      return sendJson(200, {
+        generated_at: new Date().toISOString(),
+        subject: { lumi_id: subject.uid, email: subject.em },
+        note: "teacher_notes are intentionally excluded from this export.",
+        data,
+      });
+    } catch (err) {
+      console.error("admin-student-data error:", safeErr(err));
+      return sendJson(500, { error: "export failed" });
     }
   }
 
