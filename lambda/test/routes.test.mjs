@@ -485,6 +485,30 @@ test('GET /class-enrollments?scope=teaching scopes the roster to the caller-owne
   assert.equal(q.params[0], TEACHER.email);
 });
 
+test('DELETE /class-enrollments?id scopes by (id, student_id) — dropped-class cleanup', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId, onRoute: () => res([]) }) });
+  const r = await invoke(handler, {
+    method: 'DELETE', path: '/class-enrollments', token: tokenFor(STUDENT), query: { id: 'e-dropped' },
+  });
+  assert.equal(r.statusCode, 200);
+  const q = findQuery(ctx, /DELETE FROM public\.class_enrollments/);
+  // Scoped to the caller's own student_id, so a student can only delete their OWN row.
+  assert.match(q.text, /WHERE id = \$1 AND student_id = \$2/);
+  assert.deepEqual(q.params, ['e-dropped', STUDENT.userId]);
+});
+
+test('DELETE /class-enrollments without ?id returns 400 (no accidental broad delete)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
+  const r = await invoke(handler, {
+    method: 'DELETE', path: '/class-enrollments', token: tokenFor(STUDENT),
+  });
+  assert.equal(r.statusCode, 400);
+  // Nothing was deleted.
+  assert.equal(findQuery(ctx, /DELETE FROM public\.class_enrollments/), undefined);
+});
+
 // ================================ /sis-import ===============================
 
 test('POST /sis-import is admin-only (403 for a teacher)', async () => {

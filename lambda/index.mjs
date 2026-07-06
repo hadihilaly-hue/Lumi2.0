@@ -1280,7 +1280,12 @@ async function handleRequest(event, responseStream) {
   // PATCH: the teacher note save. Body = {id, teacher_notes}; 2-step authz replicating
   //   teacher_update_class + protect_teacher_notes: the enrollment's linked
   //   teacher_profiles.teacher_email must equal the JWT email → else 403; 404 unknown id.
-  // No DELETE — no RLS policy to port (dropped-class cleanup is a known pre-Menlo TODO).
+  // DELETE: dropped-class cleanup. ?id=<enrollment uuid>, scoped to the caller's own
+  //   student_id (a would-be student_delete_own policy) so a student can only remove
+  //   their OWN enrollment — never touch another student's row. Deleting the row also
+  //   drops that student's teacher_notes for the class; that is the intended semantics
+  //   (the enrollment relationship ended). Returns {deleted}. The student-side
+  //   syncEnrollments prune calls this for every class no longer in the schedule.
   if (path === "/class-enrollments") {
     const method = event.requestContext?.http?.method || "GET";
     const qs = event.queryStringParameters || {};
@@ -1346,6 +1351,20 @@ async function handleRequest(event, responseStream) {
           [body.id, body.teacher_notes]
         );
         return sendJson(200, result.rows[0]);
+      } catch (err) {
+        console.error("class-enrollments error:", safeErr(err));
+        return sendJson(500, { error: "Database error" });
+      }
+    }
+
+    if (method === "DELETE") {
+      if (!qs.id) return sendJson(400, { error: "Provide ?id=" });
+      try {
+        const result = await dbQuery(
+          "DELETE FROM public.class_enrollments WHERE id = $1 AND student_id = $2",
+          [qs.id, user.id]
+        );
+        return sendJson(200, { deleted: result.rowCount });
       } catch (err) {
         console.error("class-enrollments error:", safeErr(err));
         return sendJson(500, { error: "Database error" });

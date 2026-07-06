@@ -108,7 +108,7 @@ export function syncScheduleToSupabase(schedule) {
 
   // Upsert enrollment rows so teachers can see their roster and write per-student notes.
   // Looks up teacher_profile IDs first — skips classes whose teacher hasn't onboarded yet.
-  // TODO: No cleanup for dropped classes — old enrollment rows persist. Handle before shipping.
+  // Also prunes enrollments for classes the student has dropped (see syncEnrollments).
   syncEnrollments(schedule);
 }
 
@@ -129,9 +129,38 @@ function syncEnrollments(schedule) {
       return { email, course, block };
     })
     .filter(Boolean);
-  if (!pairs.length) return;
 
+  // Dropped-class cleanup: delete the caller's enrollment rows whose
+  // (teacher_profile_id, block) is no longer in their schedule, so a class the
+  // student removed disappears from the teacher's roster. `desiredKeys` is the
+  // set of enrollments this sync intends to KEEP; anything the server still has
+  // outside that set is pruned. Runs even when desiredKeys is empty (student
+  // dropped everything). student_id is always the JWT user server-side, so a
+  // student can only ever delete their OWN rows. NOTE: pruning trusts the
+  // freshly-resolved desired set — the profile-fetch error branch bails before
+  // we get here, so an empty desired set means "no current classes", not
+  // "couldn't resolve them".
+  const prune = (desiredKeys) =>
+    rdsFetch('class-enrollments') // student-scope GET: caller's own rows only
+      .then(current => {
+        const drop = (current || []).filter(
+          e => !desiredKeys.has(e.teacher_profile_id + '__' + e.block)
+        );
+        if (!drop.length) return 0;
+        return Promise.all(drop.map(e =>
+          rdsFetch(`class-enrollments?id=${encodeURIComponent(e.id)}`, { method: 'DELETE' })
+        )).then(() => drop.length);
+      })
+      .then(n => { if (n) console.log('[enrollment] pruned', n, 'dropped class(es)'); })
+      .catch(err => {
+        console.error('Enrollment prune failed:', err);
+        showToast('Could not remove dropped classes — see console');
+      });
+
+  // No resolvable classes left → desired set is empty → prune everything.
   const emails = [...new Set(pairs.map(p => p.email))];
+  if (!emails.length) { prune(new Set()); return; }
+
   fetchTeacherProfilesByEmails(emails)
     .then(data => ({ data, error: null }), error => ({ data: null, error }))
     .then(({ data, error }) => {
@@ -147,12 +176,19 @@ function syncEnrollments(schedule) {
           return { student_id: currentUser.id, teacher_profile_id: profileId, block, student_name: studentName };
         })
         .filter(Boolean);
-      if (!rows.length) return;
 
-      // Hardened (§2): failure now surfaces to the user. student_id in each
-      // row is ignored server-side (always the JWT user).
-      rdsFetch('class-enrollments', { method: 'POST', body: rows })
-        .then(res => console.log('[enrollment] synced', res?.upserted ?? rows.length, 'enrollment(s)'))
+      const desiredKeys = new Set(rows.map(r => r.teacher_profile_id + '__' + r.block));
+
+      // Upsert the current set first, then prune whatever is no longer desired.
+      // Hardened (§2): failure surfaces to the user. student_id in each row is
+      // ignored server-side (always the JWT user).
+      const upsert = rows.length
+        ? rdsFetch('class-enrollments', { method: 'POST', body: rows })
+            .then(res => console.log('[enrollment] synced', res?.upserted ?? rows.length, 'enrollment(s)'))
+        : Promise.resolve();
+
+      upsert
+        .then(() => prune(desiredKeys))
         .catch(err => {
           console.error('Enrollment sync failed: upsert error:', err);
           showToast('Could not sync your class enrollments — see console');
