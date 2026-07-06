@@ -489,7 +489,7 @@ function buildTeacherNotesSection(notes) {
 async function fetchTeacherNotes({ studentId, teacherProfileId }) {
   try {
     const work = dbQuery(
-      "SELECT teacher_notes FROM public.class_enrollments WHERE student_id = $1 AND teacher_profile_id = $2",
+      "SELECT teacher_notes FROM public.class_enrollments WHERE student_id = $1 AND teacher_profile_id = $2 AND deleted_at IS NULL",
       [studentId, teacherProfileId]
     ).then(r => r.rows.map(x => x.teacher_notes));
     // AUDIT_LAMBDA_BUGS H4: keep a handle to the loser timer and clear it after
@@ -807,7 +807,7 @@ async function handleRequest(event, responseStream) {
           }
           const result = await dbQuery(
             `SELECT teacher_email, course_name, done, updated_at, engagement_rules, teaching_voice
-               FROM public.teacher_profiles ORDER BY updated_at DESC NULLS LAST`
+               FROM public.teacher_profiles WHERE deleted_at IS NULL ORDER BY updated_at DESC NULLS LAST`
           );
           return sendJson(200, result.rows);
         }
@@ -816,6 +816,7 @@ async function handleRequest(event, responseStream) {
             `SELECT course_info, syllabus_text, syllabus_file_path
                FROM public.teacher_profiles
               WHERE course_name = $1 AND share_course_info = true AND teacher_email <> $2
+                AND deleted_at IS NULL
               ORDER BY updated_at DESC NULLS LAST
               LIMIT 1`,
             [qs.template_for_course, user.email.toLowerCase()]
@@ -838,11 +839,11 @@ async function handleRequest(event, responseStream) {
             "suggested_prompts, welcome_message, title, created_at, updated_at";
         const result = courseName
           ? await dbQuery(
-              `SELECT ${selectCols} FROM public.teacher_profiles WHERE teacher_email = $1 AND course_name = $2 ORDER BY course_name`,
+              `SELECT ${selectCols} FROM public.teacher_profiles WHERE teacher_email = $1 AND course_name = $2 AND deleted_at IS NULL ORDER BY course_name`,
               [targetEmail, courseName]
             )
           : await dbQuery(
-              `SELECT ${selectCols} FROM public.teacher_profiles WHERE teacher_email = $1 ORDER BY course_name`,
+              `SELECT ${selectCols} FROM public.teacher_profiles WHERE teacher_email = $1 AND deleted_at IS NULL ORDER BY course_name`,
               [targetEmail]
             );
         if (result.rowCount === 0) return sendJson(404, { error: "No teacher profile found" });
@@ -926,7 +927,7 @@ async function handleRequest(event, responseStream) {
           `SELECT id, name, grade, values_profile, created_at, schedule, schedule_updated_at,
                   semester_banner_dismissed_at, study_style, calendar_connected, learning_style,
                   pain_points, typical_activities, onboarding_complete, homework_start_time
-             FROM public.profiles WHERE id = $1`,
+             FROM public.profiles WHERE id = $1 AND deleted_at IS NULL`,
           [user.id]
         );
         if (result.rowCount === 0) return sendJson(404, { error: "No profile found" });
@@ -996,7 +997,7 @@ async function handleRequest(event, responseStream) {
           const one = await dbQuery(
             `SELECT id, title, messages, teacher, course, created_at, updated_at
                FROM public.conversations
-              WHERE id = $1 AND user_id = $2`,
+              WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL`,
             [qs.id, user.id]
           );
           if (one.rowCount === 0) return sendJson(404, { error: "No conversation found" });
@@ -1026,7 +1027,7 @@ async function handleRequest(event, responseStream) {
                             CASE WHEN jsonb_typeof(messages) = 'array' THEN messages ELSE '[]'::jsonb END) m
                     WHERE m->>'role' = 'user' LIMIT 1) AS preview
              FROM public.conversations
-            WHERE user_id = $1 AND is_teacher_test = $2
+            WHERE user_id = $1 AND is_teacher_test = $2 AND deleted_at IS NULL
             ORDER BY created_at DESC
             LIMIT 50`,
           [user.id, isTest]
@@ -1107,7 +1108,7 @@ async function handleRequest(event, responseStream) {
     try {
       if (method === "GET") {
         const result = await dbQuery(
-          "SELECT * FROM public.homework_tasks WHERE user_id = $1 ORDER BY due_date NULLS LAST, created_at",
+          "SELECT * FROM public.homework_tasks WHERE user_id = $1 AND deleted_at IS NULL ORDER BY due_date NULLS LAST, created_at",
           [user.id]
         );
         return sendJson(200, result.rows);
@@ -1219,7 +1220,7 @@ async function handleRequest(event, responseStream) {
         }
         const result = await dbQuery(
           `SELECT * FROM public.teacher_work_samples
-            WHERE teacher_profile_id = ANY($1::uuid[])
+            WHERE teacher_profile_id = ANY($1::uuid[]) AND deleted_at IS NULL
             ORDER BY teacher_profile_id, tier`,
           [ids]
         );
@@ -1380,6 +1381,7 @@ async function handleRequest(event, responseStream) {
              FROM public.class_enrollments ce
              JOIN public.teacher_profiles tp ON tp.id = ce.teacher_profile_id
             WHERE tp.teacher_email = $1
+              AND ce.deleted_at IS NULL AND tp.deleted_at IS NULL
             ORDER BY ce.teacher_profile_id, ce.block, ce.student_name`,
           [user.email.toLowerCase()]
         );
@@ -1388,7 +1390,7 @@ async function handleRequest(event, responseStream) {
       // Student scope: caller's own enrollments only, teacher_notes EXCLUDED.
       const result = await dbQuery(
         `SELECT id, teacher_profile_id, block, student_name, created_at, updated_at
-           FROM public.class_enrollments WHERE student_id = $1
+           FROM public.class_enrollments WHERE student_id = $1 AND deleted_at IS NULL
           ORDER BY teacher_profile_id, block`,
         [user.id]
       );

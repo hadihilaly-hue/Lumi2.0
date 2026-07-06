@@ -69,14 +69,14 @@ test('GET /teacher-profile?scope=all works for an admin', async () => {
   const ctx = resetContext({
     dbRouter: makeRouter({
       userId: ADMIN.userId, domains: [],
-      onRoute: (t) => /FROM public\.teacher_profiles ORDER BY updated_at/.test(t) ? res([{ teacher_email: 'a@b.org' }]) : res([]),
+      onRoute: (t) => /FROM public\.teacher_profiles WHERE deleted_at IS NULL ORDER BY updated_at/.test(t) ? res([{ teacher_email: 'a@b.org' }]) : res([]),
     }),
   });
   const r = await invoke(handler, {
     method: 'GET', path: '/teacher-profile', query: { scope: 'all' }, token: tokenFor(ADMIN),
   });
   assert.equal(r.statusCode, 200);
-  assert.ok(findQuery(ctx, /FROM public\.teacher_profiles ORDER BY updated_at DESC/));
+  assert.ok(findQuery(ctx, /FROM public\.teacher_profiles WHERE deleted_at IS NULL ORDER BY updated_at DESC/));
 });
 
 test('GET /teacher-profile cross-teacher read withholds S3 key columns from non-owners (H3 fix)', async () => {
@@ -483,6 +483,83 @@ test('GET /class-enrollments?scope=teaching scopes the roster to the caller-owne
   const q = findQuery(ctx, /WHERE tp\.teacher_email = \$1/);
   assert.ok(q);
   assert.equal(q.params[0], TEACHER.email);
+  // Soft-delete read enforcement: a self-deleted student (or teacher) must not
+  // surface on the roster during the 30-day grace window.
+  assert.match(q.text, /ce\.deleted_at IS NULL/);
+  assert.match(q.text, /tp\.deleted_at IS NULL/);
+});
+
+// ===================== soft-delete read-path enforcement =====================
+// Phase 4 stamps deleted_at on write and denies the deleted ACCOUNT at auth,
+// but the read routes did not filter deleted_at — so soft-deleted rows were
+// still served to OTHER active users (a deleted student on the teacher roster;
+// a deleted teacher's profile/work-samples to students) for the whole grace
+// window. These pin the filter onto every cross-user read path.
+
+test('GET /class-enrollments (student scope) hides soft-deleted rows', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({ userId: STUDENT.userId, onRoute: () => res([]) }),
+  });
+  await invoke(handler, { method: 'GET', path: '/class-enrollments', token: tokenFor(STUDENT) });
+  const q = findQuery(ctx, /FROM public\.class_enrollments WHERE student_id = \$1/);
+  assert.match(q.text, /deleted_at IS NULL/);
+});
+
+test('GET /teacher-profile (default) hides a soft-deleted teacher from students', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId,
+      onRoute: (t) => /FROM public\.teacher_profiles WHERE teacher_email/.test(t) ? res([{ id: 'tp1' }]) : res([]),
+    }),
+  });
+  await invoke(handler, {
+    method: 'GET', path: '/teacher-profile', token: tokenFor(STUDENT),
+    query: { teacher_email: TEACHER.email, course_name: 'Algebra 2' },
+  });
+  const q = findQuery(ctx, /FROM public\.teacher_profiles WHERE teacher_email = \$1 AND course_name = \$2/);
+  assert.match(q.text, /deleted_at IS NULL/);
+});
+
+test('GET /teacher-profile?scope=all (admin) hides soft-deleted profiles', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: ADMIN.userId,
+      onRoute: (t) => /FROM public\.teacher_profiles WHERE deleted_at/.test(t) ? res([]) : res([]),
+    }),
+  });
+  await invoke(handler, {
+    method: 'GET', path: '/teacher-profile', token: tokenFor(ADMIN), query: { scope: 'all' },
+  });
+  const q = findQuery(ctx, /FROM public\.teacher_profiles WHERE deleted_at IS NULL ORDER BY updated_at/);
+  assert.ok(q, 'scope=all query must filter deleted_at');
+});
+
+test('GET /work-samples hides a soft-deleted teacher\'s samples', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId,
+      onRoute: (t) => /FROM public\.teacher_work_samples/.test(t) ? res([]) : res([]),
+    }),
+  });
+  await invoke(handler, {
+    method: 'GET', path: '/work-samples', token: tokenFor(STUDENT), query: { teacher_profile_id: 'tp1' },
+  });
+  const q = findQuery(ctx, /FROM public\.teacher_work_samples/);
+  assert.match(q.text, /deleted_at IS NULL/);
+});
+
+test('GET /conversations (list) hides soft-deleted conversations', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({ userId: STUDENT.userId, onRoute: () => res([]) }),
+  });
+  await invoke(handler, { method: 'GET', path: '/conversations', token: tokenFor(STUDENT) });
+  const q = findQuery(ctx, /FROM public\.conversations\s+WHERE user_id = \$1 AND is_teacher_test/);
+  assert.match(q.text, /deleted_at IS NULL/);
 });
 
 test('DELETE /class-enrollments?id scopes by (id, student_id) — dropped-class cleanup', async () => {
