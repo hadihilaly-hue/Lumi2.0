@@ -1,7 +1,7 @@
 import { lookupSubjectForCourse } from './conversation.js';
 import { setSidebarUserSubtitle } from './prompts.js';
 import { S, currentUser } from './state.js';
-import { TEACHER_EMAIL_MAP, fetchTeacherProfilesByEmails, rdsFetch } from './teachers.js';
+import { fetchTeacherProfilesByEmails, rdsFetch, resolveTeacherEmail, setTestModeTeacher } from './teachers.js';
 import { showToast } from './ui.js';
 
 
@@ -68,7 +68,11 @@ export async function loadTestModeSchedule() {
     // path works without a special case for test mode.
     const fullName = currentUser.user_metadata?.full_name
       || currentUser.email.split('@')[0];
-    TEACHER_EMAIL_MAP[fullName] = currentUser.email;
+    // F2: register the pairing in the test-mode overlay instead of mutating the
+    // shared TEACHER_EMAIL_MAP. resolveTeacherEmail (used by every lookup path)
+    // consults the overlay first, so the existing getTeacherProfile flow works
+    // unchanged without a special case.
+    setTestModeTeacher(fullName, currentUser.email);
     S.testSchedule = data.map(row => ({
       course:  row.course_name,
       teacher: fullName,
@@ -116,7 +120,7 @@ function syncEnrollments(schedule) {
   const studentName = localStorage.getItem('lumi_name') || '';
   const pairs = schedule
     .map(({ course, teacher, block }) => {
-      const email = TEACHER_EMAIL_MAP[teacher];
+      const email = resolveTeacherEmail(teacher);
       if (!email) return null;
       if (!block) {
         console.warn('[enrollment] skipping class without block:', course);

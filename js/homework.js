@@ -4,7 +4,7 @@ import { teacherDisplayName } from './prompts.js';
 import { addLongPress, renderSidebar } from './sidebar.js';
 import { $, S, currentUser } from './state.js';
 import { getSchedule } from './storage.js';
-import { TEACHER_EMAIL_MAP, _profileCache, fetchTeacherProfileLambda, rdsFetch } from './teachers.js';
+import { _profileCache, fetchTeacherProfileLambda, rdsFetch, resolveTeacherEmail } from './teachers.js';
 import { closeSidebar, showToast } from './ui.js';
 
 
@@ -463,7 +463,7 @@ export function todayStr() { return new Date().toISOString().slice(0, 10); }
 // Load teacher profiles for time hints — uses same teacher_email + class_name lookup
 const _hwProfileCache = {};
 async function getTeacherProfileCached(course, teacherName) {
-  const email = TEACHER_EMAIL_MAP[teacherName];
+  const email = resolveTeacherEmail(teacherName);
   if (!email) return null;
   const key = email + '__' + course;
   if (_hwProfileCache[key] !== undefined) return _hwProfileCache[key];
