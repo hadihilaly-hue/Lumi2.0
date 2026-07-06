@@ -161,9 +161,14 @@ account and Region (us-east-1). Per AWS's published policy:
   yet built. The `conversations.messages` store already persists student content today, so
   that erasure path is needed, not hypothetical.
 - **Real staff PII committed to public repos.** A staff name→email directory is hardcoded
-  in `admin.html` and `app.js` (tracked, on public GitHub remotes) — present in HEAD and
-  in history. Removal + a history-scrub decision are addressed in Phase 2 (history rewrite
-  only with explicit owner approval).
+  in `teacher-directory.js` (the single source after AUDIT_FRONTEND H3/F1) — present in HEAD
+  and in history. **Phase 2b incremental hardening (shipped):** deleted the orphaned
+  `lumi.html` duplicate (dead code that still carried staff names and was publicly reachable
+  via the Pages direct URL) and consolidated the admin email/name to one source. **Still
+  open:** full removal (fetch the directory from the Lambda at runtime so no real PII is
+  committed) and the git-history scrub — both designed in `docs/PII_REMOVAL_PLAN.md`. The
+  history rewrite is deferred: it would break the ~16 parallel worktrees, so it needs a repo
+  freeze + explicit owner approval.
 - **CloudWatch log hygiene.** Phase 2a fixed the 4 log sites that emitted full error
   objects — all error logging now routes through a single `safeErr()` redaction helper
   (deployed + verified: authed requests leave no email/JWT/body in logs). Still open: no

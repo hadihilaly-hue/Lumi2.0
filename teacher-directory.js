@@ -11,9 +11,9 @@
 // both the module and non-module worlds can load it via <script src>.
 //
 // NOTE: MENLO_CURRICULUM is intentionally NOT centralized here — its per-page
-// copies have diverged in course content (e.g. teacher.html's test course,
-// lumi.html's Algebra 2 roster), so merging them is a behavior change that
-// needs product sign-off, out of scope for this access-config consolidation.
+// copies have diverged in course content (e.g. teacher.html's test course),
+// so merging them is a behavior change that needs product sign-off, out of
+// scope for this access-config consolidation. See docs/PII_REMOVAL_PLAN.md.
 (function (g) {
   // Maps teacher display name → real @menloschool.org email. Every teacher
   // access decision (teacher.html gate, student-side profile lookup) resolves
@@ -100,11 +100,18 @@
     "Rick Santos":            "rsantos@lumidemo.test",
   };
 
+  // Owner/admin identity — the single hardcoded source for the app's admin
+  // (Compliance Phase 2b). Consumed by admin.html (admin-console gate) and
+  // teacher.html (the "grant all classes" dev backdoor) so the email/name are
+  // no longer hand-copied into those pages.
+  g.ADMIN_EMAIL = "hadi.hilaly@menloschool.org";
+  g.ADMIN_NAME  = "Hadi Hilaly";
+
   // Allowlist for the "Switch to Teacher Mode" LINK on the student app
   // (app.html). This is deliberately narrower than teacher.html's actual entry
   // gate (TEACHER_DATABASE, derived from MENLO_CURRICULUM + TEACHER_EMAIL_MAP);
   // it only decides who SEES the shortcut link. Both gates now read from this
   // one file so an access-model change is a single-file edit (AUDIT_FRONTEND
   // F1 — no more app.js vs teacher.html drift across files).
-  g.ALLOWED_TEACHER_EMAILS = ["hadi.hilaly@menloschool.org"];
+  g.ALLOWED_TEACHER_EMAILS = [g.ADMIN_EMAIL];
 })(typeof globalThis !== "undefined" ? globalThis : window);

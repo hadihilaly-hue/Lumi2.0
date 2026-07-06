@@ -214,7 +214,8 @@ body { overflow: auto; display: block; }
 <script src="cognito-auth.js"></script>
 <script src="teacher-directory.js"></script>
 <script>
-const ADMIN_EMAIL = 'hadi.hilaly@menloschool.org';
+// Compliance Phase 2b: single source is teacher-directory.js (loaded above).
+const ADMIN_EMAIL = window.ADMIN_EMAIL;
 
 const LAMBDA_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws';
 

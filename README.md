@@ -67,9 +67,9 @@ synthetic_data/   Synthetic SIS + persona data and seeding/test scripts
 CLAUDE.md         Architecture reference (authoritative)
 ```
 
-Note: `lumi.html` is a **legacy, orphaned** self-contained copy of the old
-student app and is not linked from anything — the live app is `app.html` →
-`app.js`.
+Note: the live student app is `app.html` → `app.js`. (A legacy orphaned
+`lumi.html` copy was removed in Compliance Phase 2b — it was unlinked dead
+code that still carried hardcoded staff names.)
 
 ---
 

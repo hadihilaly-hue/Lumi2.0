@@ -3,8 +3,8 @@
 // values. A Lambda-host or model swap is now one edit here instead of scattered
 // literals across api.js, chat.js, and onboarding.js.
 //
-// NOTE: cognito-auth.js is a classic (non-module) script shared by teacher.html,
-// admin.html, and lumi.html, so it cannot import this module. It keeps its own
+// NOTE: cognito-auth.js is a classic (non-module) script shared by teacher.html
+// and admin.html, so it cannot import this module. It keeps its own
 // consolidated CONFIG object with the SAME Lambda host — keep the two in sync.
 
 // Lambda function URL host. Both the trailing-slash and no-slash forms are
