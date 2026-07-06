@@ -196,6 +196,14 @@ the JWT; a caller can only ever touch their own rows.
   (`verifyCognitoAuth`), access is **revoked immediately** — verified live: a valid token
   returns 401 the instant after deletion. Data is retained for a **30-day grace period**
   and hard-deleted after.
+- **Read-path enforcement.** Every read route filters `deleted_at IS NULL`, so soft-deleted
+  data disappears from *other* users the moment it is stamped — not only at hard-delete. A
+  self-deleted student leaves the teacher's roster (`/class-enrollments?scope=teaching`) and
+  their notes stop being injected; a self-deleted teacher's profile, work-samples, and
+  shared course template stop being served to students (`/teacher-profile`, `/work-samples`).
+  The subject's own `GET /my-data` export deliberately still includes their rows during the
+  grace window. This keeps the 30-day retention a true *recovery* window rather than a period
+  of continued exposure.
 
 ### First-run consent gate (SOPIPA/COPPA notice-and-consent)
 
