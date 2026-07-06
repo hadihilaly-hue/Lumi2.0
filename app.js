@@ -27,6 +27,15 @@ import { initVoice, wireVoiceListeners } from './js/voice.js';
 
   setCurrentUser(session.user);
 
+  // Compliance Phase 2b: the teacher directory is fetched from the Lambda at
+  // runtime (no longer hardcoded in teacher-directory.js). Await it here — after
+  // auth, before ANY teacher-resolution consumer (isTeacherModeAllowed below,
+  // preloadProfileStatuses / resolveTeacherEmail inside startApp). On failure we
+  // log and continue in a degraded state (same as an empty directory), never
+  // block the whole app.
+  try { await window.loadTeacherDirectory(); }
+  catch (e) { console.error('[boot] teacher-directory load failed:', e); }
+
   // TM-2: teacher-test-mode boot detection. ?mode=test on the URL flips
   // the flag for this tab; sessionStorage stickiness keeps it across
   // refreshes inside the same tab without leaking to other tabs/sessions.

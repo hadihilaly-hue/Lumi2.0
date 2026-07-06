@@ -3,17 +3,13 @@ import { renderSidebar } from './sidebar.js';
 import { getSchedule } from './storage.js';
 
 
-// Teacher access config — SINGLE SOURCE OF TRUTH is teacher-directory.js, a classic
-// <script> loaded before this module (app.html) and by teacher.html/admin.html
-// so every page shares ONE definition (AUDIT_FRONTEND H3/F1). This module simply
-// re-exports the globals it publishes; edit the list in teacher-directory.js.
-// (Reading a classic-script global from a module mirrors the existing `sb`
-// pattern from cognito-auth.js.)
-if (!globalThis.TEACHER_EMAIL_MAP) {
-  console.error('[teachers] teacher-directory.js was not loaded before app.js — TEACHER_EMAIL_MAP is empty. Check the <script src="teacher-directory.js"> tag in app.html.');
-}
-export const TEACHER_EMAIL_MAP = globalThis.TEACHER_EMAIL_MAP || {};
-export const ALLOWED_TEACHER_EMAILS = globalThis.ALLOWED_TEACHER_EMAILS || [];
+// Teacher access config — the directory (teacher-directory.js) is now fetched
+// from the Lambda at runtime (Compliance Phase 2b), so it populates
+// globalThis.TEACHER_EMAIL_MAP / ALLOWED_TEACHER_EMAILS ASYNCHRONOUSLY, AFTER
+// auth. The old `export const X = globalThis.X` snapshot froze an empty map at
+// module-eval time (before the fetch) — so read the globals LIVE inside the
+// helpers below instead. Every page awaits window.loadTeacherDirectory() right
+// after auth and before any consumer here runs.
 
 // Teacher-mode LINK gate (app.html "Switch to Teacher Mode"). Single call-site
 // helper so app.js imports the decision instead of hardcoding its own email
@@ -21,7 +17,7 @@ export const ALLOWED_TEACHER_EMAILS = globalThis.ALLOWED_TEACHER_EMAILS || [];
 export function isTeacherModeAllowed(email) {
   if (!email) return false;
   const e = email.toLowerCase();
-  return ALLOWED_TEACHER_EMAILS.some(a => a.toLowerCase() === e);
+  return (globalThis.ALLOWED_TEACHER_EMAILS || []).some(a => a.toLowerCase() === e);
 }
 
 // ── Test-mode teacher overlay (AUDIT_FRONTEND F2) ────────────────────────────
@@ -37,7 +33,7 @@ export function setTestModeTeacher(name, email) {
 }
 export function resolveTeacherEmail(name) {
   if (!name) return undefined;
-  return _testModeEmailMap[name] || TEACHER_EMAIL_MAP[name];
+  return _testModeEmailMap[name] || (globalThis.TEACHER_EMAIL_MAP || {})[name];
 }
 
 // ── Teacher profile system — single source of truth: Supabase ──
