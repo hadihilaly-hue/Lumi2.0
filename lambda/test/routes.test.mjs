@@ -632,6 +632,60 @@ test('GET /conversations scopes the read to the JWT user id', async () => {
   assert.equal(q.params[0], STUDENT.userId);
 });
 
+// AUDIT_LAMBDA_PERF #3: the list must not ship every conversation's full
+// `messages` jsonb. It selects metadata + a computed preview + exchange_count.
+test('GET /conversations list is lightweight (no messages blob; computes preview + count)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId,
+      onRoute: (t) => /FROM public\.conversations/.test(t)
+        ? res([{ id: 'c1', title: 't', preview: 'hi', exchange_count: 2 }]) : res([]),
+    }),
+  });
+  const r = await invoke(handler, { method: 'GET', path: '/conversations', token: tokenFor(STUDENT) });
+  assert.equal(r.statusCode, 200);
+  const q = findQuery(ctx, /FROM public\.conversations\s+WHERE user_id = \$1/);
+  // The list SELECT does NOT project the raw messages column (old shape was
+  // `SELECT id, title, messages, teacher, ...`). `messages` now appears only
+  // inside the jsonb_array_elements() subqueries that compute preview/count.
+  assert.doesNotMatch(q.text, /SELECT id, title, messages/);
+  // ...but it DOES compute the two fields the sidebar needs.
+  assert.match(q.text, /AS exchange_count/);
+  assert.match(q.text, /AS preview/);
+});
+
+test('GET /conversations?id= returns one owned conversation with its full messages', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId,
+      onRoute: (t) => /FROM public\.conversations\s+WHERE id = \$1 AND user_id = \$2/.test(t)
+        ? res([{ id: 'c1', messages: [{ role: 'user', content: 'hi' }] }]) : res([]),
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'GET', path: '/conversations', query: { id: 'c1' }, token: tokenFor(STUDENT),
+  });
+  assert.equal(r.statusCode, 200);
+  const body = r.json();
+  assert.ok(Array.isArray(body.messages), 'single-conversation fetch includes messages');
+  const q = findQuery(ctx, /FROM public\.conversations\s+WHERE id = \$1 AND user_id = \$2/);
+  assert.match(q.text, /\bmessages\b/);
+  assert.deepEqual(q.params, ['c1', STUDENT.userId]); // scoped to the caller
+});
+
+test('GET /conversations?id= 404s a conversation the caller does not own', async () => {
+  const { handler } = await loadHandler();
+  resetContext({
+    dbRouter: makeRouter({ userId: STUDENT.userId, onRoute: () => res([]) }),
+  });
+  const r = await invoke(handler, {
+    method: 'GET', path: '/conversations', query: { id: 'someone-elses' }, token: tokenFor(STUDENT),
+  });
+  assert.equal(r.statusCode, 404);
+});
+
 test('PATCH /homework-tasks scopes the UPDATE by (id, user_id)', async () => {
   const { handler } = await loadHandler();
   const ctx = resetContext({

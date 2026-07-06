@@ -169,16 +169,20 @@ export async function loadConvsFromSupabase() {
 
     const convs = {};
     data.forEach(row => {
+      // PERF #3: the list endpoint is now lightweight — no `messages` blob, but
+      // a server-computed `preview` + `exchange_count`. Prefer those; fall back
+      // to deriving from `messages` for an older Lambda that still inlines them.
       const msgs = row.messages || [];
-      // Derive preview from first user message
       const firstUser = msgs.find(m => m.role === 'user');
-      const preview   = typeof firstUser?.content === 'string'
+      const derivedPreview = typeof firstUser?.content === 'string'
         ? firstUser.content.slice(0, 60)
         : (Array.isArray(firstUser?.content)
             ? (firstUser.content.find(p => p.type === 'text')?.text || '').slice(0, 60)
             : '');
-      // Count exchanges from message pairs
-      const exchangeCount = msgs.filter(m => m.role === 'assistant').length;
+      const preview = (typeof row.preview === 'string' && row.preview) ? row.preview : derivedPreview;
+      const exchangeCount = Number.isFinite(row.exchange_count)
+        ? row.exchange_count
+        : msgs.filter(m => m.role === 'assistant').length;
       // Reconstruct tutorCtx from teacher/course columns
       const tutorCtx = row.teacher && row.course
         ? { ...lookupSubjectForCourse(row.course), course: row.course, teacher: row.teacher }

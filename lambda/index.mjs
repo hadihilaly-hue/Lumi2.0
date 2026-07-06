@@ -972,8 +972,10 @@ async function handleRequest(event, responseStream) {
   // user_id = JWT user id; POST never reads user_id from the body
   // (MIGRATION_HARDENING §1 insert path). messages jsonb is student chat content —
   // NEVER log request/response bodies on this route.
-  // GET   — ?is_teacher_test=true|false (default false; Teacher Test Mode split).
-  //         Caller's 50 most recent, newest first. 200 [] when none (list semantics).
+  // GET   — ?id=<uuid> returns ONE owned conversation with its full messages
+  //         (lazy load on open). Otherwise a lightweight list: caller's 50 most
+  //         recent (newest first) as metadata + server-computed preview +
+  //         exchange_count, NO messages blob (PERF #3). 200 [] when none.
   // POST  — insert; returns {id} only (the frontend consumes just the new id).
   // PATCH — body.id targets the row; SET only provided allowlisted columns +
   //         updated_at. Returns {id, updated_at} (not the row — messages can be
@@ -985,9 +987,42 @@ async function handleRequest(event, responseStream) {
     const qs = event.queryStringParameters || {};
     try {
       if (method === "GET") {
+        // AUDIT_LAMBDA_PERF #3: single-conversation fetch on open. Returns the
+        // full messages blob for ONE owned row (scoped by user_id). The list
+        // path below is deliberately lightweight, so bodies load lazily here.
+        if (qs.id) {
+          const one = await dbQuery(
+            `SELECT id, title, messages, teacher, course, created_at, updated_at
+               FROM public.conversations
+              WHERE id = $1 AND user_id = $2`,
+            [qs.id, user.id]
+          );
+          if (one.rowCount === 0) return sendJson(404, { error: "No conversation found" });
+          return sendJson(200, one.rows[0]);
+        }
+        // AUDIT_LAMBDA_PERF #3: the list endpoint used to ship every
+        // conversation's full `messages` jsonb (hundreds of KB × 50) on every
+        // app open. It now returns metadata plus a server-computed `preview`
+        // (first user message, 60 chars) and `exchange_count` (assistant-turn
+        // count) — the only two things the sidebar derives from messages —
+        // without the blob. The CASE guards tolerate a null/non-array messages.
         const isTest = qs.is_teacher_test === "true";
         const result = await dbQuery(
-          `SELECT id, title, messages, teacher, course, created_at, updated_at
+          `SELECT id, title, teacher, course, created_at, updated_at,
+                  (SELECT count(*) FROM jsonb_array_elements(
+                     CASE WHEN jsonb_typeof(messages) = 'array' THEN messages ELSE '[]'::jsonb END) m
+                    WHERE m->>'role' = 'assistant')::int AS exchange_count,
+                  (SELECT left(
+                            CASE jsonb_typeof(m->'content')
+                              WHEN 'string' THEN m->>'content'
+                              WHEN 'array'  THEN COALESCE(
+                                (SELECT p->>'text' FROM jsonb_array_elements(m->'content') p
+                                  WHERE p->>'type' = 'text' LIMIT 1), '')
+                              ELSE ''
+                            END, 60)
+                     FROM jsonb_array_elements(
+                            CASE WHEN jsonb_typeof(messages) = 'array' THEN messages ELSE '[]'::jsonb END) m
+                    WHERE m->>'role' = 'user' LIMIT 1) AS preview
              FROM public.conversations
             WHERE user_id = $1 AND is_teacher_test = $2
             ORDER BY created_at DESC

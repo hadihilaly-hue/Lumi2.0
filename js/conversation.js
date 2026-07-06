@@ -4,8 +4,8 @@ import { prepareSuggestedPrompts, renderEmptyState, showWelcome } from './emptys
 import { getStudentName, teacherDisplayName, updateTestModeBanner } from './prompts.js';
 import { clearSearch, renderSidebar } from './sidebar.js';
 import { $, S, SB, _introShownFor, _saveIntroShown, currentUser, messagesEl, msgInput } from './state.js';
-import { genId, getConvs, saveCurrentConv } from './storage.js';
-import { getTeacherProfile, loadWorkSampleImages } from './teachers.js';
+import { genId, getConvs, saveConvs, saveCurrentConv } from './storage.js';
+import { getTeacherProfile, loadWorkSampleImages, rdsFetch } from './teachers.js';
 
 
 // ─── SUPABASE SYNC ────────────────────────────────────────────────────────────
@@ -27,6 +27,24 @@ export function lookupSubjectForCourse(courseName) {
 export async function loadConv(id) {
   const conv = getConvs()[id];
   if (!conv) return;
+
+  // PERF #3: the sidebar list is lightweight now (no message bodies), so fetch
+  // the full messages on first open. Backward-compatible: convs saved within
+  // this session — or served by an older Lambda that still inlines messages —
+  // already have them, so this fetch is skipped.
+  if (conv.sbId && (!conv.messages || conv.messages.length === 0)) {
+    try {
+      const full = await rdsFetch(`conversations?id=${encodeURIComponent(conv.sbId)}`);
+      if (full && Array.isArray(full.messages)) {
+        conv.messages = full.messages;
+        const store = getConvs();
+        if (store[id]) { store[id].messages = full.messages; saveConvs(store); }
+      }
+    } catch (err) {
+      console.warn('[loadConv] lazy message fetch failed:', err);
+    }
+  }
+
   S.currentId     = id;
   S.messages      = conv.messages || [];
   S.exchangeCount = conv.exchangeCount || 0;
