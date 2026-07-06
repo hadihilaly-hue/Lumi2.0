@@ -245,8 +245,9 @@ body { overflow: auto; display: block; }
 <script src="cognito-auth.js"></script>
 <script src="teacher-directory.js"></script>
 <script>
-// Compliance Phase 2b: single source is teacher-directory.js (loaded above).
-const ADMIN_EMAIL = window.ADMIN_EMAIL;
+// Compliance Phase 2b: the directory (incl. ADMIN_EMAIL) is fetched at runtime;
+// assigned in the auth IIFE after loadTeacherDirectory() resolves.
+let ADMIN_EMAIL = null;
 
 const LAMBDA_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws';
 
@@ -378,17 +379,15 @@ const MENLO_CURRICULUM = {
   }
 };
 
-// Teacher email list — single source of truth is teacher-directory.js
-// (loaded above; shared with app.html + admin/teacher pages). AUDIT H3.
-const TEACHER_EMAIL_MAP = window.TEACHER_EMAIL_MAP;
-
-// Build teacher list: email → { name, classes: string[] }
+// Teacher directory — fetched from the Lambda at runtime (Compliance Phase 2b);
+// window.TEACHER_EMAIL_MAP is populated by loadTeacherDirectory() in the auth
+// IIFE below. Read it LIVE; build TEACHER_DATABASE only after that await.
 function buildTeacherDatabase() {
   const db = {};
   for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
     for (const [course, teachers] of Object.entries(courses)) {
       for (const teacher of teachers) {
-        const email = TEACHER_EMAIL_MAP[teacher];
+        const email = window.TEACHER_EMAIL_MAP[teacher];
         if (!email) continue;
         if (!db[email]) db[email] = { name: teacher, classes: [] };
         if (!db[email].classes.includes(course)) db[email].classes.push(course);
@@ -397,7 +396,7 @@ function buildTeacherDatabase() {
   }
   return db;
 }
-const TEACHER_DATABASE = buildTeacherDatabase();
+let TEACHER_DATABASE = {};
 
 function lookupSubjectForCourse(courseName) {
   for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
@@ -416,6 +415,13 @@ let aRefreshTimer = null;
 (async () => {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { window.location.replace('index.html'); return; }
+  // Compliance Phase 2b: fetch the directory before the admin gate reads it.
+  // Fail-closed — if the fetch fails, ADMIN_EMAIL stays null and the check below
+  // redirects (admin access is not granted on an unverifiable directory).
+  try { await window.loadTeacherDirectory(); }
+  catch (e) { console.error('[admin] directory load failed:', e); }
+  ADMIN_EMAIL = window.ADMIN_EMAIL;
+  TEACHER_DATABASE = buildTeacherDatabase();
   if (session.user.email.toLowerCase() !== ADMIN_EMAIL) {
     await sb.auth.signOut();
     window.location.replace('index.html');
