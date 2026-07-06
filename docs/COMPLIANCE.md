@@ -175,7 +175,12 @@ account and Region (us-east-1). Per AWS's published policy:
   (deployed + verified: authed requests leave no email/JWT/body in logs). Still open: no
   CloudWatch log-group retention limit is set (default never-expire).
 - **`profiles.google_calendar_token` stored in plaintext at rest.** A live third-party
-  OAuth token; warrants encryption-at-rest and a revocation-on-delete plan.
+  OAuth token. **Revocation-on-delete is now implemented** — the soft-delete cascade
+  (`softDeleteUserRows`, both self-service and admin) nulls the token and clears
+  `calendar_connected` immediately, so a deleted account holds no live credential even
+  during the 30-day grace. Still open: encryption-at-rest for *active* users, and a
+  server-side revoke call to Google's token endpoint (this drops our stored copy but does
+  not invalidate the grant on Google's side).
 - **`/admin/sql` still exists.** Reachable only via IAM-gated direct Lambda invoke
   (HTTP-unreachable by design); pending post-cutover removal. Not yet rotated/removed.
 - **S3 orphan objects.** Files removed from a teacher's syllabi/work-samples are not

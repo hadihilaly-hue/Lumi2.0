@@ -535,7 +535,13 @@ async function softDeleteUserRows(uid, em) {
   await softDelete("teacher_profiles",
     "UPDATE public.teacher_profiles SET deleted_at = now() WHERE teacher_email = $1 AND deleted_at IS NULL", [em]);
   await softDelete("profiles",
-    "UPDATE public.profiles SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL", [uid]);
+    // Also clear the live Google Calendar OAuth token (plaintext at rest) and the
+    // connected flag: a credential, not recoverable "data", so it is revoked on
+    // soft-delete rather than held through the 30-day grace. (Server-side revoke
+    // against Google's endpoint is a documented follow-up; this drops OUR copy.)
+    `UPDATE public.profiles
+        SET deleted_at = now(), google_calendar_token = NULL, calendar_connected = false
+      WHERE id = $1 AND deleted_at IS NULL`, [uid]);
   await softDelete("conversations",
     "UPDATE public.conversations SET deleted_at = now() WHERE user_id = $1 AND deleted_at IS NULL", [uid]);
   await softDelete("homework_tasks",
