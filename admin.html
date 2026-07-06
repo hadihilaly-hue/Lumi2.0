@@ -200,6 +200,37 @@ body { overflow: auto; display: block; }
       </div>
     </div>
 
+    <!-- FERPA DATA REQUESTS -->
+    <div style="border:1px solid var(--border,#e7e2d8);border-radius:12px;padding:16px 18px;margin-bottom:22px;background:var(--card,#fff)">
+      <div style="font-weight:600;margin-bottom:4px">FERPA data requests</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+        Export or erase all Lumi data for one student, by email. Deletion is a
+        <b>soft-delete</b> — access is revoked immediately and data is permanently removed
+        after a 30-day grace period, so a mistake is recoverable within that window.
+        Teacher notes about the student are excluded from the export.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input id="ferpaEmail" type="email" placeholder="student@menloschool.org" aria-label="Student email"
+               style="flex:1;min-width:240px;padding:8px 11px;border:1px solid var(--border,#ccc);border-radius:8px;font-size:14px">
+        <button onclick="ferpaExport()"
+                style="padding:8px 14px;border:1px solid var(--accent-glow,#ccc);border-radius:8px;background:var(--accent-soft,#f4f4f4);color:var(--accent,#333);font-weight:500;cursor:pointer">Export data</button>
+        <button onclick="ferpaShowConfirm()"
+                style="padding:8px 14px;border:1px solid #e0b4b4;border-radius:8px;background:#fdf3f3;color:#b3261e;font-weight:500;cursor:pointer">Delete student data…</button>
+      </div>
+      <div id="ferpaConfirm" style="display:none;margin-top:12px;padding:12px 14px;border:1px solid #e0b4b4;background:#fdf3f3;border-radius:8px">
+        <div style="font-size:13px;margin-bottom:9px">Type <b>DELETE</b> to erase all data for <b id="ferpaConfirmEmail"></b>.</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input id="ferpaConfirmInput" type="text" placeholder="DELETE" oninput="ferpaConfirmSync()" aria-label="Type DELETE to confirm"
+                 style="padding:7px 10px;border:1px solid #ccc;border-radius:8px;font-size:14px;width:130px">
+          <button id="ferpaConfirmBtn" onclick="ferpaDelete()" disabled
+                  style="padding:8px 14px;border:none;border-radius:8px;background:#b3261e;color:#fff;font-weight:600;cursor:pointer;opacity:.5">Confirm delete</button>
+          <button onclick="ferpaHideConfirm()"
+                  style="padding:8px 12px;border:1px solid #ccc;border-radius:8px;background:#fff;color:var(--text-muted);cursor:pointer">Cancel</button>
+        </div>
+      </div>
+      <div id="ferpaResult" style="margin-top:12px;font-size:13px;line-height:1.5"></div>
+    </div>
+
     <!-- SEARCH -->
     <div class="a-search-row">
       <input class="a-search" id="teacherSearch" type="text" placeholder="Search teachers…" aria-label="Search teachers" oninput="renderDashboard()">
@@ -429,6 +460,88 @@ function updateRefreshTime() {
   const now = new Date();
   const t   = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   document.getElementById('refreshInfo').textContent = `Last refreshed ${t} · auto-refreshes every 60s`;
+}
+
+// ─── FERPA DATA REQUESTS (admin erasure + export) ─────────────────────────────
+// Thin client over the admin-gated Lambda routes /admin/student-data and
+// /admin/delete-student. The server re-checks adminEmails, so this UI is
+// convenience, not the security boundary.
+async function adminApi(path, opts = {}) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.replace('index.html'); throw new Error('Signed out'); }
+  const res = await fetch(`${LAMBDA_URL}${path}`, {
+    method: opts.method || 'GET',
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      ...(opts.body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const text = await res.text();
+  let json = null;
+  try { json = text ? JSON.parse(text) : null; } catch {}
+  if (!res.ok) throw new Error((json && json.error) || `HTTP ${res.status}`);
+  return json;
+}
+
+function ferpaSetResult(html, kind) {
+  const el = document.getElementById('ferpaResult');
+  el.style.color = kind === 'error' ? '#b3261e' : kind === 'ok' ? '#1a7f37' : 'var(--text)';
+  el.innerHTML = html;
+}
+
+async function ferpaExport() {
+  const email = document.getElementById('ferpaEmail').value.trim();
+  if (!email) { ferpaSetResult('Enter a student email first.', 'error'); return; }
+  ferpaSetResult('Exporting…');
+  try {
+    const payload = await adminApi(`/admin/student-data?email=${encodeURIComponent(email)}`);
+    const counts = payload && payload.data
+      ? Object.entries(payload.data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.length : (v ? 1 : 0)}`).join(', ')
+      : '';
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    ferpaSetResult(
+      `Export ready for <b>${escHtml(email)}</b> — ${escHtml(counts)}. ` +
+      `<a href="${url}" download="lumi-export-${encodeURIComponent(email)}.json" style="color:var(--accent);font-weight:600">Download JSON</a>`,
+      'ok');
+  } catch (e) {
+    ferpaSetResult(`Export failed: ${escHtml(e.message)}`, 'error');
+  }
+}
+
+function ferpaShowConfirm() {
+  const email = document.getElementById('ferpaEmail').value.trim();
+  if (!email) { ferpaSetResult('Enter a student email first.', 'error'); return; }
+  document.getElementById('ferpaConfirmEmail').textContent = email;
+  document.getElementById('ferpaConfirmInput').value = '';
+  ferpaConfirmSync();
+  document.getElementById('ferpaConfirm').style.display = 'block';
+}
+function ferpaHideConfirm() { document.getElementById('ferpaConfirm').style.display = 'none'; }
+function ferpaConfirmSync() {
+  const ok  = document.getElementById('ferpaConfirmInput').value === 'DELETE';
+  const btn = document.getElementById('ferpaConfirmBtn');
+  btn.disabled = !ok;
+  btn.style.opacity = ok ? '1' : '.5';
+}
+async function ferpaDelete() {
+  const email = document.getElementById('ferpaConfirmEmail').textContent;
+  ferpaHideConfirm();
+  ferpaSetResult('Deleting…');
+  try {
+    const r = await adminApi('/admin/delete-student', { method: 'POST', body: { confirm: 'DELETE', email } });
+    const counts = r && r.rows_affected
+      ? Object.entries(r.rows_affected).map(([k, v]) => `${k}: ${v}`).join(', ')
+      : '';
+    const grace = r && r.grace_until ? new Date(r.grace_until).toLocaleDateString() : '';
+    ferpaSetResult(
+      `Soft-deleted <b>${escHtml(email)}</b> — access revoked now. Rows affected: ${escHtml(counts)}. ` +
+      `Permanent removal after ${escHtml(grace)}.`,
+      'ok');
+  } catch (e) {
+    ferpaSetResult(`Deletion failed: ${escHtml(e.message)}`, 'error');
+  }
 }
 
 // ─── RENDER ───────────────────────────────────────────────────────────────────
