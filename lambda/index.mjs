@@ -224,6 +224,47 @@ async function isTeacher(email) {
   }
 }
 
+// === Teacher WRITE authorization (AUDIT_LAMBDA_BUGS H1) ===
+// isTeacher() reads teacher_profiles.done — but that column is client-writable
+// through POST /teacher-profile, so any student could insert a row for their own
+// email with done=true and self-promote to "teacher" everywhere the boundary is
+// checked (/upload-url S3 PUTs, the 500/day rate tier, selectable-persona
+// visibility). Teacher status must derive from data the SERVER controls, never
+// from the request.
+//
+// A caller may create/edit a teacher profile iff one of these holds:
+//   1. admin (SCHOOL_CONFIG.adminEmails), or
+//   2. roster teacher — a sis_map row (entity_type='teacher') for this lumi_id,
+//      written ONLY by the admin-only /sis-import, or
+//   3. already provisioned — an existing teacher_profiles row for this email (an
+//      admin/SIS-seeded stub, or a prior authorized onboarding).
+//
+// Not circular: a fresh student satisfies none of the three, so they can never
+// mint the FIRST teacher_profiles row (the self-promotion vector). The
+// existing-row clause only grandfathers rows the server itself provisioned. Once
+// the write is gated, teacher_profiles.done is trustworthy and isTeacher (the
+// read side, used by /upload-url + the rate tier) rests on server-controlled data.
+// Fail-closed to "not authorized" on DB error — same posture as isTeacher.
+async function isProvisionedTeacher(user) {
+  const email = user.email.toLowerCase();
+  if (SCHOOL_CONFIG.adminEmails.has(email)) return true;
+  try {
+    const roster = await dbQuery(
+      "SELECT 1 FROM public.sis_map WHERE lumi_id = $1 AND entity_type = 'teacher' LIMIT 1",
+      [user.id]
+    );
+    if (roster.rowCount > 0) return true;
+    const provisioned = await dbQuery(
+      "SELECT 1 FROM public.teacher_profiles WHERE teacher_email = $1 LIMIT 1",
+      [email]
+    );
+    return provisioned.rowCount > 0;
+  } catch (err) {
+    console.error("isProvisionedTeacher error:", safeErr(err));
+    return false;
+  }
+}
+
 // === Rate Limit ===
 // There is deliberately NO client-facing /api-usage route — a JWT-authed POST
 // would let any student forge usage rows. The Lambda's own checkRateLimit +
@@ -573,8 +614,9 @@ async function handleRequest(event, responseStream) {
   // === Route: GET /allowed-domains (public, no auth) ===
   // Sign-in-page UX: the client checks the just-signed-in email against this
   // list to show a friendly "your school isn't set up" message. Enforcement
-  // is server-side (isEmailAllowed in verifyCognitoAuth + the route gate);
-  // this endpoint only discloses domains that the sign-in flow reveals anyway.
+  // is server-side (isEmailAllowed in verifyCognitoAuth, which fails closed
+  // before any identity/route work); this endpoint only discloses domains that
+  // the sign-in flow reveals anyway.
   if (path === "/allowed-domains") {
     const method = event.requestContext?.http?.method || "GET";
     if (method !== "GET") {
@@ -593,16 +635,17 @@ async function handleRequest(event, responseStream) {
     return sendJson(400, { error: "Invalid JSON" });
   }
 
-  // --- Auth ---
+  // --- Auth (+ domain gate) ---
+  // AUDIT_LAMBDA_PERF #5: verifyAuth -> verifyCognitoAuth already enforces the
+  // allowed-domains gate BEFORE returning a user (it must, so a random Google
+  // account never mints an app_users identity row). Since that is now the only
+  // auth path (Supabase retired), a non-null `user` already implies an allowed
+  // domain — the second isEmailAllowed() call that used to live here was
+  // redundant, so it is gone (deduplicated).
   const headers = event.headers || {};
   const authHeader = headers.authorization || headers.Authorization;
   const user = await verifyAuth(authHeader);
   if (!user) return sendJson(401, { error: "Unauthorized" });
-  
-  // --- Domain check ---
-  if (!(await isEmailAllowed(user.email))) {
-    return sendJson(403, { error: "Forbidden: school accounts only" });
-  }
 
   // === Route: GET /my-data (FERPA data-access export) ===
   // The authenticated caller receives a JSON export of every row tied to their
@@ -810,6 +853,11 @@ async function handleRequest(event, responseStream) {
         if (typeof body.course_name !== "string" || !body.course_name.trim()) {
           return sendJson(400, { error: "Missing course_name" });
         }
+        // AUDIT_LAMBDA_BUGS H1: gate teacher-profile creation on server-controlled
+        // teacher authorization so `done` cannot be self-asserted by a student.
+        if (!(await isProvisionedTeacher(user))) {
+          return sendJson(403, { error: "Not authorized to create a teacher profile" });
+        }
         const { cols, vals } = pickColumns(body, TEACHER_PROFILE_COLS);
         const insertCols = ["teacher_email", "course_name", ...cols];
         const placeholders = insertCols.map((_, i) => `$${i + 1}`);
@@ -829,6 +877,11 @@ async function handleRequest(event, responseStream) {
       if (method === "PATCH") {
         if (typeof body.course_name !== "string" || !body.course_name.trim()) {
           return sendJson(400, { error: "Missing course_name" });
+        }
+        // AUDIT_LAMBDA_BUGS H1: same server-controlled gate as POST — `done` is a
+        // PATCH-able column, so an edit path must not become a self-promotion path.
+        if (!(await isProvisionedTeacher(user))) {
+          return sendJson(403, { error: "Not authorized to edit a teacher profile" });
         }
         const { cols, vals } = pickColumns(body, TEACHER_PROFILE_COLS);
         if (cols.length === 0) return sendJson(400, { error: "No updatable fields" });
@@ -921,8 +974,10 @@ async function handleRequest(event, responseStream) {
   // user_id = JWT user id; POST never reads user_id from the body
   // (MIGRATION_HARDENING §1 insert path). messages jsonb is student chat content —
   // NEVER log request/response bodies on this route.
-  // GET   — ?is_teacher_test=true|false (default false; Teacher Test Mode split).
-  //         Caller's 50 most recent, newest first. 200 [] when none (list semantics).
+  // GET   — ?id=<uuid> returns ONE owned conversation with its full messages
+  //         (lazy load on open). Otherwise a lightweight list: caller's 50 most
+  //         recent (newest first) as metadata + server-computed preview +
+  //         exchange_count, NO messages blob (PERF #3). 200 [] when none.
   // POST  — insert; returns {id} only (the frontend consumes just the new id).
   // PATCH — body.id targets the row; SET only provided allowlisted columns +
   //         updated_at. Returns {id, updated_at} (not the row — messages can be
@@ -934,9 +989,42 @@ async function handleRequest(event, responseStream) {
     const qs = event.queryStringParameters || {};
     try {
       if (method === "GET") {
+        // AUDIT_LAMBDA_PERF #3: single-conversation fetch on open. Returns the
+        // full messages blob for ONE owned row (scoped by user_id). The list
+        // path below is deliberately lightweight, so bodies load lazily here.
+        if (qs.id) {
+          const one = await dbQuery(
+            `SELECT id, title, messages, teacher, course, created_at, updated_at
+               FROM public.conversations
+              WHERE id = $1 AND user_id = $2`,
+            [qs.id, user.id]
+          );
+          if (one.rowCount === 0) return sendJson(404, { error: "No conversation found" });
+          return sendJson(200, one.rows[0]);
+        }
+        // AUDIT_LAMBDA_PERF #3: the list endpoint used to ship every
+        // conversation's full `messages` jsonb (hundreds of KB × 50) on every
+        // app open. It now returns metadata plus a server-computed `preview`
+        // (first user message, 60 chars) and `exchange_count` (assistant-turn
+        // count) — the only two things the sidebar derives from messages —
+        // without the blob. The CASE guards tolerate a null/non-array messages.
         const isTest = qs.is_teacher_test === "true";
         const result = await dbQuery(
-          `SELECT id, title, messages, teacher, course, created_at, updated_at
+          `SELECT id, title, teacher, course, created_at, updated_at,
+                  (SELECT count(*) FROM jsonb_array_elements(
+                     CASE WHEN jsonb_typeof(messages) = 'array' THEN messages ELSE '[]'::jsonb END) m
+                    WHERE m->>'role' = 'assistant')::int AS exchange_count,
+                  (SELECT left(
+                            CASE jsonb_typeof(m->'content')
+                              WHEN 'string' THEN m->>'content'
+                              WHEN 'array'  THEN COALESCE(
+                                (SELECT p->>'text' FROM jsonb_array_elements(m->'content') p
+                                  WHERE p->>'type' = 'text' LIMIT 1), '')
+                              ELSE ''
+                            END, 60)
+                     FROM jsonb_array_elements(
+                            CASE WHEN jsonb_typeof(messages) = 'array' THEN messages ELSE '[]'::jsonb END) m
+                    WHERE m->>'role' = 'user' LIMIT 1) AS preview
              FROM public.conversations
             WHERE user_id = $1 AND is_teacher_test = $2
             ORDER BY created_at DESC
@@ -1731,12 +1819,31 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
     try {
       const { bucket, key } = body;
       if (!bucket || !key) return sendJson(400, { error: "Missing bucket or key" });
-      
+      if (!BUCKETS[bucket]) return sendJson(400, { error: "Invalid bucket" });
+
+      // AUDIT_LAMBDA_BUGS H2: signing was ungated — any authed caller could
+      // download ANY key (syllabus PDFs, graded-work photos), defeating
+      // share_course_info. Keys are discoverable from the world-readable
+      // /teacher-profile and /work-samples GETs. Enforce ownership for the
+      // `syllabi` bucket: keys are `teachers/{lumi_id}/...` (buildS3Key), so the
+      // caller's JWT id must match the owner segment (admins bypass). The
+      // `work-samples` bucket stays open to any authenticated caller BY DESIGN —
+      // the runtime vision pipeline fetches a teacher's work-sample photos for
+      // every enrolled student (documented in CLAUDE.md).
+      if (bucket === "syllabi") {
+        const segs = String(key).split("/");
+        const owner = segs[0] === "teachers" && segs.length >= 3 ? segs[1] : null;
+        const isAdmin = SCHOOL_CONFIG.adminEmails.has(user.email.toLowerCase());
+        if (!isAdmin && owner !== user.id) {
+          return sendJson(403, { error: "Forbidden" });
+        }
+      }
+
       const downloadUrl = await generateDownloadURL({ bucketType: bucket, key });
       return sendJson(200, { downloadUrl });
     } catch (err) {
       console.error("download-url error:", safeErr(err));
-      return sendJson(500, { error: err.message });
+      return sendJson(500, { error: "Failed to sign URL" });
     }
   }
   

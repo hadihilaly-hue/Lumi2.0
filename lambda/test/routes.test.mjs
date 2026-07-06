@@ -21,7 +21,7 @@ test('POST /teacher-profile forces teacher_email from the JWT, ignoring the body
   const { handler } = await loadHandler();
   const ctx = resetContext({
     dbRouter: makeRouter({
-      userId: TEACHER.userId, isTeacher: true,
+      userId: TEACHER.userId, isTeacher: true, provisionedTeacher: true,
       onRoute: (t) => /INSERT INTO public\.teacher_profiles/.test(t) ? res([{ id: 'tp1' }]) : res([]),
     }),
   });
@@ -41,7 +41,7 @@ test('PATCH /teacher-profile scopes the UPDATE to the caller JWT email', async (
   const { handler } = await loadHandler();
   const ctx = resetContext({
     dbRouter: makeRouter({
-      userId: TEACHER.userId, isTeacher: true,
+      userId: TEACHER.userId, isTeacher: true, provisionedTeacher: true,
       onRoute: (t) => /UPDATE public\.teacher_profiles/.test(t) ? res([{ id: 'tp1' }]) : res([]),
     }),
   });
@@ -111,6 +111,77 @@ test('GET /teacher-profile owner read (own email) uses SELECT *', async () => {
   const q = findQuery(ctx, /FROM public\.teacher_profiles WHERE teacher_email = \$1/);
   assert.match(q.text, /SELECT \* FROM public\.teacher_profiles/);
   assert.equal(q.params[0], TEACHER.email); // self
+});
+
+// AUDIT_LAMBDA_BUGS H1: teacher status must not be self-asserted. A caller with
+// no server-controlled teacher standing (not admin, no sis_map teacher row, no
+// existing/seeded teacher_profiles row) cannot create a teacher profile — so
+// they cannot set done=true and self-promote.
+test('POST /teacher-profile rejects a non-provisioned caller (H1: no self-promotion via done=true)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId, provisionedTeacher: false,
+      onRoute: (t) => /INSERT INTO public\.teacher_profiles/.test(t) ? res([{ id: 'tp1' }]) : res([]),
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/teacher-profile', token: tokenFor(STUDENT),
+    body: { course_name: 'Fake Class', done: true },
+  });
+  assert.equal(r.statusCode, 403);
+  // Nothing was written — the self-promotion INSERT never ran.
+  assert.equal(findQuery(ctx, /INSERT INTO public\.teacher_profiles/), undefined);
+});
+
+test('POST /teacher-profile allows a provisioned teacher (roster / seeded profile)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: TEACHER.userId, provisionedTeacher: true,
+      onRoute: (t) => /INSERT INTO public\.teacher_profiles/.test(t) ? res([{ id: 'tp1' }]) : res([]),
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/teacher-profile', token: tokenFor(TEACHER),
+    body: { course_name: 'Algebra', done: true },
+  });
+  assert.equal(r.statusCode, 200);
+  const q = findQuery(ctx, /INSERT INTO public\.teacher_profiles/);
+  assert.ok(q, 'the upsert runs for an authorized teacher');
+  assert.equal(q.params[0], TEACHER.email);
+});
+
+test('PATCH /teacher-profile rejects a non-provisioned caller (H1)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId, provisionedTeacher: false,
+      onRoute: (t) => /UPDATE public\.teacher_profiles/.test(t) ? res([{ id: 'tp1' }]) : res([]),
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'PATCH', path: '/teacher-profile', token: tokenFor(STUDENT),
+    body: { course_name: 'Algebra', done: true },
+  });
+  assert.equal(r.statusCode, 403);
+  assert.equal(findQuery(ctx, /UPDATE public\.teacher_profiles/), undefined);
+});
+
+test('POST /teacher-profile: an admin is always authorized (adminEmails bypass)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: ADMIN.userId, domains: [], provisionedTeacher: false,
+      onRoute: (t) => /INSERT INTO public\.teacher_profiles/.test(t) ? res([{ id: 'tp1' }]) : res([]),
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/teacher-profile', token: tokenFor(ADMIN),
+    body: { course_name: 'Algebra', done: true },
+  });
+  assert.equal(r.statusCode, 200);
+  assert.ok(findQuery(ctx, /INSERT INTO public\.teacher_profiles/));
 });
 
 // ================================ /profiles =================================
@@ -464,19 +535,67 @@ test('POST /upload-url signs a key namespaced to the JWT user id (not a body-sup
 
 // =============================== /download-url ==============================
 
-// AUDIT_LAMBDA_BUGS H2: this route has NO ownership/teacher check — any
-// authenticated user can sign a GET for any key. This test PINS that current
-// behavior so a future fix (re-adding the owner check) will visibly flip it.
-test('POST /download-url signs a URL for any authenticated user [pins H2: no ownership check]', async () => {
+// AUDIT_LAMBDA_BUGS H2: /download-url must not sign a syllabus URL for a key the
+// caller does not own. This previously PINNED the broken "signs any key" behavior;
+// it is flipped here to assert the fix (403 + no sign for a non-owned syllabus key).
+test('POST /download-url refuses a syllabus key the caller does not own (H2 fix)', async () => {
   const { handler } = await loadHandler();
-  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId, isTeacher: false }) });
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
   const r = await invoke(handler, {
     method: 'POST', path: '/download-url', token: tokenFor(STUDENT),
     body: { bucket: 'syllabi', key: 'teachers/some-other-teacher/general/1-file.pdf' },
   });
+  assert.equal(r.statusCode, 403);
+  assert.equal(ctx.signRequests.length, 0, 'no URL signed for a non-owned syllabus key');
+});
+
+test('POST /download-url signs a syllabus URL for the key owner (H2)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: TEACHER.userId }) });
+  const key = `teachers/${TEACHER.userId}/general/1-file.pdf`;
+  const r = await invoke(handler, {
+    method: 'POST', path: '/download-url', token: tokenFor(TEACHER),
+    body: { bucket: 'syllabi', key },
+  });
   assert.equal(r.statusCode, 200);
-  assert.equal(r.json().downloadUrl, ctx.signedUrl);
-  assert.equal(ctx.signRequests[0].command.Key, 'teachers/some-other-teacher/general/1-file.pdf');
+  assert.equal(ctx.signRequests.length, 1);
+  assert.equal(ctx.signRequests[0].command.Key, key);
+});
+
+test('POST /download-url lets an admin sign any syllabus key (H2 admin bypass)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: ADMIN.userId, domains: [] }) });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/download-url', token: tokenFor(ADMIN),
+    body: { bucket: 'syllabi', key: 'teachers/some-other-teacher/general/1-file.pdf' },
+  });
+  assert.equal(r.statusCode, 200);
+  assert.equal(ctx.signRequests.length, 1);
+});
+
+// work-samples download is intentionally open to any authed caller (the runtime
+// vision pipeline fetches a teacher's work-sample photos for enrolled students).
+test('POST /download-url still signs work-sample keys for any authed caller (documented)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
+  const key = 'teachers/some-teacher/algebra/proficient/1-photo.jpg';
+  const r = await invoke(handler, {
+    method: 'POST', path: '/download-url', token: tokenFor(STUDENT),
+    body: { bucket: 'work-samples', key },
+  });
+  assert.equal(r.statusCode, 200);
+  assert.equal(ctx.signRequests[0].command.Key, key);
+});
+
+test('POST /download-url 400s on an unknown bucket', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/download-url', token: tokenFor(STUDENT),
+    body: { bucket: 'evil', key: 'teachers/x/y/z.pdf' },
+  });
+  assert.equal(r.statusCode, 400);
+  assert.equal(ctx.signRequests.length, 0);
 });
 
 test('POST /download-url 400s without bucket/key', async () => {
@@ -511,6 +630,60 @@ test('GET /conversations scopes the read to the JWT user id', async () => {
   const q = findQuery(ctx, /FROM public\.conversations\s+WHERE user_id = \$1/);
   assert.ok(q);
   assert.equal(q.params[0], STUDENT.userId);
+});
+
+// AUDIT_LAMBDA_PERF #3: the list must not ship every conversation's full
+// `messages` jsonb. It selects metadata + a computed preview + exchange_count.
+test('GET /conversations list is lightweight (no messages blob; computes preview + count)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId,
+      onRoute: (t) => /FROM public\.conversations/.test(t)
+        ? res([{ id: 'c1', title: 't', preview: 'hi', exchange_count: 2 }]) : res([]),
+    }),
+  });
+  const r = await invoke(handler, { method: 'GET', path: '/conversations', token: tokenFor(STUDENT) });
+  assert.equal(r.statusCode, 200);
+  const q = findQuery(ctx, /FROM public\.conversations\s+WHERE user_id = \$1/);
+  // The list SELECT does NOT project the raw messages column (old shape was
+  // `SELECT id, title, messages, teacher, ...`). `messages` now appears only
+  // inside the jsonb_array_elements() subqueries that compute preview/count.
+  assert.doesNotMatch(q.text, /SELECT id, title, messages/);
+  // ...but it DOES compute the two fields the sidebar needs.
+  assert.match(q.text, /AS exchange_count/);
+  assert.match(q.text, /AS preview/);
+});
+
+test('GET /conversations?id= returns one owned conversation with its full messages', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId,
+      onRoute: (t) => /FROM public\.conversations\s+WHERE id = \$1 AND user_id = \$2/.test(t)
+        ? res([{ id: 'c1', messages: [{ role: 'user', content: 'hi' }] }]) : res([]),
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'GET', path: '/conversations', query: { id: 'c1' }, token: tokenFor(STUDENT),
+  });
+  assert.equal(r.statusCode, 200);
+  const body = r.json();
+  assert.ok(Array.isArray(body.messages), 'single-conversation fetch includes messages');
+  const q = findQuery(ctx, /FROM public\.conversations\s+WHERE id = \$1 AND user_id = \$2/);
+  assert.match(q.text, /\bmessages\b/);
+  assert.deepEqual(q.params, ['c1', STUDENT.userId]); // scoped to the caller
+});
+
+test('GET /conversations?id= 404s a conversation the caller does not own', async () => {
+  const { handler } = await loadHandler();
+  resetContext({
+    dbRouter: makeRouter({ userId: STUDENT.userId, onRoute: () => res([]) }),
+  });
+  const r = await invoke(handler, {
+    method: 'GET', path: '/conversations', query: { id: 'someone-elses' }, token: tokenFor(STUDENT),
+  });
+  assert.equal(r.statusCode, 404);
 });
 
 test('PATCH /homework-tasks scopes the UPDATE by (id, user_id)', async () => {
