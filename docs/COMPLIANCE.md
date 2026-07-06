@@ -152,14 +152,15 @@ account and Region (us-east-1). Per AWS's published policy:
 
 - **No signed NDPA/DPA and no MOA with the school.** No AB 1584 data-privacy agreement
   with Menlo is in place; no Data Processing Addendum executed for the subprocessor chain.
-- **Deletion: shipped for account-owned data (Phase 4); student-scoped erasure still
-  pending.** Every PII table now has a `deleted_at` column, and an authenticated user can
-  export (`GET /my-data`) and delete (`POST /delete-my-account`) their own data with
-  immediate access revocation + a 30-day grace before hard delete (see §6). What remains:
-  an *administrator-initiated* "delete student X" flow and a per-student export for
-  parent/guardian FERPA requests — designed in `docs/PERSISTENCE_SPEC.md` (Phase 5), not
-  yet built. The `conversations.messages` store already persists student content today, so
-  that erasure path is needed, not hypothetical.
+- **Deletion: shipped for account-owned data (Phase 4) AND admin-initiated (Phase 5
+  erasure/export).** Every PII table has a `deleted_at` column. An authenticated user can
+  export (`GET /my-data`) and delete (`POST /delete-my-account`) their own data; an admin
+  can now erase (`POST /admin/delete-student`) or export (`GET /admin/student-data`) a
+  *target* subject by email/id — both reuse the same cascade/export helpers, so behavior
+  can't drift. All paths give immediate access revocation + a 30-day grace before hard
+  delete (see §6). **What remains:** the 30-day hard-delete is still *manual* documented SQL
+  (not automated); `teacher_notes` are excluded from every export (an open policy question
+  for guardian FERPA requests — see §6); and the flows are API-only (no admin UI yet).
 - **Real staff PII committed to public repos.** A staff name→email directory is hardcoded
   in `teacher-directory.js` (the single source after AUDIT_FRONTEND H3/F1) — present in HEAD
   and in history. **Phase 2b incremental hardening (shipped):** deleted the orphaned
@@ -201,6 +202,16 @@ the JWT; a caller can only ever touch their own rows.
   (`verifyCognitoAuth`), access is **revoked immediately** — verified live: a valid token
   returns 401 the instant after deletion. Data is retained for a **30-day grace period**
   and hard-deleted after.
+- **`POST /admin/delete-student`** (admin-only) — the administrator-initiated erasure.
+  Requires `{"confirm":"DELETE"}` plus a target (`email` or `student_id`); resolves the
+  subject via `app_users` and runs the **same** `softDeleteUserRows` cascade against that
+  target. Idempotent; logs actor + target `lumi_id` only (no emails). 403 for non-admins,
+  404 for an unknown subject.
+- **`GET /admin/student-data?email=|student_id=`** (admin-only) — a per-student export for
+  parent/guardian FERPA requests. Same shape/helper as `/my-data` (so `teacher_notes` stay
+  excluded — flagged as an open policy question for guardian requests). Returns rows even
+  when soft-deleted so a request during the grace window still resolves; the response
+  carries the target email (an authorized admin read) while logs carry ids only.
 - **Read-path enforcement.** Every read route filters `deleted_at IS NULL`, so soft-deleted
   data disappears from *other* users the moment it is stamped — not only at hard-delete. A
   self-deleted student leaves the teacher's roster (`/class-enrollments?scope=teaching`) and
