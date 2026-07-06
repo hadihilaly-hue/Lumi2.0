@@ -876,6 +876,37 @@ async function handleRequest(event, responseStream) {
     }
   }
 
+  // === Route: /teacher-directory (GET) ===
+  // The staff name→email directory (Compliance Phase 2b full removal) — moved out
+  // of the committed frontend (teacher-directory.js) into RDS so real staff PII is
+  // no longer in the public repo. Any authenticated + domain-gated caller may read
+  // it (students need it to resolve their teacher's persona). Read-only.
+  if (path === "/teacher-directory") {
+    const method = event.requestContext?.http?.method || "GET";
+    if (method !== "GET") return sendJson(405, { error: "Method not allowed" });
+    try {
+      const result = await dbQuery(
+        `SELECT name, email, is_admin FROM public.staff_directory ORDER BY name`
+      );
+      const emailByName = {};
+      let adminEmail = null, adminName = null;
+      for (const r of result.rows) {
+        emailByName[r.name] = r.email;
+        if (r.is_admin) { adminEmail = r.email; adminName = r.name; }
+      }
+      return sendJson(200, {
+        emailByName,
+        adminEmail,
+        adminName,
+        // Mirrors the old client-derived ALLOWED_TEACHER_EMAILS = [ADMIN_EMAIL].
+        allowedTeacherEmails: adminEmail ? [adminEmail] : [],
+      });
+    } catch (err) {
+      console.error("teacher-directory error:", safeErr(err));
+      return sendJson(500, { error: "teacher-directory failed" });
+    }
+  }
+
   // === Route: /teacher-profile (GET, POST, PATCH) ===
   // Authed (verifyAuth) + domain-gated above.
   //
