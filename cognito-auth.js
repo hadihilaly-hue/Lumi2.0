@@ -9,8 +9,17 @@
 // expects token_use=id and resolves cognito_sub → preserved lumi uuid via the
 // app_users table server-side.
 
-const COGNITO_DOMAIN    = 'https://lumi-auth-613136968914.auth.us-east-1.amazoncognito.com';
-const COGNITO_CLIENT_ID = '538k8vb5uh8k7ikim8ql64vf44';
+// AUDIT_FRONTEND F6: all infra values for this (classic, non-module) script live
+// in one CONFIG object. This is a classic script shared by teacher/admin/lumi
+// pages, so it cannot import js/config.js — lambdaBaseUrl mirrors that module's
+// LAMBDA_HOST (no trailing slash form); keep the two in sync on a host swap.
+const CONFIG = {
+  cognitoDomain:   'https://lumi-auth-613136968914.auth.us-east-1.amazoncognito.com',
+  cognitoClientId: '538k8vb5uh8k7ikim8ql64vf44',
+  lambdaBaseUrl:   'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws',
+};
+const COGNITO_DOMAIN    = CONFIG.cognitoDomain;
+const COGNITO_CLIENT_ID = CONFIG.cognitoClientId;
 
 const AUTH_STORAGE_KEY = 'lumi_auth';       // localStorage: {id_token, refresh_token, expires_at}
 const PKCE_STORAGE_KEY = 'lumi_auth_pkce';  // sessionStorage: in-flight sign-in {verifier, state, redirectTo}
@@ -272,7 +281,7 @@ const sb = {
 // schools.allowed_domains (Workstream I Phase 4). This client check is UX
 // only (friendly error before any data loads); the Lambda enforces the gate.
 // Fails OPEN on fetch problems so a network blip can't brick the sign-in page.
-const LAMBDA_BASE_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws';
+const LAMBDA_BASE_URL = CONFIG.lambdaBaseUrl; // AUDIT_FRONTEND F6: see CONFIG at top
 let allowedDomainsPromise = null;
 
 async function isAllowedEmail(email) {

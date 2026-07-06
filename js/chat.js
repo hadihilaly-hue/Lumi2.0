@@ -1,4 +1,5 @@
 import { callAPI, fetchClaudeProxy } from './api.js';
+import { CONFIG } from './config.js';
 import { todayStr } from './homework.js';
 import { getProjects } from './projects.js';
 import { buildCompanionSystem, buildTutorSystem, teacherDisplayName, teacherInitials } from './prompts.js';
@@ -125,7 +126,7 @@ async function generateTitle(convId, firstUserMsg) {
   if (!convs[convId] || convs[convId].title) return;
   try {
     const prompt = `Generate a short 4-6 word title for this conversation. Just the title, nothing else, no punctuation at the end: ${firstUserMsg.slice(0, 300)}`;
-    const res = await fetchClaudeProxy({ model: 'claude-haiku-4-5', max_tokens: 20, messages: [{ role: 'user', content: prompt }] });
+    const res = await fetchClaudeProxy({ model: CONFIG.models.titler, max_tokens: 20, messages: [{ role: 'user', content: prompt }] });
     if (!res.ok) return;
     const data  = await res.json();
     const title = data.content?.[0]?.text?.trim().replace(/[.!?]$/, '');

@@ -1,8 +1,11 @@
 import { S } from './state.js';
+import { CONFIG } from './config.js';
 
 
 // ─── CLAUDE API PROXY ─────────────────────────────────────────────────────────
-export const CLAUDE_PROXY_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/';
+// AUDIT_FRONTEND F6: host now lives in js/config.js. Re-exported here so existing
+// importers (e.g. teachers.js) keep working unchanged.
+export const CLAUDE_PROXY_URL = CONFIG.claudeProxyUrl;
 
 // Helper to make authenticated API calls to the Claude proxy
 export async function fetchClaudeProxy(body, options = {}) {
@@ -35,7 +38,7 @@ export async function fetchClaudeProxy(body, options = {}) {
 // ─── API CALL ────────────────────────────────────────────────────────────────
 export async function callAPI(msgs, system) {
   const res = await fetchClaudeProxy({
-    model: 'claude-sonnet-4-20250514',
+    model: CONFIG.models.chat,
     max_tokens: 2500,
     stream: true,
     system,
