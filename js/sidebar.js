@@ -5,7 +5,7 @@ import { renderHwSidebar } from './homework.js';
 import { initScheduleSetup } from './schedule.js';
 import { S, SB, messagesEl, sbNav, sbSearch } from './state.js';
 import { deleteConvFromSupabase, genId, getConvs, getSchedule, saveConvs, saveCurrentConv, syncConvToSupabase } from './storage.js';
-import { TEACHER_EMAIL_MAP, _profileCache, _profileStatusCache } from './teachers.js';
+import { resolveTeacherEmail, _profileCache, _profileStatusCache } from './teachers.js';
 import { closeSidebar, escHtml } from './ui.js';
 
 
@@ -321,7 +321,7 @@ export function renderSidebar() {
     sbNav.appendChild(myHd);
 
     schedule.forEach(({ course, teacher, ready }) => {
-      const email = TEACHER_EMAIL_MAP[teacher];
+      const email = resolveTeacherEmail(teacher);
       const cachedProfile = email ? _profileCache[email + '__' + course] : null;
       const lastName = teacher ? teacher.split(' ').slice(-1)[0] : '';
       const sidebarName = cachedProfile?.title ? cachedProfile.title + ' ' + lastName : lastName;

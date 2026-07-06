@@ -1,7 +1,7 @@
 import { lookupSubjectForCourse } from './conversation.js';
 import { setSidebarUserSubtitle } from './prompts.js';
 import { S, currentUser } from './state.js';
-import { TEACHER_EMAIL_MAP, fetchTeacherProfilesByEmails, rdsFetch } from './teachers.js';
+import { registerTestModeTeacherEmail, resolveTeacherEmail, fetchTeacherProfilesByEmails, rdsFetch } from './teachers.js';
 import { showToast } from './ui.js';
 
 
@@ -64,11 +64,12 @@ export async function loadTestModeSchedule() {
 
     // Display name for synthetic schedule entries — prefer the session
     // full_name; fall back to the email local-part. Register the
-    // name → email mapping so the existing getTeacherProfile lookup
-    // path works without a special case for test mode.
+    // name → email mapping in the SEPARATE test-mode map (AUDIT_FRONTEND F2)
+    // so the shared TEACHER_EMAIL_MAP is never mutated at runtime — resolveTeacherEmail
+    // (used by getTeacherProfile, the sidebar, and the homework hints) falls back to it.
     const fullName = currentUser.user_metadata?.full_name
       || currentUser.email.split('@')[0];
-    TEACHER_EMAIL_MAP[fullName] = currentUser.email;
+    registerTestModeTeacherEmail(fullName, currentUser.email);
     S.testSchedule = data.map(row => ({
       course:  row.course_name,
       teacher: fullName,
@@ -116,7 +117,7 @@ function syncEnrollments(schedule) {
   const studentName = localStorage.getItem('lumi_name') || '';
   const pairs = schedule
     .map(({ course, teacher, block }) => {
-      const email = TEACHER_EMAIL_MAP[teacher];
+      const email = resolveTeacherEmail(teacher);
       if (!email) return null;
       if (!block) {
         console.warn('[enrollment] skipping class without block:', course);

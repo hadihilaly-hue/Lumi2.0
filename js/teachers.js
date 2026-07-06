@@ -86,6 +86,16 @@ export const TEACHER_EMAIL_MAP = {
   "Rick Santos":            "rsantos@lumidemo.test",
 };
 
+// AUDIT_FRONTEND F2: test-mode teachers (the signed-in teacher's own display
+// name → their email) live in a SEPARATE map, registered at test-mode boot,
+// so loadTestModeSchedule never mutates the shared TEACHER_EMAIL_MAP above
+// (which would break if the map is ever frozen/derived/server-sourced, and
+// collides if a Google full_name equals a curriculum name). resolveTeacherEmail
+// is the single lookup all callers use — falls back to the test-mode map.
+const _testModeEmailByName = {};
+export function registerTestModeTeacherEmail(name, email) { _testModeEmailByName[name] = email; }
+export function resolveTeacherEmail(name) { return TEACHER_EMAIL_MAP[name] || _testModeEmailByName[name] || null; }
+
 // ── Teacher profile system — single source of truth: Supabase ──
 // Seed profiles are pushed to Supabase on load; _profileCache is the in-memory fallback.
 export const _profileCache = {};
@@ -94,7 +104,7 @@ export const _profileStatusCache = {}; // { 'course::teacher': 'ready' | 'pendin
 export async function preloadProfileStatuses() {
   const schedule = getSchedule();
   if (!schedule.length) return;
-  const emails = [...new Set(schedule.map(s => TEACHER_EMAIL_MAP[s.teacher]).filter(Boolean))];
+  const emails = [...new Set(schedule.map(s => resolveTeacherEmail(s.teacher)).filter(Boolean))];
   if (!emails.length) return;
   try {
     let data;
@@ -109,7 +119,7 @@ export async function preloadProfileStatuses() {
     (data || []).forEach(row => { lookup[row.teacher_email + '__' + row.course_name] = row.done; });
     // Map each scheduled class
     schedule.forEach(({ course, teacher }) => {
-      const email = TEACHER_EMAIL_MAP[teacher];
+      const email = resolveTeacherEmail(teacher);
       const key = course + '::' + teacher;
       if (!email) { _profileStatusCache[key] = 'pending'; return; }
       const done = lookup[email + '__' + course];
@@ -177,7 +187,7 @@ export async function fetchTeacherProfilesByEmails(emails) {
 // Returns profile if complete, { __notReady } if in progress, null if not found.
 export async function getTeacherProfile(teacherName, course) {
   if (!teacherName || !course) return null;
-  const email = TEACHER_EMAIL_MAP[teacherName];
+  const email = resolveTeacherEmail(teacherName); // F2: incl. test-mode teachers
   if (!email) { console.warn('[getTeacherProfile] no email for:', teacherName); return null; }
   const cacheKey = email + '__' + course;
   console.log('[getTeacherProfile] loading:', teacherName, course);
