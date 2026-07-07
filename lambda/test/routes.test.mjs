@@ -869,6 +869,30 @@ test('POST /delete-my-account soft-deletes the caller (cascade, app_users by JWT
   const appUsers = findQuery(ctx, /UPDATE public\.app_users SET deleted_at/);
   assert.equal(appUsers.params[0], STUDENT.userId); // stamped for the JWT id, not the body
   assert.ok(findQuery(ctx, /UPDATE public\.class_enrollments SET deleted_at/));
+  // The live Google Calendar OAuth token is revoked (cleared) on delete, not held
+  // through the grace window.
+  const profiles = findQuery(ctx, /UPDATE public\.profiles/);
+  assert.match(profiles.text, /google_calendar_token = NULL/);
+  assert.match(profiles.text, /calendar_connected = false/);
+});
+
+test('POST /admin/delete-student also clears the target\'s Calendar token', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: ADMIN.userId,
+      onRoute: (t) => /FROM public\.app_users WHERE lower\(email\)/.test(t)
+        ? res([{ lumi_id: 'uuid-jane', email: 'jane@menloschool.org' }]) : res([]),
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/admin/delete-student', token: tokenFor(ADMIN),
+    body: { confirm: 'DELETE', email: 'jane@menloschool.org' },
+  });
+  assert.equal(r.statusCode, 200);
+  const profiles = findQuery(ctx, /UPDATE public\.profiles/);
+  assert.equal(profiles.params[0], 'uuid-jane'); // the resolved target, not the admin
+  assert.match(profiles.text, /google_calendar_token = NULL/);
 });
 
 test('GET /my-data exports the caller\'s rows scoped to the JWT id', async () => {
