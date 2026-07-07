@@ -122,7 +122,7 @@ function fullProfile(overrides = {}) {
 
 test('buildTutorSystem injects the teacher persona (display name + all three sections)', () => {
   const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile());
-  assert.match(p, /You are Lumi, acting as a 24\/7 digital version of Ms\. Huntley for their Chemistry class/);
+  assert.match(p, /You are Lumi, Ms\. Huntley's 24\/7 digital stand-in for their Chemistry class/);
   // Section headers use the teacher's FIRST name upper-cased.
   assert.match(p, /═══ HOW LAURA WANTS YOU TO HELP STUDENTS ═══\nENGAGE_RULES_MARKER/);
   assert.match(p, /═══ HOW LAURA TALKS AND TEACHES ═══\nTEACHING_VOICE_MARKER/);
