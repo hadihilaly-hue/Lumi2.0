@@ -18,6 +18,10 @@
 --   * Column public.class_enrollments.term
 --   * Column public.teacher_profiles.course_code
 --
+-- New objects (Q4 v2 work-sample expansion: docs/Q4V2_SPEC.md):
+--   * Table  public.teacher_work_artifacts    (per-artifact graded-work examples,
+--            N per tier, photo OR text; standalone migration rds-work-artifacts.sql)
+--
 
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
@@ -160,6 +164,28 @@ CREATE TABLE public.teacher_work_samples (
 );
 
 
+-- Q4 v2: per-artifact child table (N per tier; photo OR text). See
+-- migration/rds-work-artifacts.sql for the standalone additive migration and
+-- rationale. deleted_at is inline here (this table ships with soft-delete from
+-- day one, unlike the tables retrofitted by rds-add-deleted-at.sql).
+CREATE TABLE public.teacher_work_artifacts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    teacher_profile_id uuid NOT NULL,
+    tier text NOT NULL,
+    artifact_type text NOT NULL,
+    text_content text,
+    s3_path text,
+    label text,
+    sort_order integer DEFAULT 0 NOT NULL,
+    deleted_at timestamp with time zone,
+    CONSTRAINT teacher_work_artifacts_tier_check CHECK ((tier = ANY (ARRAY['progressing'::text, 'proficient'::text, 'exemplary'::text]))),
+    CONSTRAINT teacher_work_artifacts_type_check CHECK ((artifact_type = ANY (ARRAY['photo'::text, 'comment'::text, 'essay_feedback'::text, 'eval_note'::text, 'other'::text]))),
+    CONSTRAINT teacher_work_artifacts_content_check CHECK ((((artifact_type = 'photo'::text) AND (s3_path IS NOT NULL) AND (text_content IS NULL)) OR ((artifact_type <> 'photo'::text) AND (text_content IS NOT NULL) AND (s3_path IS NULL))))
+);
+
+
 --
 -- PRIMARY KEY / UNIQUE CONSTRAINTS
 --
@@ -200,6 +226,9 @@ ALTER TABLE ONLY public.teacher_work_samples
 ALTER TABLE ONLY public.teacher_work_samples
     ADD CONSTRAINT teacher_work_samples_teacher_profile_id_tier_key UNIQUE (teacher_profile_id, tier);
 
+ALTER TABLE ONLY public.teacher_work_artifacts
+    ADD CONSTRAINT teacher_work_artifacts_pkey PRIMARY KEY (id);
+
 
 --
 -- INDEXES
@@ -215,6 +244,8 @@ CREATE INDEX idx_enrollments_teacher_profile ON public.class_enrollments USING b
 
 CREATE INDEX idx_work_samples_profile ON public.teacher_work_samples USING btree (teacher_profile_id);
 
+CREATE INDEX idx_work_artifacts_profile ON public.teacher_work_artifacts USING btree (teacher_profile_id);
+
 
 --
 -- TRIGGERS (updated_at maintenance)
@@ -227,6 +258,8 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.conversations FOR EACH ROW
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.teacher_profiles FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 CREATE TRIGGER set_work_samples_updated_at BEFORE UPDATE ON public.teacher_work_samples FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER set_work_artifacts_updated_at BEFORE UPDATE ON public.teacher_work_artifacts FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 CREATE TRIGGER set_schools_updated_at BEFORE UPDATE ON public.schools FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
@@ -247,12 +280,17 @@ ALTER TABLE ONLY public.class_enrollments
 ALTER TABLE ONLY public.teacher_work_samples
     ADD CONSTRAINT teacher_work_samples_teacher_profile_id_fkey FOREIGN KEY (teacher_profile_id) REFERENCES public.teacher_profiles(id) ON DELETE CASCADE;
 
+ALTER TABLE ONLY public.teacher_work_artifacts
+    ADD CONSTRAINT teacher_work_artifacts_teacher_profile_id_fkey FOREIGN KEY (teacher_profile_id) REFERENCES public.teacher_profiles(id) ON DELETE CASCADE;
+
 
 --
 -- COMMENTS
 --
 
 COMMENT ON TABLE public.class_enrollments IS 'Per-student enrollment rows. teacher_notes stores running teacher observations per student per class.';
+
+COMMENT ON TABLE public.teacher_work_artifacts IS 'Q4 v2: per-artifact graded-work examples (N per tier), each a photo (s3_path) or a block of teacher text (text_content). Injected into Lumi''s feedback voice; never shown to students. Sibling to teacher_work_samples (per-tier description container).';
 
 COMMENT ON COLUMN public.teacher_profiles.syllabus_paths IS 'Array of storage paths (bucket: syllabi) for the teacher''s uploaded syllabi. Replaces singleton syllabus_file_path. Cap: 20 files per profile, enforced client-side. Phase 1 stores PDFs only; DOCX/JPG/PNG support would extend the bucket''s allowed_mime_types in a follow-up.';
 
