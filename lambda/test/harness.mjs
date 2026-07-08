@@ -47,6 +47,9 @@ export function makeRouter(opts = {}) {
     provisionedTeacher = false,
     usageCount = 0,
     profileName = null,
+    // Phase 5: answer for isPersistenceEnabled's schools gate query. Default
+    // false so no test accidentally enables cross-session memory.
+    persistenceEnabled = false,
     appUserExists = true,
     // If set, the app_users INSERT returns this cognito_sub instead of echoing
     // the caller's sub — exercises the email/sub-collision fail-closed branch.
@@ -55,6 +58,10 @@ export function makeRouter(opts = {}) {
   } = opts;
 
   return function router(text, params) {
+    // Phase 5 gate query (more specific — must precede the broad schools match).
+    if (/persistence_enabled = true/.test(text)) {
+      return persistenceEnabled ? result([{ ok: 1 }]) : result([]);
+    }
     if (/FROM public\.schools/.test(text)) {
       if (domains === null) throw new Error('simulated domains DB error');
       return result(domains.map((d) => ({ d: d.toLowerCase() })));
