@@ -62,5 +62,20 @@ export function mountClass(route) {
   if (ctx && ctx.course === course && ctx.teacher === teacher) return;
 
   const { subjectId } = lookupSubjectForCourse(course);
+  // Diagnostic: subjectId is null when a scheduled course name isn't in the
+  // static MENLO_CURRICULUM (js/data.js). Not a chat blocker — profile fetch
+  // and teacher-notes injection are keyed off (course, teacher email), not
+  // subjectId — but a silent mismatch here can mask a wider schedule/catalog
+  // drift (e.g. a course renamed in /available-classes but still saved under
+  // the old name in lumi_schedule). Under the old sidebar this was invisible
+  // because the sidebar walked MENLO_CURRICULUM to build its list; the
+  // redesign renders from S.schedule, so the mismatch surfaces here first.
+  if (!subjectId) {
+    console.warn(
+      `[classview] lookupSubjectForCourse returned null subjectId for course "${course}". ` +
+      `Chat will still open, but this course is not in the static MENLO_CURRICULUM — check that ` +
+      `S.schedule[].course matches the canonical name from /available-classes.`
+    );
+  }
   openTutor(subjectId, course, teacher);
 }

@@ -1111,3 +1111,25 @@ Toggle: `localStorage.setItem('lumi_home_redesign_v1','true'); location.reload()
 - **B15.** Accent-bar color is stable across renders for the same course (`hashPalette` determinism).
 - **B16.** `?mode=test` → strip / count line / quick-actions all suppressed; only the class grid renders (D10-B sort holds).
 - **B17.** Mobile ≤640px → header stacks; grid single-column; strip single-column; quick-actions stack.
+- **B18.** Grid **fills viewport width** and **centers** at the 1140 px cap. Home surface **scrolls** — all cards below the fold are reachable. (Layout-root fix 2026-07-08.)
+- **B19.** Tap a ready card → class view shows the **back arrow + course title + teacher subline stacked ABOVE the chat panel** (not beside it). Chat panel fills remaining vertical space. Pinned welcome card renders, suggested-prompt chips appear, sending a message streams a reply — same as the old sidebar-initiated chat. (Layout-root fix 2026-07-08.)
+
+### 12.10 Live-testing bugfixes (2026-07-08)
+
+Three bugs surfaced in the first browser session with the flag on:
+
+| Bug | Symptom | Root cause | Fix commit |
+|---|---|---|---|
+| 1 | Home occupies only the left ~half of the viewport, doesn't center. | `.main{display:flex}` (flex-row) at style.css:337 — `#homeView` was a flex-row child with no `flex:1`/`width:100%`, so it shrank to the intrinsic width of the 1140px shell. `.home-redesign-v1 .content{display:block}` neutralized `.main{flex:1}` but did not override `.main`'s flex-row layout. | Column-flex layout roots scoped to `.home-redesign-v1`. |
+| 2 | Content below the first card row unreachable. | Same layout defect. `html,body{overflow:hidden}` means the redesign must scroll internally; `#homeView` had `overflow-y:auto` but the flex-row squeeze + `.main{overflow:hidden}` clipped it. | Same commit — `#homeView{flex:1;min-height:0;overflow-y:auto}` gives it real vertical space to scroll in. |
+| 3 | Tapping a class card mounts an "empty" chat — no welcome card, no teacher identity. | Downstream layout artifact — NOT a wiring bug. `#classViewHeader` + `#chatPanel` rendered side-by-side as flex-row children; `#chatPanel` collapsed to intrinsic height ≈ 0. `renderPinnedWelcome`, teacher-notes injection, streaming, and work samples were all firing correctly into `#messages`, which was visually clipped. `classview.js:mountClass → openTutor` is byte-identical to `sidebar.js`'s callers at js/sidebar.js:262/296/368/553. | Same layout commit fixes it. Verified via B19. |
+
+**Adjacent diagnostic (not a bug — added defensively).**
+`lookupSubjectForCourse` (js/conversation.js:14) returns `{subjectId:null}` for any course not in the static `MENLO_CURRICULUM` (js/data.js:3). Not a chat blocker (`S.tutorCtx.subjectId=null` doesn't gate anything downstream), but silent under the redesign — the sidebar previously masked it because its browse tree was built FROM `MENLO_CURRICULUM`, whereas the home grid renders directly from `S.schedule`. `js/classview.js:mountClass` now `console.warn`s when this happens so a schedule/catalog drift (e.g. `/available-classes` renamed a course that's still stored in `lumi_schedule` under the old name) is diagnosable rather than invisible.
+
+**TM-1..TM-4 re-verification after the layout fix.**
+- **TM-1**: Server-side only. Untouched.
+- **TM-2**: The fix is CSS-only + one `console.warn`. Zero new write paths in `js/home.js` / `js/classview.js` (grep `sync|saveConvs|localStorage.setItem` in the changed files returns nothing).
+- **TM-3**: Locked-card routing unchanged. `S.isTestMode` branch in `js/home.js:renderCard` still points to `teacher.html?course=<encoded>&from=test-mode`.
+- **TM-4**: `#homeTestBanner` + `#testModeBanner` + `#settingsExitTestBtn` IDs unchanged. Banners still flip `display` visible when `S.isTestMode`. `.class-view-header{flex-shrink:0}` scoped to the flag; TM-mode banner in `#chatPanel` still stacks above the messages area (chat-panel is flex-column internally).
+- `?mode=test` deep-link: zero new `pushState` calls; router untouched.
