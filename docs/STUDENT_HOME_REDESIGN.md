@@ -779,87 +779,91 @@ redesign is layout only, not visual language.
 
 ---
 
-## 9. OPEN DECISIONS — HADI
+## 9. DECISIONS — LOCKED (D1–D13, 2026-07-08)
 
-Every product call I could not make without you. Answer these before implementation session 1.
+Hadi accepted every recommendation as printed on 2026-07-08. This section is now the
+authoritative product spec for session 1. Alternatives are kept below for context; do not
+implement them.
 
-**D1.** Empty-state per class card (no prior conv, no HW):
-  - **D1-A** — show `"—"` (silent).
-  - **D1-B** — show a static "Say hi to [teacher]" chip.
-  - **D1-C** — show one of the STATIC_FALLBACK_PROMPTS ("Want to try some factoring
+**D1. DECIDED — D1-B: show a static "Say hi to [teacher]" chip.** Empty-state per class card (no
+prior conv, no HW).
+  - D1-A — show `"—"` (silent).
+  - D1-B — show a static "Say hi to [teacher]" chip. **← chosen**
+  - D1-C — show one of the STATIC_FALLBACK_PROMPTS ("Want to try some factoring
     practice?").
-  Recommendation: **D1-B** (personal but silent-safe).
 
-**D2.** Do we tag the "where you left off" line so the shift from conv-snippet (v1) to
-Layer-3 summary (post-flip) is transparent to students?
-  - **D2-A** — no tag; it looks the same, content just gets smarter.
-  - **D2-B** — a small "from your last chat" tag on the v1 fallback so students know the
-    source.
-  Recommendation: **D2-A** — students don't care about our data source.
+**D2. DECIDED — D2-A: no tag on the "where you left off" line.** The line looks the same before
+and after the Layer-3 flip; content just gets smarter.
+  - D2-A — no tag. **← chosen**
+  - D2-B — a small "from your last chat" tag on the v1 fallback.
 
-**D3.** The red ring in v1:
-  - **D3-A** — drop it; use the red dot for "HW due within 24h". Ring lands in v2 with
-    rotation.
-  - **D3-B** — ship a naive "assume every class meets every weekday" ring.
-  Recommendation: **D3-A** (see §6.2).
+**D3. DECIDED — D3-A: no red ring in v1; use a red dot for HW-due-in-24h.** Ring lands in v2
+alongside the rotation schema (see §6.2).
+  - D3-A — drop ring; red dot on urgent-HW cards. **← chosen**
+  - D3-B — ship a naive "assume every class meets every weekday" ring.
 
-**D4.** Tomorrow-schedule strip in v1 (no rotation):
-  - **D4-A** — hide silently until rotation exists.
-  - **D4-B** — always show; if no rotation, it says "Set up your block schedule to see
-    tomorrow's classes" as a permanent prompt.
-  Recommendation: **D4-A**. B annoys every student until a schema they can't affect lands.
+**D4. DECIDED — D4-A: hide the tomorrow-schedule strip silently until a rotation exists.**
+  - D4-A — hide silently. **← chosen**
+  - D4-B — always show; nag students to set up a block schedule they can't affect.
 
-**D5.** On boot, if the student had a chat open when they last closed the tab:
-  - **D5-A** — land on home (drop the auto-resume behavior).
-  - **D5-B** — auto-open the last chat (preserve today's behavior).
-  - **D5-C** — land on home but pre-highlight the card that owns the last chat.
-  Recommendation: **D5-A** — the redesign's whole thesis is "home is where you start". If
-  needed, `?resume=1` deep-links carry the old behavior for e.g. notification tap flows.
+**D5. DECIDED — D5-A: land on home on boot; drop the auto-resume behavior.** `?resume=1`
+deep-links preserve the old behavior for notification-tap flows.
+  - D5-A — land on home. **← chosen**
+  - D5-B — auto-open the last chat.
+  - D5-C — land on home but pre-highlight the card that owns the last chat.
 
-**D6.** `GET /home-summary` returns `last_session_summary` to the browser (per §7). Yes / no.
-  Recommendation: yes; explicitly document the policy shift ("this one field is
-  student-visible; the rest of the note is not") in the persistence spec.
+**D6. DECIDED — YES: `GET /home-summary` returns `last_session_summary` to the browser.** Follow-
+up work (blocking): amend `docs/PERSISTENCE_SPEC.md` to document the one-field policy carve-out
+("this single field is student-visible; the rest of the note is not"). Filed as §11 follow-up
+below.
 
-**D7.** General Chat context: (a) CHEAP or (b) FULL (§5).
-  Recommendation: **(a)** for v1.
+**D7. DECIDED — D7-A (CHEAP): General Chat carries the class list + Layer-3 summaries only,
+never teacher personas.** No fanout over `buildTutorSystem`-shaped profiles.
+  - D7-A — CHEAP. **← chosen**
+  - D7-B — FULL (concat all class profiles).
 
-**D8.** Voice hazard resolution (§4.9):
-  - **D8-A** — keep voice at document scope; class view only owns the messages panel + input
-    row (Option V-A).
-  - **D8-B** — make `initVoice()` idempotent and re-bind on class-view mount (Option V-B).
-  Recommendation: **D8-A**.
+**D8. DECIDED — D8-A / V-A: keep voice at document scope; class view owns only the messages
+panel + input row.** `voice.js` untouched.
+  - D8-A — voice at document scope. **← chosen**
+  - D8-B — make `initVoice()` idempotent and re-bind on class-view mount.
 
-**D9.** Feature-flag rollout window (§4.7):
-  - **D9-A** — 2 weeks, then delete.
-  - **D9-B** — leave the flag in but default-on after a week.
-  - **D9-C** — hard cut, no flag.
-  Recommendation: **D9-A**.
+**D9. DECIDED — D9-A: 2-week feature-flag window, then delete the flag and the sidebar code.**
+  - D9-A — 2 weeks, then delete. **← chosen**
+  - D9-B — leave the flag in but default-on after a week.
+  - D9-C — hard cut, no flag.
 
-**D10.** Test Mode home grid sort:
-  - **D10-A** — alphabetical only.
-  - **D10-B** — group by "ready" vs "locked" first, then alphabetical.
-  Recommendation: **D10-B** (teacher's own use pattern is "let me test the ones I can").
+**D10. DECIDED — D10-B: Test Mode home grid sorts "ready" first, then "locked", then
+alphabetical within each group.**
+  - D10-A — alphabetical only.
+  - D10-B — ready → locked → alphabetical. **← chosen**
 
-**D11.** General chat card copy — one-liner. Options:
-  - "Chat with Lumi across your classes."
-  - "Chat with Lumi about anything."
-  - "Lumi — general chat."
-  Recommendation: the first — the class-list context makes the promise honest.
+**D11. DECIDED — copy is "Chat with Lumi across your classes."** — the class-list context makes
+the promise honest.
 
-**D12.** Locked-card behavior in **student** (non-test) mode:
-  - **D12-A** — a toast "Your teacher is still setting up".
-  - **D12-B** — the card is hidden entirely.
-  - **D12-C** — the card is shown but tap opens a Settings-style modal explaining and linking
-    to the teacher's calendar (unrelated) — no, kill this one.
-  Recommendation: **D12-A** — a hidden card silently drops a class from the student's mental
-  model of enrollment.
+**D12. DECIDED — D12-A: locked cards in student (non-test) mode surface a toast "Your teacher is
+still setting up".** Card remains visible so the student's enrollment map is intact.
+  - D12-A — toast. **← chosen**
+  - D12-B — hide the card.
+  - D12-C — Settings-style modal.
 
-**D13.** Do we keep the intro slide (`_introShownFor` once-per-class) inside the new class
-view?
-  - **D13-A** — yes, unchanged.
-  - **D13-B** — deprecate; the home card already tells the student who the teacher is.
-  Recommendation: **D13-A** — the intro slide sets pedagogy expectations, not identity; it
-  still earns its keep.
+**D13. DECIDED — D13-A: keep the intro slide (`_introShownFor` once-per-class) unchanged inside
+the class view.** It sets pedagogy expectations, not identity; the card only shows identity.
+  - D13-A — keep. **← chosen**
+  - D13-B — deprecate.
+
+---
+
+## 11. Follow-ups locked in by §9
+
+- **From D6:** amend `docs/PERSISTENCE_SPEC.md` §7 (or wherever the "notes never reach the
+  browser" invariant is stated) to record the `last_session_summary` carve-out. Do this
+  BEFORE the `GET /home-summary` route is added — the spec must precede the code.
+- **From D9:** calendar the 2-week flag-window kill in whatever tracker Hadi uses; session 8 of
+  the implementation plan (§4.8) is the concrete task.
+- **From D3 / §6.2:** file a separate design pass for the rotation schema before session 6 —
+  block-day mapping is per-school, not per-student, so this is a school-wide `schools.
+  block_schedule` (or `school_block_schedule`) addition, plus a client `GET /block-schedule`
+  route. Ring + tomorrow-strip both light up when that lands.
 
 ---
 
@@ -867,7 +871,7 @@ view?
 
 Before landing any code:
 
-- [ ] §9 D1–D13 answered.
+- [x] §9 D1–D13 answered — locked 2026-07-08.
 - [ ] A staging Cognito account with a real Menlo email is available for smoke tests.
 - [ ] `docs/PERSISTENCE_SPEC.md` §7 (retention) resolved — even a "keep current default"
       answer.
