@@ -680,7 +680,10 @@ live with spoofed ids.
   `S.tutorCtx.workSamples`. Both `buildTutorSystem()` (description
   block) and `buildApiMessages()` (synthetic image-prepend exchange)
   read this same object and share a `hasAllTiers` check that is true
-  iff every tier has loaded images AND a non-empty description. When
+  iff every tier has loaded images AND a non-empty description (D5:
+  descriptions are optional per tier, so this runtime gate is a graceful
+  skip, not a policy assertion — text artifacts still inject through
+  `<<LUMI_WORK_ARTIFACTS>>`). When
   it's false, ZERO bytes of work-samples wiring land in the prompt
   AND the synthetic exchange is skipped — the result is byte-identical
   to the pre-Q4 prompt + message array for that concern.

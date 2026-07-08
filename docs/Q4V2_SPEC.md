@@ -75,8 +75,9 @@ of mixed types).
   `?teacher_profile_ids=a,b,c`. `WHERE teacher_profile_id = ANY($1) AND
   deleted_at IS NULL`. 200 `[]` when none. (Students legitimately read this;
   the vision pipeline runs client-side — see §1.4 and Decision **P1**.)
-- **POST** — per-tier upsert. Validates `tier ∈ TIERS`, `description` non-empty
-  string, `photo_paths` array. Authz = `denyUnlessOwner()` 2-step: resolve
+- **POST** — per-tier upsert. Validates `tier ∈ TIERS`; `description` is
+  optional (D5) — accept string or missing, reject non-string types;
+  `photo_paths` array. Authz = `denyUnlessOwner()` 2-step: resolve
   `teacher_profiles.teacher_email` for the id → require `== user.email` else
   403; 404 if the profile id doesn't exist. `ON CONFLICT (teacher_profile_id,
   tier) DO UPDATE`.
@@ -99,10 +100,10 @@ of mixed types).
   (`handleSampleFiles`, `teacher.html:1852`). HEIC→JPEG via `heic2any` before
   upload. `renderTierUI` (`:1914`) draws thumbs + `(n/3)` counter.
 - **Validation:** `validateStep4()` (`teacher.html:1953`) currently makes the
-  entire step **fully optional** — it never gates Continue. ⚠️ **This
-  contradicts `CLAUDE.md`**, which states Step 5 "requires ≥1 photo and a
-  non-empty description for every tier." The *live code* is the optional
-  version. See Decision **[D6]**.
+  entire step **fully optional** — it never gates Continue. Per D5 + D6,
+  descriptions and per-tier artifacts are both optional; the wizard
+  `hasAllWorkSampleTiers` check (`teacher.html:1463`) surfaces a
+  "add samples" banner when any tier lacks BOTH a photo AND text.
 - A FERPA callout sits at the top of the step (`teacher.html:962`): "cover or
   blur student names…". There is **no** "Only Lumi sees this" copy anywhere
   today (confirmed by grep).
@@ -128,7 +129,10 @@ of mixed types).
   `{ <tier>: { description, images:[{base64, mediaType}] } }`. Stored on
   `S.tutorCtx.workSamples`.
 - `buildTutorSystem` (`js/prompts.js:149`): `hasAllTiers` = all three tiers have
-  a non-empty description **and** ≥1 loaded image. When true, emits the
+  a non-empty description **and** ≥1 loaded image. Descriptions are
+  optional per D5, so an empty description gracefully skips this feedback-
+  voice section (byte-identical to pre-Q4); text artifacts still inject
+  independently via `<<LUMI_WORK_ARTIFACTS>>`. When true, emits the
   `═══ HOW {First} GIVES FEEDBACK ═══` section with the three descriptions.
   When false, **zero bytes** — byte-identical to the pre-Q4 prompt.
 - `buildApiMessages` (`js/chat.js:153`): same all-3-tiers image gate → prepends
@@ -255,13 +259,13 @@ budget (§6) and abuse safety.
 - Per-text-artifact length: propose **hard cap 2,000 chars** (server-enforced),
   soft counter in UI. Rationale in §6.
 
-**DECISION [D5] — does the per-tier `description` stay required?** Today
-`teacher_work_samples.description` is `NOT NULL` and is the "what I look for"
-note. In v2 a teacher might supply only concrete artifacts and no meta-
-description. Options: (a) keep description as the tier's required guidance and
-treat artifacts as additive; (b) make description optional if ≥1 text artifact
-exists. RECOMMEND (a) for minimal churn — description stays the tier's short
-guidance line; artifacts are the examples. Confirm with product.
+**DECISION [D5] — RESOLVED: description is OPTIONAL per tier.** The column
+stays `NOT NULL` at the schema level (backfilled with `''` on missing input),
+but the Lambda POST /work-samples validator accepts empty or missing
+description (rejects only non-string types). Rationale: matches the Q4 UX
+principle of open-ended, non-rigid inputs. The runtime feedback-voice gate
+in `js/prompts.js hasAllTiers` gracefully skips its section when any tier
+has empty description — text artifacts still inject independently.
 
 ### 3.3 What does NOT change
 
@@ -664,7 +668,7 @@ second session without leaving anything half-wired, because with no
 | **D2** | Where new photos live | **Freeze `photo_paths`, union at read; no backfill** |
 | **D3** | `artifact_type` enum set | `photo, comment, essay_feedback, eval_note, other` (confirm `eval_note`; defer audio/video) |
 | **D4** | Per-tier caps + text length | ≤5 artifacts/tier (≤3 photos); text ≤2,000 chars |
-| **D5** | Is per-tier `description` still required | Keep required (minimal churn) |
+| **D5** | Is per-tier `description` still required | **RESOLVED: optional per tier** |
 | **D6** | Validation rule (code contradicts CLAUDE.md) | Tier = description + ≥1 artifact any type; keep step optional-with-banner (**D6-A-i**); must update `hasAllWorkSampleTiers` |
 | **D7** | Relax all-3-tiers injection gate | Per-tier, per-modality gates; preserve byte-identical zero-artifact case |
 | **D8** | Total artifact-text token budget | Add a total cap, truncate oldest-first (~4 K tokens) |

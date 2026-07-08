@@ -155,7 +155,9 @@ export function buildTutorSystem(subject, course, teacher, teacherProfile, workS
   // synthetic-exchange decision. False if any tier is missing description
   // OR loaded images. When false, ZERO bytes of work-samples wiring land
   // in the prompt (no header, no placeholder) — the prompt is byte-
-  // identical to the pre-Q4 prompt for that concern.
+  // identical to the pre-Q4 prompt for that concern. Per D5 descriptions
+  // are OPTIONAL at save; graceful skip here when any tier's description
+  // is empty is intentional (artifacts still inject via <<LUMI_WORK_ARTIFACTS>>).
   const ws = workSamples;
   const tiersAll = ['progressing','proficient','exemplary'];
   const hasAllTiers = !!ws

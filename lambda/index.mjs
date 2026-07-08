@@ -1851,9 +1851,13 @@ async function handleRequest(event, responseStream) {
 
       if (method === "POST") {
         if (!TIERS.includes(body.tier)) return sendJson(400, { error: "Invalid tier" });
-        if (typeof body.description !== "string" || !body.description.trim()) {
-          return sendJson(400, { error: "Missing description" });
+        // D5: description is OPTIONAL. Accept empty string or missing; only
+        // reject a non-string type. Normalized to '' below for the NOT NULL
+        // column.
+        if (body.description != null && typeof body.description !== "string") {
+          return sendJson(400, { error: "Invalid description" });
         }
+        const description = typeof body.description === "string" ? body.description : "";
         const photoPaths = Array.isArray(body.photo_paths) ? body.photo_paths : [];
         const denied = await denyUnlessOwner(body.teacher_profile_id);
         if (denied) return sendJson(denied.status, { error: denied.error });
@@ -1865,7 +1869,7 @@ async function handleRequest(event, responseStream) {
                            photo_paths = EXCLUDED.photo_paths,
                            updated_at = now()
              RETURNING *`,
-          [body.teacher_profile_id, body.tier, body.description, photoPaths]
+          [body.teacher_profile_id, body.tier, description, photoPaths]
         );
         return sendJson(200, result.rows[0]);
       }
