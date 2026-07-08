@@ -213,6 +213,15 @@ ${ws.exemplary.description}`;
     // the cacheable prefix, BEFORE <<LUMI_TEACHER_NOTES>> (per-student) below.
     // The chat Lambda replaces it with the built section or strips it to ''
     // (stray-marker safe → byte-identical when the teacher has no text artifacts).
+    //
+    // GATE POSTURE (Decision D7-A, docs/Q4V2_SPEC.md): text artifacts are gated
+    // PER-TIER on the server (any tier with text emits; other tiers stay silent).
+    // The PHOTO vision gate above is UNCHANGED — hasAllTiers still requires all
+    // three tiers to have both a description and loaded images before the
+    // "═══ HOW … GIVES FEEDBACK ═══" photo section and the synthetic image
+    // exchange emit. The two gates are deliberately independent: a teacher with
+    // one written example on "proficient" contributes text-only feedback voice
+    // without pretending to have photo evidence for the other tiers.
     prompt += `<<LUMI_WORK_ARTIFACTS>>`;
 
     prompt += `

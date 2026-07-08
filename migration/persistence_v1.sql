@@ -2,14 +2,15 @@
 -- persistence_v1.sql — Phase 5 cross-session student memory (FERPA)
 -- =====================================================================
 --
--- STATUS: DESIGN-ONLY MIGRATION. NOT YET APPLIED to any database.
---   docs/PERSISTENCE_SPEC.md is the design of record; that spec ships
---   "no code, no migrations, and no schema ... applied to RDS." This file
---   is the concrete DDL for the spec's Option B (rolling-summary MVP) so it
---   is review-ready, but it MUST NOT be run against lumi-db until the
---   §8 open questions (retention, consent, who-may-view) are resolved with
---   the school. When it IS applied, it goes through the IAM-gated
---   direct-invoke `adminSql` branch, like every other migration in this dir.
+-- STATUS: SCHEMA APPLIED to lumi-db on 2026-07-08 via the IAM-gated
+--   adminSql path (synthetic_data/lambda_admin.py). ENABLEMENT still gated
+--   on the §8 open questions (retention window, consent, who-may-view) —
+--   real tenants stay at `persistence_enabled = false` until a school
+--   opts in under a signed data agreement. The Lumi Demo (synthetic)
+--   tenant is seeded at TRUE for voice testing on @lumidemo.test.
+--   docs/PERSISTENCE_SPEC.md remains the design of record; this file is
+--   the concrete DDL for its Option B (rolling-summary MVP). Re-running
+--   is safe — every statement is guarded (idempotency verified live).
 --
 -- WHAT THIS ADDS:
 --   1. schools.persistence_enabled  — per-school feature flag, OFF by default
@@ -297,15 +298,15 @@ COMMENT ON COLUMN public.student_progress_notes.deleted_at IS
 
 
 -- =====================================================================
--- HOW TO APPLY AND VERIFY
+-- HOW TO APPLY AND VERIFY  (historical — this file was applied 2026-07-08)
 -- =====================================================================
--- This file is DESIGN-ONLY and is NOT applied here. When Phase 5 is greenlit:
---
 -- APPLY (IAM-gated direct-invoke adminSql path — the only direct-DB route;
 --        never over the Lambda Function URL):
---   1. Resolve the §8 open questions (retention window, consent, visibility)
---      and confirm OFF-by-default is acceptable for every real tenant.
---   2. Send this file's statements through the adminSql branch, e.g. via
+--   1. Resolved: OFF-by-default confirmed for every real tenant; §8
+--      open questions still tracked in docs/PERSISTENCE_SPEC.md §8 for the
+--      *enablement* decision. This migration only lays down the schema and
+--      seeds the synthetic tenant — no real student gets memory yet.
+--   2. Sent through the adminSql branch on 2026-07-08 via
 --      synthetic_data/lambda_admin.py (boto3 `aws lambda invoke` with an
 --      {"adminSql": "...", "params": [...]} payload). Idempotent — re-running
 --      is a no-op.
