@@ -26,11 +26,12 @@
 //   Session 6: tomorrow-schedule peek (D4-A hidden silently until then).
 
 import { openGeneralChat } from './conversation.js';
-import { navClass } from './router.js';
+import { navClass, navPlan } from './router.js';
 import { S } from './state.js';
 import { getConvs, getSchedule } from './storage.js';
 import { getHwTasks } from './homework.js';
 import { _profileStatusCache } from './teachers.js';
+import { buildStudyPlan, remainingTotals, loadCheckedMap } from './studyplan.js';
 import { showToast } from './ui.js';
 
 // ── Utilities ───────────────────────────────────────────────────────────────
@@ -498,20 +499,25 @@ function renderQuickActions() {
   if (S.isTestMode) { row.style.display = 'none'; return; }
   row.style.display = '';
 
-  // Tonight's Study Plan — Hadi's decision: STUB disabled (Session 4 wire).
+  // Tonight's Study Plan — live (Session 4). Subtitle mirrors the "remaining"
+  // total so the check-state on the plan surface flows through.
+  const rawPlan = buildStudyPlan(getHwTasks(), null, new Date());
+  const remaining = remainingTotals(rawPlan, loadCheckedMap());
+  const planSub = remaining.count === 0
+    ? "You're clear tonight"
+    : `${remaining.count} task${remaining.count === 1 ? '' : 's'} tonight`;
   const plan = el('button', {
     class: 'home-qa home-qa--navy',
     type: 'button',
-    disabled: 'disabled',
-    'aria-disabled': 'true',
-    title: 'Coming soon',
+    title: "Open tonight's study plan",
   }, [
     el('div', { class: 'home-qa-icon', html: ICON_CAL }),
     el('div', { class: 'home-qa-body' }, [
       el('div', { class: 'home-qa-title', text: "Tonight's Study Plan" }),
-      el('div', { class: 'home-qa-sub', text: 'Coming soon — Session 4' }),
+      el('div', { class: 'home-qa-sub', text: planSub }),
     ]),
   ]);
+  plan.addEventListener('click', () => navPlan());
   row.appendChild(plan);
 
   // General Chat — wire to the existing openGeneralChat() in conversation.js.
@@ -596,9 +602,11 @@ export function mountHome() {
   const home = document.getElementById('homeView');
   const chat = document.getElementById('chatPanel');
   const header = document.getElementById('classViewHeader');
+  const plan = document.getElementById('studyPlanView');
   if (home) home.style.display = '';
   if (chat) chat.style.display = 'none';
   if (header) header.style.display = 'none';
+  if (plan) plan.style.display = 'none';
   renderGreeting();
   renderDueStrip();
   renderQuickActions();

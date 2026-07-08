@@ -1106,7 +1106,7 @@ Toggle: `localStorage.setItem('lumi_home_redesign_v1','true'); location.reload()
 
 - **B11.** Flag ON → header shows serif greeting title ("Good <tod>, <First>") + date + count line ("N things due this week across M classes"). Zero HW → count line drops silently.
 - **B12.** Due-soon strip renders up to 4 chips; urgent (≤24h) items get terracotta border + terracotta ink on the day badge. Empty → whole section hidden.
-- **B13.** Quick-actions row shows Tonight's Study Plan (navy, disabled with "Coming soon" tooltip) + General Chat (cream). General Chat click → chat surface, back button returns home.
+- **B13.** Quick-actions row shows Tonight's Study Plan (navy, live — subtitle reads "N tasks tonight" / "You're clear tonight") + General Chat (cream). Study Plan click → `#plan` route, full-surface list with back button; General Chat click → chat surface, back button returns home. (Live-wire: §12.11.)
 - **B14.** Search input filters cards live by course/teacher substring; blank query restores all.
 - **B15.** Accent-bar color is stable across renders for the same course (`hashPalette` determinism).
 - **B16.** `?mode=test` → strip / count line / quick-actions all suppressed; only the class grid renders (D10-B sort holds).
@@ -1133,3 +1133,81 @@ Three bugs surfaced in the first browser session with the flag on:
 - **TM-3**: Locked-card routing unchanged. `S.isTestMode` branch in `js/home.js:renderCard` still points to `teacher.html?course=<encoded>&from=test-mode`.
 - **TM-4**: `#homeTestBanner` + `#testModeBanner` + `#settingsExitTestBtn` IDs unchanged. Banners still flip `display` visible when `S.isTestMode`. `.class-view-header{flex-shrink:0}` scoped to the flag; TM-mode banner in `#chatPanel` still stacks above the messages area (chat-panel is flex-column internally).
 - `?mode=test` deep-link: zero new `pushState` calls; router untouched.
+
+### 12.11 Session 4 — Tonight's Study Plan v1 (2026-07-08)
+
+**What shipped.** The quick-action card at the top of home flipped from
+"Coming soon" stub to a live entry point. Tapping it navigates via the new
+`#plan` router route to a full-surface view (same nav pattern as the class
+view — full surface, single back button that routes home via `navHome()`).
+The view lists tonight's homework grouped by bucket with per-task time chips
+and checkbox strike-through; state persists per-day in localStorage and never
+touches the real `lumi_hw_tasks`.
+
+**Where it lives.**
+- `js/studyplan.js` — pure-logic core: `estimateMinutes`, `bucketOf`,
+  `sortStudyItems`, `buildStudyPlan`, `formatDuration`, `planHeader`,
+  `planDateKey`, `loadCheckedMap`, `saveCheckedMap`, `remainingTotals`. Zero
+  DOM / fetch / Lambda. Deterministic.
+- `js/studyplanview.js` — DOM mount + render + wiring. Reads
+  `getHwTasks()` / `getSchedule()`; writes only the checked-map under
+  `lumi_study_plan_checked_YYYY-MM-DD`. In test mode, `S.isTestMode → tasks=[]`
+  keeps the plan surface consistent with the home due-strip suppression.
+- `js/router.js` — added `#plan` route (`{name:'plan'}`) + `navPlan()`.
+- `js/home.js` — Study Plan quick-action is now live; subtitle reads
+  `${remaining.count} task(s) tonight` or `"You're clear tonight"`; hides
+  the plan view on home mount for symmetry with the class view.
+- `js/classview.js` — hides the plan view on class mount (deep-link
+  correctness).
+- `app.html` — new `#studyPlanView` sibling to `#homeView`/`#chatPanel`.
+- `style.css` — `.study-plan-*` scoped rules; picks up cream/navy/warm
+  tokens and terracotta urgency (`--warm` / `--warm-soft`) for urgent
+  due chips.
+
+**Behavior contract (matches the Session 4 spec).**
+- **Input.** Same source as the home due-strip: `getHwTasks()`. Tomorrow's
+  schedule is NOT derivable client-side (§4.4 — no rotation column), so
+  `buildStudyPlan` accepts an optional `tomorrowCourses` argument that
+  no-ops for now — the plumbing lands with the surface so a schema change
+  can flip it on without touching this module.
+- **Ordering.** overdue → tomorrow (today + tomorrow) → this week. Within a
+  bucket, classes-meeting-tomorrow first (no-op today), then alphabetical
+  by className then title. `later` and no-date tasks are dropped.
+- **Time chip.** Deterministic per-title: 45 min for essay/project/
+  research/paper/report/presentation/portfolio/read/reading/chapter/novel;
+  30 min otherwise. Word-boundary matched (no "prescreen"→"read" false
+  positives).
+- **Header.** `"Tonight: N task(s) · ~X hr Y min"` — updates live as
+  checkboxes toggle.
+- **Checkbox = visual only.** Strikes through, drops from the remaining
+  header, persists under `lumi_study_plan_checked_YYYY-MM-DD` (dated key
+  resets naturally at midnight). Does NOT mutate `lumi_hw_tasks` or trigger
+  `/homework-tasks` writes. A hint below the list links to the real
+  homework popup (`showHwPopup()`) so a student can mark items done for
+  real.
+- **Empty state.** "Nothing due — you're clear tonight." (matches the
+  home-card "You're clear tonight" subtitle when the count is zero.)
+- **Test mode.** Plan view mirrors the home due-strip: HW is suppressed
+  because a teacher-tester isn't actually enrolled. Locked cards on home
+  still route through `teacher.html?course=…&from=test-mode` — the plan
+  entry stays visible but renders the empty state.
+
+**Suites.** Root: **158 tests pass** (+25 from Session 3: estimateMinutes,
+bucketOf, sortStudyItems × 4 variants, buildStudyPlan × 4, formatDuration
+× 2, planHeader, planDateKey, load/saveCheckedMap, remainingTotals + the 3
+new router-plan cases). Lambda: unchanged (no Lambda changes). Boot-smoke
+covers `js/studyplan.js` + `js/studyplanview.js` automatically (data-driven
+discovery of `js/*.js`).
+
+**Deferred to Study Plan v2 (persistence-gated).**
+- **Bedrock-personalized ordering.** Layer-3 progress notes
+  (docs/PERSISTENCE_SPEC.md) will influence the sort: recent struggle
+  topics bubble ahead of stale ones, and the ordering explanation can
+  surface inline. Blocked until persistence enablement so no student-facing
+  copy references material the student never authorized us to persist.
+- **Progress-note advice.** A short "why these first" blurb generated
+  server-side from the same notes source that already feeds
+  `<<LUMI_TEACHER_NOTES>>` / `<<LUMI_PROGRESS_NOTE>>` — reuses the
+  chat-Lambda marker mechanism, no new route needed.
+- Until v2 turns on, the v1 ordering is fully deterministic and the plan
+  view is safe on any surface the flag is on.
