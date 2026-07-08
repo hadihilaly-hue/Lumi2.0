@@ -1556,14 +1556,28 @@ async function handleRequest(event, responseStream) {
     };
     try {
       if (method === "GET") {
-        // Owner-scoped: a single profile the caller owns (P1-A privacy posture).
-        const denied = await denyUnlessOwner(qs.teacher_profile_id);
-        if (denied) return sendJson(denied.status, { error: denied.error });
+        // Owner-scoped (P1-A privacy posture): ?teacher_profile_id=<uuid> (single,
+        // wizard edit-seed) or ?teacher_profile_ids=a,b,c (batch, home-card banner).
+        // EVERY requested profile must be owned by the caller, else 403 — artifact
+        // text must never reach anyone but the owning teacher.
+        const ids = qs.teacher_profile_ids
+          ? qs.teacher_profile_ids.split(",").map((s) => s.trim()).filter(Boolean)
+          : qs.teacher_profile_id ? [qs.teacher_profile_id] : null;
+        if (!ids || ids.length === 0) {
+          return sendJson(400, { error: "Provide ?teacher_profile_id= or ?teacher_profile_ids=" });
+        }
+        const owned = await dbQuery(
+          "SELECT id FROM public.teacher_profiles WHERE id = ANY($1::uuid[]) AND teacher_email = $2",
+          [ids, user.email.toLowerCase()]
+        );
+        if (owned.rowCount !== ids.length) {
+          return sendJson(403, { error: "Not the owning teacher for every requested profile" });
+        }
         const result = await dbQuery(
           `SELECT * FROM public.teacher_work_artifacts
-            WHERE teacher_profile_id = $1 AND deleted_at IS NULL
-            ORDER BY tier, sort_order, created_at, id`,
-          [qs.teacher_profile_id]
+            WHERE teacher_profile_id = ANY($1::uuid[]) AND deleted_at IS NULL
+            ORDER BY teacher_profile_id, tier, sort_order, created_at, id`,
+          [ids]
         );
         return sendJson(200, result.rows);
       }
