@@ -35,6 +35,18 @@
 -- Idempotent: every statement is guarded (IF NOT EXISTS /
 -- ADD COLUMN IF NOT EXISTS / CREATE OR REPLACE). Safe to re-run.
 --
+-- DEPENDS ON (both already applied to lumi-db):
+--   * rds-schema.sql          — public.schools, public.teacher_profiles,
+--                               and the shared update_updated_at_column() trigger fn.
+--   * rds-school-domains.sql  — public.schools.allowed_domains (the demo-tenant
+--                               seed below writes it; the base schools table
+--                               does NOT define this column on its own).
+--
+-- RECONCILED against the live schema on 2026-07-08 (Phase 5 build session):
+--   verified schools(name UNIQUE, allowed_domains, updated_at) + the
+--   set_schools_updated_at trigger, teacher_profiles.id PK for the FK, and the
+--   Phase-4 deleted_at soft-delete convention. No DDL drift; no changes needed.
+--
 -- Conventions matched from migration/rds-schema.sql + rds-add-deleted-at.sql:
 --   * gen_random_uuid() (core PG >= 13; no extension needed).
 --   * identity columns are plain uuid with NO FK to app_users — the same
