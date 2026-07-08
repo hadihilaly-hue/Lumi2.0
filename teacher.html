@@ -2145,6 +2145,42 @@ function renderTierArtifacts(tier) {
   });
 }
 
+// Persist one tier's written-example artifacts to teacher_work_artifacts.
+// New/edited editors with non-empty text → POST (upsert by id when present).
+// Existing artifacts whose editor was removed OR emptied → soft-DELETE. Saved
+// ids are captured back onto the editor so a per-tier retry upserts, never dupes.
+async function saveTierArtifacts(tier, profileId, local) {
+  const editors = local.textArtifacts || [];
+  const survivingIds = new Set();
+  for (const art of editors) {
+    const text = (art.text || '').trim();
+    // Blank editor is not written. An emptied EXISTING artifact keeps its id out
+    // of survivingIds, so it falls into the removed set below (empty = remove).
+    if (!text) continue;
+    const body = {
+      teacher_profile_id: profileId,
+      tier,
+      artifact_type: art.type || 'comment',
+      text_content: art.text,
+      label: (art.label || '').trim() || null,
+    };
+    if (art.id) body.id = art.id;
+    const saved = await rdsFetch('work-artifacts', { method: 'POST', body });
+    if (saved && saved.id) art.id = saved.id; // capture id from a new INSERT → retry upserts
+    if (art.id) survivingIds.add(art.id);
+  }
+  // Soft-delete existing artifacts the teacher removed or emptied this session.
+  const removed = (tExistingArtifactsByTier[tier] || []).filter(a => a.id && !survivingIds.has(a.id));
+  for (const r of removed) {
+    await rdsFetch(`work-artifacts?id=${encodeURIComponent(r.id)}`, { method: 'DELETE' });
+  }
+  // Refresh in-session snapshots so a re-open / retry reflects the saved state.
+  tExistingArtifactsByTier[tier] = [...survivingIds].map(id => ({ id }));
+  (tArtifactsByProfile[profileId] ||= {})[tier] = editors
+    .filter(a => (a.text || '').trim() && a.id)
+    .map(a => ({ id: a.id, teacher_profile_id: profileId, tier, artifact_type: a.type, text_content: a.text, label: (a.label || '').trim() || null }));
+}
+
 function validateStep4() {
   // Step 5 (work samples) is fully optional — photos, written examples, and the
   // per-tier description can all be skipped. Continue is never gated (D6-A-i).
@@ -2712,84 +2748,93 @@ async function saveTeacherProfile() {
     for (const tier of tiers) {
       const local = tWorkSamples[tier];
       try {
-        if (local.photos.length) {
-          const { data: { session } } = await sb.auth.getSession();
-          const classSlug = (tCurrentClass.course || 'general')
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-+|-+$/g, '') || 'general';
+        // Q4 v2: only write teacher_work_samples when the tier has photo or
+        // description content. A fully-empty tier is skipped (no spurious
+        // empty-description 400); a text-only tier persists via saveTierArtifacts.
+        const hasSampleContent = !!(local.description.trim() || local.existingPaths.length || local.photos.length);
+        if (hasSampleContent) {
+          if (local.photos.length) {
+            const { data: { session } } = await sb.auth.getSession();
+            const classSlug = (tCurrentClass.course || 'general')
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-+|-+$/g, '') || 'general';
 
-          const newPaths = await Promise.all(local.photos.map(async (file) => {
-            const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-            const fileContentType = file.type || 'image/jpeg';
+            const newPaths = await Promise.all(local.photos.map(async (file) => {
+              const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+              const fileContentType = file.type || 'image/jpeg';
 
-            // 1. Request signed S3 upload URL from the Lambda.
-            const sigRes = await fetch(`${LAMBDA_URL}/upload-url`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                bucket: 'work-samples',
-                filename: cleanName,
-                contentType: fileContentType,
-                classId: classSlug,
-                tier,
-              }),
-            });
-            if (!sigRes.ok) {
-              const errText = await sigRes.text();
-              throw new Error(`Failed to get S3 upload URL (${sigRes.status}): ${errText}`);
-            }
-            const { uploadUrl, key } = await sigRes.json();
+              // 1. Request signed S3 upload URL from the Lambda.
+              const sigRes = await fetch(`${LAMBDA_URL}/upload-url`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${session.access_token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  bucket: 'work-samples',
+                  filename: cleanName,
+                  contentType: fileContentType,
+                  classId: classSlug,
+                  tier,
+                }),
+              });
+              if (!sigRes.ok) {
+                const errText = await sigRes.text();
+                throw new Error(`Failed to get S3 upload URL (${sigRes.status}): ${errText}`);
+              }
+              const { uploadUrl, key } = await sigRes.json();
 
-            // 2. PUT the file directly to S3. Content-Type MUST match what we signed for.
-            const putRes = await fetch(uploadUrl, {
-              method: 'PUT',
-              headers: { 'Content-Type': fileContentType },
-              body: file,
-            });
-            if (!putRes.ok) {
-              const errText = await putRes.text();
-              throw new Error(`S3 upload failed (${putRes.status}): ${errText}`);
-            }
+              // 2. PUT the file directly to S3. Content-Type MUST match what we signed for.
+              const putRes = await fetch(uploadUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': fileContentType },
+                body: file,
+              });
+              if (!putRes.ok) {
+                const errText = await putRes.text();
+                throw new Error(`S3 upload failed (${putRes.status}): ${errText}`);
+              }
 
-            return key;
-          }));
-          // Promote successful uploads into existingPaths so a retry skips them.
-          local.existingPaths = [...local.existingPaths, ...newPaths];
-          local.photos = [];
+              return key;
+            }));
+            // Promote successful uploads into existingPaths so a retry skips them.
+            local.existingPaths = [...local.existingPaths, ...newPaths];
+            local.photos = [];
+          }
+
+          const finalPaths = [...local.existingPaths];
+
+          // Detect deletes: paths from the old DB row not in finalPaths.
+          const oldPaths = (tExistingSamplesByTier[tier]?.photo_paths) || [];
+          const toDelete = oldPaths.filter(p => !finalPaths.includes(p));
+          if (toDelete.length) {
+            // TODO(Week2+): Lambda has no /delete-objects endpoint yet. Files removed
+            // from a tier become S3 orphans. Acceptable for demo (cents/month). Fix
+            // options: (a) add /delete-objects to Lambda, or (b) S3 lifecycle rule.
+            console.info(`[Q4] skipped delete for ${tier} (S3 migration pending /delete-objects):`, toDelete);
+          }
+
+          // POST is a (teacher_profile_id, tier) upsert; updated_at is
+          // server-set. Throws on non-2xx → caught by the per-tier handler below.
+          await rdsFetch('work-samples', { method: 'POST', body: {
+            teacher_profile_id: profileId,
+            tier,
+            description: local.description.trim(),
+            photo_paths: finalPaths,
+          } });
+
+          // Mirror DB snapshot for next-edit delete-detection.
+          tExistingSamplesByTier[tier] = { photo_paths: [...finalPaths] };
+          (tSamplesByProfile[profileId] ||= {})[tier] = {
+            teacher_profile_id: profileId, tier,
+            description: local.description.trim(),
+            photo_paths: [...finalPaths],
+          };
         }
 
-        const finalPaths = [...local.existingPaths];
-
-        // Detect deletes: paths from the old DB row not in finalPaths.
-        const oldPaths = (tExistingSamplesByTier[tier]?.photo_paths) || [];
-        const toDelete = oldPaths.filter(p => !finalPaths.includes(p));
-        if (toDelete.length) {
-          // TODO(Week2+): Lambda has no /delete-objects endpoint yet. Files removed
-          // from a tier become S3 orphans. Acceptable for demo (cents/month). Fix
-          // options: (a) add /delete-objects to Lambda, or (b) S3 lifecycle rule.
-          console.info(`[Q4] skipped delete for ${tier} (S3 migration pending /delete-objects):`, toDelete);
-        }
-
-        // POST is a (teacher_profile_id, tier) upsert; updated_at is
-        // server-set. Throws on non-2xx → caught by the per-tier handler below.
-        await rdsFetch('work-samples', { method: 'POST', body: {
-          teacher_profile_id: profileId,
-          tier,
-          description: local.description.trim(),
-          photo_paths: finalPaths,
-        } });
-
-        // Mirror DB snapshot for next-edit delete-detection.
-        tExistingSamplesByTier[tier] = { photo_paths: [...finalPaths] };
-        (tSamplesByProfile[profileId] ||= {})[tier] = {
-          teacher_profile_id: profileId, tier,
-          description: local.description.trim(),
-          photo_paths: [...finalPaths],
-        };
+        // Q4 v2: persist this tier's written-example (text) artifacts.
+        await saveTierArtifacts(tier, profileId, local);
       } catch (e) {
         console.warn(`[Q4] tier ${tier} failed:`, e);
         failedTiers.push(tier);
