@@ -1,9 +1,12 @@
 // Hash router for the student-home redesign v1 (docs/STUDENT_HOME_REDESIGN.md §4.3).
-// Session 1 knows two routes: `home` (default) and `class`.
+// Session 1 knows two routes: `home` (default) and `class`. Session 4 adds a
+// third: `plan` (Tonight's Study Plan — full-surface view, same nav pattern as
+// class view, single instance so no id in the URL).
 //
 // Route wire format (all client-side; no server rewrites):
 //   `` or `#home`                       -> {name:'home'}
 //   `#class/<courseB64>/<teacherEmailB64>` -> {name:'class', course, teacher}
+//   `#plan`                             -> {name:'plan'}
 // Anything else falls back to `home`.
 //
 // CRITICAL — preserving `?mode=test` (spec §4.5). Every pushState() call keeps
@@ -40,6 +43,7 @@ export function parseHash(hash) {
   // Accept both `#foo` and `foo` (some callers strip the leading #).
   const h = raw.startsWith('#') ? raw.slice(1) : raw;
   if (h === '' || h === 'home') return { name: 'home' };
+  if (h === 'plan') return { name: 'plan' };
   if (h.startsWith('class/')) {
     const parts = h.split('/');
     if (parts.length !== 3) return { name: 'home' };
@@ -54,6 +58,7 @@ export function parseHash(hash) {
 /** Build the hash string for a route (no leading `#`). */
 export function buildHash(route) {
   if (!route || route.name === 'home') return 'home';
+  if (route.name === 'plan') return 'plan';
   if (route.name === 'class') {
     return `class/${b64urlEncode(route.course)}/${b64urlEncode(route.teacher)}`;
   }
@@ -75,17 +80,18 @@ export function buildRouteUrl(route, search) {
 // functions below touch window/history/location and are only ever called from
 // live boot code, so they don't appear in unit tests.
 
-let _handlers = { onHome: () => {}, onClass: () => {} };
+let _handlers = { onHome: () => {}, onClass: () => {}, onPlan: () => {} };
 let _wired = false;
 
 function dispatch(route) {
   if (route.name === 'class') _handlers.onClass(route);
+  else if (route.name === 'plan') _handlers.onPlan(route);
   else _handlers.onHome(route);
 }
 
 /** Wire the router to the current window. Idempotent — safe to call once. */
 export function initRouter(handlers) {
-  _handlers = { onHome: () => {}, onClass: () => {}, ..._handlers, ...handlers };
+  _handlers = { onHome: () => {}, onClass: () => {}, onPlan: () => {}, ..._handlers, ...handlers };
   if (!_wired) {
     window.addEventListener('hashchange', () => dispatch(parseHash(location.hash)));
     _wired = true;
@@ -105,5 +111,13 @@ export function navClass(course, teacher) {
   const route = { name: 'class', course, teacher };
   const url = buildRouteUrl(route, location.search);
   history.pushState({ route: 'class' }, '', url);
+  dispatch(route);
+}
+
+/** Navigate to Tonight's Study Plan, preserving the current query string. */
+export function navPlan() {
+  const route = { name: 'plan' };
+  const url = buildRouteUrl(route, location.search);
+  history.pushState({ route: 'plan' }, '', url);
   dispatch(route);
 }

@@ -40,6 +40,11 @@ export function mountClass(route) {
   wireBackOnce();
   unmountHome();
 
+  // Session 4 (Study Plan): make sure the plan surface is hidden when the
+  // router hands us the class route directly (deep-link case).
+  const planView = document.getElementById('studyPlanView');
+  if (planView) planView.style.display = 'none';
+
   const header = document.getElementById('classViewHeader');
   const chat = document.getElementById('chatPanel');
   const courseEl = document.getElementById('classViewCourse');
