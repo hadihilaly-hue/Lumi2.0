@@ -1489,6 +1489,46 @@ body.signin-page{
   height: auto;
 }
 
+/* Home-only page-scroll switch (bugfix 2026-07-08 pt. 2).
+   Symptom (earlier build): home content sat in the top half of the viewport
+   with a strip of --bg cream below, and cards past the fold were only
+   reachable by scrolling INSIDE #homeView — easy to miss under macOS's
+   auto-hide scrollbar. Cause: the column-flex rules above put #homeView in a
+   100vh-clipped ancestor chain (html/body {overflow:hidden} + .content/.main
+   {height:100vh; overflow:hidden}), so the ONLY scroll region was the inner
+   flex child.
+
+   Fix: release that chain when — and ONLY when — home is the mounted view.
+   Detection signal is the router's own inline display toggle on #homeView
+   (js/home.js mountHome/unmountHome sets style.display = '' / 'none'). When
+   home is mounted, html/body/.content/.main go to natural flow with cream
+   --bg extending the full document and the PAGE scrolls. When class view or
+   study plan is mounted, unmountHome() re-applies inline display:none →
+   :has() misses → the 100vh-clipped rules above stay in force → #chatPanel
+   and #studyPlanView keep their existing inner-scroll (Bug-2 preserved). */
+html:has(#homeView.home-view:not([style*="none"])) {
+  height: auto;
+  overflow: visible;
+}
+body.home-redesign-v1:has(#homeView.home-view:not([style*="none"])) {
+  height: auto;
+  min-height: 100vh;
+  overflow: visible;
+  background: var(--bg);
+}
+body.home-redesign-v1:has(#homeView.home-view:not([style*="none"])) .content,
+body.home-redesign-v1:has(#homeView.home-view:not([style*="none"])) .main {
+  height: auto;
+  min-height: 100vh;
+  overflow: visible;
+}
+body.home-redesign-v1:has(#homeView.home-view:not([style*="none"])) .home-view {
+  height: auto;
+  min-height: 100vh;
+  flex: none;
+  overflow: visible;
+}
+
 /* Home view container. Hidden by default; router.mountHome() flips display.
    The .home-redesign-v1 rules above take precedence when the flag is on. */
 .home-view {
