@@ -490,21 +490,30 @@ Legend: **U** unchanged · **M** modified · **R** replaced · **N** new.
 
 ### 4.7 Migration strategy
 
-**Recommendation: flag-gated feature switch, single session cut.**
+**Status:** default flipped ON on **2026-07-08** (this branch). The old sidebar layout is now
+the opt-out, not the default.
 
-**Reasoning.** Teachers see this too via Test Mode; leaving a stale sidebar codebase alive
-alongside the new grid doubles the maintenance surface and *risks* the Test Mode invariants
-(TM-2 in particular — a stale write path from the old sidebar could pollute student data if it
-survives). But we also can't yank the sidebar in one big commit with no way to revert if
-teachers hate the grid on day one. **Best compromise:**
+- Default: the redesign renders for every session (student and Test Mode).
+- Kill switch: `localStorage.setItem('lumi_home_redesign_v1','off'); location.reload();` —
+  restores the pre-redesign sidebar layout. Absence of the key, or any other value (including
+  the legacy `'true'` set during the pre-flip rollout window), resolves to the redesign.
+- The old layout code paths, sidebar markup, and CSS remain fully in-tree. Deletion is still
+  scheduled as **Session 8** in §4.8. This session is a semantics inversion only.
+
+**Reasoning (retained for history).** Teachers see this too via Test Mode; leaving a stale
+sidebar codebase alive alongside the new grid doubles the maintenance surface and *risks* the
+Test Mode invariants (TM-2 in particular — a stale write path from the old sidebar could
+pollute student data if it survives). But we also can't yank the sidebar in one big commit
+with no way to revert if teachers hate the grid on day one. **Best compromise:**
 
 1. Land the router + `home.js` + `classview.js` behind `S.homeRedesign` (a boolean read from
-   `localStorage.lumi_home_redesign_v1` at boot, default `false`). Old sidebar still boots
-   when the flag is off; new home boots when it's on.
+   `localStorage.lumi_home_redesign_v1` at boot). Historically default `false`; **default
+   flipped to `true` on 2026-07-08**. Kill switch above returns to the old sidebar.
 2. Turn the flag on for the author's own account (hardcode by email or by an admin toggle in
    Settings) and one test cohort.
 3. After a week of live use in Test Mode + a small student group, flip the default to `true`
-   and delete the sidebar code + the flag in a separate cleanup session.
+   and delete the sidebar code + the flag in a separate cleanup session. **Default flip
+   shipped 2026-07-08; sidebar deletion still pending Session 8.**
 4. **Do NOT ship the flag long-term.** It exists specifically to shorten the "roll back if
    this is bad" window to one Settings toggle. Kill it after two weeks max.
 
@@ -1009,14 +1018,16 @@ Written against the exact changes on this branch. Every invariant preserved.
 
 ### 12.7 Manual browser verification list (for Hadi)
 
-Toggle: `localStorage.setItem('lumi_home_redesign_v1','true'); location.reload();`
+Default ON since 2026-07-08. Kill switch (opt back into the old sidebar):
+`localStorage.setItem('lumi_home_redesign_v1','off'); location.reload();`
+Restore the default: `localStorage.removeItem('lumi_home_redesign_v1'); location.reload();`
 
 Run each; each is <60 seconds.
 
-- [ ] **B1.** Flag OFF → app boots into the old sidebar layout, byte-identical
-      (no home grid visible, no `body.home-redesign-v1` class).
-- [ ] **B2.** Flag ON → home grid renders, sidebar hidden, no console errors.
-      Card count matches `getSchedule().length`.
+- [ ] **B1.** Kill switch set (`'off'`) → app boots into the old sidebar layout,
+      byte-identical (no home grid visible, no `body.home-redesign-v1` class).
+- [ ] **B2.** Default (no key, or any non-`'off'` value) → home grid renders,
+      sidebar hidden, no console errors. Card count matches `getSchedule().length`.
 - [ ] **B3.** Tap a *ready* card → class view mounts, back button visible,
       chat pipeline works (send a message, see streamed reply).
 - [ ] **B4.** Back button → returns to home; the URL hash flips to `#home`;
@@ -1031,10 +1042,12 @@ Run each; each is <60 seconds.
       click → routes to `teacher.html`, sessionStorage cleared.
 - [ ] **B9.** Student mode, tap a *locked* card → toast appears; no
       navigation.
-- [ ] **B10.** Flag OFF → all the above surfaces (banner, exit button,
-      sidebar) return to their old positions with no drift.
+- [ ] **B10.** Kill switch set (`'off'`) → all the above surfaces (banner, exit
+      button, sidebar) return to their old positions with no drift.
 
-Any failure → flip the flag off (`localStorage.removeItem('lumi_home_redesign_v1'); location.reload();`) and the old layout is fully restored. Rollback is one line.
+Any failure → engage the kill switch
+(`localStorage.setItem('lumi_home_redesign_v1','off'); location.reload();`) and
+the old layout is fully restored. Rollback is one line.
 
 ### 12.8 Session 2 pickup (per §4.8)
 
@@ -1102,9 +1115,10 @@ Landed 2026-07-08 on `main` in four commits:
 
 **Manual verification list (extends §12.7 for the new surface).**
 
-Toggle: `localStorage.setItem('lumi_home_redesign_v1','true'); location.reload();`
+Default ON since 2026-07-08. Kill switch:
+`localStorage.setItem('lumi_home_redesign_v1','off'); location.reload();`
 
-- **B11.** Flag ON → header shows serif greeting title ("Good <tod>, <First>") + date + count line ("N things due this week across M classes"). Zero HW → count line drops silently.
+- **B11.** Default → header shows serif greeting title ("Good <tod>, <First>") + date + count line ("N things due this week across M classes"). Zero HW → count line drops silently.
 - **B12.** Due-soon strip renders up to 4 chips; urgent (≤24h) items get terracotta border + terracotta ink on the day badge. Empty → whole section hidden.
 - **B13.** Quick-actions row shows Tonight's Study Plan (navy, live — subtitle reads "N tasks tonight" / "You're clear tonight") + General Chat (cream). Study Plan click → `#plan` route, full-surface list with back button; General Chat click → chat surface, back button returns home. (Live-wire: §12.11.)
 - **B14.** Search input filters cards live by course/teacher substring; blank query restores all.

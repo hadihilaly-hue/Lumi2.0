@@ -1,6 +1,15 @@
 // ─── AUTH GUARD ───────────────────────────────────────────────────────────────
 export let currentUser = null;
 
+// Student-home redesign v1 flag reader. Exported for tests; used once at
+// module load below. DEFAULT ON — only the exact string 'off' opts back into
+// the old sidebar layout. Any read failure (private-mode Safari, etc.) also
+// falls through to ON, matching the shipped default.
+export function readHomeRedesignFlag() {
+  try { return localStorage.getItem('lumi_home_redesign_v1') !== 'off'; }
+  catch { return true; }
+}
+
 // ─── STATE ────────────────────────────────────────────────────────────────────
 export const S = {
   currentId:     null,
@@ -21,12 +30,14 @@ export const S = {
   isTestMode:    false,
   testSchedule:  [],
   testConvs:     {},
-  // Student-home redesign v1 (docs/STUDENT_HOME_REDESIGN.md).
-  // Feature flag: read once at module load from localStorage. `true` boots the
-  // new home/class hash-routed layout; `false` keeps the pre-redesign sidebar
-  // shell untouched. Toggled DevTools-only in Session 1 (spec §4.7):
-  //   localStorage.setItem('lumi_home_redesign_v1', 'true'); location.reload();
-  homeRedesign:  (() => { try { return localStorage.getItem('lumi_home_redesign_v1') === 'true'; } catch { return false; } })(),
+  // Student-home redesign v1 (docs/STUDENT_HOME_REDESIGN.md §4.7).
+  // Feature flag, read once at module load from localStorage — DEFAULT ON.
+  // Kill switch (opt back into old sidebar layout):
+  //   localStorage.setItem('lumi_home_redesign_v1', 'off'); location.reload();
+  // Absence / any other value (including the legacy 'true' from the pre-flip
+  // rollout window) resolves to the redesign. Old-layout code paths still live
+  // in-tree; removal is scheduled as Session 8.
+  homeRedesign:  readHomeRedesignFlag(),
   // Current hash route (only meaningful when homeRedesign is true; router.js
   // owns writes). Session 1 shape: {name:'home'} or {name:'class', course, teacher}.
   route:         { name: 'home' },

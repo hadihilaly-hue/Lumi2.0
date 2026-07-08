@@ -53,9 +53,9 @@ import { initVoice, wireVoiceListeners } from './js/voice.js';
 
   // Home redesign v1 (docs/STUDENT_HOME_REDESIGN.md §4.7). Flag is read at
   // module load from localStorage; here we mirror it onto <body> so the CSS
-  // can hide the sidebar shell in one place. DevTools-only toggle for the
-  // 2-week rollback window:
-  //   localStorage.setItem('lumi_home_redesign_v1', 'true'); location.reload();
+  // can hide the sidebar shell in one place. DEFAULT ON — kill switch to
+  // fall back to the pre-redesign sidebar layout:
+  //   localStorage.setItem('lumi_home_redesign_v1', 'off'); location.reload();
   if (S.homeRedesign) document.body.classList.add('home-redesign-v1');
 
   // TM-4: when in test mode, reveal the persistent banner at the top

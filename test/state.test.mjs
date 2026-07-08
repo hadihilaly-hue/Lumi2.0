@@ -16,6 +16,7 @@ import {
   setCurrentProjId,
   _introShownFor,
   _saveIntroShown,
+  readHomeRedesignFlag,
 } from '../js/state.js';
 import { reset } from './harness.mjs';
 
@@ -35,8 +36,27 @@ test('S has the documented initial shape', () => {
   assert.deepEqual(S.testSchedule, []);
   assert.deepEqual(S.testConvs, {});
   // Student-home redesign v1 flag + route (docs/STUDENT_HOME_REDESIGN.md §4.7).
-  assert.equal(S.homeRedesign, false);
+  // Default flipped ON — see readHomeRedesignFlag tests below for the
+  // 'off' kill-switch contract. reset() reseeds S from the same baseline.
+  assert.equal(S.homeRedesign, true);
   assert.deepEqual(S.route, { name: 'home' });
+});
+
+test('readHomeRedesignFlag: default ON with an empty localStorage', () => {
+  // No key set → the redesign is the default layout. This is the flip.
+  assert.equal(globalThis.localStorage.getItem('lumi_home_redesign_v1'), null);
+  assert.equal(readHomeRedesignFlag(), true);
+});
+
+test('readHomeRedesignFlag: "off" kill switch restores the old layout', () => {
+  globalThis.localStorage.setItem('lumi_home_redesign_v1', 'off');
+  assert.equal(readHomeRedesignFlag(), false);
+});
+
+test('readHomeRedesignFlag: legacy "true" from the rollout window still resolves to ON', () => {
+  // Redundant-but-harmless: pre-flip clients that set 'true' keep working.
+  globalThis.localStorage.setItem('lumi_home_redesign_v1', 'true');
+  assert.equal(readHomeRedesignFlag(), true);
 });
 
 test('SB (sidebar state) has the documented initial shape', () => {
