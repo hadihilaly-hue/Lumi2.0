@@ -136,6 +136,21 @@ test('buildTutorSystem includes the <<LUMI_TEACHER_NOTES>> injection marker', ()
   assert.ok(p.includes('<<LUMI_TEACHER_NOTES>>'));
 });
 
+test('buildTutorSystem includes the <<LUMI_WORK_ARTIFACTS>> marker, before the notes marker', () => {
+  // Q4 v2: text artifacts are injected server-side at this marker. It must be
+  // present in the profile branch and sit in the teacher-stable prefix BEFORE
+  // the per-student notes marker (cache-stability, D9).
+  const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile());
+  assert.ok(p.includes('<<LUMI_WORK_ARTIFACTS>>'));
+  assert.ok(p.indexOf('<<LUMI_WORK_ARTIFACTS>>') < p.indexOf('<<LUMI_TEACHER_NOTES>>'));
+});
+
+test('buildTutorSystem omits the <<LUMI_WORK_ARTIFACTS>> marker without a profile', () => {
+  // The generic fallback branch carries no injection markers.
+  const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', null);
+  assert.ok(!p.includes('<<LUMI_WORK_ARTIFACTS>>'));
+});
+
 test('buildTutorSystem shows placeholders when persona fields are missing', () => {
   const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', { title: 'Ms.' });
   assert.match(p, /\(No rules specified\)/);

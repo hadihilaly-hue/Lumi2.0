@@ -46,6 +46,9 @@ export async function callAPI(msgs, system) {
     // Server-side teacher-notes injection target (Lambda swaps the
     // <<LUMI_TEACHER_NOTES>> marker in `system`; notes never reach the client).
     ...(S.tutorCtx?.notesInjection ? { inject_teacher_notes: S.tutorCtx.notesInjection } : {}),
+    // Q4 v2: server-side text work-artifacts injection (Lambda swaps the
+    // <<LUMI_WORK_ARTIFACTS>> marker; artifact text never reaches the client).
+    ...(S.tutorCtx?.artifactsInjection ? { inject_work_artifacts: S.tutorCtx.artifactsInjection } : {}),
   });
 
   if (!res.ok) {

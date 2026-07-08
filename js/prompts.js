@@ -206,6 +206,13 @@ EXEMPLARY-level (students exceeding expectations):
 ${ws.exemplary.description}`;
     }
 
+    // Q4 v2: teacher-stable text-artifact section is injected SERVER-SIDE
+    // (Decision P1-A — text never reaches the browser). Emit the marker here in
+    // the cacheable prefix, BEFORE <<LUMI_TEACHER_NOTES>> (per-student) below.
+    // The chat Lambda replaces it with the built section or strips it to ''
+    // (stray-marker safe → byte-identical when the teacher has no text artifacts).
+    prompt += `<<LUMI_WORK_ARTIFACTS>>`;
+
     prompt += `
 
 ═══ STUDENT MODE RULES — FOLLOW THESE AT ALL TIMES ═══
