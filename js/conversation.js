@@ -5,15 +5,40 @@ import { getStudentName, teacherDisplayName, updateTestModeBanner } from './prom
 import { clearSearch, renderSidebar } from './sidebar.js';
 import { $, S, SB, _introShownFor, _saveIntroShown, currentUser, messagesEl, msgInput } from './state.js';
 import { flushProgressNote, genId, getConvs, saveConvs, saveCurrentConv } from './storage.js';
-import { getTeacherProfile, loadWorkSampleImages, rdsFetch } from './teachers.js';
+import { getAvailableClassesSync, getTeacherProfile, loadWorkSampleImages, rdsFetch, resolveScheduleCourse } from './teachers.js';
 
 
 // ─── SUPABASE SYNC ────────────────────────────────────────────────────────────
 
-// Helper: look up subjectId + subjectName for a given course name
+// Helper: look up subjectId + subjectName for a given course name. Prefers
+// the live /available-classes cache (so a schedule string like "US History (H)"
+// or "Algebra 2" resolves to the DB's subject even when it doesn't match a
+// MENLO_CURRICULUM key). Falls back to the static curriculum when the cache
+// is empty (boot fetch pending) or the class isn't in the DB list — then
+// returns subjectId=null on total miss. subjectId is only used for UI state
+// (sidebar expansion), so a null is a soft failure, not a chat blocker.
 export function lookupSubjectForCourse(courseName) {
+  // 1. Live /available-classes: exact / normalized / alias resolution.
+  const resolved = resolveScheduleCourse(courseName);
+  const rows = getAvailableClassesSync();
+  if (resolved && rows) {
+    const row = rows.find(r => r && r.course_name === resolved.canonicalCourse);
+    const subjectName = (row && row.subject) || null;
+    if (subjectName) {
+      return {
+        subjectId: SUBJECT_IDS[subjectName] || subjectName.toLowerCase().replace(/\s+/g, '-'),
+        subjectName,
+      };
+    }
+    // Row matched but has no `subject` — fall through to the static
+    // MENLO_CURRICULUM check on the canonical name below.
+  }
+  const staticProbe = (resolved && resolved.canonicalCourse) || courseName;
+  // 2. Static MENLO_CURRICULUM (exact key). Kept as a compat fallback so the
+  // sidebar's "All Menlo Classes" tree — which iterates MENLO_CURRICULUM
+  // directly — still resolves its own entries.
   for (const [subjectName, courses] of Object.entries(MENLO_CURRICULUM)) {
-    if (courses[courseName]) {
+    if (courses[staticProbe]) {
       return {
         subjectId:   SUBJECT_IDS[subjectName] || subjectName.toLowerCase().replace(/\s+/g, '-'),
         subjectName,

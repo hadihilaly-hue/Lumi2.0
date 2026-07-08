@@ -1,4 +1,5 @@
 import { CLAUDE_PROXY_URL } from './api.js';
+import { findUnresolvedScheduleCourses, resolveCanonicalCourse } from './courseNormalize.js';
 import { renderSidebar } from './sidebar.js';
 import { getSchedule } from './storage.js';
 
@@ -57,12 +58,16 @@ export async function preloadProfileStatuses() {
     // Build a lookup: email__course -> done
     const lookup = {};
     (data || []).forEach(row => { lookup[row.teacher_email + '__' + row.course_name] = row.done; });
-    // Map each scheduled class
+    // Map each scheduled class. Use the canonical course_name (via
+    // resolveScheduleCourse) so a schedule string like "US History (H)" still
+    // resolves to the DB row "US History" for the ready badge / locked state.
     schedule.forEach(({ course, teacher }) => {
       const email = resolveTeacherEmail(teacher);
       const key = course + '::' + teacher;
       if (!email) { _profileStatusCache[key] = 'pending'; return; }
-      const done = lookup[email + '__' + course];
+      const resolved = resolveScheduleCourse(course);
+      const effectiveCourse = resolved ? resolved.canonicalCourse : course;
+      const done = lookup[email + '__' + effectiveCourse];
       _profileStatusCache[key] = done === true ? 'ready' : 'pending';
     });
     renderSidebar();
@@ -106,6 +111,42 @@ export async function fetchAvailableClasses() {
   }
 }
 
+// Module-scope cache of /available-classes rows so lookupSubjectForCourse and
+// getTeacherProfile can reconcile a student-schedule course string against
+// the DB's canonical course_name synchronously. `preloadAvailableClasses`
+// (called from app boot, non-blocking) fills it; readers must tolerate an
+// empty cache (fetch pending or failed).
+let _availableClasses = null;
+export function getAvailableClassesSync() { return _availableClasses; }
+
+export async function preloadAvailableClasses() {
+  const rows = await fetchAvailableClasses();
+  if (!rows) return null;
+  _availableClasses = rows;
+  // Emit a one-shot diagnostic listing every schedule course that could not
+  // be resolved to a DB row, with closest-candidate suggestions. The list
+  // is what a maintainer uses to decide whether a new COURSE_ALIASES entry
+  // is warranted (or a bad row in the DB). Never gates the UI.
+  try {
+    const schedule = getSchedule();
+    const unresolved = findUnresolvedScheduleCourses(schedule, rows);
+    if (unresolved.length) {
+      console.warn(
+        `[course_mapping] ${unresolved.length} scheduled course(s) do not match any /available-classes row:`,
+        unresolved
+      );
+    }
+  } catch (e) { /* diagnostic only */ }
+  return rows;
+}
+
+// Sync resolver used by lookupSubjectForCourse and getTeacherProfile. Returns
+// null on empty cache — callers keep the schedule string as-is on miss.
+export function resolveScheduleCourse(scheduleCourse) {
+  if (!_availableClasses) return null;
+  return resolveCanonicalCourse(scheduleCourse, _availableClasses);
+}
+
 // Option 2: fetch one teacher profile from the RDS-backed Lambda route, shape-matched
 // to the supabase-js path (returns the row object, or null on 404). Auth is the same
 // Supabase JWT the chat proxy already uses. The route returns an array (teacher_email
@@ -144,7 +185,17 @@ export async function getTeacherProfile(teacherName, course) {
   if (!teacherName || !course) return null;
   const email = resolveTeacherEmail(teacherName);
   if (!email) { console.warn('[getTeacherProfile] no email for:', teacherName); return null; }
-  const cacheKey = email + '__' + course;
+  // Reconcile the schedule course string against the DB's canonical
+  // course_name (from cached /available-classes rows). Keeps display names
+  // unchanged; only the value we send to the Lambda changes. Falls through
+  // to the raw string when the cache is empty or nothing matched — the
+  // downstream 404 path then reports "no profile" as before.
+  const resolved = resolveScheduleCourse(course);
+  const effectiveCourse = resolved ? resolved.canonicalCourse : course;
+  if (resolved && resolved.canonicalCourse !== course) {
+    console.log('[getTeacherProfile] mapped course:', course, '→', resolved.canonicalCourse, `(${resolved.matchType})`);
+  }
+  const cacheKey = email + '__' + effectiveCourse;
 
   // AUDIT_FRONTEND F3: serve a warm cache entry instead of re-hitting the Lambda
   // on every open of the same class (previously N opens = N round-trips; the
@@ -167,7 +218,7 @@ export async function getTeacherProfile(teacherName, course) {
     const timeout = new Promise(resolve => setTimeout(() => resolve(undefined), 5000));
     let raced;
     try {
-      raced = await Promise.race([fetchTeacherProfileLambda(email, course), timeout]);
+      raced = await Promise.race([fetchTeacherProfileLambda(email, effectiveCourse), timeout]);
     } catch (err) {
       console.error('[getTeacherProfile] Lambda fetch failed:', teacherName, course, err);
       return { __error: true, message: err?.message || String(err) };

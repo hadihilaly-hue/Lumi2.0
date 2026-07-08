@@ -12,7 +12,7 @@ import { mountClass } from './js/classview.js';
 import { initRouter } from './js/router.js';
 import { $, S, SB, currentUser, fileInput, msgInput, sbSearch, sendBtn, setCurrentProjId, setCurrentUser, themeToggle } from './js/state.js';
 import { flushProgressNote, genId, getSchedule, loadConvsFromSupabase, loadProfileFromSupabase, loadTestModeSchedule, migrateOldData, saveCurrentConv } from './js/storage.js';
-import { isTeacherModeAllowed, preloadProfileStatuses, rdsFetch } from './js/teachers.js';
+import { isTeacherModeAllowed, preloadAvailableClasses, preloadProfileStatuses, rdsFetch } from './js/teachers.js';
 import { autoGrow, closeSettings, closeSidebar, openSettings, openSidebar, showToast, updateSendBtn } from './js/ui.js';
 import { initVoice, wireVoiceListeners } from './js/voice.js';
 
@@ -350,7 +350,12 @@ function startApp() {
   initVoice();
   wireVoiceListeners();
 
-  preloadProfileStatuses(); // fetch teacher profile statuses for sidebar badges (non-blocking)
+  // Load /available-classes into the module-level cache FIRST — the
+  // preloadProfileStatuses call below and every subsequent openTutor need it
+  // to reconcile schedule course strings ("US History (H)", "Algebra 2") with
+  // the DB's canonical course_name. Non-blocking chain: profile statuses are
+  // scheduled after so their lookup keys land on canonical names.
+  preloadAvailableClasses().finally(() => preloadProfileStatuses());
   loadHwFromSupabase().then(async () => {
     await loadProjectsFromSupabase();
     injectProjectTasksToHomework();
