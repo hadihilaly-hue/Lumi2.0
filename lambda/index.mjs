@@ -1560,12 +1560,15 @@ async function handleRequest(event, responseStream) {
         // wizard edit-seed) or ?teacher_profile_ids=a,b,c (batch, home-card banner).
         // EVERY requested profile must be owned by the caller, else 403 — artifact
         // text must never reach anyone but the owning teacher.
-        const ids = qs.teacher_profile_ids
+        const rawIds = qs.teacher_profile_ids
           ? qs.teacher_profile_ids.split(",").map((s) => s.trim()).filter(Boolean)
           : qs.teacher_profile_id ? [qs.teacher_profile_id] : null;
-        if (!ids || ids.length === 0) {
+        if (!rawIds || rawIds.length === 0) {
           return sendJson(400, { error: "Provide ?teacher_profile_id= or ?teacher_profile_ids=" });
         }
+        // Dedup so a repeated id (`?teacher_profile_ids=X,X`) doesn't make the
+        // owned-count comparison below spuriously 403 the whole batch.
+        const ids = [...new Set(rawIds)];
         const owned = await dbQuery(
           "SELECT id FROM public.teacher_profiles WHERE id = ANY($1::uuid[]) AND teacher_email = $2",
           [ids, user.email.toLowerCase()]

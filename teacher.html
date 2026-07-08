@@ -1595,19 +1595,18 @@ async function loadAllTeacherProfiles() {
 }
 
 // Returns true iff all three tiers are complete for this profile id. Q4 v2
-// (Decision D6): a tier "counts" when it has a non-empty description AND at
-// least one artifact of ANY type — a photo OR a written (text) example. This is
-// the generalization of the old photo-only rule so a text-only PE/orchestra
-// teacher who is fully configured is not nagged by the home-card banner forever.
+// (Decision D6): a tier "counts" when it has at least one artifact of ANY type
+// — a photo OR a written (text) example. Description is NOT required: a text-only
+// PE/orchestra teacher who added a written example per tier (but left the
+// optional "what I look for" note blank) must not be nagged by the home-card
+// banner. "Completeness counts any artifact type."
 function hasAllWorkSampleTiers(profileId) {
   if (!profileId) return false;
-  const samplesByTier = tSamplesByProfile[profileId];
-  if (!samplesByTier) return false;
+  const samplesByTier = tSamplesByProfile[profileId] || {};
   const artifactsByTier = tArtifactsByProfile[profileId] || {};
   return ['progressing','proficient','exemplary'].every(tier => {
     const r = samplesByTier[tier];
-    if (!r || (r.description || '').trim().length === 0) return false;
-    const hasPhoto = Array.isArray(r.photo_paths) && r.photo_paths.length > 0;
+    const hasPhoto = r && Array.isArray(r.photo_paths) && r.photo_paths.length > 0;
     const hasText = Array.isArray(artifactsByTier[tier]) && artifactsByTier[tier].length > 0;
     return hasPhoto || hasText;
   });
@@ -2065,8 +2064,15 @@ const TEXT_ARTIFACT_TYPES = [
   { value: 'other', label: 'Other' },
 ];
 const MAX_ARTIFACT_TEXT = 2000; // matches the Lambda per-text hard cap
+const MAX_TEXT_ARTIFACTS_PER_TIER = 5; // matches the Lambda per-tier cap (5/tier)
 
 function addTextArtifact(tier) {
+  // Cap client-side so a teacher can't build an unsaveable tier: the Lambda 409s
+  // the 6th create, which would fail the whole tier save with no visible reason.
+  if (tWorkSamples[tier].textArtifacts.length >= MAX_TEXT_ARTIFACTS_PER_TIER) {
+    showToast(`Up to ${MAX_TEXT_ARTIFACTS_PER_TIER} written examples per level.`, 'error');
+    return;
+  }
   tWorkSamples[tier].textArtifacts.push({ id: null, type: 'comment', text: '', label: '' });
   renderTierArtifacts(tier);
   validateStep4();
@@ -2152,17 +2158,22 @@ function renderTierArtifacts(tier) {
 async function saveTierArtifacts(tier, profileId, local) {
   const editors = local.textArtifacts || [];
   const survivingIds = new Set();
-  for (const art of editors) {
+  for (let idx = 0; idx < editors.length; idx++) {
+    const art = editors[idx];
     const text = (art.text || '').trim();
     // Blank editor is not written. An emptied EXISTING artifact keeps its id out
-    // of survivingIds, so it falls into the removed set below (empty = remove).
-    if (!text) continue;
+    // of survivingIds, so it falls into the removed set below (empty = remove) and
+    // gets soft-deleted; null its id here so if the teacher retypes into the same
+    // card and saves again, it INSERTs fresh instead of upserting a now-soft-
+    // deleted row (which the Lambda's `deleted_at IS NULL` guard would 404).
+    if (!text) { art.id = null; continue; }
     const body = {
       teacher_profile_id: profileId,
       tier,
       artifact_type: art.type || 'comment',
       text_content: art.text,
       label: (art.label || '').trim() || null,
+      sort_order: idx, // preserve the teacher's on-screen order deterministically
     };
     if (art.id) body.id = art.id;
     const saved = await rdsFetch('work-artifacts', { method: 'POST', body });
@@ -2204,7 +2215,7 @@ function updateWorkSamplesSummary() {
     const parts = [];
     if (photoCount) parts.push(`${photoCount} photo${photoCount===1?'':'s'}`);
     if (textCount) parts.push(`${textCount} written example${textCount===1?'':'s'}`);
-    const countStr = parts.length ? parts.join(', ') : 'nothing added';
+    const countStr = parts.length ? parts.join(', ') : (safe ? 'description only' : 'nothing added');
     return `<div style="margin-bottom:8px"><strong style="text-transform:capitalize">${tier}</strong>: ${countStr} — ${safe || '<em style="color:var(--text-faint)">no description</em>'}</div>`;
   }).join('');
 }

@@ -43,10 +43,12 @@ gives direct answers, only guides reasoning.
   at 600 (counter color-shifts past 600 but never blocks). Step 5 (work
   samples) is **fully optional** — Continue is never gated (live
   `validateStep4`). Completeness for the home-card "add samples" banner
-  (Q4 v2, Decision D6): a tier counts as complete when it has a
-  description AND ≥1 artifact of ANY type (photo OR written example), via
-  `hasAllWorkSampleTiers`. This unblocks text-only teachers, who were
-  wrongly flagged incomplete by the old photo-only check.
+  (Q4 v2, Decision D6): a tier counts as complete when it has ≥1 artifact
+  of ANY type (a photo OR a written example) — the per-tier description is
+  NOT required, so a text-only teacher who leaves the optional "what I
+  look for" note blank is not nagged. Via `hasAllWorkSampleTiers`. This
+  unblocks text-only teachers, who were wrongly flagged incomplete by the
+  old photo-only check.
 - Stores text answers as flat TEXT columns on teacher_profiles
   (not JSONB); syllabus PDFs go to AWS S3 (`syllabi` bucket) via
   Lambda signed URLs, with text still extracted client-side via
