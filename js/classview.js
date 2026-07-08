@@ -12,6 +12,7 @@ import { openTutor } from './conversation.js';
 import { unmountHome } from './home.js';
 import { navHome } from './router.js';
 import { S } from './state.js';
+import { mountRail, unmountRail } from './classviewrail.js';
 
 // Look up subjectId for a course name. Mirrors the same lookup the sidebar's
 // openTutor callers do — we import lookupSubjectForCourse from conversation.js
@@ -55,6 +56,12 @@ export function mountClass(route) {
 
   if (header) header.style.display = '';
   if (chat) chat.style.display = '';
+
+  // Session 3: mount the left rail (convs / HW / projects, scoped to this
+  // class). No-op under flag-off — the old sidebar handles nav. Mounting
+  // BEFORE the openTutor short-circuit below so a re-nav to the same class
+  // still refreshes the rail (e.g. after loadConv from the rail).
+  mountRail(course, teacher);
 
   // Skip openTutor if the same class is already the active tutor context
   // (route re-mount, hashchange no-op, or Session 1 second visit).

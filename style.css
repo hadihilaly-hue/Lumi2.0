@@ -1854,3 +1854,185 @@ body.signin-page{
   .home-due-strip { grid-template-columns: 1fr; }
   .class-view-header { padding: 14px 16px 10px; }
 }
+
+/* ── Class-view body split (Session 3, §4.1.2 rail) ────────────────────────
+   Structure: .main → #classViewBody { #classViewRail | #chatPanel }. Under
+   flag-OFF, the rail is display:none and .class-view-body is a transparent
+   flex passthrough so the layout renders byte-identically to before. Under
+   flag-ON, the body sits below the class-view-header inside a flex-column
+   .main. */
+.class-view-body {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+/* Under redesign flag, the body fills the remaining column height. */
+.home-redesign-v1 .class-view-body {
+  flex: 1;
+  min-height: 0;
+}
+/* Belt-and-suspenders: chat-panel keeps flex:1 across both layouts. */
+.class-view-body > .chat-panel { flex: 1; min-width: 0; }
+
+/* ── Class-view left rail ─────────────────────────────────────────────── */
+.class-view-rail {
+  width: 280px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  transition: width .18s ease, border-color .18s ease;
+}
+.class-view-rail.collapsed {
+  width: 0;
+  border-right-color: transparent;
+  overflow: hidden;
+}
+.cv-rail-inner {
+  padding: 16px 14px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* New-chat button — matches the sb-new button visual weight. */
+.cv-rail-newchat {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 12px;
+  background: var(--accent);
+  color: #fff;
+  border: none; border-radius: 8px;
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+}
+.cv-rail-newchat:hover { background: var(--accent-dark, var(--accent)); filter: brightness(1.05); }
+.cv-rail-newchat svg { width: 14px; height: 14px; stroke: currentColor; fill: none; flex-shrink: 0; }
+.cv-rail-newchat span {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; text-align: left;
+}
+
+.cv-rail-section { display: flex; flex-direction: column; gap: 8px; }
+.cv-rail-section-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+.cv-rail-list { display: flex; flex-direction: column; gap: 4px; }
+.cv-rail-empty {
+  font-size: 12px; color: var(--text-faint);
+  padding: 6px 8px;
+  font-style: italic;
+}
+
+/* Conversation row — mirrors .hist-item vertical rhythm but simplified: no
+   ··· menu here (rename/delete still live in the old sidebar; under flag-on
+   Session 8 will consolidate, but this session keeps scope tight). */
+.cv-rail-conv {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 10px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text);
+  font-family: inherit; font-size: 13px; text-align: left;
+  cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.cv-rail-conv:hover { background: var(--lumi-bg); }
+.cv-rail-conv.active { background: var(--lumi-bg); border-color: var(--accent); }
+.cv-rail-conv-title {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 500;
+}
+.cv-rail-conv-meta {
+  font-size: 11px; color: var(--text-muted);
+}
+
+/* Homework rows — no click handler in this session (spec §4.8: "HW panel
+   scrolled to the tapped task if we arrived from a due-strip chip" is a
+   pointer-in behavior, not a nav target — visualize-only for now). */
+.cv-rail-hw {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+.cv-rail-hw-title {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text);
+}
+.cv-rail-hw-chip {
+  font-size: 10.5px; font-weight: 600;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--surface); color: var(--text-muted);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+  text-transform: capitalize;
+}
+.cv-rail-hw-chip.urgent {
+  background: rgba(199, 109, 61, .12);
+  color: var(--warm, #c76d3d);
+  border-color: rgba(199, 109, 61, .35);
+}
+
+/* Project rows — click opens the existing project-plan modal. */
+.cv-rail-project {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 8px 10px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: inherit; font-size: 12.5px; text-align: left;
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.cv-rail-project:hover { border-color: var(--accent); background: var(--lumi-bg); }
+.cv-rail-project.complete { opacity: .55; }
+.cv-rail-project-title {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 500;
+}
+.cv-rail-project-meta { font-size: 11px; color: var(--text-muted); }
+
+/* Toggle button in the class-view header — hidden under flag-OFF; visible
+   only when the redesign flag is on AND a class view is mounted. */
+.class-view-rail-toggle {
+  margin-left: auto;
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.class-view-rail-toggle:hover { border-color: var(--accent); background: var(--lumi-bg); }
+.class-view-rail-toggle svg { width: 16px; height: 16px; }
+
+/* Mobile: rail overlays the chat rather than pushing it, so the message area
+   keeps its full width. Also collapse by default (readCollapsedPref uses
+   matchMedia so this is redundant, but a real ≤640 first-visit reads the
+   same). */
+@media (max-width: 640px) {
+  .class-view-rail {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    z-index: 30;
+    width: 88%;
+    max-width: 320px;
+    box-shadow: 2px 0 12px rgba(0, 0, 0, .1);
+  }
+  .class-view-rail.collapsed {
+    width: 0;
+    box-shadow: none;
+  }
+}

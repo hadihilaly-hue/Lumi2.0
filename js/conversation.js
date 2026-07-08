@@ -10,6 +10,18 @@ import { getTeacherProfile, loadWorkSampleImages, rdsFetch } from './teachers.js
 
 // ─── SUPABASE SYNC ────────────────────────────────────────────────────────────
 
+// Broadcast that the active conversation changed. The class-view rail
+// (js/classviewrail.js) listens for this to update its active-row highlight
+// without needing to import from this module (which would cycle: the rail
+// already imports openTutor/loadConv/lookupSubjectForCourse from here).
+function dispatchConvChanged() {
+  try {
+    if (typeof document !== 'undefined' && document.dispatchEvent) {
+      document.dispatchEvent(new CustomEvent('lumi:conv-changed'));
+    }
+  } catch { /* offline test env */ }
+}
+
 // Helper: look up subjectId + subjectName for a given course name
 export function lookupSubjectForCourse(courseName) {
   for (const [subjectName, courses] of Object.entries(MENLO_CURRICULUM)) {
@@ -71,6 +83,7 @@ export async function loadConv(id) {
 
   scrollBottom();
   renderSidebar();
+  dispatchConvChanged();
 
   // AUDIT_FRONTEND H1: re-hydrate the teacher persona. Convs loaded from RDS
   // (loadConvsFromSupabase) reconstruct tutorCtx from the teacher/course columns
@@ -148,6 +161,7 @@ export function newChat() {
   messagesEl.innerHTML = '';
   showWelcome();
   renderSidebar();
+  dispatchConvChanged();
   startLumi();
 }
 
@@ -327,6 +341,7 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
   }
   saveCurrentConv();
   renderSidebar();
+  dispatchConvChanged();
   scrollBottom();
   msgInput.focus();
   console.log('[openTutor] done');
@@ -375,6 +390,7 @@ export function openGeneralChat() {
   messagesEl.appendChild(promptCards);
   saveCurrentConv();
   renderSidebar();
+  dispatchConvChanged();
   scrollBottom();
   msgInput.focus();
 }

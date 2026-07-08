@@ -596,9 +596,15 @@ export function mountHome() {
   const home = document.getElementById('homeView');
   const chat = document.getElementById('chatPanel');
   const header = document.getElementById('classViewHeader');
+  const rail = document.getElementById('classViewRail');
+  const railToggle = document.getElementById('classViewRailToggle');
   if (home) home.style.display = '';
   if (chat) chat.style.display = 'none';
   if (header) header.style.display = 'none';
+  // Session 3: the rail is scoped to a class view; hide it whenever we return
+  // to the home grid (routed via navHome / Back button).
+  if (rail) rail.style.display = 'none';
+  if (railToggle) railToggle.style.display = 'none';
   renderGreeting();
   renderDueStrip();
   renderQuickActions();

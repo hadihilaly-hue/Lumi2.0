@@ -308,6 +308,9 @@
         <span class="class-view-course" id="classViewCourse"></span>
         <span class="class-view-teacher" id="classViewTeacher"></span>
       </div>
+      <button class="class-view-rail-toggle" id="classViewRailToggle" type="button" title="Toggle class history" aria-label="Toggle class history" aria-expanded="true" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
     </div>
 
     <!-- Intro slide — shown once per session when opening a class -->
@@ -324,6 +327,15 @@
         <button class="intro-cta" id="introGoBtn">Let's get into it</button>
       </div>
     </div>
+    <!-- Class-view body: horizontal split of [rail | chatPanel] under the
+         redesign flag (Session 3, docs/STUDENT_HOME_REDESIGN.md §4.1.2 rail).
+         Under flag-OFF the rail is display:none, and .class-view-body is a
+         transparent flex passthrough so the old single-chat-panel layout
+         renders byte-identically. -->
+    <div class="class-view-body" id="classViewBody">
+      <aside class="class-view-rail" id="classViewRail" style="display:none" aria-label="Class navigation">
+        <div class="cv-rail-inner" id="classViewRailInner"></div>
+      </aside>
     <div class="chat-panel" id="chatPanel">
       <!-- TM-4: test-mode banner. Sticky strip at top of chat panel,
            visible only when S.isTestMode. Course text updates per
@@ -382,7 +394,8 @@
           </button>
         </div>
       </div>
-    </div>
+    </div><!-- /#chatPanel -->
+    </div><!-- /#classViewBody -->
   </div>
 </div>
 
