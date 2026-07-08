@@ -661,6 +661,35 @@ function buildArtifactSection(data, firstName) {
 // two-gate check (isPersistenceEnabled) — OFF by default for real students.
 const PROGRESS_NOTE_MARKER = "<<LUMI_PROGRESS_NOTE>>";
 
+// Feature H (prompt caching): the client may now send `system` as EITHER a
+// plain string (legacy / companion / no-profile path) OR an array of native
+// Anthropic content blocks (`{type:'text', text, cache_control?}`) so a single
+// cache_control breakpoint can sit at the SEG1/SEG2 boundary of the tutor
+// prompt. These two helpers make the marker swaps below shape-agnostic. A given
+// marker lives in exactly ONE block, so running a replacement across every
+// block is safe — and required, because <<LUMI_WORK_ARTIFACTS>> sits in SEG1
+// (the cached prefix), not the dynamic tail. The string path is byte-identical
+// to the previous behaviour (.includes / .split.join), so stale clients that
+// still POST a string keep working unchanged.
+function systemHasMarker(system, marker) {
+  if (typeof system === "string") return system.includes(marker);
+  if (Array.isArray(system)) {
+    return system.some((b) => typeof b?.text === "string" && b.text.includes(marker));
+  }
+  return false;
+}
+function systemReplaceMarker(system, marker, replacement) {
+  if (typeof system === "string") return system.split(marker).join(replacement);
+  if (Array.isArray(system)) {
+    return system.map((b) =>
+      typeof b?.text === "string" && b.text.includes(marker)
+        ? { ...b, text: b.text.split(marker).join(replacement) }
+        : b
+    );
+  }
+  return system;
+}
+
 // Both gates must pass (spec §0). Fail CLOSED on any error — a broken lookup
 // must never enable cross-session memory for a real student.
 async function isPersistenceEnabled(email) {
@@ -2692,8 +2721,11 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
   // notes section built here (notes never reach the browser). Marker is ALWAYS
   // stripped even when no injection was requested. Runs before the SSE wrap so
   // notes-fetch failures can never corrupt an open stream (they degrade to '').
+  // Feature H: `body.system` may be a string (legacy) or an array of content
+  // blocks (SEG1 cached / SEG2 dynamic). systemHasMarker / systemReplaceMarker
+  // handle both shapes; the marker swaps below are otherwise unchanged.
   let systemPrompt = body.system || "";
-  if (systemPrompt.includes(TEACHER_NOTES_MARKER)) {
+  if (systemHasMarker(systemPrompt, TEACHER_NOTES_MARKER)) {
     let notesSection = "";
     const inj = body.inject_teacher_notes;
     if (inj && typeof inj.teacher_profile_id === "string" && inj.teacher_profile_id) {
@@ -2704,7 +2736,7 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
       notesSection = buildTeacherNotesSection(notes);
       if (notesSection) console.log(`[notes] injected ${notes.length} note(s), ${notesSection.length} chars`);
     }
-    systemPrompt = systemPrompt.split(TEACHER_NOTES_MARKER).join(notesSection);
+    systemPrompt = systemReplaceMarker(systemPrompt, TEACHER_NOTES_MARKER, notesSection);
   }
 
   // Server-side work-artifacts injection (Q4 v2): replace the client's marker with
@@ -2712,7 +2744,7 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
   // browser — "Only Lumi sees this" is literally true). Teacher-stable, so it lands
   // in the cacheable prefix, BEFORE the per-student notes marker above. Marker is
   // ALWAYS stripped; any fetch failure degrades to '' and never blocks the stream.
-  if (systemPrompt.includes(WORK_ARTIFACTS_MARKER)) {
+  if (systemHasMarker(systemPrompt, WORK_ARTIFACTS_MARKER)) {
     let artifactSection = "";
     const inj = body.inject_work_artifacts;
     if (inj && typeof inj.teacher_profile_id === "string" && inj.teacher_profile_id) {
@@ -2722,7 +2754,7 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
         console.log(`[artifacts] injected ${data.artifacts.length} artifact(s), ${artifactSection.length} chars`);
       }
     }
-    systemPrompt = systemPrompt.split(WORK_ARTIFACTS_MARKER).join(artifactSection);
+    systemPrompt = systemReplaceMarker(systemPrompt, WORK_ARTIFACTS_MARKER, artifactSection);
   }
 
   // Server-side progress-note injection (Phase 5, Layer 3) — same posture as
@@ -2731,7 +2763,7 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
   // no note exists (stray-marker defense). FLAG-GATED: a real student fails
   // isPersistenceEnabled, so the section is always '' and the marker is stripped
   // to nothing — byte-identical to today's behaviour for them.
-  if (systemPrompt.includes(PROGRESS_NOTE_MARKER)) {
+  if (systemHasMarker(systemPrompt, PROGRESS_NOTE_MARKER)) {
     let noteSection = "";
     const inj = body.inject_progress_note;
     if (inj && typeof inj.teacher_profile_id === "string" && inj.teacher_profile_id
@@ -2743,7 +2775,7 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
       noteSection = buildProgressNoteSection(note);
       if (noteSection) console.log(`[progress_note] injected class=${inj.teacher_profile_id} ${noteSection.length}chars`);
     }
-    systemPrompt = systemPrompt.split(PROGRESS_NOTE_MARKER).join(noteSection);
+    systemPrompt = systemReplaceMarker(systemPrompt, PROGRESS_NOTE_MARKER, noteSection);
   }
 
   // Begin SSE stream (separate wrap because content-type differs)
@@ -2767,7 +2799,22 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
       maxTokens: Math.min(body.max_tokens || SCHOOL_CONFIG.maxTokensCap, SCHOOL_CONFIG.maxTokensCap),
     })) {
       if (chunk.type === "message_start") {
-        inputTokens = chunk.message?.usage?.input_tokens || 0;
+        const usage = chunk.message?.usage || {};
+        inputTokens = usage.input_tokens || 0;
+        // Feature H (prompt caching) verification hook. We CANNOT know from the
+        // repo whether the forced `global.` cross-region inference profile emits
+        // cache-usage fields (or honors caching at all) until we read these logs
+        // — so log defensively: emit the standard Anthropic field names when
+        // present, otherwise dump the usage keys that DID arrive so we can
+        // confirm the real wire shape without inventing parameter names. Counts
+        // only, no PII — same discipline as the [notes]/[artifacts] logs.
+        const cacheWrite = usage.cache_creation_input_tokens;
+        const cacheRead = usage.cache_read_input_tokens;
+        if (cacheWrite !== undefined || cacheRead !== undefined) {
+          console.log(`[cache] write=${cacheWrite ?? 0} read=${cacheRead ?? 0} in=${inputTokens}`);
+        } else {
+          console.log(`[cache] no cache usage fields; usage keys=[${Object.keys(usage).join(",")}]`);
+        }
       }
       if (chunk.type === "message_delta") {
         outputTokens = chunk.usage?.output_tokens || outputTokens;

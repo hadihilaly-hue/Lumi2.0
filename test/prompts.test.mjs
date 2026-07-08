@@ -26,6 +26,14 @@ import { reset, seedLocalStorage } from './harness.mjs';
 
 beforeEach(() => reset());
 
+// Feature H (prompt caching): the PROFILE branch of buildTutorSystem now returns
+// an ARRAY of content blocks ([{text:SEG1, cache_control:{...}}, {text:SEG2}]);
+// buildCompanionSystem and the no-profile fallback still return plain strings.
+// systemText() flattens either shape into the effective delivered prompt (blocks
+// concatenated in order, exactly as Bedrock concatenates system blocks), so the
+// existing content assertions below can stay shape-agnostic.
+const systemText = (s) => (Array.isArray(s) ? s.map((b) => b.text).join('') : s);
+
 // ── getStudentName ───────────────────────────────────────────────────────────
 test('getStudentName returns the stored name, or "there" as fallback', () => {
   assert.equal(getStudentName(), 'there');
@@ -123,7 +131,7 @@ function fullProfile(overrides = {}) {
 }
 
 test('buildTutorSystem injects the teacher persona (display name + all three sections)', () => {
-  const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile());
+  const p = systemText(buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile()));
   assert.match(p, /You are Lumi, Ms\. Huntley's 24\/7 digital stand-in for their Chemistry class/);
   // Section headers use the teacher's FIRST name upper-cased.
   assert.match(p, /═══ HOW LAURA WANTS YOU TO HELP STUDENTS ═══\nENGAGE_RULES_MARKER/);
@@ -134,7 +142,7 @@ test('buildTutorSystem injects the teacher persona (display name + all three sec
 test('buildTutorSystem includes the <<LUMI_TEACHER_NOTES>> injection marker', () => {
   // Per-student teacher notes are spliced in downstream at this marker; the
   // assembled prompt must carry it for that injection to land.
-  const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile());
+  const p = systemText(buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile()));
   assert.ok(p.includes('<<LUMI_TEACHER_NOTES>>'));
 });
 
@@ -142,7 +150,7 @@ test('buildTutorSystem includes the <<LUMI_WORK_ARTIFACTS>> marker, before the n
   // Q4 v2: text artifacts are injected server-side at this marker. It must be
   // present in the profile branch and sit in the teacher-stable prefix BEFORE
   // the per-student notes marker (cache-stability, D9).
-  const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile());
+  const p = systemText(buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile()));
   assert.ok(p.includes('<<LUMI_WORK_ARTIFACTS>>'));
   assert.ok(p.indexOf('<<LUMI_WORK_ARTIFACTS>>') < p.indexOf('<<LUMI_TEACHER_NOTES>>'));
 });
@@ -156,9 +164,9 @@ test('buildTutorSystem omits the <<LUMI_WORK_ARTIFACTS>> marker without a profil
 test('buildTutorSystem includes the <<LUMI_PROGRESS_NOTE>> marker in the dynamic tail', () => {
   // Phase 5: the rolling progress note is spliced server-side at this marker.
   // Per docs/PROMPT_CACHING_PLAN.md §3c it must sit immediately AFTER the
-  // teacher-notes marker (both in the future SEG2 dynamic tail) so a later
-  // caching split never invalidates the cached static prefix.
-  const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile());
+  // teacher-notes marker (both in the SEG2 dynamic tail) so the caching split
+  // never invalidates the cached static prefix.
+  const p = systemText(buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile()));
   assert.ok(p.includes('<<LUMI_PROGRESS_NOTE>>'));
   assert.ok(p.indexOf('<<LUMI_PROGRESS_NOTE>>') > p.indexOf('<<LUMI_TEACHER_NOTES>>'));
   // No dynamic student data may follow the markers except the fixed JSON footer.
@@ -166,18 +174,81 @@ test('buildTutorSystem includes the <<LUMI_PROGRESS_NOTE>> marker in the dynamic
 });
 
 test('buildTutorSystem shows placeholders when persona fields are missing', () => {
-  const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', { title: 'Ms.' });
+  const p = systemText(buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', { title: 'Ms.' }));
   assert.match(p, /\(No rules specified\)/);
   assert.match(p, /\(No voice specified\)/);
   assert.match(p, /\(No course info\)/);
 });
 
 test('buildTutorSystem appends the syllabus section only when syllabus_text is present', () => {
-  const withSyl = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile({ syllabus_text: 'SYLLABUS_MARKER' }));
+  const withSyl = systemText(buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile({ syllabus_text: 'SYLLABUS_MARKER' })));
   assert.match(withSyl, /═══ COURSE SYLLABUS ═══\nSYLLABUS_MARKER/);
 
-  const withoutSyl = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile());
+  const withoutSyl = systemText(buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile()));
   assert.ok(!withoutSyl.includes('COURSE SYLLABUS'));
+});
+
+// ── buildTutorSystem — Feature H SEG1/SEG2 split (prompt caching) ─────────────
+test('buildTutorSystem profile branch returns a 2-block array with ONE cache_control breakpoint at the SEG1/SEG2 boundary', () => {
+  const sys = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile());
+  assert.ok(Array.isArray(sys), 'profile branch returns an array');
+  assert.equal(sys.length, 2);
+  assert.equal(sys[0].type, 'text');
+  assert.equal(sys[1].type, 'text');
+  // Exactly one breakpoint, on SEG1 (the cached prefix).
+  assert.deepEqual(sys[0].cache_control, { type: 'ephemeral' });
+  assert.ok(!('cache_control' in sys[1]), 'SEG2 carries no breakpoint');
+});
+
+test('buildTutorSystem companion + no-profile branches stay plain strings (cache-exempt)', () => {
+  assert.equal(typeof buildCompanionSystem(), 'string');
+  assert.equal(typeof buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', null), 'string');
+});
+
+test('SEG1 is byte-stable across two different students of the same class', () => {
+  // The whole point of the split: student identity/context lives in SEG2, so
+  // SEG1 (the cached prefix) must be IDENTICAL for two different students who
+  // open the same teacher/class — otherwise the cross-student cache never hits.
+  seedLocalStorage({
+    lumi_name: 'Alice', lumi_grade: '9',
+    lumi_learning_style: 'socratic', lumi_pain_points: ['essays'],
+    lumi_schedule: [{ course: 'Chemistry', teacher: 'Laura Huntley' }],
+  });
+  const seg1A = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile({ syllabus_text: 'SYL' }))[0].text;
+
+  reset();
+  seedLocalStorage({
+    lumi_name: 'Bob', lumi_grade: '12',
+    lumi_learning_style: 'step_by_step', lumi_pain_points: ['timed tests'],
+    lumi_schedule: [{ course: 'Chemistry', teacher: 'Laura Huntley' }],
+  });
+  const seg1B = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile({ syllabus_text: 'SYL' }))[0].text;
+
+  assert.equal(seg1A, seg1B, 'SEG1 must not vary with the student');
+  // Sanity: SEG1 really is the teacher-stable prefix and carries the marker.
+  assert.match(seg1A, /You are Lumi, Ms\. Huntley's/);
+  assert.ok(seg1A.includes('<<LUMI_WORK_ARTIFACTS>>'));
+});
+
+test('all dynamic (per-student) content lives in SEG2, never in SEG1', () => {
+  seedLocalStorage({
+    lumi_name: 'Alice', lumi_grade: '9',
+    lumi_pain_points: ['essays'],
+    lumi_schedule: [{ course: 'Chemistry', teacher: 'Laura Huntley' }],
+  });
+  const [seg1, seg2] = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile());
+  // studentCtx() output (name, grade, schedule, pain points, study style,
+  // bedtime) must be in SEG2, not the cached SEG1.
+  assert.ok(!seg1.text.includes('Alice'), 'student name must not appear in SEG1');
+  assert.ok(!seg1.text.includes('grade 9'), 'grade must not appear in SEG1');
+  assert.ok(!seg1.text.includes('Bedtime'), 'student context must not appear in SEG1');
+  assert.match(seg2.text, /The student's name is Alice and they are in grade 9/);
+  assert.match(seg2.text, /Bedtime: 10:30 PM/);
+  // The per-student injection markers also live only in SEG2.
+  assert.ok(!seg1.text.includes('<<LUMI_TEACHER_NOTES>>'));
+  assert.ok(!seg1.text.includes('<<LUMI_PROGRESS_NOTE>>'));
+  assert.ok(seg2.text.includes('<<LUMI_TEACHER_NOTES>>'));
+  assert.ok(seg2.text.includes('<<LUMI_PROGRESS_NOTE>>'));
 });
 
 // ── buildTutorSystem — graded work-samples gating (Q4) ───────────────────────
@@ -190,7 +261,7 @@ function completeSamples() {
 }
 
 test('buildTutorSystem includes the feedback section when all three tiers are complete', () => {
-  const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile(), completeSamples());
+  const p = systemText(buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile(), completeSamples()));
   assert.match(p, /═══ HOW LAURA GIVES FEEDBACK ═══/);
   assert.match(p, /PROGRESSING_MARKER/);
   assert.match(p, /PROFICIENT_MARKER/);
@@ -200,7 +271,7 @@ test('buildTutorSystem includes the feedback section when all three tiers are co
 test('buildTutorSystem omits the feedback section when a tier is missing images', () => {
   const partial = completeSamples();
   partial.exemplary.images = []; // no loaded images → tier incomplete
-  const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile(), partial);
+  const p = systemText(buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile(), partial));
   assert.ok(!p.includes('GIVES FEEDBACK'));
   assert.ok(!p.includes('PROGRESSING_MARKER'));
 });
@@ -208,12 +279,12 @@ test('buildTutorSystem omits the feedback section when a tier is missing images'
 test('buildTutorSystem omits the feedback section when a tier is missing a description', () => {
   const partial = completeSamples();
   partial.proficient.description = '   '; // blank after trim → tier incomplete
-  const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile(), partial);
+  const p = systemText(buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile(), partial));
   assert.ok(!p.includes('GIVES FEEDBACK'));
 });
 
 test('buildTutorSystem omits the feedback section when workSamples is null (default)', () => {
-  const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile());
+  const p = systemText(buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile()));
   assert.ok(!p.includes('GIVES FEEDBACK'));
 });
 

@@ -183,6 +183,22 @@ function buildApiMessages(S) {
   return [...synthetic, ...S.messages];
 }
 
+// Feature H (prompt caching): buildTutorSystem now returns an ARRAY of content
+// blocks (SEG1 cached / SEG2 dynamic) for the tutor path; buildCompanionSystem
+// and the no-profile fallback still return plain strings. Anything appended at
+// request time (ACTIVE PROJECT CONTEXT below) is dynamic, so it must land in the
+// LAST block (SEG2) — never in the cached SEG1 prefix. String systems keep the
+// original `+=` concat behaviour untouched.
+function appendToSystem(system, text) {
+  if (Array.isArray(system)) {
+    const out = system.slice();
+    const last = out[out.length - 1];
+    out[out.length - 1] = { ...last, text: (last.text || '') + text };
+    return out;
+  }
+  return system + text;
+}
+
 // ─── FETCH LUMI RESPONSE ─────────────────────────────────────────────────────
 async function fetchLumi() {
   S.busy = true; updateSendBtn();
@@ -202,7 +218,7 @@ async function fetchLumi() {
         const today = todayStr();
         const todayTask = proj.plan.find(d => d.date === today && !d.isComplete);
         const taskLabel = todayTask ? todayTask.label : proj.plan[0]?.label || 'getting started';
-        system += `\n\nACTIVE PROJECT CONTEXT:
+        system = appendToSystem(system, `\n\nACTIVE PROJECT CONTEXT:
 The student is working on: ${proj.title}
 Class: ${proj.className}
 Due date: ${proj.dueDate}
@@ -211,7 +227,7 @@ ${proj.requirements ? 'Requirements: ' + proj.requirements : ''}
 
 If they uploaded a rubric or project instructions it will be attached to their first message — read it carefully and use it to guide your help throughout the conversation.
 
-Remember: help them THINK through the project, never do it for them. Ask guiding questions, help them brainstorm, review their work, but the thinking must be theirs.`;
+Remember: help them THINK through the project, never do it for them. Ask guiding questions, help them brainstorm, review their work, but the thinking must be theirs.`);
       }
     }
     const { clean, data } = await callAPI(buildApiMessages(S), system);
