@@ -34,6 +34,9 @@ test('S has the documented initial shape', () => {
   assert.equal(S.isTestMode, false);
   assert.deepEqual(S.testSchedule, []);
   assert.deepEqual(S.testConvs, {});
+  // Student-home redesign v1 flag + route (docs/STUDENT_HOME_REDESIGN.md §4.7).
+  assert.equal(S.homeRedesign, false);
+  assert.deepEqual(S.route, { name: 'home' });
 });
 
 test('SB (sidebar state) has the documented initial shape', () => {

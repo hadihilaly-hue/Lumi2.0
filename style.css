@@ -1443,3 +1443,147 @@ body.signin-page{
   font-weight:500;color:var(--text);
 }
 .esp-resume-arrow{color:var(--text-faint);font-size:14px;flex-shrink:0;}
+
+/* ─── Student home redesign v1 (docs/STUDENT_HOME_REDESIGN.md §4.1) ─────────
+   Flag-gated behind body.home-redesign-v1 for the 2-week rollback window.
+   Session 1 slice: header + card grid. Extras (where-you-left-off,
+   next-due, dot, strip, utility cards) land in later sessions. */
+
+/* When the flag is on, hide the pre-redesign chrome. */
+.home-redesign-v1 .sidebar,
+.home-redesign-v1 .sb-overlay,
+.home-redesign-v1 .mob-header { display: none; }
+.home-redesign-v1 .content { display: block; }
+
+/* Home view container. Hidden by default; router.mountHome() flips display. */
+.home-view {
+  height: 100vh; overflow-y: auto;
+  padding: 32px 40px 64px;
+  background: var(--bg);
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+.home-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 32px;
+}
+.home-logo-name {
+  font-family: var(--font-serif);
+  font-size: 26px; font-weight: 600; letter-spacing: -.5px;
+  color: var(--text);
+}
+.home-user-chip {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 8px 14px 8px 8px;
+  background: none; border: 1px solid var(--border); border-radius: 999px;
+  color: var(--text); font-family: inherit; font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: border-color .15s, background .15s;
+}
+.home-user-chip:hover { border-color: var(--accent); background: var(--lumi-bg); }
+.home-user-chip-avatar {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600;
+  overflow: hidden;
+}
+.home-user-chip-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.home-test-banner {
+  margin-bottom: 24px;
+  padding: 10px 14px;
+  background: rgba(217, 122, 68, .12);   /* terracotta wash to match #testModeBanner */
+  color: var(--text);
+  border: 1px solid rgba(217, 122, 68, .4);
+  border-radius: 8px;
+  font-size: 12.5px; letter-spacing: .3px;
+}
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.home-empty {
+  grid-column: 1 / -1;
+  padding: 40px; text-align: center;
+  color: var(--text-muted); font-size: 14px;
+}
+
+.home-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  padding: 22px 20px;
+  min-height: 140px;
+  background: var(--card-bg, transparent);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, transform .06s;
+}
+.home-card:hover { border-color: var(--accent); background: var(--lumi-bg); }
+.home-card:active { transform: translateY(1px); }
+
+.home-card-course {
+  font-family: var(--font-serif); font-size: 20px; font-weight: 600;
+  line-height: 1.2; letter-spacing: -.3px;
+  color: var(--text);
+}
+.home-card-teacher {
+  font-size: 13px; color: var(--text-muted);
+}
+.home-card-block {
+  font-size: 10.5px; font-weight: 600;
+  color: var(--text-faint); letter-spacing: 1px; text-transform: uppercase;
+  margin-top: auto;
+}
+
+.home-card--locked {
+  opacity: .55; cursor: pointer;
+}
+.home-card--locked:hover { border-color: var(--border); background: transparent; }
+.home-card-lock {
+  font-size: 10.5px; font-weight: 600;
+  color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase;
+  margin-top: auto;
+}
+
+/* Class-view header (§4.1.2). Sits ABOVE the untouched #chatPanel; the
+   messages/input pipeline lives inside chatPanel as before. */
+.class-view-header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 18px 24px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.class-view-back {
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); font-size: 18px; line-height: 1; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.class-view-back:hover { border-color: var(--accent); background: var(--lumi-bg); }
+
+.class-view-title {
+  display: flex; flex-direction: column;
+}
+.class-view-course {
+  font-family: var(--font-serif); font-size: 17px; font-weight: 600;
+  color: var(--text); letter-spacing: -.2px;
+}
+.class-view-teacher {
+  font-size: 12px; color: var(--text-muted); margin-top: 2px;
+}
+
+/* Mobile: tighten the padding a touch. */
+@media (max-width: 640px) {
+  .home-view { padding: 20px 16px 40px; }
+  .home-grid { grid-template-columns: 1fr; gap: 14px; }
+  .home-card { min-height: 110px; padding: 18px 16px; }
+  .class-view-header { padding: 14px 16px 10px; }
+}

@@ -7,6 +7,9 @@ import { _projPendingFile, clearAllChats, clearCompletedProjects, clearProjFile,
 import { setSidebarUserSubtitle } from './js/prompts.js';
 import { checkSemesterBanner, initScheduleSetup } from './js/schedule.js';
 import { activeDropdownEl, closeOpenMenu, renderSearchDropdown, renderSidebar, showInlineConfirm } from './js/sidebar.js';
+import { mountHome } from './js/home.js';
+import { mountClass } from './js/classview.js';
+import { initRouter } from './js/router.js';
 import { $, S, SB, currentUser, fileInput, msgInput, sbSearch, sendBtn, setCurrentProjId, setCurrentUser, themeToggle } from './js/state.js';
 import { flushProgressNote, genId, getSchedule, loadConvsFromSupabase, loadProfileFromSupabase, loadTestModeSchedule, migrateOldData, saveCurrentConv } from './js/storage.js';
 import { isTeacherModeAllowed, preloadProfileStatuses, rdsFetch } from './js/teachers.js';
@@ -47,6 +50,13 @@ import { initVoice, wireVoiceListeners } from './js/voice.js';
   }
   S.isTestMode = sessionStorage.getItem('lumi_test_mode') === 'true';
 
+  // Home redesign v1 (docs/STUDENT_HOME_REDESIGN.md §4.7). Flag is read at
+  // module load from localStorage; here we mirror it onto <body> so the CSS
+  // can hide the sidebar shell in one place. DevTools-only toggle for the
+  // 2-week rollback window:
+  //   localStorage.setItem('lumi_home_redesign_v1', 'true'); location.reload();
+  if (S.homeRedesign) document.body.classList.add('home-redesign-v1');
+
   // TM-4: when in test mode, reveal the persistent banner at the top
   // of the chat panel and the exit-test-mode button under the user
   // card in the sidebar. Both are display:none by default in the
@@ -54,10 +64,24 @@ import { initVoice, wireVoiceListeners } from './js/voice.js';
   if (S.isTestMode) {
     const banner = document.getElementById('testModeBanner');
     if (banner) banner.style.display = 'flex';
+    // Home redesign v1: mirror the same TEST-MODE strip onto #homeView so
+    // teachers see it before entering a class card.
+    const homeBanner = document.getElementById('homeTestBanner');
+    if (homeBanner) homeBanner.style.display = '';
     const exitBtn = document.getElementById('sbExitTestBtn');
     if (exitBtn) {
       exitBtn.style.display = 'flex';
       exitBtn.addEventListener('click', () => {
+        sessionStorage.removeItem('lumi_test_mode');
+        window.location.href = 'teacher.html';
+      });
+    }
+    // Home redesign v1 TM-4: mirror the exit button into Settings — the
+    // sidebar (its default host) is hidden under the flag.
+    const settingsExit = document.getElementById('settingsExitTestBtn');
+    if (settingsExit) {
+      settingsExit.style.display = '';
+      settingsExit.addEventListener('click', () => {
         sessionStorage.removeItem('lumi_test_mode');
         window.location.href = 'teacher.html';
       });
@@ -88,6 +112,19 @@ import { initVoice, wireVoiceListeners } from './js/voice.js';
     const img2 = document.createElement('img'); img2.src = meta.avatar_url; img2.alt = '';
     sbAvatarEl.appendChild(img2);
   } else { sbAvatarEl.textContent = initials; }
+
+  // Home redesign v1: mirror the user chip onto #homeUserChip. Click opens
+  // the same Settings drawer as the sidebar gear button (imported below via
+  // openSettings; wireListeners binds it once #homeUserChip exists).
+  const homeAvatar = document.getElementById('homeUserAvatar');
+  const homeName = document.getElementById('homeUserName');
+  if (homeName) homeName.textContent = fullName.split(' ')[0] || fullName;
+  if (homeAvatar) {
+    if (meta.avatar_url) {
+      const img3 = document.createElement('img'); img3.src = meta.avatar_url; img3.alt = '';
+      homeAvatar.appendChild(img3);
+    } else { homeAvatar.textContent = initials; }
+  }
 
   await loadProfileFromSupabase();
 
@@ -190,6 +227,10 @@ function wireListeners() {
   $('sbOverlay').addEventListener('click', closeSidebar);
 
   $('gearBtn').addEventListener('click', openSettings);
+  // Home redesign v1: the home user-chip replaces the sidebar gear as the
+  // Settings entry when the flag is on. Same drawer, same handlers.
+  const homeChip = $('homeUserChip');
+  if (homeChip) homeChip.addEventListener('click', openSettings);
   $('settingsClose').addEventListener('click', closeSettings);
   $('settingsOverlay').addEventListener('click', closeSettings);
 
@@ -318,7 +359,18 @@ function startApp() {
     checkDailyHwPrompt();
   });
   renderSidebar();
-  showWelcome();
+  if (S.homeRedesign) {
+    // Home redesign v1: the router owns the initial mount. `renderSidebar()`
+    // above still runs so it can populate the (now hidden) #sbUserEmail /
+    // user-chip DOM that prompts.setSidebarUserSubtitle writes into; the
+    // sidebar itself is hidden by CSS via body.home-redesign-v1.
+    // The router honors any existing hash so a hard refresh at
+    // #class/<b64>/<b64> re-mounts the same class (D5-A: on boot, if a hash
+    // is present, route to it; else land on home).
+    initRouter({ onHome: mountHome, onClass: mountClass });
+  } else {
+    showWelcome();
+  }
   checkSemesterBanner();
 
   // Wire timeline modal close buttons

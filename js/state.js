@@ -21,6 +21,15 @@ export const S = {
   isTestMode:    false,
   testSchedule:  [],
   testConvs:     {},
+  // Student-home redesign v1 (docs/STUDENT_HOME_REDESIGN.md).
+  // Feature flag: read once at module load from localStorage. `true` boots the
+  // new home/class hash-routed layout; `false` keeps the pre-redesign sidebar
+  // shell untouched. Toggled DevTools-only in Session 1 (spec §4.7):
+  //   localStorage.setItem('lumi_home_redesign_v1', 'true'); location.reload();
+  homeRedesign:  (() => { try { return localStorage.getItem('lumi_home_redesign_v1') === 'true'; } catch { return false; } })(),
+  // Current hash route (only meaningful when homeRedesign is true; router.js
+  // owns writes). Session 1 shape: {name:'home'} or {name:'class', course, teacher}.
+  route:         { name: 'home' },
 };
 
 export const SB = {

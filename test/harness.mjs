@@ -24,6 +24,8 @@ function baselineState() {
     isTestMode: false,
     testSchedule: [],
     testConvs: {},
+    homeRedesign: false,
+    route: { name: 'home' },
   };
 }
 

@@ -245,6 +245,35 @@
   </header>
 
   <div class="main">
+
+    <!-- ─── STUDENT HOME (redesign v1, flag-gated) ────────
+         Hidden by default; router mounts it when
+         S.homeRedesign is true. Sibling to #chatPanel. -->
+    <div class="home-view" id="homeView" style="display:none">
+      <header class="home-header">
+        <div class="home-logo-name">Lumi</div>
+        <button class="home-user-chip" id="homeUserChip" type="button" title="Settings">
+          <span class="home-user-chip-avatar" id="homeUserAvatar"></span>
+          <span class="home-user-chip-name" id="homeUserName">Menu</span>
+        </button>
+      </header>
+      <!-- TM-4: test-mode banner (mirrors #testModeBanner in #chatPanel so the
+           label is visible on both surfaces). -->
+      <div class="home-test-banner" id="homeTestBanner" style="display:none">
+        TEST MODE — you're chatting with your own AI persona.
+      </div>
+      <div class="home-grid" id="homeGrid"></div>
+    </div>
+
+    <!-- Class-view header — mounted above #chatPanel by classview.js -->
+    <div class="class-view-header" id="classViewHeader" style="display:none">
+      <button class="class-view-back" id="classViewBack" type="button" title="Back to home" aria-label="Back to home">←</button>
+      <div class="class-view-title">
+        <span class="class-view-course" id="classViewCourse"></span>
+        <span class="class-view-teacher" id="classViewTeacher"></span>
+      </div>
+    </div>
+
     <!-- Intro slide — shown once per session when opening a class -->
     <div class="intro-slide" id="introSlide" style="display:none">
       <div class="intro-pill" id="introPill"></div>
@@ -343,6 +372,11 @@
       <button class="danger-btn" id="signOutBtn" style="margin-top:10px">Sign out</button>
       <button class="settings-save-btn" id="updateScheduleBtn" style="margin-top:8px">Update My Schedule</button>
       <a href="teacher.html" id="teacherModeLink" style="display:none;margin-top:8px;text-align:center;font-size:13px;color:var(--accent);text-decoration:none;padding:8px;border:1px solid rgba(123,105,245,.3);border-radius:8px;background:var(--accent-soft);display:none">🍎 Switch to Teacher Mode</a>
+      <!-- Home redesign v1 TM-4: the sidebar (and its #sbExitTestBtn) is
+           CSS-hidden when the flag is on, so the exit-test-mode action moves
+           into Settings per spec §4.5 ("the exit button lives on the user chip
+           menu in the new layout"). Same click handler as #sbExitTestBtn. -->
+      <button class="danger-btn" id="settingsExitTestBtn" style="display:none;margin-top:8px">← Exit test mode</button>
     </div>
 
     <!-- Appearance -->
