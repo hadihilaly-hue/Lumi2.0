@@ -6,6 +6,9 @@ export class BedrockRuntimeClient {
   async send(command) {
     const ctx = globalThis.__LUMI_TEST__;
     const spec = ctx.bedrock || {};
+    // Record each command's input so a test can assert on what was sent to
+    // Bedrock (e.g. the forwarded `system` shape for Feature H prompt caching).
+    (spec.commands ||= []).push(command?.input);
     if (spec.throw) throw spec.throw;
     const chunks = spec.chunks || [];
     return {

@@ -158,6 +158,98 @@ test('/chat strips the work-artifacts marker even when no injection is requested
   assert.doesNotMatch(r.body, /LUMI_WORK_ARTIFACTS/);
 });
 
+// ==================== Feature H: array-form system (prompt caching) =========
+
+// The client may now send `system` as an array of content blocks
+// (SEG1 cached / SEG2 dynamic) with a cache_control breakpoint at the boundary.
+// The Lambda must swap markers per-block (WORK_ARTIFACTS lives in SEG1, notes in
+// SEG2), preserve cache_control, and forward the array to Bedrock unchanged.
+test('/chat array-form system: per-block marker swaps + array forwarded to Bedrock with cache_control', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId, isTeacher: false,
+      onRoute: (text) => {
+        if (/FROM public\.teacher_work_artifacts/.test(text)) {
+          return res([{ tier: 'proficient', artifact_type: 'comment', text_content: 'Sharpen your thesis.', label: null, created_at: new Date(0) }]);
+        }
+        if (/FROM public\.teacher_work_samples/.test(text)) {
+          return res([{ tier: 'proficient', description: 'clarity of argument' }]);
+        }
+        if (/SELECT teacher_notes FROM public\.class_enrollments/.test(text)) {
+          return res([{ teacher_notes: JSON.stringify([{ timestamp: 1, text: 'be encouraging' }]) }]);
+        }
+        return res([]);
+      },
+    }),
+    bedrock: { chunks: CHAT_CHUNKS },
+  });
+  // SEG1 carries the teacher-stable WORK_ARTIFACTS marker + a cache breakpoint;
+  // SEG2 carries the per-student TEACHER_NOTES marker.
+  const seg1 = `You are Lumi. Teacher-stable prefix.${WA_MARKER}`;
+  const seg2 = `Student context here.${MARKER}`;
+  const r = await invoke(handler, {
+    method: 'POST', path: '/chat', token: tokenFor(STUDENT),
+    body: {
+      messages: [{ role: 'user', content: 'hi' }],
+      system: [
+        { type: 'text', text: seg1, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: seg2 },
+      ],
+      inject_work_artifacts: { teacher_profile_id: 'tp1', first_name: 'Laura' },
+      inject_teacher_notes: { teacher_profile_id: 'tp1' },
+    },
+  });
+  assert.equal(r.statusCode, 200);
+
+  // The array reached Bedrock as an array, with the cache_control breakpoint intact on SEG1.
+  const sent = JSON.parse(ctx.bedrock.commands.at(-1).body);
+  assert.ok(Array.isArray(sent.system), 'system forwarded to Bedrock as an array');
+  assert.equal(sent.system.length, 2);
+  assert.deepEqual(sent.system[0].cache_control, { type: 'ephemeral' }, 'cache_control preserved on SEG1');
+  assert.ok(!('cache_control' in sent.system[1]), 'SEG2 has no breakpoint');
+
+  // WORK_ARTIFACTS marker (SEG1 / block 0) was replaced in place; injected text landed in SEG1.
+  assert.ok(!sent.system[0].text.includes('LUMI_WORK_ARTIFACTS'), 'WA marker swapped out of SEG1');
+  assert.match(sent.system[0].text, /Sharpen your thesis/, 'artifact section injected into SEG1');
+  assert.match(sent.system[0].text, /Teacher-stable prefix\./, 'SEG1 base text preserved');
+
+  // TEACHER_NOTES marker (SEG2 / block 1) was replaced in place; notes landed in SEG2, not SEG1.
+  assert.ok(!sent.system[1].text.includes('LUMI_TEACHER_NOTES'), 'notes marker swapped out of SEG2');
+  assert.match(sent.system[1].text, /be encouraging/, 'notes section injected into SEG2');
+  assert.ok(!sent.system[0].text.includes('be encouraging'), 'per-student notes never leak into cached SEG1');
+
+  // Nothing private leaks to the client stream.
+  assert.doesNotMatch(r.body, /LUMI_WORK_ARTIFACTS|LUMI_TEACHER_NOTES/);
+  assert.doesNotMatch(r.body, /Sharpen your thesis|be encouraging/);
+});
+
+test('/chat array-form system: markers stripped across all blocks when no injection is requested', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({ userId: STUDENT.userId }),
+    bedrock: { chunks: CHAT_CHUNKS },
+  });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/chat', token: tokenFor(STUDENT),
+    body: {
+      messages: [{ role: 'user', content: 'hi' }],
+      system: [
+        { type: 'text', text: `SEG1.${WA_MARKER}`, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: `SEG2.${MARKER}` },
+      ],
+    },
+  });
+  assert.equal(r.statusCode, 200);
+  // No injection requested → no DB fetches, and every marker stripped to nothing.
+  assert.equal(findQueries(ctx, /FROM public\.teacher_work_artifacts/).length, 0);
+  assert.equal(findQueries(ctx, /SELECT teacher_notes FROM public\.class_enrollments/).length, 0);
+  const sent = JSON.parse(ctx.bedrock.commands.at(-1).body);
+  assert.equal(sent.system[0].text, 'SEG1.');
+  assert.equal(sent.system[1].text, 'SEG2.');
+});
+
 // ============================= /suggested-prompts ===========================
 
 test('/suggested-prompts requires teacher_profile_id (400)', async () => {
