@@ -532,6 +532,10 @@ async function softDeleteUserRows(uid, em) {
     `UPDATE public.teacher_work_samples ws SET deleted_at = now()
        FROM public.teacher_profiles tp
       WHERE ws.teacher_profile_id = tp.id AND tp.teacher_email = $1 AND ws.deleted_at IS NULL`, [em]);
+  await softDelete("teacher_work_artifacts",
+    `UPDATE public.teacher_work_artifacts wa SET deleted_at = now()
+       FROM public.teacher_profiles tp
+      WHERE wa.teacher_profile_id = tp.id AND tp.teacher_email = $1 AND wa.deleted_at IS NULL`, [em]);
   await softDelete("teacher_profiles",
     "UPDATE public.teacher_profiles SET deleted_at = now() WHERE teacher_email = $1 AND deleted_at IS NULL", [em]);
   await softDelete("profiles",
@@ -559,12 +563,17 @@ async function softDeleteUserRows(uid, em) {
 // soft-deleted so a guardian request during the 30-day grace still resolves.
 async function buildUserExport(uid, em) {
   const q = (sql, params) => dbQuery(sql, params).then(r => r.rows);
-  const [app_user, profile, teacher_profiles, work_samples, conversations, homework_tasks, enrollments, api_usage] = await Promise.all([
+  const [app_user, profile, teacher_profiles, work_samples, work_artifacts, conversations, homework_tasks, enrollments, api_usage] = await Promise.all([
     q("SELECT lumi_id, email, created_at, updated_at, deleted_at FROM public.app_users WHERE lumi_id = $1", [uid]),
     q("SELECT * FROM public.profiles WHERE id = $1", [uid]),
     q("SELECT * FROM public.teacher_profiles WHERE teacher_email = $1", [em]),
     q(`SELECT ws.* FROM public.teacher_work_samples ws
          JOIN public.teacher_profiles tp ON tp.id = ws.teacher_profile_id
+        WHERE tp.teacher_email = $1`, [em]),
+    // text_content IS the teacher's own authored content → included (unlike
+    // class_enrollments.teacher_notes, which are ABOUT students and excluded).
+    q(`SELECT wa.* FROM public.teacher_work_artifacts wa
+         JOIN public.teacher_profiles tp ON tp.id = wa.teacher_profile_id
         WHERE tp.teacher_email = $1`, [em]),
     q("SELECT * FROM public.conversations WHERE user_id = $1", [uid]),
     q("SELECT * FROM public.homework_tasks WHERE user_id = $1", [uid]),
@@ -577,6 +586,7 @@ async function buildUserExport(uid, em) {
   return {
     app_user, profile, teacher_profiles,
     teacher_work_samples: work_samples,
+    teacher_work_artifacts: work_artifacts,
     conversations, homework_tasks,
     class_enrollments: enrollments, api_usage,
   };
@@ -1400,6 +1410,141 @@ async function handleRequest(event, responseStream) {
       return sendJson(405, { error: "Method not allowed" });
     } catch (err) {
       console.error("work-samples error:", safeErr(err));
+      return sendJson(500, { error: "Database error" });
+    }
+  }
+
+  // === Route: /work-artifacts (GET, POST, DELETE) — Q4 v2 ===
+  // Authed + domain-gated above. Sibling to /work-samples: one row per artifact
+  // (N per tier), each a photo (s3_path) or a block of teacher text (text_content).
+  // In this pass only TEXT is written here (photos stay on teacher_work_samples,
+  // Decision D2-A) and text is injected SERVER-SIDE at chat time (Decision P1-A) —
+  // so, unlike /work-samples, GET is OWNER-SCOPED: artifact text must never reach a
+  // student's browser. denyUnlessOwner mirrors the /work-samples 2-step exactly.
+  // DELETE is SOFT (Phase-4 posture), NOT the hard delete /work-samples uses.
+  if (path === "/work-artifacts") {
+    const method = event.requestContext?.http?.method || "GET";
+    const qs = event.queryStringParameters || {};
+    const TIERS = ["progressing", "proficient", "exemplary"];
+    // Keep in sync with the CHECK constraint in migration/rds-work-artifacts.sql.
+    const TYPES = ["photo", "comment", "essay_feedback", "eval_note", "other"];
+    const MAX_ARTIFACTS_PER_TIER = 5;   // [D4] combined cap
+    const MAX_PHOTOS_PER_TIER = 3;      // [D4] photo sub-cap (moot this pass; photos live on work_samples)
+    const MAX_TEXT_LEN = 2000;          // [D4] per-text-artifact hard cap
+    const MAX_LABEL_LEN = 200;
+    // Same 2-step write authz as /work-samples. null when authorized, else {status,error}.
+    const denyUnlessOwner = async (teacherProfileId) => {
+      if (typeof teacherProfileId !== "string" || !teacherProfileId) {
+        return { status: 400, error: "Missing teacher_profile_id" };
+      }
+      const owner = await dbQuery(
+        "SELECT teacher_email FROM public.teacher_profiles WHERE id = $1",
+        [teacherProfileId]
+      );
+      if (owner.rowCount === 0) return { status: 404, error: "No teacher profile found" };
+      if (owner.rows[0].teacher_email !== user.email.toLowerCase()) {
+        return { status: 403, error: "Not the owning teacher" };
+      }
+      return null;
+    };
+    try {
+      if (method === "GET") {
+        // Owner-scoped: a single profile the caller owns (P1-A privacy posture).
+        const denied = await denyUnlessOwner(qs.teacher_profile_id);
+        if (denied) return sendJson(denied.status, { error: denied.error });
+        const result = await dbQuery(
+          `SELECT * FROM public.teacher_work_artifacts
+            WHERE teacher_profile_id = $1 AND deleted_at IS NULL
+            ORDER BY tier, sort_order, created_at, id`,
+          [qs.teacher_profile_id]
+        );
+        return sendJson(200, result.rows);
+      }
+
+      if (method === "POST") {
+        if (!TIERS.includes(body.tier)) return sendJson(400, { error: "Invalid tier" });
+        if (!TYPES.includes(body.artifact_type)) return sendJson(400, { error: "Invalid artifact_type" });
+        // Content integrity mirrors the DB CHECK: photo ⇒ s3_path only; text ⇒ text_content only.
+        let textContent = null, s3Path = null;
+        if (body.artifact_type === "photo") {
+          if (typeof body.s3_path !== "string" || !body.s3_path.trim()) {
+            return sendJson(400, { error: "photo artifact requires s3_path" });
+          }
+          s3Path = body.s3_path.trim();
+        } else {
+          if (typeof body.text_content !== "string" || !body.text_content.trim()) {
+            return sendJson(400, { error: "text artifact requires text_content" });
+          }
+          if (body.text_content.length > MAX_TEXT_LEN) {
+            return sendJson(400, { error: `text_content exceeds ${MAX_TEXT_LEN} chars` });
+          }
+          textContent = body.text_content;
+        }
+        const label = typeof body.label === "string" ? body.label.slice(0, MAX_LABEL_LEN) : null;
+        const sortOrder = Number.isInteger(body.sort_order) ? body.sort_order : 0;
+        const denied = await denyUnlessOwner(body.teacher_profile_id);
+        if (denied) return sendJson(denied.status, { error: denied.error });
+
+        // Edit (upsert by id): update in place; no new row → no cap check.
+        if (typeof body.id === "string" && body.id) {
+          const upd = await dbQuery(
+            `UPDATE public.teacher_work_artifacts
+                SET tier = $3, artifact_type = $4, text_content = $5, s3_path = $6,
+                    label = $7, sort_order = $8, updated_at = now()
+              WHERE id = $1 AND teacher_profile_id = $2 AND deleted_at IS NULL
+              RETURNING *`,
+            [body.id, body.teacher_profile_id, body.tier, body.artifact_type, textContent, s3Path, label, sortOrder]
+          );
+          if (upd.rowCount === 0) return sendJson(404, { error: "No such artifact" });
+          return sendJson(200, upd.rows[0]);
+        }
+
+        // Create: enforce per-tier caps server-side before INSERT.
+        const counts = await dbQuery(
+          `SELECT
+             count(*)::int AS total,
+             count(*) FILTER (WHERE artifact_type = 'photo')::int AS photos
+             FROM public.teacher_work_artifacts
+            WHERE teacher_profile_id = $1 AND tier = $2 AND deleted_at IS NULL`,
+          [body.teacher_profile_id, body.tier]
+        );
+        const { total, photos } = counts.rows[0];
+        if (total >= MAX_ARTIFACTS_PER_TIER) {
+          return sendJson(409, { error: `Tier already has ${MAX_ARTIFACTS_PER_TIER} artifacts` });
+        }
+        if (body.artifact_type === "photo" && photos >= MAX_PHOTOS_PER_TIER) {
+          return sendJson(409, { error: `Tier already has ${MAX_PHOTOS_PER_TIER} photos` });
+        }
+        const ins = await dbQuery(
+          `INSERT INTO public.teacher_work_artifacts
+             (teacher_profile_id, tier, artifact_type, text_content, s3_path, label, sort_order)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING *`,
+          [body.teacher_profile_id, body.tier, body.artifact_type, textContent, s3Path, label, sortOrder]
+        );
+        return sendJson(200, ins.rows[0]);
+      }
+
+      if (method === "DELETE") {
+        if (typeof qs.id !== "string" || !qs.id) return sendJson(400, { error: "Missing id" });
+        // Resolve the row's owning profile, then owner-check, then soft-delete.
+        const owned = await dbQuery(
+          "SELECT teacher_profile_id FROM public.teacher_work_artifacts WHERE id = $1 AND deleted_at IS NULL",
+          [qs.id]
+        );
+        if (owned.rowCount === 0) return sendJson(404, { error: "No such artifact" });
+        const denied = await denyUnlessOwner(owned.rows[0].teacher_profile_id);
+        if (denied) return sendJson(denied.status, { error: denied.error });
+        const result = await dbQuery(
+          "UPDATE public.teacher_work_artifacts SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL",
+          [qs.id]
+        );
+        return sendJson(200, { deleted: result.rowCount });
+      }
+
+      return sendJson(405, { error: "Method not allowed" });
+    } catch (err) {
+      console.error("work-artifacts error:", safeErr(err));
       return sendJson(500, { error: "Database error" });
     }
   }
