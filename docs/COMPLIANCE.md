@@ -37,6 +37,7 @@ Lambda's per-route JWT authorization (RLS was removed from the RDS schema at mig
 | Teacher email, title, teaching voice, engagement rules, course info | Onboarding (`teacher_profiles`) | RDS | Y | N | Indefinite¹ | owner; any-authed (read); admin |
 | Syllabus text + PDF (`syllabus_text`, `syllabus_paths`) | Onboarding upload | RDS + S3 (`lumi-syllabi-*`) | Y | Y | Indefinite¹ ² | owner (write); any-authed (read) |
 | Graded work-sample photos + descriptions (`teacher_work_samples`) | Onboarding upload | RDS + S3 (`lumi-work-samples`) | Y | Y | Indefinite¹ ² | owner (write); any-authed (read) |
+| Written-example work artifacts (`teacher_work_artifacts.text_content`, Q4 v2) | Onboarding | RDS | Y (teacher-authored; may quote student work) | Y | Soft-delete⁵ | **owner only** — never returned to students; injected server-side into Lumi's feedback voice (marker `<<LUMI_WORK_ARTIFACTS>>`), like `teacher_notes` |
 | Identity bridge (`app_users`: lumi_id, cognito_sub, email) | First sign-in / SIS import | RDS | Y | N (link key) | Indefinite¹ | server only (Lambda) |
 | SIS person-id map (`sis_map`: email, lumi_id) | SIS import | RDS | Y | Y | Indefinite¹ | admin (import); server |
 | Section metadata (`sections`) | SIS import | RDS | N | N | Indefinite¹ | teacher-of-class; admin |
@@ -54,6 +55,10 @@ JWT claims, request bodies, or row contents. (Phase 0 found 4 sites that violate
 fixed in Phase 2.)
 ⁴ CloudWatch log-group retention is currently the account default (never-expire unless a
 retention is set) — flagged in Known Gaps.
+⁵ `teacher_work_artifacts` ships with `deleted_at` from day one (Q4 v2) and follows the
+Phase-4 soft-delete → 30-day-grace → hard-delete pattern: soft-deleted by the
+`/delete-my-account` cascade and by `DELETE /work-artifacts?id=`; included in the
+`/my-data` export (teacher's own content); no S3 objects (text-only in this pass).
 
 ---
 
@@ -197,8 +202,9 @@ pattern on data that already exists (account-owned rows). Identity is always tak
 the JWT; a caller can only ever touch their own rows.
 
 - **`GET /my-data`** — returns a JSON export of every row tied to the caller's identity
-  (`app_users`, `profiles`, `teacher_profiles`, `teacher_work_samples`, `conversations`,
-  `homework_tasks`, the caller's own `class_enrollments`, `api_usage`). **`teacher_notes`
+  (`app_users`, `profiles`, `teacher_profiles`, `teacher_work_samples`,
+  `teacher_work_artifacts`, `conversations`, `homework_tasks`, the caller's own
+  `class_enrollments`, `api_usage`). **`teacher_notes`
   is deliberately excluded** — those are observations *other people* wrote about the
   caller, not the caller's own record.
 - **`POST /delete-my-account`** — requires body `{"confirm":"DELETE"}` (a stray POST
@@ -251,6 +257,9 @@ rows. Order matters: dependent rows before identity rows.
 ```sql
 DELETE FROM public.teacher_work_samples ws USING public.teacher_profiles tp
   WHERE ws.teacher_profile_id = tp.id
+    AND tp.deleted_at IS NOT NULL AND tp.deleted_at < now() - interval '30 days';
+DELETE FROM public.teacher_work_artifacts wa USING public.teacher_profiles tp
+  WHERE wa.teacher_profile_id = tp.id
     AND tp.deleted_at IS NOT NULL AND tp.deleted_at < now() - interval '30 days';
 DELETE FROM public.teacher_profiles  WHERE deleted_at IS NOT NULL AND deleted_at < now() - interval '30 days';
 DELETE FROM public.class_enrollments WHERE deleted_at IS NOT NULL AND deleted_at < now() - interval '30 days';
