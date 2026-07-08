@@ -6,10 +6,16 @@ Writes, through the IAM-gated Lambda adminSql path (lambda_admin.rds_sql):
                      cognito_sub NULL; they never sign in, the row just gives
                      class_enrollments.student_id a stable uuid).
   2. profiles      — a student stub per identity (name, grade) for roster realism.
-  3. teacher_profiles — one row per (teacher, class), done=true, with the three
+  3. staff_directory — the "First Last" -> email map the Lambda /teacher-directory
+                     route serves and the frontend resolveTeacherEmail() consults.
+                     Without this row the schedule string "Thomas Beck" resolves
+                     to undefined and getTeacherProfile silently fails, even though
+                     teacher_profiles is populated. is_admin=false on all 8; the
+                     real admin identity is seeded out-of-band.
+  4. teacher_profiles — one row per (teacher, class), done=true, with the three
                      voice fields (engagement_rules, teaching_voice, course_info),
                      title, and welcome_message.
-  4. class_enrollments — one row per (student, class): student_id, teacher_profile_id,
+  5. class_enrollments — one row per (student, class): student_id, teacher_profile_id,
                      block, student_name. teacher_notes deliberately left NULL/untouched.
 
 All ids are deterministic (uuid5) so re-running is a no-op, not a duplicate.
@@ -91,6 +97,8 @@ def seed(dry_run=False):
           f"{sum(len(c['students']) for p in PERSONAS for c in p['classes'])} enrollments.")
     if dry_run:
         for p in PERSONAS:
+            print(f"  staff_directory <- {p['first']} {p['last']} -> {p['email']}")
+        for p in PERSONAS:
             for c in p["classes"]:
                 print(f"  teacher_profiles <- {p['email']} / {c['course_name']} (done=true)")
         return
@@ -123,7 +131,21 @@ def seed(dry_run=False):
         total += r.get("rowCount", 0)
     print(f"  profiles: {total} upserted (of {len(rows)})")
 
-    # --- 3 + 4. teacher_profiles then class_enrollments per class ---
+    # --- 3. staff_directory (batch) ---
+    # "First Last" -> email, keyed by the schedule display string. Idempotent on
+    # name (PK). is_admin stays false so we don't overwrite the real admin row.
+    rows = [(f'{p["first"]} {p["last"]}', p["email"]) for p in PERSONAS]
+    vals, params = [], []
+    for j, (name, email) in enumerate(rows):
+        vals.append(f"(${2*j+1}, ${2*j+2}, false)")
+        params += [name, email]
+    r = lambda_admin.rds_sql(
+        f"INSERT INTO public.staff_directory (name, email, is_admin) VALUES {', '.join(vals)} "
+        "ON CONFLICT (name) DO UPDATE SET email = EXCLUDED.email, updated_at = now() RETURNING name",
+        params)
+    print(f"  staff_directory: {r.get('rowCount', 0)} upserted (of {len(rows)})")
+
+    # --- 4 + 5. teacher_profiles then class_enrollments per class ---
     tp_count, enr_count = 0, 0
     for p in PERSONAS:
         for c in p["classes"]:
@@ -170,6 +192,22 @@ def verify():
     print("Verifying personas (projection a student read receives)"
           + (" + authenticated HTTPS GET" if id_token else "") + ":\n")
     all_ok = True
+
+    # staff_directory: one row per persona, keyed by "First Last". Without this,
+    # the client's TEACHER_EMAIL_MAP lookup misses and no profile ever loads.
+    for p in PERSONAS:
+        expected_name = f'{p["first"]} {p["last"]}'
+        r = lambda_admin.rds_sql(
+            "SELECT email FROM public.staff_directory WHERE name = $1",
+            [expected_name])
+        row = (r.get("rows") or [None])[0]
+        ok = bool(row) and (row.get("email") or "").lower() == p["email"].lower()
+        all_ok = all_ok and ok
+        status = "PASS" if ok else "FAIL"
+        print(f"  [{status}] staff_directory  {expected_name:20} -> "
+              f"{(row or {}).get('email') or '(missing)'}")
+    print()
+
     for p in PERSONAS:
         for c in p["classes"]:
             r = lambda_admin.rds_sql(
