@@ -76,6 +76,16 @@ import { initVoice, wireVoiceListeners } from './js/voice.js';
         window.location.href = 'teacher.html';
       });
     }
+    // Home redesign v1 TM-4: mirror the exit button into Settings — the
+    // sidebar (its default host) is hidden under the flag.
+    const settingsExit = document.getElementById('settingsExitTestBtn');
+    if (settingsExit) {
+      settingsExit.style.display = '';
+      settingsExit.addEventListener('click', () => {
+        sessionStorage.removeItem('lumi_test_mode');
+        window.location.href = 'teacher.html';
+      });
+    }
   }
 
   // Hide loading screen and show the app

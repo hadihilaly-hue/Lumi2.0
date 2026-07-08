@@ -879,3 +879,166 @@ Before landing any code:
       :updateTestModeBanner`).
 - [ ] Someone (you) has actually seen the mockup and confirmed the visual affordance
       choices — this spec is layout, not visuals.
+
+---
+
+## 12. Session 1 boot-smoke gate (2026-07-08)
+
+Session 1 landed on branch `feature/session-1-home-redesign` in four small commits:
+
+| # | Sha (branch) | What |
+|---|---|---|
+| 1 | `5a1ef23` | State scaffold (`S.homeRedesign`, `S.route`) + `js/router.js` + 15 router tests |
+| 2 | `7a4a5b0` | `js/home.js` + `#homeView` / `#classViewHeader` containers + CSS |
+| 3 | `41772e1` | `js/classview.js` + boot wiring + TM-4 exit button in Settings |
+| 4 | *(this doc)* | Boot-smoke gate + manual browser verification list |
+
+### 12.1 TM-1 through TM-4 walk (file by file)
+
+Written against the exact changes on this branch. Every invariant preserved.
+
+**TM-1 — `is_teacher_test=true` conversation flag.**
+- Server-side only: Lambda + RDS. Session 1 touched neither.
+- Conversation writes go through `js/storage.js:syncConvToSupabase`, unchanged.
+- **Result: intact.**
+
+**TM-2 — data isolation via `S.isTestMode` write-path guards.**
+- Session 1 added ZERO new write paths. Every new module (`js/router.js`,
+  `js/home.js`, `js/classview.js`) only reads state / mutates DOM.
+- `home.js` reads `S.schedule` (or `S.testSchedule` when `S.isTestMode`); writes
+  nothing back.
+- `classview.js` calls `openTutor(...)`, which itself already respects TM-2
+  (line 237 of `js/conversation.js`: `if (profile && ... && !S.isTestMode)`).
+  No change here.
+- `router.js` calls `history.pushState` and reads/writes `location.hash` — no
+  shared-table surface.
+- **Result: intact.**
+
+**TM-3 — locked classes route to `teacher.html?course=…&from=test-mode`.**
+- `js/home.js:renderCard`: when `!card.ready` **and** `S.isTestMode`, navigates
+  to `teacher.html?course=<encoded>&from=test-mode` — matches the sidebar's
+  previous route (`js/sidebar.js` had the same pattern).
+- Student mode locked-card behavior is a toast (§9 D12-A) — never routes
+  cross-page.
+- **Result: intact, and slightly better (a locked card is now a big grid tile,
+  not a small sidebar row).**
+
+**TM-4 — persistent banner + exit button.**
+- Chat-panel banner (`#testModeBanner`): app.js still flips
+  `display = 'flex'` when `S.isTestMode` (unchanged). Visible during class
+  view because the class view mounts the same `#chatPanel`.
+- Home-view banner (`#homeTestBanner`): new in commit 2. Also flipped visible
+  when `S.isTestMode`. Visible on home.
+- Exit button — **the regression risk**. The original exit lives in
+  `#sbExitTestBtn` inside `#sidebar`, which is CSS-hidden under
+  `.home-redesign-v1`. If we shipped commit 2/3 alone, a teacher entering test
+  mode would have no way out. Fixed in commit 3 by mirroring the exit button
+  into Settings (`#settingsExitTestBtn`) — same click handler, same
+  destination. Spec §4.5 called for this ("the exit button lives on the user
+  chip menu in the new layout"), and the user chip is the Settings entry.
+- **Result: intact.**
+
+### 12.2 Student boot path (flag-off)
+
+- `app.html` loads → auth guard → allowed-email → `loadTeacherDirectory` →
+  test-mode boot detection → `S.homeRedesign` is `false` → **no body class
+  applied** → user-chip populated (both sidebar chip AND home chip; home is
+  hidden so writes are harmless) → `init()` → onboarding / schedule wizard as
+  needed → `startApp()` → the existing `renderSidebar()` + `showWelcome()`
+  path runs verbatim.
+- Byte-identical to pre-redesign: no route hash appended, no `#homeView`
+  shown, sidebar visible, chat panel is the landing surface.
+
+### 12.3 Student boot path (flag-on)
+
+- Same up through auth + directory + user chip.
+- `S.homeRedesign` is `true` (localStorage flag set) → `body.classList` gets
+  `home-redesign-v1` → CSS hides `.sidebar`, `.sb-overlay`, `.mob-header`.
+- `init()` → `startApp()` → `renderSidebar()` still fires (populates
+  `#sbUserEmail` subtitle) but the sidebar is invisible → hits the `if
+  (S.homeRedesign)` branch → `initRouter({onHome: mountHome, onClass:
+  mountClass})`.
+- Router parses `location.hash`. Empty hash → `mountHome()` shows `#homeView`
+  and renders the card grid.
+- `?mode=test` in the URL survives every `pushState` because
+  `buildRouteUrl(route, location.search)` prepends the query verbatim.
+
+### 12.4 Teacher Test-Mode boot path (flag-on)
+
+- URL: `app.html?mode=test`.
+- Boot detection sets `sessionStorage.lumi_test_mode = 'true'` and
+  `S.isTestMode = true`.
+- `#testModeBanner` + `#homeTestBanner` + `#settingsExitTestBtn` all get
+  `display` flipped to visible.
+- `loadTestModeSchedule()` synthesizes `S.testSchedule` — each entry carries
+  a `ready` flag.
+- Home grid renders sorted `ready` first, then locked, alphabetical within
+  each (§9 D10-B).
+- Ready card → `navClass(course, teacher)` → `#class/<b64>/<b64>` hash →
+  `openTutor(...)`. Query string preserves `?mode=test` (verified in the
+  unit tests).
+- Locked card → `teacher.html?course=<encoded>&from=test-mode`.
+- Exit: Settings drawer → "← Exit test mode" → clears sessionStorage +
+  navigates to `teacher.html`.
+
+### 12.5 Test suites
+
+- Root: **108 tests pass** (was 91; +15 router pure surface, +1 boot-smoke
+  auto-discovery for `js/home.js`, +1 for `js/classview.js`).
+- Lambda: **158 tests pass** (unchanged — no Lambda changes this session).
+- All commits gated on both suites green.
+
+### 12.6 What a student sees (flag-on)
+
+- **Boot** → cream/navy grid of cards, one per enrolled class, alphabetized
+  by course name. Big serif course name; small teacher last name; small
+  block letter.
+- **Tap a card** → the existing chat opens full-screen with a back-arrow
+  button, the course title, and the teacher name in the header strip. Chat
+  behaves exactly as before (streaming, welcome card, work samples,
+  suggested-prompt chips, teacher-notes injection).
+- **Back button** → returns to the grid.
+- **Refresh at `#class/…`** → re-mounts the same class (D5-A: honor hash on
+  boot).
+- **Refresh at `#home` / no hash** → home.
+- **Locked class** → tiled but faded, "Setting up" tag; tap in student mode
+  shows a toast; tap in test mode routes to `teacher.html` prefilled.
+- **Test Mode teachers** → grid with a terracotta strip at the top; Settings
+  drawer carries an "Exit test mode" button; the existing chat-panel banner
+  still shows during a class view.
+
+### 12.7 Manual browser verification list (for Hadi)
+
+Toggle: `localStorage.setItem('lumi_home_redesign_v1','true'); location.reload();`
+
+Run each; each is <60 seconds.
+
+- [ ] **B1.** Flag OFF → app boots into the old sidebar layout, byte-identical
+      (no home grid visible, no `body.home-redesign-v1` class).
+- [ ] **B2.** Flag ON → home grid renders, sidebar hidden, no console errors.
+      Card count matches `getSchedule().length`.
+- [ ] **B3.** Tap a *ready* card → class view mounts, back button visible,
+      chat pipeline works (send a message, see streamed reply).
+- [ ] **B4.** Back button → returns to home; the URL hash flips to `#home`;
+      previous chat state preserved (revisiting the same card resumes it).
+- [ ] **B5.** Deep-link — paste `app.html#class/<b64>/<b64>` in the URL bar
+      (or hit refresh while on a class) → boots straight to that class.
+- [ ] **B6.** `app.html?mode=test` → home grid renders with the terracotta
+      test strip; ready classes sorted first, locked second (D10-B).
+- [ ] **B7.** In Test Mode, navigate into a ready class → URL preserves
+      `?mode=test` after the class hash. TM banner still visible in-chat.
+- [ ] **B8.** Test Mode → Settings drawer shows the "Exit test mode" button;
+      click → routes to `teacher.html`, sessionStorage cleared.
+- [ ] **B9.** Student mode, tap a *locked* card → toast appears; no
+      navigation.
+- [ ] **B10.** Flag OFF → all the above surfaces (banner, exit button,
+      sidebar) return to their old positions with no drift.
+
+Any failure → flip the flag off (`localStorage.removeItem('lumi_home_redesign_v1'); location.reload();`) and the old layout is fully restored. Rollback is one line.
+
+### 12.8 Session 2 pickup (per §4.8)
+
+- Last-conv snippet + timestamp per card (§2.1 v1 fallback).
+- Next-due line via `activeHwForClass(course)` (§2.2).
+- Priority sort v1 (urgent-HW → recency → alpha).
+- Red dot on cards with urgent HW (§9 D3-A).
