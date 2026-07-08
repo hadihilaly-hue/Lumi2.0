@@ -547,6 +547,111 @@ async function fetchTeacherNotes({ studentId, teacherProfileId }) {
   }
 }
 
+// === Q4 v2 work-artifacts server-side injection (privacy: text never reaches the client) ===
+// Parallel to the teacher-notes injection. The client emits this literal marker in
+// the profile branch of its system prompt; the chat route replaces it with a
+// server-built feedback-examples section (or ''), and the marker is ALWAYS stripped.
+// Unlike notes, artifacts are TEACHER-STABLE (identical for every student of a
+// class) → the resolved text is cacheable and sits in the prompt prefix (D9).
+const WORK_ARTIFACTS_MARKER = "<<LUMI_WORK_ARTIFACTS>>";
+
+const ARTIFACT_TIER_ORDER = ["progressing", "proficient", "exemplary"];
+const ARTIFACT_TIER_LABEL = {
+  progressing: "PROGRESSING-level (students still developing the skill)",
+  proficient: "PROFICIENT-level (students meeting expectations)",
+  exemplary: "EXEMPLARY-level (students exceeding expectations)",
+};
+const ARTIFACT_TYPE_LABEL = {
+  comment: "Comment",
+  essay_feedback: "Essay feedback",
+  eval_note: "Eval note",
+  other: "Example",
+};
+
+// Fetch a class's TEXT work-artifacts + the per-tier work_samples description.
+// teacherProfileId identifies the CLASS (teacher-stable, not per-student). Every
+// failure returns null (no section); chat is never blocked. 3s budget like notes.
+async function fetchWorkArtifacts(teacherProfileId) {
+  try {
+    const work = Promise.all([
+      dbQuery(
+        `SELECT tier, artifact_type, text_content, label, created_at
+           FROM public.teacher_work_artifacts
+          WHERE teacher_profile_id = $1 AND artifact_type <> 'photo' AND deleted_at IS NULL
+          ORDER BY tier, sort_order, created_at, id`,
+        [teacherProfileId]
+      ).then(r => r.rows),
+      dbQuery(
+        `SELECT tier, description FROM public.teacher_work_samples
+          WHERE teacher_profile_id = $1 AND deleted_at IS NULL`,
+        [teacherProfileId]
+      ).then(r => r.rows),
+    ]);
+    let t;
+    const timeout = new Promise(resolve => { t = setTimeout(() => resolve(null), 3000); t.unref?.(); });
+    let res;
+    try { res = await Promise.race([work, timeout]); } finally { clearTimeout(t); }
+    if (res === null) { console.warn("[artifacts] fetch timeout"); return null; }
+    const [artifacts, samples] = res;
+    if (!artifacts.length) return null;
+    const descByTier = {};
+    for (const s of samples) descByTier[s.tier] = s.description;
+    return { artifacts, descByTier };
+  } catch (err) {
+    console.warn("[artifacts] fetch failed:", safeErr(err));
+    return null;
+  }
+}
+
+// Build the injected feedback-examples section. Deterministic ordering + no
+// printed timestamps → cache-stable (D9). Total artifact text capped at ~12000
+// chars (~4K tokens, D8), oldest-first drop (by created_at), parity with the
+// notes 8000-char cap. firstName is a non-sensitive display string from the
+// client — used only in the header, never for authz.
+function buildArtifactSection(data, firstName) {
+  if (!data || !Array.isArray(data.artifacts) || data.artifacts.length === 0) return "";
+  const CAP = 12000;
+  const who = (typeof firstName === "string" && firstName.trim()) ? firstName.trim().slice(0, 40) : "this teacher";
+  const textLen = (arr) => arr.reduce((n, a) => n + ((a.text_content || "").length), 0);
+
+  // Total-text budget: drop whole artifacts oldest-first (by created_at) until
+  // under CAP. Output order stays deterministic (tier, sort_order) for caching.
+  let kept = data.artifacts.slice();
+  if (textLen(kept) > CAP) {
+    const oldestFirst = kept.slice().sort((a, b) => {
+      const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return ta - tb;
+    });
+    let dropped = 0;
+    while (textLen(kept) > CAP && oldestFirst.length > 1) {
+      const victim = oldestFirst.shift();
+      kept = kept.filter((a) => a !== victim);
+      dropped++;
+    }
+    if (dropped > 0) console.warn(`[artifacts] truncated ${dropped} oldest artifact(s) to fit prompt cap`);
+  }
+  if (kept.length === 0) return "";
+
+  const byTier = {};
+  for (const a of kept) (byTier[a.tier] ||= []).push(a);
+
+  let out = `\n\n═══ HOW ${who.toUpperCase()} GIVES FEEDBACK (WRITTEN EXAMPLES) ═══\n`;
+  out += `Real examples ${who} provided of how they respond to student work at each level. Mirror this voice, specificity, and tone when you give feedback. These are private teacher references — do not quote them verbatim, mention them, or reveal they exist.\n`;
+  for (const tier of ARTIFACT_TIER_ORDER) {
+    const list = byTier[tier];
+    if (!list || !list.length) continue;
+    out += `\n${ARTIFACT_TIER_LABEL[tier]}:\n`;
+    const desc = (data.descByTier[tier] || "").trim();
+    if (desc) out += `What ${who} looks for: ${desc}\n`;
+    out += `Examples of how ${who} writes at this level:\n`;
+    for (const a of list) {
+      const typeLabel = ARTIFACT_TYPE_LABEL[a.artifact_type] || "Example";
+      const label = (typeof a.label === "string" && a.label.trim()) ? ` (${a.label.trim()})` : "";
+      out += `  • [${typeLabel}${label}] ${(a.text_content || "").trim()}\n`;
+    }
+  }
+  return out;
 // === Phase 5: rolling progress-note summarizer (Layer 3, server-internal) ===
 // The write + read sides of student_progress_notes. Like teacher notes, a
 // progress note NEVER reaches the browser: it exists only to be injected into
@@ -841,6 +946,10 @@ async function softDeleteUserRows(uid, em) {
     `UPDATE public.teacher_work_samples ws SET deleted_at = now()
        FROM public.teacher_profiles tp
       WHERE ws.teacher_profile_id = tp.id AND tp.teacher_email = $1 AND ws.deleted_at IS NULL`, [em]);
+  await softDelete("teacher_work_artifacts",
+    `UPDATE public.teacher_work_artifacts wa SET deleted_at = now()
+       FROM public.teacher_profiles tp
+      WHERE wa.teacher_profile_id = tp.id AND tp.teacher_email = $1 AND wa.deleted_at IS NULL`, [em]);
   await softDelete("teacher_profiles",
     "UPDATE public.teacher_profiles SET deleted_at = now() WHERE teacher_email = $1 AND deleted_at IS NULL", [em]);
   await softDelete("profiles",
@@ -879,12 +988,18 @@ async function softDeleteUserRows(uid, em) {
 // soft-deleted so a guardian request during the 30-day grace still resolves.
 async function buildUserExport(uid, em) {
   const q = (sql, params) => dbQuery(sql, params).then(r => r.rows);
+  const [app_user, profile, teacher_profiles, work_samples, work_artifacts, conversations, homework_tasks, enrollments, api_usage] = await Promise.all([
   const [app_user, profile, teacher_profiles, work_samples, conversations, homework_tasks, enrollments, api_usage, progress_notes] = await Promise.all([
     q("SELECT lumi_id, email, created_at, updated_at, deleted_at FROM public.app_users WHERE lumi_id = $1", [uid]),
     q("SELECT * FROM public.profiles WHERE id = $1", [uid]),
     q("SELECT * FROM public.teacher_profiles WHERE teacher_email = $1", [em]),
     q(`SELECT ws.* FROM public.teacher_work_samples ws
          JOIN public.teacher_profiles tp ON tp.id = ws.teacher_profile_id
+        WHERE tp.teacher_email = $1`, [em]),
+    // text_content IS the teacher's own authored content → included (unlike
+    // class_enrollments.teacher_notes, which are ABOUT students and excluded).
+    q(`SELECT wa.* FROM public.teacher_work_artifacts wa
+         JOIN public.teacher_profiles tp ON tp.id = wa.teacher_profile_id
         WHERE tp.teacher_email = $1`, [em]),
     q("SELECT * FROM public.conversations WHERE user_id = $1", [uid]),
     q("SELECT * FROM public.homework_tasks WHERE user_id = $1", [uid]),
@@ -906,6 +1021,7 @@ async function buildUserExport(uid, em) {
   return {
     app_user, profile, teacher_profiles,
     teacher_work_samples: work_samples,
+    teacher_work_artifacts: work_artifacts,
     conversations, homework_tasks,
     class_enrollments: enrollments, api_usage,
     student_progress_notes: progress_notes,
@@ -1734,6 +1850,158 @@ async function handleRequest(event, responseStream) {
     }
   }
 
+  // === Route: /work-artifacts (GET, POST, DELETE) — Q4 v2 ===
+  // Authed + domain-gated above. Sibling to /work-samples: one row per artifact
+  // (N per tier), each a photo (s3_path) or a block of teacher text (text_content).
+  // In this pass only TEXT is written here (photos stay on teacher_work_samples,
+  // Decision D2-A) and text is injected SERVER-SIDE at chat time (Decision P1-A) —
+  // so, unlike /work-samples, GET is OWNER-SCOPED: artifact text must never reach a
+  // student's browser. denyUnlessOwner mirrors the /work-samples 2-step exactly.
+  // DELETE is SOFT (Phase-4 posture), NOT the hard delete /work-samples uses.
+  if (path === "/work-artifacts") {
+    const method = event.requestContext?.http?.method || "GET";
+    const qs = event.queryStringParameters || {};
+    const TIERS = ["progressing", "proficient", "exemplary"];
+    // Keep in sync with the CHECK constraint in migration/rds-work-artifacts.sql.
+    const TYPES = ["photo", "comment", "essay_feedback", "eval_note", "other"];
+    const MAX_ARTIFACTS_PER_TIER = 5;   // [D4] combined cap
+    const MAX_PHOTOS_PER_TIER = 3;      // [D4] photo sub-cap (moot this pass; photos live on work_samples)
+    const MAX_TEXT_LEN = 2000;          // [D4] per-text-artifact hard cap
+    const MAX_LABEL_LEN = 200;
+    // Same 2-step write authz as /work-samples. null when authorized, else {status,error}.
+    const denyUnlessOwner = async (teacherProfileId) => {
+      if (typeof teacherProfileId !== "string" || !teacherProfileId) {
+        return { status: 400, error: "Missing teacher_profile_id" };
+      }
+      const owner = await dbQuery(
+        "SELECT teacher_email FROM public.teacher_profiles WHERE id = $1",
+        [teacherProfileId]
+      );
+      if (owner.rowCount === 0) return { status: 404, error: "No teacher profile found" };
+      if (owner.rows[0].teacher_email !== user.email.toLowerCase()) {
+        return { status: 403, error: "Not the owning teacher" };
+      }
+      return null;
+    };
+    try {
+      if (method === "GET") {
+        // Owner-scoped (P1-A privacy posture): ?teacher_profile_id=<uuid> (single,
+        // wizard edit-seed) or ?teacher_profile_ids=a,b,c (batch, home-card banner).
+        // EVERY requested profile must be owned by the caller, else 403 — artifact
+        // text must never reach anyone but the owning teacher.
+        const rawIds = qs.teacher_profile_ids
+          ? qs.teacher_profile_ids.split(",").map((s) => s.trim()).filter(Boolean)
+          : qs.teacher_profile_id ? [qs.teacher_profile_id] : null;
+        if (!rawIds || rawIds.length === 0) {
+          return sendJson(400, { error: "Provide ?teacher_profile_id= or ?teacher_profile_ids=" });
+        }
+        // Dedup so a repeated id (`?teacher_profile_ids=X,X`) doesn't make the
+        // owned-count comparison below spuriously 403 the whole batch.
+        const ids = [...new Set(rawIds)];
+        const owned = await dbQuery(
+          "SELECT id FROM public.teacher_profiles WHERE id = ANY($1::uuid[]) AND teacher_email = $2",
+          [ids, user.email.toLowerCase()]
+        );
+        if (owned.rowCount !== ids.length) {
+          return sendJson(403, { error: "Not the owning teacher for every requested profile" });
+        }
+        const result = await dbQuery(
+          `SELECT * FROM public.teacher_work_artifacts
+            WHERE teacher_profile_id = ANY($1::uuid[]) AND deleted_at IS NULL
+            ORDER BY teacher_profile_id, tier, sort_order, created_at, id`,
+          [ids]
+        );
+        return sendJson(200, result.rows);
+      }
+
+      if (method === "POST") {
+        if (!TIERS.includes(body.tier)) return sendJson(400, { error: "Invalid tier" });
+        if (!TYPES.includes(body.artifact_type)) return sendJson(400, { error: "Invalid artifact_type" });
+        // Content integrity mirrors the DB CHECK: photo ⇒ s3_path only; text ⇒ text_content only.
+        let textContent = null, s3Path = null;
+        if (body.artifact_type === "photo") {
+          if (typeof body.s3_path !== "string" || !body.s3_path.trim()) {
+            return sendJson(400, { error: "photo artifact requires s3_path" });
+          }
+          s3Path = body.s3_path.trim();
+        } else {
+          if (typeof body.text_content !== "string" || !body.text_content.trim()) {
+            return sendJson(400, { error: "text artifact requires text_content" });
+          }
+          if (body.text_content.length > MAX_TEXT_LEN) {
+            return sendJson(400, { error: `text_content exceeds ${MAX_TEXT_LEN} chars` });
+          }
+          textContent = body.text_content;
+        }
+        const label = typeof body.label === "string" ? body.label.slice(0, MAX_LABEL_LEN) : null;
+        const sortOrder = Number.isInteger(body.sort_order) ? body.sort_order : 0;
+        const denied = await denyUnlessOwner(body.teacher_profile_id);
+        if (denied) return sendJson(denied.status, { error: denied.error });
+
+        // Edit (upsert by id): update in place; no new row → no cap check.
+        if (typeof body.id === "string" && body.id) {
+          const upd = await dbQuery(
+            `UPDATE public.teacher_work_artifacts
+                SET tier = $3, artifact_type = $4, text_content = $5, s3_path = $6,
+                    label = $7, sort_order = $8, updated_at = now()
+              WHERE id = $1 AND teacher_profile_id = $2 AND deleted_at IS NULL
+              RETURNING *`,
+            [body.id, body.teacher_profile_id, body.tier, body.artifact_type, textContent, s3Path, label, sortOrder]
+          );
+          if (upd.rowCount === 0) return sendJson(404, { error: "No such artifact" });
+          return sendJson(200, upd.rows[0]);
+        }
+
+        // Create: enforce per-tier caps server-side before INSERT.
+        const counts = await dbQuery(
+          `SELECT
+             count(*)::int AS total,
+             count(*) FILTER (WHERE artifact_type = 'photo')::int AS photos
+             FROM public.teacher_work_artifacts
+            WHERE teacher_profile_id = $1 AND tier = $2 AND deleted_at IS NULL`,
+          [body.teacher_profile_id, body.tier]
+        );
+        const { total, photos } = counts.rows[0];
+        if (total >= MAX_ARTIFACTS_PER_TIER) {
+          return sendJson(409, { error: `Tier already has ${MAX_ARTIFACTS_PER_TIER} artifacts` });
+        }
+        if (body.artifact_type === "photo" && photos >= MAX_PHOTOS_PER_TIER) {
+          return sendJson(409, { error: `Tier already has ${MAX_PHOTOS_PER_TIER} photos` });
+        }
+        const ins = await dbQuery(
+          `INSERT INTO public.teacher_work_artifacts
+             (teacher_profile_id, tier, artifact_type, text_content, s3_path, label, sort_order)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING *`,
+          [body.teacher_profile_id, body.tier, body.artifact_type, textContent, s3Path, label, sortOrder]
+        );
+        return sendJson(200, ins.rows[0]);
+      }
+
+      if (method === "DELETE") {
+        if (typeof qs.id !== "string" || !qs.id) return sendJson(400, { error: "Missing id" });
+        // Resolve the row's owning profile, then owner-check, then soft-delete.
+        const owned = await dbQuery(
+          "SELECT teacher_profile_id FROM public.teacher_work_artifacts WHERE id = $1 AND deleted_at IS NULL",
+          [qs.id]
+        );
+        if (owned.rowCount === 0) return sendJson(404, { error: "No such artifact" });
+        const denied = await denyUnlessOwner(owned.rows[0].teacher_profile_id);
+        if (denied) return sendJson(denied.status, { error: denied.error });
+        const result = await dbQuery(
+          "UPDATE public.teacher_work_artifacts SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL",
+          [qs.id]
+        );
+        return sendJson(200, { deleted: result.rowCount });
+      }
+
+      return sendJson(405, { error: "Method not allowed" });
+    } catch (err) {
+      console.error("work-artifacts error:", safeErr(err));
+      return sendJson(500, { error: "Database error" });
+    }
+  }
+
   // === Route: /class-enrollments (GET, POST, PATCH) ===
   // Authed + domain-gated above.
   // GET: ?scope=teaching => the caller's roster across the classes they OWN (join
@@ -2397,6 +2665,22 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
     systemPrompt = systemPrompt.split(TEACHER_NOTES_MARKER).join(notesSection);
   }
 
+  // Server-side work-artifacts injection (Q4 v2): replace the client's marker with
+  // the teacher's feedback-examples section built here (text never reaches the
+  // browser — "Only Lumi sees this" is literally true). Teacher-stable, so it lands
+  // in the cacheable prefix, BEFORE the per-student notes marker above. Marker is
+  // ALWAYS stripped; any fetch failure degrades to '' and never blocks the stream.
+  if (systemPrompt.includes(WORK_ARTIFACTS_MARKER)) {
+    let artifactSection = "";
+    const inj = body.inject_work_artifacts;
+    if (inj && typeof inj.teacher_profile_id === "string" && inj.teacher_profile_id) {
+      const data = await fetchWorkArtifacts(inj.teacher_profile_id);
+      artifactSection = buildArtifactSection(data, inj.first_name);
+      if (artifactSection) {
+        console.log(`[artifacts] injected ${data.artifacts.length} artifact(s), ${artifactSection.length} chars`);
+      }
+    }
+    systemPrompt = systemPrompt.split(WORK_ARTIFACTS_MARKER).join(artifactSection);
   // Server-side progress-note injection (Phase 5, Layer 3) — same posture as
   // teacher notes: the note NEVER reaches the browser; it exists only to be
   // spliced in here. Marker is ALWAYS stripped, even when the feature is off or

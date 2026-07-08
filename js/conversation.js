@@ -110,6 +110,13 @@ async function hydrateTutorProfile() {
     ctx.notesInjection = { teacher_profile_id: profile.id };
   }
 
+  // Q4 v2: teacher-stable text work-artifacts (server-side marker injection);
+  // not test-gated, unlike notes. See finishOpenTutor for the rationale.
+  ctx.artifactsInjection = null;
+  if (profile && !profile.__notReady && !profile.__error && profile.id) {
+    ctx.artifactsInjection = { teacher_profile_id: profile.id, first_name: (ctx.teacher || '').trim().split(/\s+/)[0] };
+  }
+
   ctx.workSamples = null;
   if (profile && !profile.__notReady && !profile.__error && profile.workSamples) {
     try {
@@ -229,6 +236,15 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
   S.tutorCtx.notesInjection = null;
   if (profile && !profile.__notReady && profile.id && currentUser && !S.isTestMode) {
     S.tutorCtx.notesInjection = { teacher_profile_id: profile.id };
+  }
+
+  // Q4 v2: text work-artifacts are also injected SERVER-SIDE (marker
+  // <<LUMI_WORK_ARTIFACTS>>). Unlike notes, artifacts are teacher-stable and
+  // class-scoped (never student PII), so they inject even in TEST MODE — that is
+  // exactly when a teacher validates their own persona's feedback voice.
+  S.tutorCtx.artifactsInjection = null;
+  if (profile && !profile.__notReady && profile.id) {
+    S.tutorCtx.artifactsInjection = { teacher_profile_id: profile.id, first_name: (teacher || '').trim().split(/\s+/)[0] };
   }
 
   // Q4: load graded work-sample images. Single-source-of-truth gate —

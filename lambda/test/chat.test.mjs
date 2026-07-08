@@ -102,6 +102,62 @@ test('/chat strips the notes marker even when no injection is requested', async 
   assert.doesNotMatch(r.body, /LUMI_TEACHER_NOTES/);
 });
 
+// ==================== work-artifacts injection (Q4 v2) ======================
+
+const WA_MARKER = '<<LUMI_WORK_ARTIFACTS>>';
+
+test('/chat work-artifacts injection reads the class artifacts by teacher_profile_id and strips the marker', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId, isTeacher: false,
+      onRoute: (text) => {
+        if (/FROM public\.teacher_work_artifacts/.test(text)) {
+          return res([{ tier: 'proficient', artifact_type: 'comment', text_content: 'Sharpen your thesis.', label: null, created_at: new Date(0) }]);
+        }
+        if (/FROM public\.teacher_work_samples/.test(text)) {
+          return res([{ tier: 'proficient', description: 'clarity of argument' }]);
+        }
+        return res([]);
+      },
+    }),
+    bedrock: { chunks: CHAT_CHUNKS },
+  });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/chat', token: tokenFor(STUDENT),
+    body: {
+      messages: [{ role: 'user', content: 'hi' }],
+      system: `You are a tutor.${WA_MARKER}`,
+      inject_work_artifacts: { teacher_profile_id: 'tp1', first_name: 'Laura' },
+    },
+  });
+  assert.equal(r.statusCode, 200);
+  const q = findQuery(ctx, /FROM public\.teacher_work_artifacts/);
+  assert.ok(q, 'artifact fetch should run');
+  assert.equal(q.params[0], 'tp1');
+  assert.match(q.text, /artifact_type <> 'photo'/);      // text-only fetch
+  assert.match(q.text, /deleted_at IS NULL/);
+  // The marker (and thus the private artifact text) never leaks to the client stream.
+  assert.doesNotMatch(r.body, /LUMI_WORK_ARTIFACTS/);
+  assert.doesNotMatch(r.body, /Sharpen your thesis/);
+});
+
+test('/chat strips the work-artifacts marker even when no injection is requested', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({ userId: STUDENT.userId }),
+    bedrock: { chunks: CHAT_CHUNKS },
+  });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/chat', token: tokenFor(STUDENT),
+    body: { messages: [{ role: 'user', content: 'hi' }], system: `Base.${WA_MARKER}` },
+  });
+  assert.equal(r.statusCode, 200);
+  assert.equal(findQueries(ctx, /FROM public\.teacher_work_artifacts/).length, 0);
+  assert.doesNotMatch(r.body, /LUMI_WORK_ARTIFACTS/);
+});
+
 // ============================= /suggested-prompts ===========================
 
 test('/suggested-prompts requires teacher_profile_id (400)', async () => {

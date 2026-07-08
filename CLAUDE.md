@@ -25,17 +25,30 @@ gives direct answers, only guides reasoning.
      new student thread. Stored as `welcome_message TEXT` on
      teacher_profiles. Soft 600-char counter, hard 80-char min.
   5. Graded work samples — three tiers (progressing / proficient /
-     exemplary). Per tier: up to 3 photos + a description of what the
-     teacher looks for at that level. HEIC photos are converted to
-     JPEG client-side via heic2any before upload. See "teacher_work_
-     samples" under Data Architecture and the "Q4 graded work samples"
-     entry under Roadmap → Implemented.
+     exemplary). Per tier: a description of what the teacher looks for
+     at that level, plus artifacts of the teacher's work at that level.
+     An artifact is EITHER up to 3 photos OR (Q4 v2) one or more
+     **written examples** — a report-card comment, essay feedback, or a
+     verbal-eval note — so a PE/orchestra teacher with no photo can
+     still contribute. HEIC photos are converted to JPEG client-side via
+     heic2any before upload; written examples are text-only (no S3) and
+     injected server-side (never sent to the student browser). See
+     "teacher_work_samples" and "teacher_work_artifacts" under Data
+     Architecture and the "Q4 graded work samples" / "Q4 v2 work-sample
+     expansion" entries under Roadmap → Implemented.
   6. Review summary cards with Edit buttons + share-course-info
      checkbox + Save
 - Steps 1–3 each require a 50-word minimum before Continue is enabled.
   Step 4 (welcome message) requires 80 characters minimum, soft-limited
   at 600 (counter color-shifts past 600 but never blocks). Step 5 (work
-  samples) requires ≥1 photo and a non-empty description for every tier.
+  samples) is **fully optional** — Continue is never gated (live
+  `validateStep4`). Completeness for the home-card "add samples" banner
+  (Q4 v2, Decision D6): a tier counts as complete when it has ≥1 artifact
+  of ANY type (a photo OR a written example) — the per-tier description is
+  NOT required, so a text-only teacher who leaves the optional "what I
+  look for" note blank is not nagged. Via `hasAllWorkSampleTiers`. This
+  unblocks text-only teachers, who were wrongly flagged incomplete by the
+  old photo-only check.
 - Stores text answers as flat TEXT columns on teacher_profiles
   (not JSONB); syllabus PDFs go to AWS S3 (`syllabi` bucket) via
   Lambda signed URLs, with text still extracted client-side via
@@ -237,6 +250,48 @@ gives direct answers, only guides reasoning.
   app.js `getTeacherProfile()` and are converted to base64 images
   by `loadWorkSampleImages()` at chat-open.
 
+### teacher_work_artifacts (Q4 v2)
+- Expands work samples from *photos only* to *any artifact* a teacher
+  can contribute — a photo OR a block of **text** (quarterly comment,
+  essay feedback, verbal-eval note, "other"). This is what makes the
+  feature work for a PE / orchestra / drama / language teacher who has
+  no photo of "graded work." Child table of `teacher_work_samples`,
+  which is left **untouched** so existing photo-only teachers
+  (Harris/Bush) need zero migration.
+- One row **per artifact** (N per tier, mixed types), unlike
+  `teacher_work_samples` (one row per tier). Columns: id, created_at,
+  updated_at, teacher_profile_id (UUID FK → teacher_profiles, ON DELETE
+  CASCADE), tier (`progressing|proficient|exemplary` CHECK),
+  artifact_type (`photo|comment|essay_feedback|eval_note|other` CHECK),
+  text_content (non-null for text types), s3_path (non-null for photo),
+  label (optional caption), sort_order, deleted_at. A
+  content-integrity CHECK enforces `photo ⇒ s3_path` / `text ⇒
+  text_content` exclusivity. Live schema in `migration/rds-schema.sql`;
+  standalone additive migration `migration/rds-work-artifacts.sql`.
+- **In this pass the table holds ONLY text.** New photos still write to
+  `teacher_work_samples.photo_paths` (Decision D2-A — freeze photo_paths,
+  no backfill); the `photo`/`s3_path` shape exists so a future pass can
+  move photos here without a schema change.
+- **Lambda `/work-artifacts` route** (GET/POST/DELETE) clones the
+  `/work-samples` authz (`denyUnlessOwner` 2-step email ownership), with
+  two deliberate differences: **GET is OWNER-SCOPED** (`?teacher_profile_id=`
+  or `?teacher_profile_ids=`, every id owner-checked) because artifact
+  text must never reach a student browser (Decision P1-A); **DELETE is
+  SOFT** (`?id=` → `deleted_at`), matching the Phase-4 posture rather than
+  the hard delete `/work-samples` uses. POST validates tier + type against
+  the same allowlists as the CHECK, enforces content integrity + a 2,000-
+  char text cap, caps 5 artifacts/tier (≤3 photos), and upserts by `id`
+  (edit) or INSERTs (create). Also folded into `/my-data` (teacher's own
+  text_content is included) and the `/delete-my-account` soft-delete cascade.
+- **Injection is SERVER-SIDE** (Decision P1-A), exactly like teacher
+  notes — see "Per-tier work-artifacts injection" under System Prompt
+  Architecture. Text never reaches the browser, so "Only Lumi sees this"
+  (the wizard copy) is literally true for text.
+- Writes happen in teacher.html `saveTeacherProfile()` →
+  `saveTierArtifacts()` (upsert-by-id / soft-delete removed), inside the
+  same per-tier `failedTiers` tolerance as work samples. The wizard seeds
+  its editors from a batch owner-scoped GET in `loadAllTeacherProfiles()`.
+
 ### Storage bucket inventory
 - **`syllabi`** — teacher syllabus PDFs. Storage lives in AWS S3
   bucket `lumi-syllabi-613136968914` (us-east-1); not accessible via
@@ -305,6 +360,14 @@ live with spoofed ids.
 - **/work-samples** GET (any authenticated caller, `?teacher_profile_id=` or
   `?teacher_profile_ids=`) + POST/DELETE (2-step JOIN-by-email authz: 403
   non-owner, 404 missing profile — fail-visible where RLS was silently empty).
+- **/work-artifacts** (Q4 v2) GET/POST/DELETE on `teacher_work_artifacts`,
+  cloning the `/work-samples` `denyUnlessOwner` authz. Two deliberate
+  differences: **GET is OWNER-SCOPED** (single or `?teacher_profile_ids=` batch,
+  every id owner-checked) because artifact text is private (Decision P1-A);
+  **DELETE is SOFT** (`?id=` → `deleted_at`). POST enforces type/content
+  integrity + a 2,000-char text cap + per-tier caps (5/tier, ≤3 photos) and
+  upserts by `id`. In this pass writes are text-only (photos stay on
+  `/work-samples`).
 - **api_usage: NO client route by design** (forgeable). `checkRateLimit` +
   `logUsage` inside the Lambda query `public.api_usage` in RDS
   **unconditionally** — the `USE_RDS_USAGE` env-var gate and the Supabase
@@ -391,6 +454,37 @@ live with spoofed ids.
 - **localStorage hygiene:** tutorCtx no longer carries teacherNotes; app
   boot runs a one-time scrub that deletes `teacherNotes` from any
   conversation objects older builds persisted into `lumi_convs`.
+
+### Per-tier work-artifacts injection (Q4 v2; server-side, Decision P1-A)
+- **Text work-artifacts never reach the browser.** The client emits the
+  literal marker `<<LUMI_WORK_ARTIFACTS>>` in `buildTutorSystem` (`js/prompts.js`,
+  profile branch only), in the **teacher-stable prefix, BEFORE the
+  `<<LUMI_TEACHER_NOTES>>` marker** (student-specific) — so item-H prompt
+  caching can place a `cache_control` breakpoint with the stable artifact text
+  inside the cached prefix and the per-student notes after it (Decision D9). The
+  chat Lambda replaces the marker with a server-built section; the marker is
+  ALWAYS stripped, so a teacher with no text artifacts gets a byte-identical
+  DELIVERED prompt (the client-assembled string carries the marker, exactly like
+  the notes marker precedent).
+- `js/conversation.js` sets `S.tutorCtx.artifactsInjection = { teacher_profile_id,
+  first_name }` (both `finishOpenTutor` + `hydrateTutorProfile`), and `callAPI`
+  passes it as `inject_work_artifacts`. Unlike notes, this is **NOT test-mode
+  gated** — a teacher validating their own persona in test mode SHOULD see
+  artifact-shaped feedback; artifacts are teacher-stable/class-scoped, never
+  student PII. `first_name` is a non-sensitive display string used only in the
+  section header.
+- Lambda helpers `WORK_ARTIFACTS_MARKER`, `fetchWorkArtifacts(teacherProfileId)`
+  (text rows + per-tier `teacher_work_samples.description`, 3s budget, fail-open
+  to null) + `buildArtifactSection(data, firstName)` (per-tier labeled examples,
+  deterministic order, ~12,000-char oldest-first total cap for the token budget,
+  Decision D8) live next to the notes helpers. Logs carry counts/lengths only
+  (`[artifacts] injected n artifact(s), m chars`), never content.
+- **Photos are unchanged** — they stay on `teacher_work_samples.photo_paths` and
+  ride the existing client vision pipeline (`loadWorkSampleImages` +
+  `buildApiMessages`), gated by the pre-existing all-3-tiers image gate. Because
+  no photo rows are written to `teacher_work_artifacts` this pass (Decision D2-A),
+  the client union reader is a no-op and was deliberately left untouched — the
+  strongest zero-re-onboarding guarantee for Harris/Bush.
 
 ### Per-class suggested prompts (commit 4)
 - The empty-state of a tutor session shows three "starter" chips. As
@@ -525,6 +619,35 @@ live with spoofed ids.
   dormant-column cleanup item. **The 4-commit per-student teacher notes
   feature is now COMPLETE — ready for real teacher testing with
   Mr. Harris.**
+
+### Q4 v2 work-sample expansion — written examples (✅ shipped)
+- **What it is.** Extends Q4 work samples from *photos only* to *any
+  artifact* — a photo OR a block of **text** (report-card comment, essay
+  feedback, verbal-eval note, "other"), tagged to a tier. Makes the
+  feature usable for PE / orchestra / drama / language teachers who have
+  no photo of "graded work." Spec: `docs/Q4V2_SPEC.md`.
+- **Where it lives.** New child table `teacher_work_artifacts`
+  (text-only in this pass; see Data Architecture); Lambda
+  `/work-artifacts` route (owner-scoped GET, soft DELETE); server-side
+  injection via the `<<LUMI_WORK_ARTIFACTS>>` marker (see "Per-tier
+  work-artifacts injection"); teacher.html Step-5 "+ Add written example"
+  editors with an "Only Lumi sees this" affordance.
+- **Key decisions (from the spec's D1–D9/P1 index, recommendations
+  taken except where noted):** D1-A new child table · D2-A freeze
+  `photo_paths`, no backfill · D3 enum `photo|comment|essay_feedback|
+  eval_note|other` · D4 ≤5 artifacts/tier, ≤2,000 chars/text · D5-a
+  description stays the tier's guidance line · **D6** step stays optional
+  (live behavior) but `hasAllWorkSampleTiers` now counts any artifact
+  type · D7-A per-tier text gate (photo vision gate unchanged) · D8
+  ~12,000-char total artifact-text cap · D9 artifacts before the notes
+  marker · **P1-A** text injected server-side ("Only Lumi sees this" is
+  literally true for text).
+- **Zero re-onboarding.** `teacher_work_samples` is untouched; with no
+  artifact rows the injected prompt + photo vision exchange are identical
+  to pre-v2. **Known inconsistency (per the spec / Decision P1):** *text*
+  is server-side (never hits the browser) but *photos* still transit the
+  student browser via the vision pipeline — a documented, accepted
+  pre-existing gap; a future pass can move photos server-side too.
 
 ### Q4 graded work samples + one-piece feedback rule (✅ shipped)
 - **What it is.** Onboarding gained a 5th step (now Step 4, with the

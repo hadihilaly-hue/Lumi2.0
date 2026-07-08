@@ -401,6 +401,184 @@ test('GET /work-samples is readable by any authenticated user (documented auth_r
   assert.match(q.text, /teacher_profile_id = ANY\(\$1::uuid\[\]\)/);
 });
 
+// ============================ /work-artifacts (Q4 v2) =======================
+
+// Owner lookup + per-tier count helper for the POST-create happy path.
+function artifactCreateRouter(extra = {}) {
+  return makeRouter({
+    userId: TEACHER.userId, isTeacher: true,
+    onRoute: (t) => {
+      if (/SELECT teacher_email FROM public\.teacher_profiles WHERE id/.test(t)) return res([{ teacher_email: TEACHER.email }]);
+      if (/count\(\*\)::int AS total/.test(t)) return res([{ total: extra.total ?? 0, photos: extra.photos ?? 0 }]);
+      if (/INSERT INTO public\.teacher_work_artifacts/.test(t)) return res([{ id: 'wa1', tier: 'proficient', artifact_type: 'comment' }]);
+      if (/UPDATE public\.teacher_work_artifacts/.test(t)) return res([{ id: 'wa-edit' }]);
+      return res([]);
+    },
+  });
+}
+
+test('POST /work-artifacts denies a non-owning teacher (403)', async () => {
+  const { handler } = await loadHandler();
+  resetContext({
+    dbRouter: makeRouter({
+      userId: TEACHER.userId, isTeacher: true,
+      onRoute: (t) => /SELECT teacher_email FROM public\.teacher_profiles WHERE id/.test(t)
+        ? res([{ teacher_email: 'owner@menloschool.org' }]) : res([]),
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/work-artifacts', token: tokenFor(TEACHER),
+    body: { teacher_profile_id: 'tp-not-mine', tier: 'proficient', artifact_type: 'comment', text_content: 'x' },
+  });
+  assert.equal(r.statusCode, 403);
+});
+
+test('POST /work-artifacts creates a text artifact for the owning teacher', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: artifactCreateRouter() });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/work-artifacts', token: tokenFor(TEACHER),
+    body: { teacher_profile_id: 'tp-mine', tier: 'proficient', artifact_type: 'comment', text_content: 'Nice thesis.' },
+  });
+  assert.equal(r.statusCode, 200);
+  const ins = findQuery(ctx, /INSERT INTO public\.teacher_work_artifacts/);
+  assert.ok(ins, 'INSERT should run');
+  // Identity/content columns come from the body but tier/type validated; text passed through.
+  assert.ok(ins.params.includes('Nice thesis.'));
+});
+
+test('POST /work-artifacts rejects an invalid tier / artifact_type (400)', async () => {
+  const { handler } = await loadHandler();
+  resetContext({ dbRouter: artifactCreateRouter() });
+  const badTier = await invoke(handler, {
+    method: 'POST', path: '/work-artifacts', token: tokenFor(TEACHER),
+    body: { teacher_profile_id: 'tp-mine', tier: 'nope', artifact_type: 'comment', text_content: 'x' },
+  });
+  assert.equal(badTier.statusCode, 400);
+  const badType = await invoke(handler, {
+    method: 'POST', path: '/work-artifacts', token: tokenFor(TEACHER),
+    body: { teacher_profile_id: 'tp-mine', tier: 'proficient', artifact_type: 'audio', text_content: 'x' },
+  });
+  assert.equal(badType.statusCode, 400);
+});
+
+test('POST /work-artifacts requires text_content for a text type and rejects >2000 chars', async () => {
+  const { handler } = await loadHandler();
+  resetContext({ dbRouter: artifactCreateRouter() });
+  const missing = await invoke(handler, {
+    method: 'POST', path: '/work-artifacts', token: tokenFor(TEACHER),
+    body: { teacher_profile_id: 'tp-mine', tier: 'proficient', artifact_type: 'comment', text_content: '   ' },
+  });
+  assert.equal(missing.statusCode, 400);
+  const tooLong = await invoke(handler, {
+    method: 'POST', path: '/work-artifacts', token: tokenFor(TEACHER),
+    body: { teacher_profile_id: 'tp-mine', tier: 'proficient', artifact_type: 'comment', text_content: 'a'.repeat(2001) },
+  });
+  assert.equal(tooLong.statusCode, 400);
+});
+
+test('POST /work-artifacts enforces the per-tier cap (409)', async () => {
+  const { handler } = await loadHandler();
+  resetContext({ dbRouter: artifactCreateRouter({ total: 5, photos: 0 }) });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/work-artifacts', token: tokenFor(TEACHER),
+    body: { teacher_profile_id: 'tp-mine', tier: 'proficient', artifact_type: 'comment', text_content: 'one too many' },
+  });
+  assert.equal(r.statusCode, 409);
+});
+
+test('POST /work-artifacts with an id UPDATES in place (no INSERT, no cap check)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: artifactCreateRouter({ total: 5 }) });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/work-artifacts', token: tokenFor(TEACHER),
+    body: { id: 'wa-edit', teacher_profile_id: 'tp-mine', tier: 'proficient', artifact_type: 'comment', text_content: 'edited' },
+  });
+  assert.equal(r.statusCode, 200); // cap of 5 does NOT block an edit
+  const upd = findQuery(ctx, /UPDATE public\.teacher_work_artifacts/);
+  assert.ok(upd, 'UPDATE should run');
+  assert.match(upd.text, /WHERE id = \$1 AND teacher_profile_id = \$2/);
+  assert.equal(findQueries(ctx, /INSERT INTO public\.teacher_work_artifacts/).length, 0);
+});
+
+test('GET /work-artifacts is OWNER-SCOPED — a student cannot read a teacher\'s artifacts (403)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId,
+      // owner-check returns 0 rows for a student → rowCount !== ids.length → 403
+      onRoute: () => res([]),
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'GET', path: '/work-artifacts', token: tokenFor(STUDENT),
+    query: { teacher_profile_id: 'tp1' },
+  });
+  assert.equal(r.statusCode, 403);
+  // The artifact rows are NEVER queried once ownership fails.
+  assert.equal(findQueries(ctx, /FROM public\.teacher_work_artifacts/).length, 0);
+});
+
+test('GET /work-artifacts returns rows for the owning teacher (batch, deterministic order)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: TEACHER.userId, isTeacher: true,
+      onRoute: (t) => {
+        if (/SELECT id FROM public\.teacher_profiles WHERE id = ANY/.test(t)) return res([{ id: 'tp1' }, { id: 'tp2' }]);
+        if (/FROM public\.teacher_work_artifacts/.test(t)) return res([{ id: 'wa1' }]);
+        return res([]);
+      },
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'GET', path: '/work-artifacts', token: tokenFor(TEACHER),
+    query: { teacher_profile_ids: 'tp1,tp2' },
+  });
+  assert.equal(r.statusCode, 200);
+  const q = findQuery(ctx, /FROM public\.teacher_work_artifacts/);
+  assert.match(q.text, /teacher_profile_id = ANY\(\$1::uuid\[\]\)/);
+  assert.match(q.text, /ORDER BY teacher_profile_id, tier, sort_order/);
+});
+
+test('DELETE /work-artifacts SOFT-deletes (deleted_at), owner-checked', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: TEACHER.userId, isTeacher: true,
+      onRoute: (t) => {
+        if (/SELECT teacher_profile_id FROM public\.teacher_work_artifacts WHERE id/.test(t)) return res([{ teacher_profile_id: 'tp1' }]);
+        if (/SELECT teacher_email FROM public\.teacher_profiles WHERE id/.test(t)) return res([{ teacher_email: TEACHER.email }]);
+        if (/UPDATE public\.teacher_work_artifacts SET deleted_at/.test(t)) return res([{}]);
+        return res([]);
+      },
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'DELETE', path: '/work-artifacts', token: tokenFor(TEACHER),
+    query: { id: 'wa1' },
+  });
+  assert.equal(r.statusCode, 200);
+  // Soft-delete, NOT a hard DELETE (unlike /work-samples).
+  assert.ok(findQuery(ctx, /UPDATE public\.teacher_work_artifacts SET deleted_at/));
+  assert.equal(findQueries(ctx, /DELETE FROM public\.teacher_work_artifacts/).length, 0);
+});
+
+test('DELETE /work-artifacts 404s on a missing/already-deleted row', async () => {
+  const { handler } = await loadHandler();
+  resetContext({
+    dbRouter: makeRouter({
+      userId: TEACHER.userId, isTeacher: true,
+      onRoute: () => res([]), // row lookup returns nothing
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'DELETE', path: '/work-artifacts', token: tokenFor(TEACHER),
+    query: { id: 'ghost' },
+  });
+  assert.equal(r.statusCode, 404);
+});
+
 // ============================ /class-enrollments ============================
 
 test('POST /class-enrollments forces student_id from the JWT on every row', async () => {

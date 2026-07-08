@@ -424,6 +424,55 @@ body { overflow: auto; display: block; }
 }
 .tier-converting.active { display: block; }
 
+/* ─── WORK-SAMPLE BUTTON ROW + WRITTEN-EXAMPLE EDITORS (Q4 v2) ── */
+.tier-btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.tier-btn-row .tier-add-btn { margin-bottom: 12px; }
+.tier-artifacts { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.tier-artifacts:empty { margin-bottom: 0; }
+.tier-artifact {
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px; background: var(--surface-2);
+}
+.tier-artifact-row {
+  display: flex; gap: 8px; align-items: center; margin-bottom: 8px;
+}
+.tier-artifact-type {
+  padding: 6px 8px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; font-family: inherit; font-size: 12px; color: var(--text);
+  outline: none;
+}
+.tier-artifact-label {
+  flex: 1; min-width: 0; padding: 6px 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; font-family: inherit; font-size: 12px; color: var(--text);
+  outline: none;
+}
+.tier-artifact-label:focus, .tier-artifact-type:focus { border-color: var(--accent); }
+.tier-artifact-remove {
+  width: 26px; height: 26px; flex: none; border-radius: 6px;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-muted); font-size: 15px; line-height: 1; cursor: pointer;
+}
+.tier-artifact-remove:hover { border-color: #ef4444; color: #ef4444; }
+.tier-artifact-text {
+  width: 100%; min-height: 70px; padding: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; font-family: inherit; font-size: 13px; color: var(--text);
+  resize: vertical; outline: none; line-height: 1.55;
+}
+.tier-artifact-text:focus { border-color: var(--accent); }
+.tier-artifact-count {
+  font-size: 11px; color: var(--text-faint); text-align: right; margin-top: 4px;
+}
+.tier-artifact-count.over { color: #ef4444; }
+.tier-privacy {
+  display: flex; align-items: center; gap: 6px; margin-top: 10px;
+  font-size: 12px; color: var(--text-muted);
+}
+.wizard-privacy-note {
+  font-size: 13px; color: var(--text-muted); margin: -8px 0 18px;
+}
+
 /* ─── TEMPLATE BANNER ─────────────────────────────────────── */
 .template-banner {
   display: none; background: var(--accent-soft);
@@ -963,42 +1012,58 @@ body { overflow: auto; display: block; }
         <strong>Before uploading:</strong> please cover or blur student names and any identifying info. Lumi only needs to see your feedback comments and your grading style — not who they were written for. A black marker, sticky note, or quick photo edit works fine.
       </div>
       <h2 class="wizard-question-title">Show me how you grade</h2>
-      <p class="wizard-subhead">Upload examples of student work you've graded at three performance levels. Lumi will use these as evidence of your authentic feedback voice — your tone, the kinds of comments you write, and how detailed you get.</p>
+      <p class="wizard-subhead">Share examples of how you assess student work at three performance levels — a photo of graded work, or a written example like a report-card comment, essay feedback, or what you'd say out loud. Lumi uses these as evidence of your authentic feedback voice. No photo required: a written example alone works for any subject.</p>
+      <p class="wizard-privacy-note">🔒 Only Lumi sees these examples — students never see them. They only shape how Lumi gives feedback in your voice.</p>
 
       <div class="tier-card" data-tier="progressing">
         <div class="tier-heading">Progressing</div>
         <div class="tier-desc">Students still developing the skill</div>
         <div class="tier-thumbs" id="tierThumbs-progressing"></div>
-        <button type="button" class="tier-add-btn" id="tierAddBtn-progressing" onclick="document.getElementById('tierFiles-progressing').click()">
-          + Add photos<span class="tier-add-count" id="tierCount-progressing">(optional)</span>
-        </button>
+        <div class="tier-btn-row">
+          <button type="button" class="tier-add-btn" id="tierAddBtn-progressing" onclick="document.getElementById('tierFiles-progressing').click()">
+            + Add photos<span class="tier-add-count" id="tierCount-progressing">(optional)</span>
+          </button>
+          <button type="button" class="tier-add-btn" onclick="addTextArtifact('progressing')">+ Add written example</button>
+        </div>
         <input type="file" id="tierFiles-progressing" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('progressing', event)">
         <div class="tier-converting" id="tierConverting-progressing">Converting HEIC photo…</div>
+        <div class="tier-artifacts" id="tierArtifacts-progressing"></div>
         <textarea class="tier-textarea" id="tierDesc-progressing" aria-label="Grading notes for the Progressing level" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
+        <div class="tier-privacy">🔒 Only Lumi sees this — students never see these examples.</div>
       </div>
 
       <div class="tier-card" data-tier="proficient">
         <div class="tier-heading">Proficient</div>
         <div class="tier-desc">Students meeting expectations</div>
         <div class="tier-thumbs" id="tierThumbs-proficient"></div>
-        <button type="button" class="tier-add-btn" id="tierAddBtn-proficient" onclick="document.getElementById('tierFiles-proficient').click()">
-          + Add photos<span class="tier-add-count" id="tierCount-proficient">(optional)</span>
-        </button>
+        <div class="tier-btn-row">
+          <button type="button" class="tier-add-btn" id="tierAddBtn-proficient" onclick="document.getElementById('tierFiles-proficient').click()">
+            + Add photos<span class="tier-add-count" id="tierCount-proficient">(optional)</span>
+          </button>
+          <button type="button" class="tier-add-btn" onclick="addTextArtifact('proficient')">+ Add written example</button>
+        </div>
         <input type="file" id="tierFiles-proficient" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('proficient', event)">
         <div class="tier-converting" id="tierConverting-proficient">Converting HEIC photo…</div>
+        <div class="tier-artifacts" id="tierArtifacts-proficient"></div>
         <textarea class="tier-textarea" id="tierDesc-proficient" aria-label="Grading notes for the Proficient level" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
+        <div class="tier-privacy">🔒 Only Lumi sees this — students never see these examples.</div>
       </div>
 
       <div class="tier-card" data-tier="exemplary">
         <div class="tier-heading">Exemplary</div>
         <div class="tier-desc">Students exceeding expectations</div>
         <div class="tier-thumbs" id="tierThumbs-exemplary"></div>
-        <button type="button" class="tier-add-btn" id="tierAddBtn-exemplary" onclick="document.getElementById('tierFiles-exemplary').click()">
-          + Add photos<span class="tier-add-count" id="tierCount-exemplary">(optional)</span>
-        </button>
+        <div class="tier-btn-row">
+          <button type="button" class="tier-add-btn" id="tierAddBtn-exemplary" onclick="document.getElementById('tierFiles-exemplary').click()">
+            + Add photos<span class="tier-add-count" id="tierCount-exemplary">(optional)</span>
+          </button>
+          <button type="button" class="tier-add-btn" onclick="addTextArtifact('exemplary')">+ Add written example</button>
+        </div>
         <input type="file" id="tierFiles-exemplary" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('exemplary', event)">
         <div class="tier-converting" id="tierConverting-exemplary">Converting HEIC photo…</div>
+        <div class="tier-artifacts" id="tierArtifacts-exemplary"></div>
         <textarea class="tier-textarea" id="tierDesc-exemplary" aria-label="Grading notes for the Exemplary level" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
+        <div class="tier-privacy">🔒 Only Lumi sees this — students never see these examples.</div>
       </div>
 
       <div class="wizard-nav">
@@ -1322,19 +1387,29 @@ let tExpandedCourse = null;
 // `photos`        — newly-picked File objects awaiting upload at save time.
 // `description`   — textarea contents.
 // `existingPaths` — Storage paths of already-uploaded photos kept across an edit.
+// `textArtifacts` — Q4 v2 written-example editors: [{ id, type, text, label }]
+//                   (id null for a new one; text artifacts persist to the
+//                   teacher_work_artifacts table via /work-artifacts).
 let tWorkSamples = {
-  progressing: { photos: [], description: '', existingPaths: [] },
-  proficient:  { photos: [], description: '', existingPaths: [] },
-  exemplary:   { photos: [], description: '', existingPaths: [] },
+  progressing: { photos: [], description: '', existingPaths: [], textArtifacts: [] },
+  proficient:  { photos: [], description: '', existingPaths: [], textArtifacts: [] },
+  exemplary:   { photos: [], description: '', existingPaths: [], textArtifacts: [] },
 };
 // Per-profile cache of work-samples rows from teacher_work_samples,
 // populated by loadAllTeacherProfiles() (Phase 4). Keyed by
 // teacher_profile_id, then tier. Used to drive the banner and to seed
 // tWorkSamples on edit.
 let tSamplesByProfile = {};
+// Q4 v2: per-profile cache of teacher_work_artifacts rows (owner-scoped GET),
+// keyed by teacher_profile_id then tier → [rows]. Drives the banner
+// (a text-only tier counts as complete) and seeds the wizard on edit.
+let tArtifactsByProfile = {};
 // Snapshot of the current course's existing samples (set when wizard
 // opens for an edit) so the save handler can detect deleted paths.
 let tExistingSamplesByTier = {};
+// Q4 v2: snapshot of the current course's existing text artifacts per tier
+// (set at wizard open) so the save handler can soft-delete removed ones.
+let tExistingArtifactsByTier = {};
 
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
 function showView(name) {
@@ -1489,6 +1564,7 @@ async function loadAllTeacherProfiles() {
     // Q4: also load any work-samples rows so we can flag profiles that
     // are still missing tiers and seed the wizard for edits.
     tSamplesByProfile = {};
+    tArtifactsByProfile = {};
     const profileIds = data.map(p => p.id).filter(Boolean);
     if (profileIds.length) {
       let sampleRows = null;
@@ -1500,22 +1576,39 @@ async function loadAllTeacherProfiles() {
       (sampleRows || []).forEach(r => {
         (tSamplesByProfile[r.teacher_profile_id] ||= {})[r.tier] = r;
       });
+      // Q4 v2: text artifacts (owner-scoped batch). Grouped by profile → tier
+      // → [rows]. Used by hasAllWorkSampleTiers and the wizard edit-seed.
+      let artifactRows = null;
+      try {
+        artifactRows = await rdsFetch(`work-artifacts?teacher_profile_ids=${profileIds.map(encodeURIComponent).join(',')}`);
+      } catch (aErr) {
+        console.warn('Could not load work artifacts:', aErr);
+      }
+      (artifactRows || []).forEach(r => {
+        const byTier = (tArtifactsByProfile[r.teacher_profile_id] ||= {});
+        (byTier[r.tier] ||= []).push(r);
+      });
     }
   } catch (err) {
     console.warn('Could not load teacher profiles:', err);
   }
 }
 
-// Returns true iff all three tiers exist for this profile id with ≥1 photo
-// and a non-empty description. Drives the home-card banner.
+// Returns true iff all three tiers are complete for this profile id. Q4 v2
+// (Decision D6): a tier "counts" when it has at least one artifact of ANY type
+// — a photo OR a written (text) example. Description is NOT required: a text-only
+// PE/orchestra teacher who added a written example per tier (but left the
+// optional "what I look for" note blank) must not be nagged by the home-card
+// banner. "Completeness counts any artifact type."
 function hasAllWorkSampleTiers(profileId) {
   if (!profileId) return false;
-  const byTier = tSamplesByProfile[profileId];
-  if (!byTier) return false;
+  const samplesByTier = tSamplesByProfile[profileId] || {};
+  const artifactsByTier = tArtifactsByProfile[profileId] || {};
   return ['progressing','proficient','exemplary'].every(tier => {
-    const r = byTier[tier];
-    return r && Array.isArray(r.photo_paths) && r.photo_paths.length > 0
-        && (r.description || '').trim().length > 0;
+    const r = samplesByTier[tier];
+    const hasPhoto = r && Array.isArray(r.photo_paths) && r.photo_paths.length > 0;
+    const hasText = Array.isArray(artifactsByTier[tier]) && artifactsByTier[tier].length > 0;
+    return hasPhoto || hasText;
   });
 }
 
@@ -1620,11 +1713,12 @@ async function openWizard(course, subject, opts) {
   tSyllabusExistingPaths = [];
   tTemplateData = null;
   tWorkSamples = {
-    progressing: { photos: [], description: '', existingPaths: [] },
-    proficient:  { photos: [], description: '', existingPaths: [] },
-    exemplary:   { photos: [], description: '', existingPaths: [] },
+    progressing: { photos: [], description: '', existingPaths: [], textArtifacts: [] },
+    proficient:  { photos: [], description: '', existingPaths: [], textArtifacts: [] },
+    exemplary:   { photos: [], description: '', existingPaths: [], textArtifacts: [] },
   };
   tExistingSamplesByTier = {};
+  tExistingArtifactsByTier = {};
 
   document.getElementById('wizardClassName').textContent = course;
   document.getElementById('wizardClassSubject').textContent = subject;
@@ -1640,6 +1734,7 @@ async function openWizard(course, subject, opts) {
   // Edit-flow seed for work samples. tSamplesByProfile is populated by
   // loadAllTeacherProfiles. Done BEFORE showStep so renderTierUI has data.
   const existingForProfile = profile?.id ? (tSamplesByProfile[profile.id] || {}) : {};
+  const existingArtifactsForProfile = profile?.id ? (tArtifactsByProfile[profile.id] || {}) : {};
   ['progressing','proficient','exemplary'].forEach(tier => {
     const row = existingForProfile[tier];
     if (row) {
@@ -1647,6 +1742,13 @@ async function openWizard(course, subject, opts) {
       tWorkSamples[tier].description = row.description || '';
       tExistingSamplesByTier[tier] = { photo_paths: [...(row.photo_paths || [])] };
     }
+    // Q4 v2: seed written-example editors from the batch artifact cache. Snapshot
+    // the original ids so the save handler can soft-delete any the teacher removes.
+    const arts = (existingArtifactsForProfile[tier] || []).filter(a => a.artifact_type !== 'photo');
+    tWorkSamples[tier].textArtifacts = arts.map(a => ({
+      id: a.id, type: a.artifact_type, text: a.text_content || '', label: a.label || '',
+    }));
+    tExistingArtifactsByTier[tier] = arts.map(a => ({ id: a.id }));
   });
 
   // Fire-and-forget signed-URL fetch for thumbnails. We don't await here
@@ -1770,6 +1872,7 @@ function showStep(n) {
   if (n === 5) {
     ['progressing','proficient','exemplary'].forEach(tier => {
       renderTierUI(tier);
+      renderTierArtifacts(tier);
       const ta = document.getElementById('tierDesc-' + tier);
       ta.value = tWorkSamples[tier].description || '';
     });
@@ -1950,9 +2053,148 @@ function makeThumb(url, onRemove) {
   return div;
 }
 
+// ─── WRITTEN-EXAMPLE (TEXT) ARTIFACTS (Q4 v2) ────────────────────────────────
+// Text types offered in the per-artifact chip/select. 'photo' is NOT here — it's
+// the photo path. Keep the values in sync with the Lambda TYPES allowlist and the
+// teacher_work_artifacts_type_check CHECK constraint.
+const TEXT_ARTIFACT_TYPES = [
+  { value: 'comment', label: 'Comment' },
+  { value: 'essay_feedback', label: 'Essay feedback' },
+  { value: 'eval_note', label: 'Eval note' },
+  { value: 'other', label: 'Other' },
+];
+const MAX_ARTIFACT_TEXT = 2000; // matches the Lambda per-text hard cap
+const MAX_TEXT_ARTIFACTS_PER_TIER = 5; // matches the Lambda per-tier cap (5/tier)
+
+function addTextArtifact(tier) {
+  // Cap client-side so a teacher can't build an unsaveable tier: the Lambda 409s
+  // the 6th create, which would fail the whole tier save with no visible reason.
+  if (tWorkSamples[tier].textArtifacts.length >= MAX_TEXT_ARTIFACTS_PER_TIER) {
+    showToast(`Up to ${MAX_TEXT_ARTIFACTS_PER_TIER} written examples per level.`, 'error');
+    return;
+  }
+  tWorkSamples[tier].textArtifacts.push({ id: null, type: 'comment', text: '', label: '' });
+  renderTierArtifacts(tier);
+  validateStep4();
+  const container = document.getElementById('tierArtifacts-' + tier);
+  const ta = container && container.lastElementChild && container.lastElementChild.querySelector('.tier-artifact-text');
+  if (ta) ta.focus();
+}
+
+function removeTextArtifact(tier, idx) {
+  tWorkSamples[tier].textArtifacts.splice(idx, 1);
+  renderTierArtifacts(tier);
+  validateStep4();
+}
+
+// Rebuild the written-example editor list for one tier. Handlers mutate the
+// backing artifact object in place (closure), so keystrokes don't re-render and
+// never steal focus; only add/remove rebuild the list.
+function renderTierArtifacts(tier) {
+  const container = document.getElementById('tierArtifacts-' + tier);
+  if (!container) return;
+  container.innerHTML = '';
+  tWorkSamples[tier].textArtifacts.forEach((art, idx) => {
+    const card = document.createElement('div');
+    card.className = 'tier-artifact';
+
+    const row = document.createElement('div');
+    row.className = 'tier-artifact-row';
+
+    const sel = document.createElement('select');
+    sel.className = 'tier-artifact-type';
+    sel.setAttribute('aria-label', 'Example type');
+    TEXT_ARTIFACT_TYPES.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t.value; o.textContent = t.label;
+      if (t.value === art.type) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', () => { art.type = sel.value; });
+
+    const label = document.createElement('input');
+    label.type = 'text';
+    label.className = 'tier-artifact-label';
+    label.placeholder = "Optional label (e.g. 'Q2 report comment')";
+    label.maxLength = 200;
+    label.value = art.label || '';
+    label.addEventListener('input', () => { art.label = label.value; });
+
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'tier-artifact-remove';
+    rm.setAttribute('aria-label', 'Remove written example');
+    rm.textContent = '×';
+    rm.addEventListener('click', () => removeTextArtifact(tier, idx));
+
+    row.append(sel, label, rm);
+
+    const ta = document.createElement('textarea');
+    ta.className = 'tier-artifact-text';
+    ta.setAttribute('aria-label', 'Written example text');
+    ta.placeholder = 'Paste or type a real example — a comment you’d write, a few lines of feedback, or what you’d say out loud. The more specific, the better Lumi matches your voice.';
+    ta.maxLength = MAX_ARTIFACT_TEXT;
+    ta.value = art.text || '';
+
+    const count = document.createElement('div');
+    count.className = 'tier-artifact-count';
+    const updateCount = () => {
+      const n = ta.value.length;
+      count.textContent = `${n}/${MAX_ARTIFACT_TEXT}`;
+      count.classList.toggle('over', n >= MAX_ARTIFACT_TEXT);
+    };
+    ta.addEventListener('input', () => { art.text = ta.value; updateCount(); validateStep4(); });
+    updateCount();
+
+    card.append(row, ta, count);
+    container.appendChild(card);
+  });
+}
+
+// Persist one tier's written-example artifacts to teacher_work_artifacts.
+// New/edited editors with non-empty text → POST (upsert by id when present).
+// Existing artifacts whose editor was removed OR emptied → soft-DELETE. Saved
+// ids are captured back onto the editor so a per-tier retry upserts, never dupes.
+async function saveTierArtifacts(tier, profileId, local) {
+  const editors = local.textArtifacts || [];
+  const survivingIds = new Set();
+  for (let idx = 0; idx < editors.length; idx++) {
+    const art = editors[idx];
+    const text = (art.text || '').trim();
+    // Blank editor is not written. An emptied EXISTING artifact keeps its id out
+    // of survivingIds, so it falls into the removed set below (empty = remove) and
+    // gets soft-deleted; null its id here so if the teacher retypes into the same
+    // card and saves again, it INSERTs fresh instead of upserting a now-soft-
+    // deleted row (which the Lambda's `deleted_at IS NULL` guard would 404).
+    if (!text) { art.id = null; continue; }
+    const body = {
+      teacher_profile_id: profileId,
+      tier,
+      artifact_type: art.type || 'comment',
+      text_content: art.text,
+      label: (art.label || '').trim() || null,
+      sort_order: idx, // preserve the teacher's on-screen order deterministically
+    };
+    if (art.id) body.id = art.id;
+    const saved = await rdsFetch('work-artifacts', { method: 'POST', body });
+    if (saved && saved.id) art.id = saved.id; // capture id from a new INSERT → retry upserts
+    if (art.id) survivingIds.add(art.id);
+  }
+  // Soft-delete existing artifacts the teacher removed or emptied this session.
+  const removed = (tExistingArtifactsByTier[tier] || []).filter(a => a.id && !survivingIds.has(a.id));
+  for (const r of removed) {
+    await rdsFetch(`work-artifacts?id=${encodeURIComponent(r.id)}`, { method: 'DELETE' });
+  }
+  // Refresh in-session snapshots so a re-open / retry reflects the saved state.
+  tExistingArtifactsByTier[tier] = [...survivingIds].map(id => ({ id }));
+  (tArtifactsByProfile[profileId] ||= {})[tier] = editors
+    .filter(a => (a.text || '').trim() && a.id)
+    .map(a => ({ id: a.id, teacher_profile_id: profileId, tier, artifact_type: a.type, text_content: a.text, label: (a.label || '').trim() || null }));
+}
+
 function validateStep4() {
-  // Step 5 (work samples) is fully optional — both photos and the per-tier
-  // description can be skipped. Continue is never gated.
+  // Step 5 (work samples) is fully optional — photos, written examples, and the
+  // per-tier description can all be skipped. Continue is never gated (D6-A-i).
   document.querySelectorAll('.tier-card').forEach(c => c.classList.remove('invalid'));
   const btn = document.getElementById('step5NextBtn');
   if (btn) btn.disabled = false;
@@ -1965,11 +2207,16 @@ function updateWorkSamplesSummary() {
   const tiers = ['progressing','proficient','exemplary'];
   target.innerHTML = tiers.map(tier => {
     const slot = tWorkSamples[tier];
-    const count = slot.existingPaths.length + slot.photos.length;
+    const photoCount = slot.existingPaths.length + slot.photos.length;
+    const textCount = (slot.textArtifacts || []).filter(a => (a.text || '').trim()).length;
     const desc = (slot.description || '').trim();
     const short = desc.length > 200 ? desc.slice(0, 200) + '…' : desc;
     const safe = short.replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
-    return `<div style="margin-bottom:8px"><strong style="text-transform:capitalize">${tier}</strong>: ${count} photo${count===1?'':'s'} — ${safe || '<em style="color:var(--text-faint)">no description</em>'}</div>`;
+    const parts = [];
+    if (photoCount) parts.push(`${photoCount} photo${photoCount===1?'':'s'}`);
+    if (textCount) parts.push(`${textCount} written example${textCount===1?'':'s'}`);
+    const countStr = parts.length ? parts.join(', ') : (safe ? 'description only' : 'nothing added');
+    return `<div style="margin-bottom:8px"><strong style="text-transform:capitalize">${tier}</strong>: ${countStr} — ${safe || '<em style="color:var(--text-faint)">no description</em>'}</div>`;
   }).join('');
 }
 
@@ -2512,84 +2759,93 @@ async function saveTeacherProfile() {
     for (const tier of tiers) {
       const local = tWorkSamples[tier];
       try {
-        if (local.photos.length) {
-          const { data: { session } } = await sb.auth.getSession();
-          const classSlug = (tCurrentClass.course || 'general')
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-+|-+$/g, '') || 'general';
+        // Q4 v2: only write teacher_work_samples when the tier has photo or
+        // description content. A fully-empty tier is skipped (no spurious
+        // empty-description 400); a text-only tier persists via saveTierArtifacts.
+        const hasSampleContent = !!(local.description.trim() || local.existingPaths.length || local.photos.length);
+        if (hasSampleContent) {
+          if (local.photos.length) {
+            const { data: { session } } = await sb.auth.getSession();
+            const classSlug = (tCurrentClass.course || 'general')
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-+|-+$/g, '') || 'general';
 
-          const newPaths = await Promise.all(local.photos.map(async (file) => {
-            const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-            const fileContentType = file.type || 'image/jpeg';
+            const newPaths = await Promise.all(local.photos.map(async (file) => {
+              const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+              const fileContentType = file.type || 'image/jpeg';
 
-            // 1. Request signed S3 upload URL from the Lambda.
-            const sigRes = await fetch(`${LAMBDA_URL}/upload-url`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                bucket: 'work-samples',
-                filename: cleanName,
-                contentType: fileContentType,
-                classId: classSlug,
-                tier,
-              }),
-            });
-            if (!sigRes.ok) {
-              const errText = await sigRes.text();
-              throw new Error(`Failed to get S3 upload URL (${sigRes.status}): ${errText}`);
-            }
-            const { uploadUrl, key } = await sigRes.json();
+              // 1. Request signed S3 upload URL from the Lambda.
+              const sigRes = await fetch(`${LAMBDA_URL}/upload-url`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${session.access_token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  bucket: 'work-samples',
+                  filename: cleanName,
+                  contentType: fileContentType,
+                  classId: classSlug,
+                  tier,
+                }),
+              });
+              if (!sigRes.ok) {
+                const errText = await sigRes.text();
+                throw new Error(`Failed to get S3 upload URL (${sigRes.status}): ${errText}`);
+              }
+              const { uploadUrl, key } = await sigRes.json();
 
-            // 2. PUT the file directly to S3. Content-Type MUST match what we signed for.
-            const putRes = await fetch(uploadUrl, {
-              method: 'PUT',
-              headers: { 'Content-Type': fileContentType },
-              body: file,
-            });
-            if (!putRes.ok) {
-              const errText = await putRes.text();
-              throw new Error(`S3 upload failed (${putRes.status}): ${errText}`);
-            }
+              // 2. PUT the file directly to S3. Content-Type MUST match what we signed for.
+              const putRes = await fetch(uploadUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': fileContentType },
+                body: file,
+              });
+              if (!putRes.ok) {
+                const errText = await putRes.text();
+                throw new Error(`S3 upload failed (${putRes.status}): ${errText}`);
+              }
 
-            return key;
-          }));
-          // Promote successful uploads into existingPaths so a retry skips them.
-          local.existingPaths = [...local.existingPaths, ...newPaths];
-          local.photos = [];
+              return key;
+            }));
+            // Promote successful uploads into existingPaths so a retry skips them.
+            local.existingPaths = [...local.existingPaths, ...newPaths];
+            local.photos = [];
+          }
+
+          const finalPaths = [...local.existingPaths];
+
+          // Detect deletes: paths from the old DB row not in finalPaths.
+          const oldPaths = (tExistingSamplesByTier[tier]?.photo_paths) || [];
+          const toDelete = oldPaths.filter(p => !finalPaths.includes(p));
+          if (toDelete.length) {
+            // TODO(Week2+): Lambda has no /delete-objects endpoint yet. Files removed
+            // from a tier become S3 orphans. Acceptable for demo (cents/month). Fix
+            // options: (a) add /delete-objects to Lambda, or (b) S3 lifecycle rule.
+            console.info(`[Q4] skipped delete for ${tier} (S3 migration pending /delete-objects):`, toDelete);
+          }
+
+          // POST is a (teacher_profile_id, tier) upsert; updated_at is
+          // server-set. Throws on non-2xx → caught by the per-tier handler below.
+          await rdsFetch('work-samples', { method: 'POST', body: {
+            teacher_profile_id: profileId,
+            tier,
+            description: local.description.trim(),
+            photo_paths: finalPaths,
+          } });
+
+          // Mirror DB snapshot for next-edit delete-detection.
+          tExistingSamplesByTier[tier] = { photo_paths: [...finalPaths] };
+          (tSamplesByProfile[profileId] ||= {})[tier] = {
+            teacher_profile_id: profileId, tier,
+            description: local.description.trim(),
+            photo_paths: [...finalPaths],
+          };
         }
 
-        const finalPaths = [...local.existingPaths];
-
-        // Detect deletes: paths from the old DB row not in finalPaths.
-        const oldPaths = (tExistingSamplesByTier[tier]?.photo_paths) || [];
-        const toDelete = oldPaths.filter(p => !finalPaths.includes(p));
-        if (toDelete.length) {
-          // TODO(Week2+): Lambda has no /delete-objects endpoint yet. Files removed
-          // from a tier become S3 orphans. Acceptable for demo (cents/month). Fix
-          // options: (a) add /delete-objects to Lambda, or (b) S3 lifecycle rule.
-          console.info(`[Q4] skipped delete for ${tier} (S3 migration pending /delete-objects):`, toDelete);
-        }
-
-        // POST is a (teacher_profile_id, tier) upsert; updated_at is
-        // server-set. Throws on non-2xx → caught by the per-tier handler below.
-        await rdsFetch('work-samples', { method: 'POST', body: {
-          teacher_profile_id: profileId,
-          tier,
-          description: local.description.trim(),
-          photo_paths: finalPaths,
-        } });
-
-        // Mirror DB snapshot for next-edit delete-detection.
-        tExistingSamplesByTier[tier] = { photo_paths: [...finalPaths] };
-        (tSamplesByProfile[profileId] ||= {})[tier] = {
-          teacher_profile_id: profileId, tier,
-          description: local.description.trim(),
-          photo_paths: [...finalPaths],
-        };
+        // Q4 v2: persist this tier's written-example (text) artifacts.
+        await saveTierArtifacts(tier, profileId, local);
       } catch (e) {
         console.warn(`[Q4] tier ${tier} failed:`, e);
         failedTiers.push(tier);
