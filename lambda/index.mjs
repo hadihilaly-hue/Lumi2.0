@@ -2376,6 +2376,27 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
     systemPrompt = systemPrompt.split(TEACHER_NOTES_MARKER).join(notesSection);
   }
 
+  // Server-side progress-note injection (Phase 5, Layer 3) — same posture as
+  // teacher notes: the note NEVER reaches the browser; it exists only to be
+  // spliced in here. Marker is ALWAYS stripped, even when the feature is off or
+  // no note exists (stray-marker defense). FLAG-GATED: a real student fails
+  // isPersistenceEnabled, so the section is always '' and the marker is stripped
+  // to nothing — byte-identical to today's behaviour for them.
+  if (systemPrompt.includes(PROGRESS_NOTE_MARKER)) {
+    let noteSection = "";
+    const inj = body.inject_progress_note;
+    if (inj && typeof inj.teacher_profile_id === "string" && inj.teacher_profile_id
+        && await isPersistenceEnabled(user.email)) {
+      const note = await fetchProgressNote({
+        studentId: user.id,
+        teacherProfileId: inj.teacher_profile_id,
+      });
+      noteSection = buildProgressNoteSection(note);
+      if (noteSection) console.log(`[progress_note] injected class=${inj.teacher_profile_id} ${noteSection.length}chars`);
+    }
+    systemPrompt = systemPrompt.split(PROGRESS_NOTE_MARKER).join(noteSection);
+  }
+
   // Begin SSE stream (separate wrap because content-type differs)
   const chatStream = awslambda.HttpResponseStream.from(responseStream, {
     statusCode: 200,
