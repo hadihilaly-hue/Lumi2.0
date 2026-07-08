@@ -913,6 +913,43 @@ async function handleRequest(event, responseStream) {
     }
   }
 
+  // === Route: /available-classes (GET) ===
+  // The student-facing class list, data-driven (replaces the hardcoded
+  // MENLO_CURRICULUM catalog on the picker path). Returns every class whose
+  // teacher has FINISHED onboarding (teacher_profiles.done = true) — the same
+  // "ready" signal the sidebar already uses — so students only pick classes a
+  // Lumi persona actually exists for. Any authenticated + domain-gated caller
+  // may read it (students need it to build a schedule). Read-only.
+  //
+  // No PII beyond what students already see: teacher_email + display name are
+  // already exposed via /teacher-directory and the cross-teacher /teacher-profile
+  // read. `subject` is best-effort from sections (SIS) — null for manually
+  // created profiles, which the client buckets under a generic header.
+  if (path === "/available-classes") {
+    const method = event.requestContext?.http?.method || "GET";
+    if (method !== "GET") return sendJson(405, { error: "Method not allowed" });
+    try {
+      const result = await dbQuery(
+        `SELECT tp.course_name,
+                tp.teacher_email,
+                tp.title,
+                sd.name AS teacher_name,
+                (SELECT s.subject FROM public.sections s
+                   WHERE s.teacher_profile_id = tp.id
+                   LIMIT 1) AS subject
+           FROM public.teacher_profiles tp
+           LEFT JOIN public.staff_directory sd
+             ON lower(sd.email) = lower(tp.teacher_email)
+          WHERE tp.done = true AND tp.deleted_at IS NULL
+          ORDER BY tp.course_name`
+      );
+      return sendJson(200, result.rows);
+    } catch (err) {
+      console.error("available-classes error:", safeErr(err));
+      return sendJson(500, { error: "available-classes failed" });
+    }
+  }
+
   // === Route: /teacher-profile (GET, POST, PATCH) ===
   // Authed (verifyAuth) + domain-gated above.
   //
