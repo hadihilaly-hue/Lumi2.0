@@ -7,6 +7,7 @@
 //   `` or `#home`                       -> {name:'home'}
 //   `#class/<courseB64>/<teacherEmailB64>` -> {name:'class', course, teacher}
 //   `#plan`                             -> {name:'plan'}
+//   `#general`                          -> {name:'general'}
 // Anything else falls back to `home`.
 //
 // CRITICAL — preserving `?mode=test` (spec §4.5). Every pushState() call keeps
@@ -44,6 +45,7 @@ export function parseHash(hash) {
   const h = raw.startsWith('#') ? raw.slice(1) : raw;
   if (h === '' || h === 'home') return { name: 'home' };
   if (h === 'plan') return { name: 'plan' };
+  if (h === 'general') return { name: 'general' };
   if (h.startsWith('class/')) {
     const parts = h.split('/');
     if (parts.length !== 3) return { name: 'home' };
@@ -59,6 +61,7 @@ export function parseHash(hash) {
 export function buildHash(route) {
   if (!route || route.name === 'home') return 'home';
   if (route.name === 'plan') return 'plan';
+  if (route.name === 'general') return 'general';
   if (route.name === 'class') {
     return `class/${b64urlEncode(route.course)}/${b64urlEncode(route.teacher)}`;
   }
@@ -80,18 +83,19 @@ export function buildRouteUrl(route, search) {
 // functions below touch window/history/location and are only ever called from
 // live boot code, so they don't appear in unit tests.
 
-let _handlers = { onHome: () => {}, onClass: () => {}, onPlan: () => {} };
+let _handlers = { onHome: () => {}, onClass: () => {}, onPlan: () => {}, onGeneral: () => {} };
 let _wired = false;
 
 function dispatch(route) {
   if (route.name === 'class') _handlers.onClass(route);
   else if (route.name === 'plan') _handlers.onPlan(route);
+  else if (route.name === 'general') _handlers.onGeneral(route);
   else _handlers.onHome(route);
 }
 
 /** Wire the router to the current window. Idempotent — safe to call once. */
 export function initRouter(handlers) {
-  _handlers = { onHome: () => {}, onClass: () => {}, onPlan: () => {}, ..._handlers, ...handlers };
+  _handlers = { onHome: () => {}, onClass: () => {}, onPlan: () => {}, onGeneral: () => {}, ..._handlers, ...handlers };
   if (!_wired) {
     window.addEventListener('hashchange', () => dispatch(parseHash(location.hash)));
     _wired = true;
@@ -119,5 +123,13 @@ export function navPlan() {
   const route = { name: 'plan' };
   const url = buildRouteUrl(route, location.search);
   history.pushState({ route: 'plan' }, '', url);
+  dispatch(route);
+}
+
+/** Navigate to General Chat, preserving the current query string. */
+export function navGeneral() {
+  const route = { name: 'general' };
+  const url = buildRouteUrl(route, location.search);
+  history.pushState({ route: 'general' }, '', url);
   dispatch(route);
 }

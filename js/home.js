@@ -25,8 +25,7 @@
 // Deferred to later sessions:
 //   Session 6: tomorrow-schedule peek (D4-A hidden silently until then).
 
-import { openGeneralChat } from './conversation.js';
-import { navClass, navPlan } from './router.js';
+import { navClass, navGeneral, navPlan } from './router.js';
 import { S } from './state.js';
 import { getConvs, getSchedule } from './storage.js';
 import { getHwTasks } from './homework.js';
@@ -520,10 +519,8 @@ function renderQuickActions() {
   plan.addEventListener('click', () => navPlan());
   row.appendChild(plan);
 
-  // General Chat — wire to the existing openGeneralChat() in conversation.js.
-  // Small in-flight stopgap: reuse #classViewHeader with "General Chat" label
-  // so the back button is still visible. Proper #general router route lands
-  // in Session 4 (§4.1.3).
+  // General Chat — routed via #general (js/router.js). mountGeneral() in
+  // classview.js handles the header/back plumbing and calls openGeneralChat.
   const chat = el('button', {
     class: 'home-qa home-qa--cream',
     type: 'button',
@@ -534,19 +531,7 @@ function renderQuickActions() {
       el('div', { class: 'home-qa-sub', text: 'Chat with Lumi across your classes.' }),
     ]),
   ]);
-  chat.addEventListener('click', () => {
-    const home = document.getElementById('homeView');
-    const panel = document.getElementById('chatPanel');
-    const header = document.getElementById('classViewHeader');
-    const courseEl = document.getElementById('classViewCourse');
-    const teacherEl = document.getElementById('classViewTeacher');
-    if (home) home.style.display = 'none';
-    if (courseEl) courseEl.textContent = 'General Chat';
-    if (teacherEl) teacherEl.textContent = 'Across your classes';
-    if (header) header.style.display = '';
-    if (panel) panel.style.display = '';
-    openGeneralChat();
-  });
+  chat.addEventListener('click', () => navGeneral());
   row.appendChild(chat);
 }
 
@@ -602,19 +587,22 @@ export function mountHome() {
   const home = document.getElementById('homeView');
   const chat = document.getElementById('chatPanel');
   const header = document.getElementById('classViewHeader');
+  const body = document.getElementById('classViewBody');
   const rail = document.getElementById('classViewRail');
   const railToggle = document.getElementById('classViewRailToggle');
   if (home) home.style.display = '';
   if (chat) chat.style.display = 'none';
   if (header) header.style.display = 'none';
+  // Hide the class-view body wrapper too — it's a flex:1 sibling of #homeView
+  // in the .main column-flex, and if left visible with no live children it
+  // still competes for vertical space (was one half of the home vertical-clip
+  // symptom before the 6c6161a page-scroll switch releases home from 100vh).
+  if (body) body.style.display = 'none';
   // Session 3: the rail is scoped to a class view; hide it whenever we return
   // to the home grid (routed via navHome / Back button).
   if (rail) rail.style.display = 'none';
   if (railToggle) railToggle.style.display = 'none';
   const plan = document.getElementById('studyPlanView');
-  if (home) home.style.display = '';
-  if (chat) chat.style.display = 'none';
-  if (header) header.style.display = 'none';
   if (plan) plan.style.display = 'none';
   renderGreeting();
   renderDueStrip();

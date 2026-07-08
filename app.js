@@ -8,7 +8,7 @@ import { setSidebarUserSubtitle } from './js/prompts.js';
 import { checkSemesterBanner, initScheduleSetup } from './js/schedule.js';
 import { activeDropdownEl, closeOpenMenu, renderSearchDropdown, renderSidebar, showInlineConfirm } from './js/sidebar.js';
 import { mountHome } from './js/home.js';
-import { mountClass } from './js/classview.js';
+import { mountClass, mountGeneral } from './js/classview.js';
 import { mountPlan } from './js/studyplanview.js';
 import { initRouter } from './js/router.js';
 import { $, S, SB, currentUser, fileInput, msgInput, sbSearch, sendBtn, setCurrentProjId, setCurrentUser, themeToggle } from './js/state.js';
@@ -373,7 +373,7 @@ function startApp() {
     // The router honors any existing hash so a hard refresh at
     // #class/<b64>/<b64> re-mounts the same class (D5-A: on boot, if a hash
     // is present, route to it; else land on home).
-    initRouter({ onHome: mountHome, onClass: mountClass, onPlan: mountPlan });
+    initRouter({ onHome: mountHome, onClass: mountClass, onPlan: mountPlan, onGeneral: mountGeneral });
   } else {
     showWelcome();
   }

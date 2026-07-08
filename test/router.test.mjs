@@ -58,7 +58,6 @@ test('parseHash: garbage base64 segments fall back to home (no throw)', () => {
 
 test('parseHash: unknown hash falls back to home', () => {
   assert.deepEqual(parseHash('#totallyunknown'), { name: 'home' });
-  assert.deepEqual(parseHash('#general'), { name: 'home' });   // deferred surface
 });
 
 // ── buildHash ────────────────────────────────────────────────────────────────
@@ -96,6 +95,21 @@ test('buildHash: plan route serializes to "plan"', () => {
 test('buildRouteUrl: preserves a plan URL AND the query string', () => {
   const url = buildRouteUrl({ name: 'plan' }, '?mode=test');
   assert.equal(url, '?mode=test#plan');
+});
+
+// ── general route (General Chat) ─────────────────────────────────────────────
+test('parseHash: #general resolves to { name: "general" }', () => {
+  assert.deepEqual(parseHash('#general'), { name: 'general' });
+  assert.deepEqual(parseHash('general'), { name: 'general' });
+});
+
+test('buildHash: general route serializes to "general"', () => {
+  assert.equal(buildHash({ name: 'general' }), 'general');
+});
+
+test('buildRouteUrl: preserves a general URL AND the query string', () => {
+  const url = buildRouteUrl({ name: 'general' }, '?mode=test');
+  assert.equal(url, '?mode=test#general');
 });
 
 // ── buildRouteUrl — the ?mode=test-preservation contract ─────────────────────

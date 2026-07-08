@@ -8,11 +8,11 @@
 //   Session 3: left rail (convs / homework / projects panels).
 //   Session 7: voice V-A restructure (mic + input at document scope).
 
-import { openTutor } from './conversation.js';
+import { openGeneralChat, openTutor } from './conversation.js';
 import { closestCourseCandidates, resolveCanonicalCourse } from './courseNormalize.js';
 import { unmountHome } from './home.js';
 import { navHome } from './router.js';
-import { S } from './state.js';
+import { S, SB } from './state.js';
 import { mountRail, unmountRail } from './classviewrail.js';
 import { getAvailableClassesSync } from './teachers.js';
 
@@ -50,6 +50,7 @@ export function mountClass(route) {
 
   const header = document.getElementById('classViewHeader');
   const chat = document.getElementById('chatPanel');
+  const body = document.getElementById('classViewBody');
   const courseEl = document.getElementById('classViewCourse');
   const teacherEl = document.getElementById('classViewTeacher');
 
@@ -63,6 +64,10 @@ export function mountClass(route) {
 
   if (header) header.style.display = '';
   if (chat) chat.style.display = '';
+  // mountHome/mountPlan/mountGeneral now hide #classViewBody so a hidden-child
+  // flex:1 wrapper doesn't compete for column-flex space. Restore it here so
+  // the rail + chatPanel render inside their flex:1 wrapper as before.
+  if (body) body.style.display = '';
 
   // Session 3: mount the left rail (convs / HW / projects, scoped to this
   // class). No-op under flag-off — the old sidebar handles nav. Mounting
@@ -95,4 +100,47 @@ export function mountClass(route) {
     );
   }
   openTutor(subjectId, course, teacher);
+}
+
+/**
+ * Mount General Chat. Reuses #classViewHeader + #chatPanel (same DOM as
+ * mountClass) so the top-left back arrow returns to home identically. The
+ * header carries a lighter "General Chat" / "Across your classes" label
+ * instead of course/teacher — General Chat is not a class view, it just
+ * shares the shell chrome. The rail is scoped to a class view and is hidden.
+ *
+ * Router entry: initRouter { onGeneral: mountGeneral } in app.js. Also
+ * covers deep-link refresh at `#general` and browser back/forward.
+ */
+export function mountGeneral() {
+  wireBackOnce();
+  unmountHome();
+
+  const planView = document.getElementById('studyPlanView');
+  if (planView) planView.style.display = 'none';
+
+  const header = document.getElementById('classViewHeader');
+  const chat = document.getElementById('chatPanel');
+  const body = document.getElementById('classViewBody');
+  const rail = document.getElementById('classViewRail');
+  const railToggle = document.getElementById('classViewRailToggle');
+  const courseEl = document.getElementById('classViewCourse');
+  const teacherEl = document.getElementById('classViewTeacher');
+
+  if (courseEl) courseEl.textContent = 'General Chat';
+  if (teacherEl) teacherEl.textContent = 'Across your classes';
+
+  if (header) header.style.display = '';
+  if (chat) chat.style.display = '';
+  if (body) body.style.display = '';
+  if (rail) rail.style.display = 'none';
+  if (railToggle) railToggle.style.display = 'none';
+  unmountRail();
+
+  // Mirror mountClass's re-entry short-circuit: if a General Chat session
+  // is already active (tutorCtx null + SB.mode==='general' + a session id),
+  // skip openGeneralChat() so browser back/forward and hashchange no-ops
+  // preserve the conversation. openGeneralChat() is otherwise a fresh reset.
+  if (SB.mode === 'general' && S.tutorCtx === null && S.currentId) return;
+  openGeneralChat();
 }

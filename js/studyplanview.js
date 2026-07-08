@@ -216,12 +216,20 @@ export function mountPlan() {
   const home = document.getElementById('homeView');
   const chat = document.getElementById('chatPanel');
   const classHeader = document.getElementById('classViewHeader');
+  const classBody = document.getElementById('classViewBody');
   const view = document.getElementById('studyPlanView');
 
   unmountHome();
   if (home) home.style.display = 'none';
   if (chat) chat.style.display = 'none';
   if (classHeader) classHeader.style.display = 'none';
+  // Hide the class-view body wrapper too — it's a flex:1 sibling of
+  // #studyPlanView (also flex:1) in the .main column-flex, so leaving it
+  // visible with hidden children split the 100vh column in half and clipped
+  // the plan into the top ~50vh of the viewport (Bug 1). Hiding it lets
+  // #studyPlanView take the full flex:1 space and use its own overflow-y:auto
+  // for the internal scroll — same fixed-viewport model as class view.
+  if (classBody) classBody.style.display = 'none';
   if (view) view.style.display = '';
 
   renderPlan();
