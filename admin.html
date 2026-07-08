@@ -251,157 +251,42 @@ let ADMIN_EMAIL = null;
 
 const LAMBDA_URL = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws';
 
-// ─── CURRICULUM (same as teacher.html) ───────────────────────────────────────
-const MENLO_CURRICULUM = {
-  "English": {
-    "English 1": ["Rachel Blumenthal","Whitney Newton","Margaret Ramsey","Andrew Warren"],
-    "English 2": ["Jay Bush","Lily Chan","Rebecca Gertmenian","Meghann Schroers-Martin"],
-    "Junior English Seminar": ["Tom Garvey","Oscar King","Maura Sincoff","Lily Chan","Cara Plamondon"],
-    "Cafe Society": ["Bridgett Longust"],
-    "Contemporary World Literature": ["Lily Chan"],
-    "Creative Nonfiction Workshop (H)": ["Whitney Newton"],
-    "Dystopian Fiction & Film": ["Cara Plamondon"],
-    "East Asian Pop Culture": ["Oscar King"],
-    "Fairy Tales": ["Oscar King"],
-    "Global Mythologies": ["Jay Bush"],
-    "Humanities I: Renaissances": ["Rebecca Gertmenian"],
-    "Humanities II: Self-Portraits": ["Rebecca Gertmenian"],
-    "Literature & Science": ["Andrew Warren"],
-    "Literature in the Age of AI": ["Rachel Blumenthal"],
-    "Literature of the American Wilderness (H)": ["Whitney Newton"],
-    "Lyric & Lifeline": ["Margaret Ramsey"],
-    "Media & Cultural Studies (H)": ["Oscar King"],
-    "Medicine & Narrative": ["Rachel Blumenthal"],
-    "Modernist Poetry Workshop (H)": ["Jay Bush"],
-    "Novella Workshop (H)": ["Oscar King"],
-    "On Being": ["Margaret Ramsey"],
-    "Science Fiction & the Classics (H)": ["Tom Garvey"],
-    "Shakespeare Now (H)": ["Andrew Warren"],
-    "5 Months, 4 Books": ["Cara Plamondon"],
-    "Argumentation & Communication (H)": ["Maura Sincoff"]
-  },
-  "History & Social Sciences": {
-    "Modern World History": ["Sabahat Adil","Franco Cruz-Ochoa","Katharine Hanson","Nicholas Merlesena"],
-    "US History": ["Miles Bennett-Smith","Glenn Davis","Trevor McNeil","Nicholas Merlesena","Joseph Mitchell"],
-    "US History (H)": ["Glenn Davis","Trevor McNeil","Nicholas Merlesena","Joseph Mitchell"],
-    "Government & Politics (H)": ["Miles Bennett-Smith","Joseph Mitchell","Matthew Nelson"],
-    "Modern Europe (H)": ["Katharine Hanson"],
-    "Philosophy I": ["Jack Bowen"],
-    "Philosophy II": ["Jack Bowen"],
-    "Psychology I": ["Dylan Citrin Cummins","Joseph Mitchell"],
-    "Psychology II": ["Dylan Citrin Cummins","Joseph Mitchell"],
-    "Economic Theory": ["Charles Hanson"],
-    "American Economic History": ["Charles Hanson"],
-    "Environmental & Development Economics": ["Charles Hanson"],
-    "History of US Foreign Relations": ["Charles Hanson"],
-    "Ethnic Studies I": ["Glenn Davis"],
-    "Ethnic Studies II": ["Glenn Davis"],
-    "Gender Studies": ["Matthew Nelson"],
-    "Global Issues for Global Citizens": ["Matthew Nelson"],
-    "In Gods We Trust": ["Matthew Nelson"],
-    "Comparative Legal Systems": ["Trevor McNeil"],
-    "Current Affairs & Civil Discourse": ["John Schafer"],
-    "Pursuit of Happiness": ["Peter Brown"],
-    "Sultans, Shahs, and Sovereigns": ["Sabahat Adil"],
-    "Humanities I: Renaissances": ["Rebecca Gertmenian"],
-    "Humanities II: Self-Portraits": ["Rebecca Gertmenian"],
-    "IP Capstone Seminar (H)": ["Peter Brown","Matthew Nelson"]
-  },
-  "Math": {
-    "Integrated Geometry & Algebra": ["Christine Walters"],
-    "Analytic Geometry & Algebra": ["Rebecca Akers","Joe Rabison"],
-    "Analytic Geometry & Algebra (H)": ["Sujata Ganpule"],
-    "Algebra 2": ["Randall Joss","Nandhini Namasivayam"],
-    "Algebra 2 with Trig": ["Rebecca Akers","Jacqueline Arreaga","Richard Harris"],
-    "Algebra 2 with Trig (H)": ["Danielle Jensen"],
-    "Precalculus": ["Yu-Loung Chang","Christine Walters"],
-    "Introductory Calculus": ["Jacqueline Arreaga","Dave Lowell"],
-    "Introductory Calculus (H)": ["Reeve Garrett"],
-    "Calculus": ["Jude Loeffler"],
-    "Advanced Calculus I (H)": ["Sujata Ganpule","Dave Lowell"],
-    "Advanced Calculus II (H)": ["Yu-Loung Chang","Reeve Garrett"],
-    "Advanced Topics in Math (H)": ["Reeve Garrett"],
-    "Probability & Statistics (H)": ["Dennis Millstein"],
-    "Advanced Topics in Statistics (H)": ["Dennis Millstein"],
-    "Applied Statistics & Epidemiology": ["Dennis Millstein"],
-    "Intro to Applied Math & Data Science": ["Jude Loeffler"]
-  },
-  "Computer Science": {
-    "CS1: Intro to Computer Science": ["Douglas Kiang","Nandhini Namasivayam"],
-    "CS2: Data Structures & Algorithms (H)": ["Nandhini Namasivayam"],
-    "Advanced Topics in CS (H)": ["Zachary Blickensderfer"],
-    "Principles of Game Design": ["Douglas Kiang"]
-  },
-  "Science": {
-    "Living Systems: Biology in Balance": ["Chrissy Orangio"],
-    "Chemistry": ["Laura Huntley","Mary McKenna"],
-    "Chemistry (H)": ["Zachary Eagleton","Eugenia McCauley"],
-    "Conceptual Physics": ["Zachary Eagleton"],
-    "Physics 1": ["Nina Arnberg","Laura Huntley","Zane Moore","Matthew Varvir"],
-    "Physics 2 (H)": ["Matthew Varvir"],
-    "Molecular Mechanisms in Biology": ["Nina Arnberg","Todd Hardie","Cristina Weaver"],
-    "Advanced Biology (H)": ["Tatyana Buxton"],
-    "Advanced Chemistry (H)": ["Eugenia McCauley"],
-    "Advanced Physics (H)": ["James Dann"],
-    "Environmental Science": ["Chrissy Orangio"],
-    "Anatomy & Physiology": ["Todd Hardie"],
-    "Neuroscience": ["Cristina Weaver"],
-    "BioTech Research (H)": ["Tatyana Buxton"]
-  },
-  "Applied Science & Engineering": {
-    "Mechanical & Electrical Engineering": ["James Formato","Leo Jaimez"],
-    "Applied Science Research (H)": ["James Dann"],
-    "Sustainable Engineering": ["James Dann"],
-    "Design": ["James Formato"]
-  },
-  "World Language": {
-    "Spanish 1": ["Janet Tennyson"],
-    "Spanish 2": ["Janet Tennyson","Adolfo Guevara"],
-    "Heritage Spanish 3": ["Perla Amaral"],
-    "Heritage Spanish 4": ["Perla Amaral"],
-    "Advanced Spanish (H)": ["Patricia Frias"],
-    "French 1": ["Marie Sajja"],
-    "French 2": ["Corinne Chung"],
-    "French 3": ["Marie Sajja"],
-    "French 4": ["Corinne Chung"],
-    "Advanced French (H)": ["Corinne Chung"],
-    "Mandarin 1": ["Rita Yeh"],
-    "Mandarin 2": ["Rita Yeh"],
-    "Mandarin 3": ["Mingjung Chen"],
-    "Mandarin 4": ["Rita Yeh"],
-    "Mandarin 5": ["Mingjung Chen"],
-    "Advanced Mandarin (H)": ["Mingjung Chen"],
-    "Latin 1": ["Tom Garvey"],
-    "Latin 2": ["Jennifer Jordt"],
-    "Latin 3": ["Jennifer Jordt"],
-    "Latin 4": ["Jennifer Jordt"],
-    "Advanced Latin (H)": ["Tom Garvey","Jennifer Jordt"]
-  }
-};
-
-// Teacher directory — fetched from the Lambda at runtime (Compliance Phase 2b);
-// window.TEACHER_EMAIL_MAP is populated by loadTeacherDirectory() in the auth
-// IIFE below. Read it LIVE; build TEACHER_DATABASE only after that await.
-function buildTeacherDatabase() {
-  const db = {};
-  for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
-    for (const [course, teachers] of Object.entries(courses)) {
-      for (const teacher of teachers) {
-        const email = window.TEACHER_EMAIL_MAP[teacher];
-        if (!email) continue;
-        if (!db[email]) db[email] = { name: teacher, classes: [] };
-        if (!db[email].classes.includes(course)) db[email].classes.push(course);
-      }
-    }
-  }
-  return db;
-}
+// ─── TEACHER SCOPING (data-driven) ───────────────────────────────────────────
+// The hardcoded MENLO_CURRICULUM catalog and the TEACHER_DATABASE map (built from
+// it × TEACHER_EMAIL_MAP) were removed. The dashboard roster is derived from the
+// loaded teacher_profiles rows (GET /teacher-profile?scope=all): every provisioned
+// class has a row (a SIS-seeded stub or a completed onboarding), so aProfiles IS
+// the full expected roster. Display names come from the runtime directory
+// (window.TEACHER_EMAIL_MAP, email→name inverted), falling back to the email
+// local-part. `TEACHER_EMAIL_MAP` stays — it is already DB-backed (Compliance 2b).
 let TEACHER_DATABASE = {};
 
-function lookupSubjectForCourse(courseName) {
-  for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
-    if (courses[courseName]) return subject;
+// email → display name from the runtime directory (inverse of TEACHER_EMAIL_MAP).
+function emailToName(email) {
+  const map = window.TEACHER_EMAIL_MAP || {};
+  for (const [name, e] of Object.entries(map)) {
+    if (String(e).toLowerCase() === email.toLowerCase()) return name;
   }
+  return email.split('@')[0];
+}
+
+// Build the { email: { name, classes } } roster from the loaded profile rows.
+function buildTeacherDatabase() {
+  const db = {};
+  for (const key of Object.keys(aProfiles)) {
+    const row = aProfiles[key];
+    const email = row.teacher_email;
+    if (!email) continue;
+    if (!db[email]) db[email] = { name: emailToName(email), classes: [] };
+    if (!db[email].classes.includes(row.course_name)) db[email].classes.push(row.course_name);
+  }
+  Object.values(db).forEach(t => t.classes.sort((a, b) => a.localeCompare(b)));
+  return db;
+}
+
+// Subject is no longer derivable from a hardcoded curriculum; teacher_profiles
+// has no subject column. Cosmetic neutral label on the class rows.
+function lookupSubjectForCourse(courseName) {
   return 'General';
 }
 
@@ -421,7 +306,8 @@ let aRefreshTimer = null;
   try { await window.loadTeacherDirectory(); }
   catch (e) { console.error('[admin] directory load failed:', e); }
   ADMIN_EMAIL = window.ADMIN_EMAIL;
-  TEACHER_DATABASE = buildTeacherDatabase();
+  // TEACHER_DATABASE is now derived from aProfiles at render time (loadAndRender
+  // → renderDashboard), so there is nothing to build here before data loads.
   if (session.user.email.toLowerCase() !== ADMIN_EMAIL) {
     await sb.auth.signOut();
     window.location.replace('index.html');
@@ -558,6 +444,9 @@ function getStatus(email, course) {
 }
 
 function renderDashboard() {
+  // Rebuild the roster from the freshly-loaded profile rows each render so
+  // auto-refresh picks up new/onboarded classes.
+  TEACHER_DATABASE = buildTeacherDatabase();
   const query   = (document.getElementById('teacherSearch')?.value || '').toLowerCase().trim();
   const entries = Object.entries(TEACHER_DATABASE)
     .filter(([, t]) => !query || t.name.toLowerCase().includes(query))

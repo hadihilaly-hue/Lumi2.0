@@ -184,6 +184,50 @@ test('POST /teacher-profile: an admin is always authorized (adminEmails bypass)'
   assert.ok(findQuery(ctx, /INSERT INTO public\.teacher_profiles/));
 });
 
+// ============================ /available-classes ============================
+// Data-driven student class list (replaces the hardcoded MENLO_CURRICULUM
+// catalog on the picker path). Reads teacher_profiles.done — the same "ready"
+// signal the sidebar uses — so the picker only offers onboarded classes.
+
+test('GET /available-classes requires auth (401 without a token)', async () => {
+  const { handler } = await loadHandler();
+  resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
+  const r = await invoke(handler, { method: 'GET', path: '/available-classes' });
+  assert.equal(r.statusCode, 401);
+});
+
+test('GET /available-classes returns only done=true, non-deleted classes for any authed caller', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({
+    dbRouter: makeRouter({
+      userId: STUDENT.userId,
+      onRoute: (t) => /FROM public\.teacher_profiles tp/.test(t)
+        ? res([{ course_name: 'Algebra 2', teacher_email: 't@menloschool.org', teacher_name: 'A Teacher', subject: 'Math' }])
+        : res([]),
+    }),
+  });
+  const r = await invoke(handler, {
+    method: 'GET', path: '/available-classes', token: tokenFor(STUDENT),
+  });
+  assert.equal(r.statusCode, 200);
+  const body = r.json();
+  assert.equal(body.length, 1);
+  assert.equal(body[0].course_name, 'Algebra 2');
+  const q = findQuery(ctx, /FROM public\.teacher_profiles tp/);
+  // done-filtering: only onboarded classes surface, and soft-deleted ones are hidden.
+  assert.match(q.text, /tp\.done = true/);
+  assert.match(q.text, /tp\.deleted_at IS NULL/);
+});
+
+test('GET /available-classes rejects a non-GET method (405)', async () => {
+  const { handler } = await loadHandler();
+  resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/available-classes', token: tokenFor(STUDENT), body: {},
+  });
+  assert.equal(r.statusCode, 405);
+});
+
 // ================================ /profiles =================================
 
 test('POST /profiles forces id from the JWT and ignores body.id', async () => {

@@ -91,6 +91,21 @@ export async function rdsFetch(path, { method = 'GET', body } = {}) {
   return res.json();
 }
 
+// Data-driven student class list (replaces the hardcoded MENLO_CURRICULUM
+// catalog on the picker path). Returns the raw rows from GET /available-classes
+// — each { course_name, teacher_email, teacher_name, title, subject } for a class
+// whose teacher has finished onboarding (done = true) — or null on ANY failure so
+// the caller falls back to the static catalog rather than showing an empty picker.
+export async function fetchAvailableClasses() {
+  try {
+    const rows = await rdsFetch('available-classes');
+    return Array.isArray(rows) ? rows : null;
+  } catch (err) {
+    console.warn('[available-classes] fetch failed; using static fallback:', err);
+    return null;
+  }
+}
+
 // Option 2: fetch one teacher profile from the RDS-backed Lambda route, shape-matched
 // to the supabase-js path (returns the row object, or null on 404). Auth is the same
 // Supabase JWT the chat proxy already uses. The route returns an array (teacher_email
