@@ -4,6 +4,43 @@ import { setSidebarUserSubtitle } from './prompts.js';
 import { renderSidebar } from './sidebar.js';
 import { $ } from './state.js';
 import { getSchedule, saveScheduleLocal, syncScheduleToSupabase } from './storage.js';
+import { fetchAvailableClasses } from './teachers.js';
+
+// Build a MENLO_CURRICULUM-shaped map ({ subject: { course: [teacherNames] } })
+// from the flat GET /available-classes rows, so the existing subject-grouped
+// wizard consumes it unchanged. subject is best-effort (null → generic bucket);
+// teacher name falls back to the email local-part when a class's teacher isn't
+// in the staff directory. Same-course/multi-teacher rows accumulate a roster.
+export const GENERIC_SUBJECT = 'Your Classes';
+export function buildCurriculumFromRows(rows) {
+  const cur = {};
+  for (const r of rows || []) {
+    const course = r.course_name;
+    if (!course) continue;
+    const subject = r.subject || GENERIC_SUBJECT;
+    const teacher = r.teacher_name || (r.teacher_email ? r.teacher_email.split('@')[0] : '');
+    (cur[subject] ||= {});
+    (cur[subject][course] ||= []);
+    if (teacher && !cur[subject][course].includes(teacher)) cur[subject][course].push(teacher);
+  }
+  return cur;
+}
+
+// Backward-compat: a student already enrolled in a class must still see it in
+// the picker even if that class isn't in the done=true list (teacher un-onboarded
+// since, or fetch fallback). Merge any prefill entries missing from the map.
+export function mergePrefillCourses(cur, prefill) {
+  for (const p of prefill || []) {
+    if (!p.course) continue;
+    const alreadyListed = Object.values(cur).some(courses => courses[p.course]);
+    if (alreadyListed) continue;
+    const subject = p.subject || GENERIC_SUBJECT;
+    (cur[subject] ||= {});
+    (cur[subject][p.course] ||= []);
+    if (p.teacher && !cur[subject][p.course].includes(p.teacher)) cur[subject][p.course].push(p.teacher);
+  }
+  return cur;
+}
 
 
 // ─── SCHEDULE SETUP ──────────────────────────────────────────────────────────
@@ -68,11 +105,11 @@ const GRADE_COURSES = {
   ],
 };
 
-function getCoursesForGrade(grade) {
+function getCoursesForGrade(grade, curriculum) {
   const allowed = GRADE_COURSES[grade];
-  if (!allowed) return MENLO_CURRICULUM; // show all if grade unknown
+  if (!allowed) return curriculum; // show all if grade unknown
   const filtered = {};
-  Object.entries(MENLO_CURRICULUM).forEach(([subject, courses]) => {
+  Object.entries(curriculum).forEach(([subject, courses]) => {
     const matching = {};
     Object.entries(courses).forEach(([course, teachers]) => {
       if (allowed.includes(course)) matching[course] = teachers;
@@ -99,6 +136,23 @@ export function initScheduleSetup(onDone, prefill = []) {
   let teacherIdx = 0;
   let blockIdx = 0;
 
+  // Class catalog is data-driven (GET /available-classes → only classes whose
+  // teacher finished onboarding). Start from the static MENLO_CURRICULUM so the
+  // wizard is functional instantly and survives a fetch failure, then replace it
+  // with the DB list once it resolves and rebuild the class grid if it's showing.
+  // The static catalog is thus a pure fallback, not the primary source.
+  let activeCurriculum = mergePrefillCourses(structuredClone(MENLO_CURRICULUM), prefill);
+  (async () => {
+    const rows = await fetchAvailableClasses();
+    if (!rows) return; // fetch failed → keep the static fallback
+    activeCurriculum = mergePrefillCourses(buildCurriculumFromRows(rows), prefill);
+    // Rebuild only if the class-selection step is currently visible.
+    if ($('ssStep2')?.classList.contains('active')) {
+      buildClassGrid($('ssClassSearch')?.value || '');
+      updateClassHint();
+    }
+  })();
+
   // Steps: 0=grade, 1=classes, 2=teachers, 3=block, 4=study-style, 5=confirm
   const stepEls = [$('ssStep1'), $('ssStep2'), $('ssStep3'), $('ssStepBlock'), $('ssStep4'), $('ssStep5')];
 
@@ -123,7 +177,7 @@ export function initScheduleSetup(onDone, prefill = []) {
       card.classList.add('selected');
       chosenGrade = card.dataset.grade;
       // Remove any previously selected classes that aren't in new grade
-      const allowed = getCoursesForGrade(chosenGrade);
+      const allowed = getCoursesForGrade(chosenGrade, activeCurriculum);
       const allAllowed = Object.values(allowed).flatMap(c => Object.keys(c));
       [...selectedClasses].forEach(c => { if (!allAllowed.includes(c)) { selectedClasses.delete(c); delete teacherChoices[c]; delete blockChoices[c]; } });
       // Auto-advance after brief highlight
@@ -167,7 +221,7 @@ export function initScheduleSetup(onDone, prefill = []) {
     // When searching, show everything across the full catalog
     if (q) {
       let first = true;
-      Object.entries(MENLO_CURRICULUM).forEach(([subject, courses]) => {
+      Object.entries(activeCurriculum).forEach(([subject, courses]) => {
         const matching = Object.keys(courses).filter(c =>
           c.toLowerCase().includes(q) || subject.toLowerCase().includes(q));
         if (!matching.length) return;
@@ -184,7 +238,7 @@ export function initScheduleSetup(onDone, prefill = []) {
     }
 
     // No search — show grade-filtered classes, then "All Electives" section
-    const gradeCurriculum = chosenGrade ? getCoursesForGrade(chosenGrade) : MENLO_CURRICULUM;
+    const gradeCurriculum = chosenGrade ? getCoursesForGrade(chosenGrade, activeCurriculum) : activeCurriculum;
     const gradeCoursesSet = new Set(
       Object.values(gradeCurriculum).flatMap(c => Object.keys(c))
     );
@@ -214,7 +268,7 @@ export function initScheduleSetup(onDone, prefill = []) {
     electivesBody.style.display = 'none';
 
     // Build full catalog minus grade-filtered ones
-    Object.entries(MENLO_CURRICULUM).forEach(([subject, courses]) => {
+    Object.entries(activeCurriculum).forEach(([subject, courses]) => {
       const electives = Object.keys(courses).filter(c => !gradeCoursesSet.has(c));
       if (!electives.length) return;
       const hdr = document.createElement('div');
@@ -277,7 +331,7 @@ export function initScheduleSetup(onDone, prefill = []) {
     $('ssTeacherCourseName').textContent = '';
 
     let teachers = [];
-    for (const [, courses] of Object.entries(MENLO_CURRICULUM)) {
+    for (const [, courses] of Object.entries(activeCurriculum)) {
       if (courses[course]) { teachers = courses[course]; break; }
     }
 
@@ -449,7 +503,7 @@ export function initScheduleSetup(onDone, prefill = []) {
 
   $('ssStep5Done').addEventListener('click', () => {
     const schedule = getSelectedArray().map(course => {
-      const subject = Object.entries(MENLO_CURRICULUM)
+      const subject = Object.entries(activeCurriculum)
         .find(([, courses]) => courses[course])?.[0] || '';
       return {
         course,
