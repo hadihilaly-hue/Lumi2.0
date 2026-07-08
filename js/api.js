@@ -46,6 +46,10 @@ export async function callAPI(msgs, system) {
     // Server-side teacher-notes injection target (Lambda swaps the
     // <<LUMI_TEACHER_NOTES>> marker in `system`; notes never reach the client).
     ...(S.tutorCtx?.notesInjection ? { inject_teacher_notes: S.tutorCtx.notesInjection } : {}),
+    // Phase 5: same target drives the <<LUMI_PROGRESS_NOTE>> swap. The Lambda
+    // gates it (OFF for real students) and the note never reaches the client;
+    // for an ungated student the marker is simply stripped to nothing.
+    ...(S.tutorCtx?.notesInjection ? { inject_progress_note: S.tutorCtx.notesInjection } : {}),
   });
 
   if (!res.ok) {

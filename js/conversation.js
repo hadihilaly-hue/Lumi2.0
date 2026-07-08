@@ -4,7 +4,7 @@ import { prepareSuggestedPrompts, renderEmptyState, showWelcome } from './emptys
 import { getStudentName, teacherDisplayName, updateTestModeBanner } from './prompts.js';
 import { clearSearch, renderSidebar } from './sidebar.js';
 import { $, S, SB, _introShownFor, _saveIntroShown, currentUser, messagesEl, msgInput } from './state.js';
-import { genId, getConvs, saveConvs, saveCurrentConv } from './storage.js';
+import { flushProgressNote, genId, getConvs, saveConvs, saveCurrentConv } from './storage.js';
 import { getTeacherProfile, loadWorkSampleImages, rdsFetch } from './teachers.js';
 
 
@@ -130,6 +130,7 @@ async function hydrateTutorProfile() {
 // ─── NEW CHAT ─────────────────────────────────────────────────────────────────
 export function newChat() {
   saveCurrentConv();
+  flushProgressNote();   // Phase 5: summarize the session we're leaving (server-gated no-op for real students)
   S.currentId     = genId();
   S.messages      = [];
   S.exchangeCount = 0;
@@ -148,6 +149,7 @@ export async function openTutor(subjectId, course, teacher) {
   console.log('[openTutor] start:', { subjectId, course, teacher });
   clearSearch();
   saveCurrentConv();
+  flushProgressNote();   // Phase 5: summarize the prior session before switching classes
   const subjectName = SUBJECTS.find(s => s.id === subjectId)?.name || subjectId;
   S.currentId     = genId();
   S.messages      = [];

@@ -103,8 +103,10 @@ test('buildTutorSystem without a profile returns the generic tutor prompt', () =
   const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', null);
   assert.match(p, /You are tutoring a Menlo School student in Chemistry with Huntley\./);
   assert.match(p, /CRITICAL TEACHING PHILOSOPHY/);
-  // The teacher-notes placeholder only exists in the with-profile branch.
+  // The teacher-notes + progress-note placeholders only exist in the
+  // with-profile branch.
   assert.ok(!p.includes('<<LUMI_TEACHER_NOTES>>'));
+  assert.ok(!p.includes('<<LUMI_PROGRESS_NOTE>>'));
   // No persona sections without a profile.
   assert.ok(!p.includes('═══ HOW'));
 });
@@ -134,6 +136,18 @@ test('buildTutorSystem includes the <<LUMI_TEACHER_NOTES>> injection marker', ()
   // assembled prompt must carry it for that injection to land.
   const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile());
   assert.ok(p.includes('<<LUMI_TEACHER_NOTES>>'));
+});
+
+test('buildTutorSystem includes the <<LUMI_PROGRESS_NOTE>> marker in the dynamic tail', () => {
+  // Phase 5: the rolling progress note is spliced server-side at this marker.
+  // Per docs/PROMPT_CACHING_PLAN.md §3c it must sit immediately AFTER the
+  // teacher-notes marker (both in the future SEG2 dynamic tail) so a later
+  // caching split never invalidates the cached static prefix.
+  const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile());
+  assert.ok(p.includes('<<LUMI_PROGRESS_NOTE>>'));
+  assert.ok(p.indexOf('<<LUMI_PROGRESS_NOTE>>') > p.indexOf('<<LUMI_TEACHER_NOTES>>'));
+  // No dynamic student data may follow the markers except the fixed JSON footer.
+  assert.match(p.slice(p.indexOf('<<LUMI_PROGRESS_NOTE>>')), /After EVERY reply, append this JSON/);
 });
 
 test('buildTutorSystem shows placeholders when persona fields are missing', () => {
