@@ -153,6 +153,11 @@ async function generateTitle(convId, firstUserMsg) {
 function buildApiMessages(S) {
   const ws = S && S.tutorCtx && S.tutorCtx.workSamples;
   const tiers = ['progressing','proficient','exemplary'];
+  // D7-A: photo synthetic-exchange REQUIRES all three tiers to have loaded
+  // images. Text-only teachers intentionally get no image exchange — do not
+  // "fix" this to fire on partial photo coverage; the byte-identical
+  // zero-artifact case is the invariant. Text artifacts inject via
+  // <<LUMI_WORK_ARTIFACTS>> in the system prompt, not through this exchange.
   const ok = !!ws && tiers.every(t => ws[t] && Array.isArray(ws[t].images) && ws[t].images.length > 0);
   if (!ok) return S.messages;
 

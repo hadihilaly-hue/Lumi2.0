@@ -687,6 +687,13 @@ live with spoofed ids.
   it's false, ZERO bytes of work-samples wiring land in the prompt
   AND the synthetic exchange is skipped — the result is byte-identical
   to the pre-Q4 prompt + message array for that concern.
+- **D7-A: photo synthetic-exchange is all-or-nothing on photos, by design.**
+  `buildApiMessages` in `js/chat.js:153` fires the synthetic user/assistant
+  image exchange ONLY when every tier has ≥1 loaded photo. A teacher who
+  supplies text-only artifacts (no photos) gets NO image exchange —
+  intentional, not a bug. Text still injects server-side via
+  `<<LUMI_WORK_ARTIFACTS>>`. Do not relax this gate to fire on partial
+  photo coverage: the byte-identical zero-artifact fallback is the invariant.
 - **Synthetic exchange is NOT in S.messages.** `buildApiMessages(S)`
   builds it lazily inside fetchLumi's call to callAPI; S.messages
   itself is never mutated, so the chat UI stays clean and reloaded
