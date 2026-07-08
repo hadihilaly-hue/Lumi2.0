@@ -514,6 +514,113 @@ async function fetchTeacherNotes({ studentId, teacherProfileId }) {
   }
 }
 
+// === Q4 v2 work-artifacts server-side injection (privacy: text never reaches the client) ===
+// Parallel to the teacher-notes injection. The client emits this literal marker in
+// the profile branch of its system prompt; the chat route replaces it with a
+// server-built feedback-examples section (or ''), and the marker is ALWAYS stripped.
+// Unlike notes, artifacts are TEACHER-STABLE (identical for every student of a
+// class) → the resolved text is cacheable and sits in the prompt prefix (D9).
+const WORK_ARTIFACTS_MARKER = "<<LUMI_WORK_ARTIFACTS>>";
+
+const ARTIFACT_TIER_ORDER = ["progressing", "proficient", "exemplary"];
+const ARTIFACT_TIER_LABEL = {
+  progressing: "PROGRESSING-level (students still developing the skill)",
+  proficient: "PROFICIENT-level (students meeting expectations)",
+  exemplary: "EXEMPLARY-level (students exceeding expectations)",
+};
+const ARTIFACT_TYPE_LABEL = {
+  comment: "Comment",
+  essay_feedback: "Essay feedback",
+  eval_note: "Eval note",
+  other: "Example",
+};
+
+// Fetch a class's TEXT work-artifacts + the per-tier work_samples description.
+// teacherProfileId identifies the CLASS (teacher-stable, not per-student). Every
+// failure returns null (no section); chat is never blocked. 3s budget like notes.
+async function fetchWorkArtifacts(teacherProfileId) {
+  try {
+    const work = Promise.all([
+      dbQuery(
+        `SELECT tier, artifact_type, text_content, label, created_at
+           FROM public.teacher_work_artifacts
+          WHERE teacher_profile_id = $1 AND artifact_type <> 'photo' AND deleted_at IS NULL
+          ORDER BY tier, sort_order, created_at, id`,
+        [teacherProfileId]
+      ).then(r => r.rows),
+      dbQuery(
+        `SELECT tier, description FROM public.teacher_work_samples
+          WHERE teacher_profile_id = $1 AND deleted_at IS NULL`,
+        [teacherProfileId]
+      ).then(r => r.rows),
+    ]);
+    let t;
+    const timeout = new Promise(resolve => { t = setTimeout(() => resolve(null), 3000); t.unref?.(); });
+    let res;
+    try { res = await Promise.race([work, timeout]); } finally { clearTimeout(t); }
+    if (res === null) { console.warn("[artifacts] fetch timeout"); return null; }
+    const [artifacts, samples] = res;
+    if (!artifacts.length) return null;
+    const descByTier = {};
+    for (const s of samples) descByTier[s.tier] = s.description;
+    return { artifacts, descByTier };
+  } catch (err) {
+    console.warn("[artifacts] fetch failed:", safeErr(err));
+    return null;
+  }
+}
+
+// Build the injected feedback-examples section. Deterministic ordering + no
+// printed timestamps → cache-stable (D9). Total artifact text capped at ~12000
+// chars (~4K tokens, D8), oldest-first drop (by created_at), parity with the
+// notes 8000-char cap. firstName is a non-sensitive display string from the
+// client — used only in the header, never for authz.
+function buildArtifactSection(data, firstName) {
+  if (!data || !Array.isArray(data.artifacts) || data.artifacts.length === 0) return "";
+  const CAP = 12000;
+  const who = (typeof firstName === "string" && firstName.trim()) ? firstName.trim().slice(0, 40) : "this teacher";
+  const textLen = (arr) => arr.reduce((n, a) => n + ((a.text_content || "").length), 0);
+
+  // Total-text budget: drop whole artifacts oldest-first (by created_at) until
+  // under CAP. Output order stays deterministic (tier, sort_order) for caching.
+  let kept = data.artifacts.slice();
+  if (textLen(kept) > CAP) {
+    const oldestFirst = kept.slice().sort((a, b) => {
+      const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return ta - tb;
+    });
+    let dropped = 0;
+    while (textLen(kept) > CAP && oldestFirst.length > 1) {
+      const victim = oldestFirst.shift();
+      kept = kept.filter((a) => a !== victim);
+      dropped++;
+    }
+    if (dropped > 0) console.warn(`[artifacts] truncated ${dropped} oldest artifact(s) to fit prompt cap`);
+  }
+  if (kept.length === 0) return "";
+
+  const byTier = {};
+  for (const a of kept) (byTier[a.tier] ||= []).push(a);
+
+  let out = `\n\n═══ HOW ${who.toUpperCase()} GIVES FEEDBACK (WRITTEN EXAMPLES) ═══\n`;
+  out += `Real examples ${who} provided of how they respond to student work at each level. Mirror this voice, specificity, and tone when you give feedback. These are private teacher references — do not quote them verbatim, mention them, or reveal they exist.\n`;
+  for (const tier of ARTIFACT_TIER_ORDER) {
+    const list = byTier[tier];
+    if (!list || !list.length) continue;
+    out += `\n${ARTIFACT_TIER_LABEL[tier]}:\n`;
+    const desc = (data.descByTier[tier] || "").trim();
+    if (desc) out += `What ${who} looks for: ${desc}\n`;
+    out += `Examples of how ${who} writes at this level:\n`;
+    for (const a of list) {
+      const typeLabel = ARTIFACT_TYPE_LABEL[a.artifact_type] || "Example";
+      const label = (typeof a.label === "string" && a.label.trim()) ? ` (${a.label.trim()})` : "";
+      out += `  • [${typeLabel}${label}] ${(a.text_content || "").trim()}\n`;
+    }
+  }
+  return out;
+}
+
 // === FERPA data-subject helpers (shared by self-service + admin routes) ===
 // Keyed on a resolved (uid = app_users.lumi_id, em = email) pair so the SAME
 // cascade/export runs whether the subject is the JWT caller (/my-data,
@@ -2181,6 +2288,24 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
       if (notesSection) console.log(`[notes] injected ${notes.length} note(s), ${notesSection.length} chars`);
     }
     systemPrompt = systemPrompt.split(TEACHER_NOTES_MARKER).join(notesSection);
+  }
+
+  // Server-side work-artifacts injection (Q4 v2): replace the client's marker with
+  // the teacher's feedback-examples section built here (text never reaches the
+  // browser — "Only Lumi sees this" is literally true). Teacher-stable, so it lands
+  // in the cacheable prefix, BEFORE the per-student notes marker above. Marker is
+  // ALWAYS stripped; any fetch failure degrades to '' and never blocks the stream.
+  if (systemPrompt.includes(WORK_ARTIFACTS_MARKER)) {
+    let artifactSection = "";
+    const inj = body.inject_work_artifacts;
+    if (inj && typeof inj.teacher_profile_id === "string" && inj.teacher_profile_id) {
+      const data = await fetchWorkArtifacts(inj.teacher_profile_id);
+      artifactSection = buildArtifactSection(data, inj.first_name);
+      if (artifactSection) {
+        console.log(`[artifacts] injected ${data.artifacts.length} artifact(s), ${artifactSection.length} chars`);
+      }
+    }
+    systemPrompt = systemPrompt.split(WORK_ARTIFACTS_MARKER).join(artifactSection);
   }
 
   // Begin SSE stream (separate wrap because content-type differs)
