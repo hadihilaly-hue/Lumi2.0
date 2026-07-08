@@ -1843,6 +1843,114 @@ body.signin-page{
   font-size: 12px; color: var(--text-muted); margin-top: 2px;
 }
 
+/* ── Tonight's Study Plan (full surface, mirrors class view chrome) ──── */
+.study-plan-view {
+  height: 100vh; overflow-y: auto;
+  background: var(--bg); color: var(--text);
+  box-sizing: border-box;
+}
+.home-redesign-v1 .study-plan-view {
+  flex: 1; min-height: 0; height: auto; width: 100%;
+}
+.study-plan-shell {
+  max-width: 780px; margin: 0 auto;
+  padding: 40px 40px 80px;
+}
+.study-plan-header {
+  display: flex; align-items: flex-start; gap: 16px; margin-bottom: 32px;
+}
+.study-plan-back {
+  width: 36px; height: 36px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text); font-size: 18px; line-height: 1; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.study-plan-back:hover { border-color: var(--accent); background: var(--lumi-bg); }
+.study-plan-title { min-width: 0; }
+.study-plan-eyebrow {
+  font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--text-muted); font-weight: 600; margin-bottom: 8px;
+}
+.study-plan-h1 {
+  font-family: var(--font-serif); font-size: 28px; font-weight: 600;
+  line-height: 1.15; margin: 0; color: var(--text); letter-spacing: -.4px;
+}
+
+.study-plan-list { display: flex; flex-direction: column; gap: 10px; }
+.study-plan-bucket-label {
+  font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text-muted); font-weight: 600;
+  margin-top: 12px; padding-left: 4px;
+}
+.study-plan-bucket-label:first-child { margin-top: 0; }
+
+.study-plan-item {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 16px 18px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  transition: opacity .15s, background .15s;
+}
+.study-plan-item--done { opacity: .55; }
+.study-plan-item--done .study-plan-item-title {
+  text-decoration: line-through; color: var(--text-muted);
+}
+
+.study-plan-check {
+  width: 22px; height: 22px; flex-shrink: 0; margin-top: 2px;
+  border-radius: 6px; border: 1.5px solid var(--border);
+  background: var(--bg); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: border-color .15s, background .15s;
+  color: var(--bg);
+  padding: 0;
+}
+.study-plan-check:hover { border-color: var(--accent); }
+.study-plan-check--on {
+  background: var(--accent); border-color: var(--accent); color: var(--bg);
+}
+.study-plan-check--on svg { width: 14px; height: 14px; }
+
+.study-plan-item-body { flex: 1; min-width: 0; }
+.study-plan-item-title {
+  font-family: var(--font-serif); font-size: 16px; font-weight: 500;
+  color: var(--text); line-height: 1.35;
+}
+.study-plan-item-meta {
+  font-size: 12px; color: var(--text-muted); margin-top: 4px;
+}
+.study-plan-chips {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;
+}
+.study-plan-due, .study-plan-time {
+  display: inline-flex; align-items: center;
+  font-size: 11px; font-weight: 500;
+  padding: 3px 9px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--text);
+}
+.study-plan-due--urgent {
+  background: var(--warm-soft); color: var(--warm);
+}
+.study-plan-time { background: var(--lumi-bg); color: var(--text-muted); }
+
+.study-plan-empty {
+  padding: 40px 20px; text-align: center;
+  font-family: var(--font-serif); font-size: 17px; color: var(--text-muted);
+  border: 1px dashed var(--border); border-radius: 14px;
+  background: var(--surface);
+}
+
+.study-plan-hint {
+  margin-top: 18px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  background: transparent; border: 1px dashed var(--border); border-radius: 12px;
+  color: var(--text-muted); font-family: inherit; font-size: 12.5px;
+  cursor: pointer; text-align: left;
+  transition: border-color .15s, background .15s;
+}
+.study-plan-hint:hover { border-color: var(--accent); background: var(--lumi-bg); }
+
 /* Mobile: tighten the padding a touch. */
 @media (max-width: 640px) {
   .home-shell { padding: 20px 16px 40px; }
@@ -1853,6 +1961,8 @@ body.signin-page{
   .home-grid { grid-template-columns: 1fr; gap: 14px; }
   .home-due-strip { grid-template-columns: 1fr; }
   .class-view-header { padding: 14px 16px 10px; }
+  .study-plan-shell { padding: 20px 16px 40px; }
+  .study-plan-h1 { font-size: 24px; }
 }
 
 /* ── Class-view body split (Session 3, §4.1.2 rail) ────────────────────────

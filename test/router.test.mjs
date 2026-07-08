@@ -58,7 +58,7 @@ test('parseHash: garbage base64 segments fall back to home (no throw)', () => {
 
 test('parseHash: unknown hash falls back to home', () => {
   assert.deepEqual(parseHash('#totallyunknown'), { name: 'home' });
-  assert.deepEqual(parseHash('#general'), { name: 'home' });   // Session 4 route
+  assert.deepEqual(parseHash('#general'), { name: 'home' });   // deferred surface
 });
 
 // ── buildHash ────────────────────────────────────────────────────────────────
@@ -81,6 +81,21 @@ test('buildHash: class route serializes to class/<b64>/<b64>', () => {
 
 test('buildHash: unknown route name falls back to home', () => {
   assert.equal(buildHash({ name: 'somethingelse' }), 'home');
+});
+
+// ── plan route (Tonight's Study Plan, Session 4) ─────────────────────────────
+test('parseHash: #plan resolves to { name: "plan" }', () => {
+  assert.deepEqual(parseHash('#plan'), { name: 'plan' });
+  assert.deepEqual(parseHash('plan'), { name: 'plan' });
+});
+
+test('buildHash: plan route serializes to "plan"', () => {
+  assert.equal(buildHash({ name: 'plan' }), 'plan');
+});
+
+test('buildRouteUrl: preserves a plan URL AND the query string', () => {
+  const url = buildRouteUrl({ name: 'plan' }, '?mode=test');
+  assert.equal(url, '?mode=test#plan');
 });
 
 // ── buildRouteUrl — the ?mode=test-preservation contract ─────────────────────

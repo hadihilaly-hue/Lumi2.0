@@ -9,10 +9,12 @@
 //   Session 7: voice V-A restructure (mic + input at document scope).
 
 import { openTutor } from './conversation.js';
+import { closestCourseCandidates, resolveCanonicalCourse } from './courseNormalize.js';
 import { unmountHome } from './home.js';
 import { navHome } from './router.js';
 import { S } from './state.js';
 import { mountRail, unmountRail } from './classviewrail.js';
+import { getAvailableClassesSync } from './teachers.js';
 
 // Look up subjectId for a course name. Mirrors the same lookup the sidebar's
 // openTutor callers do — we import lookupSubjectForCourse from conversation.js
@@ -40,6 +42,11 @@ export function mountClass(route) {
 
   wireBackOnce();
   unmountHome();
+
+  // Session 4 (Study Plan): make sure the plan surface is hidden when the
+  // router hands us the class route directly (deep-link case).
+  const planView = document.getElementById('studyPlanView');
+  if (planView) planView.style.display = 'none';
 
   const header = document.getElementById('classViewHeader');
   const chat = document.getElementById('chatPanel');
@@ -69,19 +76,22 @@ export function mountClass(route) {
   if (ctx && ctx.course === course && ctx.teacher === teacher) return;
 
   const { subjectId } = lookupSubjectForCourse(course);
-  // Diagnostic: subjectId is null when a scheduled course name isn't in the
-  // static MENLO_CURRICULUM (js/data.js). Not a chat blocker — profile fetch
-  // and teacher-notes injection are keyed off (course, teacher email), not
-  // subjectId — but a silent mismatch here can mask a wider schedule/catalog
-  // drift (e.g. a course renamed in /available-classes but still saved under
-  // the old name in lumi_schedule). Under the old sidebar this was invisible
-  // because the sidebar walked MENLO_CURRICULUM to build its list; the
-  // redesign renders from S.schedule, so the mismatch surfaces here first.
+  // Diagnostic: subjectId is null when the scheduled course name can't be
+  // reconciled to a live /available-classes row AND isn't in the static
+  // MENLO_CURRICULUM. Not a chat blocker — profile fetch is keyed off
+  // (email, canonical course), which resolveCanonicalCourse handles
+  // independently — but a silent mismatch here can mask a wider
+  // schedule/catalog drift, so surface the closest DB candidates to make
+  // a rename/alias decision cheap.
   if (!subjectId) {
+    const rows = getAvailableClassesSync();
+    const resolved = rows ? resolveCanonicalCourse(course, rows) : null;
+    const candidates = rows ? closestCourseCandidates(course, rows, 3) : [];
     console.warn(
       `[classview] lookupSubjectForCourse returned null subjectId for course "${course}". ` +
-      `Chat will still open, but this course is not in the static MENLO_CURRICULUM — check that ` +
-      `S.schedule[].course matches the canonical name from /available-classes.`
+      `Chat will still open; the profile fetch may still succeed via alias resolution ` +
+      `(matchType=${resolved ? resolved.matchType : 'null'}). ` +
+      `Closest DB candidates: ${candidates.length ? candidates.map(c => `"${c}"`).join(', ') : '(none)'}.`
     );
   }
   openTutor(subjectId, course, teacher);
