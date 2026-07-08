@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:#1D2D4F">
+  <!-- Candidate 1 — Lightbulb / illumination -->
+  <!-- glass -->
+  <path d="M16 4 C21 4 25 7.8 25 12.6 C25 15.9 23.2 18.1 21.4 19.9 C20.6 20.7 20.2 21.6 20.1 22.6 L11.9 22.6 C11.8 21.6 11.4 20.7 10.6 19.9 C8.8 18.1 7 15.9 7 12.6 C7 7.8 11 4 16 4 Z"/>
+  <!-- screw base -->
+  <path d="M13 25.2 H19"/>
+  <path d="M14 27.6 H18"/>
+  <!-- glowing filament (warm spark) -->
+  <path d="M13 15 L16 10 L19 15" stroke="#C76D3D"/>
+</svg>

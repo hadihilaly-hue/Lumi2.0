@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lumi — Logo Candidates</title>
+<style>
+  :root{
+    --navy:#1D2D4F; --cream:#F2ECE0; --cream-card:#FAF6EE;
+    --peri:#C5D2E8; --dark:#1A1F2C; --dark-card:#232838;
+    --warm:#C76D3D;
+    --font:'Inter',-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--font);background:#e7e2d6;color:#1D2D4F;line-height:1.5;}
+  header{padding:40px 40px 8px;max-width:1100px;margin:0 auto;}
+  h1{font-size:26px;margin:0 0 6px;letter-spacing:-.5px;}
+  .sub{color:#6a6455;font-size:14px;max-width:760px;}
+  .note{background:#faf6ee;border:1px solid #dfd7c7;border-radius:12px;padding:14px 18px;margin:18px 0 4px;font-size:13.5px;color:#5a5445;}
+  .note b{color:#1D2D4F;}
+  main{max-width:1100px;margin:0 auto;padding:20px 40px 80px;}
+
+  .card{background:#faf6ee;border:1px solid #dfd7c7;border-radius:18px;padding:22px 24px;margin-bottom:22px;box-shadow:0 4px 20px rgba(0,0,0,.05);}
+  .card.current{border-color:#c76d3d;border-style:dashed;background:#fbf3ec;}
+  .card-head{display:flex;align-items:baseline;gap:12px;margin-bottom:4px;flex-wrap:wrap;}
+  .card-head h2{font-size:17px;margin:0;letter-spacing:-.3px;}
+  .tag{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#c76d3d;background:rgba(199,109,61,.12);padding:3px 8px;border-radius:6px;}
+  .rationale{font-size:13.5px;color:#6a6455;margin:0 0 18px;max-width:820px;}
+
+  .swatches{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .swatch{border-radius:14px;padding:20px;display:flex;align-items:center;gap:28px;flex-wrap:wrap;}
+  .swatch.light{background:var(--cream);color:var(--navy);border:1px solid #dfd7c7;}
+  .swatch.dark{background:var(--dark);color:var(--peri);border:1px solid #2f354a;}
+  .swatch-label{position:absolute;}
+  .sizes{display:flex;align-items:flex-end;gap:26px;}
+  .size{display:flex;flex-direction:column;align-items:center;gap:7px;}
+  .size .cap{font-size:10px;opacity:.55;letter-spacing:.3px;}
+  .mark svg{display:block;}
+  /* raw glyph rendering for the current ✦ logo */
+  .glyph{line-height:1;font-weight:400;}
+
+  .s16 svg,.s16 .glyph{width:16px;height:16px;font-size:16px;}
+  .s32 svg,.s32 .glyph{width:32px;height:32px;font-size:32px;}
+  .s128 svg,.s128 .glyph{width:128px;height:128px;font-size:128px;}
+  .swatch-title{width:100%;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;opacity:.5;margin-bottom:-4px;}
+
+  /* app-tile preview (how the mark sits in the current rounded accent tile) */
+  .tilerow{display:flex;gap:14px;align-items:center;margin-top:16px;flex-wrap:wrap;}
+  .tilecap{font-size:11px;color:#8a8474;text-transform:uppercase;letter-spacing:.6px;}
+  .tile{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;}
+  .tile.navy{background:var(--navy);color:#F2ECE0;}
+  .tile.peri{background:var(--peri);color:var(--navy);}
+  .tile svg{width:18px;height:18px;}
+  .tile .glyph{font-size:15px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Lumi — Logo Candidates</h1>
+  <p class="sub">Five directions to replace the current <b>✦</b> mark, which reads too close to Google Gemini's four-pointed sparkle. Every candidate is deliberately <b>not</b> a star or generic AI sparkle. Marks use the brand navy / periwinkle accent (<code>currentColor</code>) with the warm orange (<code>#C76D3D</code>) as a small "light" spark. Candidates-only — nothing in the live app has been changed.</p>
+  <div class="note"><b>How to read this:</b> each row shows the mark at <b>16px</b> (favicon), <b>32px</b> (header), and <b>128px</b> (large) on both light and dark backgrounds, plus a preview inside the current rounded accent tile. The current logo is shown first for comparison.</div>
+</header>
+
+<main>
+
+  <!-- CURRENT -->
+  <div class="card current">
+    <div class="card-head"><h2>Current logo</h2><span class="tag">replace</span></div>
+    <p class="rationale">The <b>✦</b> four-pointed star (U+2726) set in a navy tile — visually near-identical to Gemini's sparkle and to generic "AI" marks. Used in the sidebar, mobile header, onboarding, sign-in and scheduler. No favicon is currently defined.</p>
+    <div class="swatches">
+      <div class="swatch light">
+        <div class="swatch-title">Light</div>
+        <div class="sizes">
+          <div class="size s16"><span class="mark"><span class="glyph">✦</span></span><span class="cap">16px</span></div>
+          <div class="size s32"><span class="mark"><span class="glyph">✦</span></span><span class="cap">32px</span></div>
+          <div class="size s128"><span class="mark"><span class="glyph">✦</span></span><span class="cap">128px</span></div>
+        </div>
+      </div>
+      <div class="swatch dark">
+        <div class="swatch-title">Dark</div>
+        <div class="sizes">
+          <div class="size s16"><span class="mark"><span class="glyph">✦</span></span><span class="cap">16px</span></div>
+          <div class="size s32"><span class="mark"><span class="glyph">✦</span></span><span class="cap">32px</span></div>
+          <div class="size s128"><span class="mark"><span class="glyph">✦</span></span><span class="cap">128px</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="tilerow"><span class="tilecap">In app tile:</span>
+      <span class="tile navy"><span class="glyph">✦</span></span>
+      <span class="tile peri"><span class="glyph">✦</span></span>
+    </div>
+  </div>
+
+  <!-- CANDIDATE 1 -->
+  <div class="card">
+    <div class="card-head"><h2>Candidate 1 — Lightbulb</h2><span class="tag">illumination</span></div>
+    <p class="rationale"><b>The literal "Lumi = light."</b> A warm-filament bulb reads instantly as illumination and the "bright idea" of learning — an object, not an abstract spark, so it can never be mistaken for Gemini.</p>
+    <div class="swatches">
+      <div class="swatch light"><div class="swatch-title">Light</div><div class="sizes">
+        <div class="size s16"><span class="mark" data-cand="1"></span><span class="cap">16px</span></div>
+        <div class="size s32"><span class="mark" data-cand="1"></span><span class="cap">32px</span></div>
+        <div class="size s128"><span class="mark" data-cand="1"></span><span class="cap">128px</span></div>
+      </div></div>
+      <div class="swatch dark"><div class="swatch-title">Dark</div><div class="sizes">
+        <div class="size s16"><span class="mark" data-cand="1"></span><span class="cap">16px</span></div>
+        <div class="size s32"><span class="mark" data-cand="1"></span><span class="cap">32px</span></div>
+        <div class="size s128"><span class="mark" data-cand="1"></span><span class="cap">128px</span></div>
+      </div></div>
+    </div>
+    <div class="tilerow"><span class="tilecap">In app tile:</span>
+      <span class="tile navy" data-cand="1"></span><span class="tile peri" data-cand="1"></span></div>
+  </div>
+
+  <!-- CANDIDATE 2 -->
+  <div class="card">
+    <div class="card-head"><h2>Candidate 2 — "L" that emits light</h2><span class="tag">letterform</span></div>
+    <p class="rationale"><b>A monogram with a job.</b> A bold geometric "L" throwing off three short rays — ownable letterform that fuses the brand initial with illumination. Distinct silhouette, strong at favicon size.</p>
+    <div class="swatches">
+      <div class="swatch light"><div class="swatch-title">Light</div><div class="sizes">
+        <div class="size s16"><span class="mark" data-cand="2"></span><span class="cap">16px</span></div>
+        <div class="size s32"><span class="mark" data-cand="2"></span><span class="cap">32px</span></div>
+        <div class="size s128"><span class="mark" data-cand="2"></span><span class="cap">128px</span></div>
+      </div></div>
+      <div class="swatch dark"><div class="swatch-title">Dark</div><div class="sizes">
+        <div class="size s16"><span class="mark" data-cand="2"></span><span class="cap">16px</span></div>
+        <div class="size s32"><span class="mark" data-cand="2"></span><span class="cap">32px</span></div>
+        <div class="size s128"><span class="mark" data-cand="2"></span><span class="cap">128px</span></div>
+      </div></div>
+    </div>
+    <div class="tilerow"><span class="tilecap">In app tile:</span>
+      <span class="tile navy" data-cand="2"></span><span class="tile peri" data-cand="2"></span></div>
+  </div>
+
+  <!-- CANDIDATE 3 -->
+  <div class="card">
+    <div class="card-head"><h2>Candidate 3 — Dialogue + dawning insight</h2><span class="tag">tutoring / dialogue</span></div>
+    <p class="rationale"><b>The tutoring moment.</b> A speech bubble containing a rising sun — the "aha" that dawns in conversation. Ties the product's core loop (dialogue) to light, with no sparkle anywhere.</p>
+    <div class="swatches">
+      <div class="swatch light"><div class="swatch-title">Light</div><div class="sizes">
+        <div class="size s16"><span class="mark" data-cand="3"></span><span class="cap">16px</span></div>
+        <div class="size s32"><span class="mark" data-cand="3"></span><span class="cap">32px</span></div>
+        <div class="size s128"><span class="mark" data-cand="3"></span><span class="cap">128px</span></div>
+      </div></div>
+      <div class="swatch dark"><div class="swatch-title">Dark</div><div class="sizes">
+        <div class="size s16"><span class="mark" data-cand="3"></span><span class="cap">16px</span></div>
+        <div class="size s32"><span class="mark" data-cand="3"></span><span class="cap">32px</span></div>
+        <div class="size s128"><span class="mark" data-cand="3"></span><span class="cap">128px</span></div>
+      </div></div>
+    </div>
+    <div class="tilerow"><span class="tilecap">In app tile:</span>
+      <span class="tile navy" data-cand="3"></span><span class="tile peri" data-cand="3"></span></div>
+  </div>
+
+  <!-- CANDIDATE 4 -->
+  <div class="card">
+    <div class="card-head"><h2>Candidate 4 — Lantern</h2><span class="tag">guiding light</span></div>
+    <p class="rationale"><b>The guide who lights the way.</b> A lantern with a warm flame — a tutor metaphor (illumination + guidance) with a memorable, distinctive silhouette that owns a shape no AI brand uses.</p>
+    <div class="swatches">
+      <div class="swatch light"><div class="swatch-title">Light</div><div class="sizes">
+        <div class="size s16"><span class="mark" data-cand="4"></span><span class="cap">16px</span></div>
+        <div class="size s32"><span class="mark" data-cand="4"></span><span class="cap">32px</span></div>
+        <div class="size s128"><span class="mark" data-cand="4"></span><span class="cap">128px</span></div>
+      </div></div>
+      <div class="swatch dark"><div class="swatch-title">Dark</div><div class="sizes">
+        <div class="size s16"><span class="mark" data-cand="4"></span><span class="cap">16px</span></div>
+        <div class="size s32"><span class="mark" data-cand="4"></span><span class="cap">32px</span></div>
+        <div class="size s128"><span class="mark" data-cand="4"></span><span class="cap">128px</span></div>
+      </div></div>
+    </div>
+    <div class="tilerow"><span class="tilecap">In app tile:</span>
+      <span class="tile navy" data-cand="4"></span><span class="tile peri" data-cand="4"></span></div>
+  </div>
+
+  <!-- CANDIDATE 5 -->
+  <div class="card">
+    <div class="card-head"><h2>Candidate 5 — Radiant open book</h2><span class="tag">learning + light</span></div>
+    <p class="rationale"><b>Knowledge as light.</b> An open book with light rising from its pages — the most explicitly "education" direction, pairing the learning object with the Lumi light theme. Clearly no star.</p>
+    <div class="swatches">
+      <div class="swatch light"><div class="swatch-title">Light</div><div class="sizes">
+        <div class="size s16"><span class="mark" data-cand="5"></span><span class="cap">16px</span></div>
+        <div class="size s32"><span class="mark" data-cand="5"></span><span class="cap">32px</span></div>
+        <div class="size s128"><span class="mark" data-cand="5"></span><span class="cap">128px</span></div>
+      </div></div>
+      <div class="swatch dark"><div class="swatch-title">Dark</div><div class="sizes">
+        <div class="size s16"><span class="mark" data-cand="5"></span><span class="cap">16px</span></div>
+        <div class="size s32"><span class="mark" data-cand="5"></span><span class="cap">32px</span></div>
+        <div class="size s128"><span class="mark" data-cand="5"></span><span class="cap">128px</span></div>
+      </div></div>
+    </div>
+    <div class="tilerow"><span class="tilecap">In app tile:</span>
+      <span class="tile navy" data-cand="5"></span><span class="tile peri" data-cand="5"></span></div>
+  </div>
+
+</main>
+
+<script>
+// Inline SVG source for each candidate (fill/stroke = currentColor so each
+// container's CSS color recolors the mark per background). Kept identical to
+// the standalone candidate-N.svg files.
+const SVG = {
+  1:`<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4 C21 4 25 7.8 25 12.6 C25 15.9 23.2 18.1 21.4 19.9 C20.6 20.7 20.2 21.6 20.1 22.6 L11.9 22.6 C11.8 21.6 11.4 20.7 10.6 19.9 C8.8 18.1 7 15.9 7 12.6 C7 7.8 11 4 16 4 Z"/><path d="M13 25.2 H19"/><path d="M14 27.6 H18"/><path d="M13 15 L16 10 L19 15" stroke="#C76D3D"/></svg>`,
+  2:`<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 7 V23 H23"/><g stroke="#C76D3D" stroke-width="2.2"><path d="M11 6 L11 2.5"/><path d="M14.5 8 L17.2 5.3"/><path d="M8 8 L5.3 5.3"/></g></svg>`,
+  3:`<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5 H23 A4 4 0 0 1 27 9 V19 A4 4 0 0 1 23 23 H14 L9 27 V23 A4 4 0 0 1 5 19 V9 A4 4 0 0 1 9 5 Z"/><path d="M10 18 H22"/><path d="M12 18 A4 4 0 0 1 20 18"/><g stroke="#C76D3D" stroke-width="1.9"><path d="M16 10.5 V12.4"/><path d="M10.9 12.9 L12.1 14.1"/><path d="M21.1 12.9 L19.9 14.1"/></g></svg>`,
+  4:`<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 7 A3.5 3.5 0 0 1 19.5 7"/><path d="M11 9 H21"/><path d="M10.5 11 H21.5 A1 1 0 0 1 22.5 12 V24 A1.5 1.5 0 0 1 21 25.5 H11 A1.5 1.5 0 0 1 9.5 24 V12 A1 1 0 0 1 10.5 11 Z"/><path d="M12.5 25.5 V27.5"/><path d="M19.5 25.5 V27.5"/><path d="M16 15.5 C18 17.5 17.6 21 16 21.5 C14.4 21 14 17.5 16 15.5 Z" fill="#C76D3D" stroke="#C76D3D" stroke-width="1"/></svg>`,
+  5:`<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 15 C13.5 13 10 12.6 6.5 13 V25 C10 24.6 13.5 25 16 27 C18.5 25 22 24.6 25.5 25 V13 C22 12.6 18.5 13 16 15 Z"/><path d="M16 15 V27"/><g stroke="#C76D3D" stroke-width="1.9"><path d="M16 10 V6.5"/><path d="M11.5 10.5 L10 8"/><path d="M20.5 10.5 L22 8"/></g></svg>`
+};
+document.querySelectorAll('[data-cand]').forEach(el=>{ el.innerHTML = SVG[el.getAttribute('data-cand')]; });
+</script>
+</body>
+</html>

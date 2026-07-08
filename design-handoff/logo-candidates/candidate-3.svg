@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:#1D2D4F">
+  <!-- Candidate 3 — Dialogue bubble with a dawning "aha" (tutoring) -->
+  <!-- speech bubble with tail -->
+  <path d="M9 5 H23 A4 4 0 0 1 27 9 V19 A4 4 0 0 1 23 23 H14 L9 27 V23 A4 4 0 0 1 5 19 V9 A4 4 0 0 1 9 5 Z"/>
+  <!-- horizon -->
+  <path d="M10 18 H22"/>
+  <!-- rising sun -->
+  <path d="M12 18 A4 4 0 0 1 20 18"/>
+  <!-- sun rays (warm spark) -->
+  <g stroke="#C76D3D" stroke-width="1.9">
+    <path d="M16 10.5 V12.4"/>
+    <path d="M10.9 12.9 L12.1 14.1"/>
+    <path d="M21.1 12.9 L19.9 14.1"/>
+  </g>
+</svg>

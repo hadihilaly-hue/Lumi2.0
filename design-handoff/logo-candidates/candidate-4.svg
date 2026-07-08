@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:#1D2D4F">
+  <!-- Candidate 4 — Lantern / guiding light -->
+  <!-- handle -->
+  <path d="M12.5 7 A3.5 3.5 0 0 1 19.5 7"/>
+  <!-- top cap -->
+  <path d="M11 9 H21"/>
+  <!-- lantern body -->
+  <path d="M10.5 11 H21.5 A1 1 0 0 1 22.5 12 V24 A1.5 1.5 0 0 1 21 25.5 H11 A1.5 1.5 0 0 1 9.5 24 V12 A1 1 0 0 1 10.5 11 Z"/>
+  <!-- base -->
+  <path d="M12.5 25.5 V27.5"/>
+  <path d="M19.5 25.5 V27.5"/>
+  <!-- glowing flame (warm spark) -->
+  <path d="M16 15.5 C18 17.5 17.6 21 16 21.5 C14.4 21 14 17.5 16 15.5 Z" fill="#C76D3D" stroke="#C76D3D" stroke-width="1"/>
+</svg>
