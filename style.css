@@ -1457,11 +1457,22 @@ body.signin-page{
 
 /* Home view container. Hidden by default; router.mountHome() flips display. */
 .home-view {
+  /* Fill .main (display:flex) like its sibling .chat-panel does. Without
+     flex:1 the view shrink-wraps to its content, collapsing the grid to a
+     single left-hugging column with dead space on the right. */
+  flex: 1; min-width: 0;
   height: 100vh; overflow-y: auto;
   padding: 32px 40px 64px;
   background: var(--bg);
   color: var(--text);
   box-sizing: border-box;
+}
+
+/* Centered reading column shared by the header, banner, and grid so their
+   left edges align and the grid never spans an ultra-wide monitor. */
+.home-content {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .home-header {
@@ -1502,7 +1513,10 @@ body.signin-page{
 
 .home-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  /* auto-fill so the row packs as many ~280px columns as fit: 1 on mobile,
+     2 on a narrow desktop pane, 3–4 on a wide one. align-items:stretch
+     (grid default) gives every card in a row equal height. */
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 20px;
 }
 
