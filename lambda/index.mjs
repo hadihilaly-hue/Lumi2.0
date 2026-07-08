@@ -857,6 +857,17 @@ async function softDeleteUserRows(uid, em) {
     "UPDATE public.homework_tasks SET deleted_at = now() WHERE user_id = $1 AND deleted_at IS NULL", [uid]);
   await softDelete("class_enrollments",
     "UPDATE public.class_enrollments SET deleted_at = now() WHERE student_id = $1 AND deleted_at IS NULL", [uid]);
+  // Phase 5: Layer-3 rolling progress notes are student-owned (keyed student_id).
+  // Soft-delete alongside the rest so "delete student X" is ONE cascade (spec §4).
+  // Tolerate 42P01 (undefined_table) so account deletion still works if the
+  // Lambda is deployed before migration/persistence_v1.sql is applied.
+  try {
+    await softDelete("student_progress_notes",
+      "UPDATE public.student_progress_notes SET deleted_at = now() WHERE student_id = $1 AND deleted_at IS NULL", [uid]);
+  } catch (err) {
+    if (err.code === "42P01") counts.student_progress_notes = 0;
+    else throw err;
+  }
   await softDelete("app_users",
     "UPDATE public.app_users SET deleted_at = now() WHERE lumi_id = $1 AND deleted_at IS NULL", [uid]);
   return counts;
@@ -868,7 +879,7 @@ async function softDeleteUserRows(uid, em) {
 // soft-deleted so a guardian request during the 30-day grace still resolves.
 async function buildUserExport(uid, em) {
   const q = (sql, params) => dbQuery(sql, params).then(r => r.rows);
-  const [app_user, profile, teacher_profiles, work_samples, conversations, homework_tasks, enrollments, api_usage] = await Promise.all([
+  const [app_user, profile, teacher_profiles, work_samples, conversations, homework_tasks, enrollments, api_usage, progress_notes] = await Promise.all([
     q("SELECT lumi_id, email, created_at, updated_at, deleted_at FROM public.app_users WHERE lumi_id = $1", [uid]),
     q("SELECT * FROM public.profiles WHERE id = $1", [uid]),
     q("SELECT * FROM public.teacher_profiles WHERE teacher_email = $1", [em]),
@@ -882,12 +893,22 @@ async function buildUserExport(uid, em) {
               created_at, updated_at, deleted_at
          FROM public.class_enrollments WHERE student_id = $1`, [uid]),
     q("SELECT id, model, input_tokens, output_tokens, created_at FROM public.api_usage WHERE user_id = $1", [uid]),
+    // Phase 5 (spec §5): the Layer-3 progress note IS a record held ABOUT the
+    // student (machine-authored, about their own learning), so it belongs in
+    // the FERPA export — unlike teacher_notes (others' observations, excluded
+    // above). Under the discard default this note is the ENTIRE student-memory
+    // contribution to the export. Guarded so a pre-migration DB just yields [].
+    q(`SELECT id, teacher_profile_id, note_content, source_session_count,
+              token_count, model_version, created_at, updated_at, deleted_at
+         FROM public.student_progress_notes WHERE student_id = $1`, [uid])
+      .catch((err) => { if (err.code === "42P01") return []; throw err; }),
   ]);
   return {
     app_user, profile, teacher_profiles,
     teacher_work_samples: work_samples,
     conversations, homework_tasks,
     class_enrollments: enrollments, api_usage,
+    student_progress_notes: progress_notes,
   };
 }
 
