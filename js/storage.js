@@ -440,6 +440,30 @@ export function saveCurrentConv() {
   syncConvToSupabase(S.currentId);
 }
 
+// ─── PHASE 5: ROLLING PROGRESS-NOTE FLUSH (best-effort session-end trigger) ────
+// Summarize the just-ended class session into the student's rolling progress
+// note (spec §3 trigger 1). Fires when the student leaves a session — New chat,
+// opening another class, signing out. Fully server-gated + server-internal: a
+// real student's tenant has persistence OFF, so this is a no-op write for them,
+// and the note never comes back to the client. Skipped in test mode (a teacher
+// persona must never write student-shaped state — the TM-2 checklist). Uses the
+// server conversation id (sbId); if the session hasn't synced yet or has no
+// class/substance, it silently does nothing. Tab-close (sendBeacon) is a
+// documented follow-up — this covers the reliable in-app exit points.
+export function flushProgressNote() {
+  if (S.isTestMode) return;
+  const tpid = S.tutorCtx?.notesInjection?.teacher_profile_id;
+  if (!tpid || !S.currentId) return;
+  const conv = getConvs()[S.currentId];
+  const cid = conv?.sbId;
+  if (!cid) return;                                                  // not yet persisted server-side
+  if (!Array.isArray(conv.messages) || conv.messages.length < 2) return;  // nothing substantive to summarize
+  rdsFetch('progress-note/flush', {
+    method: 'POST',
+    body: { teacher_profile_id: tpid, conversation_id: cid },
+  }).catch(err => console.warn('[progress_note] flush:', err));
+}
+
 export function migrateOldData() {
   if (localStorage.getItem('lumi_convs')) return;
   const old = localStorage.getItem('lumi_data');

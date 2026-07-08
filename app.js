@@ -8,7 +8,7 @@ import { setSidebarUserSubtitle } from './js/prompts.js';
 import { checkSemesterBanner, initScheduleSetup } from './js/schedule.js';
 import { activeDropdownEl, closeOpenMenu, renderSearchDropdown, renderSidebar, showInlineConfirm } from './js/sidebar.js';
 import { $, S, SB, currentUser, fileInput, msgInput, sbSearch, sendBtn, setCurrentProjId, setCurrentUser, themeToggle } from './js/state.js';
-import { genId, getSchedule, loadConvsFromSupabase, loadProfileFromSupabase, loadTestModeSchedule, migrateOldData } from './js/storage.js';
+import { flushProgressNote, genId, getSchedule, loadConvsFromSupabase, loadProfileFromSupabase, loadTestModeSchedule, migrateOldData, saveCurrentConv } from './js/storage.js';
 import { isTeacherModeAllowed, preloadProfileStatuses, rdsFetch } from './js/teachers.js';
 import { autoGrow, closeSettings, closeSidebar, openSettings, openSidebar, showToast, updateSendBtn } from './js/ui.js';
 import { initVoice, wireVoiceListeners } from './js/voice.js';
@@ -207,6 +207,10 @@ function wireListeners() {
 
   $('signOutBtn').addEventListener('click', async () => {
     if (confirm('Sign out of Lumi?')) {
+      // Phase 5: persist + summarize the active session before we navigate away
+      // (best-effort, server-gated no-op for real students).
+      saveCurrentConv();
+      flushProgressNote();
       await doSignOut();
     }
   });
