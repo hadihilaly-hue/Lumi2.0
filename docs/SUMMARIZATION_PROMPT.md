@@ -2,11 +2,11 @@
 
 **Status:** Design + prompt deliverable for the `student_progress_notes` rolling-summary
 feature in `docs/PERSISTENCE_SPEC.md` (Option B). **Prompt is final; live validation is
-UNVERIFIED** (no AWS credentials in the authoring session — Bedrock unreachable). A runnable
-eval harness + an expected-behavior rubric are provided so the prompt can be validated in a
-credentialed environment before the summarizer route is built.
+VERIFIED — 2026-07-08** (direct Bedrock invoke of `global.anthropic.claude-sonnet-4-6`,
+4/4 eval cases pass — see §5). The runnable eval harness + expected-behavior rubric remain in
+place so the prompt can be re-validated in any credentialed environment.
 **Nothing here is wired into the app.** No `lambda/`, `app.js`, or `teacher.html` changes.
-**Last updated:** 2026-07-07.
+**Last updated:** 2026-07-08.
 
 This document contains **no real student or staff PII** — the test transcripts it validates
 against are the synthetic-persona smoke-run outputs in `test-transcripts/` (fabricated
@@ -144,14 +144,25 @@ truncating into invalid JSON.
 
 ## 5. Validation results
 
-**STATUS: UNVERIFIED (no live Bedrock run).** The authoring session had no AWS credentials
-(`~/.aws/credentials` absent; `sts:GetCallerIdentity` → `NoCredentialsError`), and Lumi's
-Bedrock access is IAM-signed with no HTTP fallback. The harness detects this and exits `2`
-with an `UNVERIFIED` message rather than fabricating results.
+**STATUS: VERIFIED — 2026-07-08 (4/4 cases pass).** Run via a direct Bedrock invoke of the
+forced model `global.anthropic.claude-sonnet-4-6` (`anthropic_version: bedrock-2023-05-31`)
+with `python3 synthetic_data/eval_summarizer.py`. All four cases passed every hard gate in §4
+plus their case-specific checks:
 
-Everything except the Bedrock call is exercised and passing: the model ID is read from
+| # | Case | Output tokens | Result |
+|---|---|---|---|
+| 1 | `first_session` (empty note) | 190 | PASS — valid 5-field JSON, under the 350 cap |
+| 2 | `second_session_merge` | 232 | PASS — rolling merge; prior topic retained, new topic added at the front |
+| 3 | `off_topic_exclusion` | 199 | PASS — math captured; personal / PII markers excluded |
+| 4 | `near_cap_compression` | 325 | PASS — under 350; oldest topic dropped, new topic present |
+
+All four are comfortably under the 350-token ceiling (max observed 325 tok). The harness writes
+per-case tokens, issues, warnings, and the emitted notes to
+`test-transcripts/_summarizer_eval.json` on each run.
+
+Everything around the Bedrock call is also exercised: the model ID is read from
 `lambda/index.mjs` (`global.anthropic.claude-sonnet-4-6`), all four cases build, the real
-Ferraro transcript parses, and every validator runs on hand notes.
+Ferraro transcript parses, and every validator runs.
 
 ### How to run it (credentialed environment)
 
@@ -201,11 +212,12 @@ stay under), and that a normal 1-topic note has ample headroom.
 
 ## 6. Known weaknesses / open risks
 
-1. **Live validation is UNVERIFIED.** Prompt behavior on the actual model is not yet observed.
-   The highest-risk unverified behaviors: (a) strict adherence to "JSON only, no prose" under
-   Sonnet vs. Haiku; (b) reliable compression rather than silent truncation at the boundary;
-   (c) complete personal-content exclusion under heavy off-topic disclosure. Run §5 before
-   shipping the route.
+1. **Live validation on Sonnet is now VERIFIED (2026-07-08); Haiku remains unverified.** The
+   four §5 cases pass on `global.anthropic.claude-sonnet-4-6`, covering (a) "JSON only, no prose"
+   adherence, (b) compression rather than silent truncation at the boundary, and (c) personal-
+   content exclusion under heavy off-topic disclosure — on Sonnet. Behavior on the spec-proposed
+   Haiku model is still unobserved; re-run §5 with `LUMI_SUMMARIZER_MODEL=<haiku-id>` before
+   shipping the route on Haiku.
 2. **Model mismatch spec↔code.** The spec wants Haiku; the Lambda has only Sonnet. A ≤350-token
    note that a route builder validates on Sonnet may need re-tuning if it later runs on Haiku
    (smaller model, weaker instruction-following on the JSON-only + exclusion rules). The eval
