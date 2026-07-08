@@ -1042,3 +1042,72 @@ Any failure → flip the flag off (`localStorage.removeItem('lumi_home_redesign_
 - Next-due line via `activeHwForClass(course)` (§2.2).
 - Priority sort v1 (urgent-HW → recency → alpha).
 - Red dot on cards with urgent HW (§9 D3-A).
+
+### 12.9 Session 1.5+2 (combined) — home-v2 mockup wired to real data
+
+Landed 2026-07-08 on `main` in four commits:
+
+| # | What |
+|---|---|
+| 1 | Visual shell from `design-handoff/home-v2/Lumi Home.dc.html` — 1140px centered layout, brand row + greeting + user chip, search input, empty due-soon section, empty quick-actions, mockup card DOM (accent bar + icon tile + serif course + teacher·block + snippet slot + chip row). Fixes the current single-column grid bug. `renderSidebar()`/`showWelcome()` path untouched → flag-off byte-identical. |
+| 2 | Real data wiring — where-you-left-off snippet (getConvs filtered by tutorCtx), next-due chip (getHwTasks filtered by className), priority sort v1 (urgent → recency → alpha; test-mode preserves D10-B), red urgent dot on ≤24h HW, D1-B "Say hi to [teacher]" empty-state chip. +16 tests. |
+| 3 | Greeting + due-soon strip + General Chat + accent-bar palette hash + client-side search. Tonight's Study Plan stubbed disabled (Hadi decision — Session 4 wire). Test mode suppresses HW-shaped content. +9 tests. |
+| 4 | *(this section)* — TM-1..TM-4 re-trace against the new markup. |
+
+**Locked "Hadi pick" decisions (2026-07-08):**
+- Subject grouping — FLATTEN to one grid.
+- Tonight's Study Plan quick action — STUB disabled ("Coming soon — Session 4").
+- Search bar — client-side filter only (no add-class shortcut).
+
+**TM-1 through TM-4 re-trace (against the code as of commit 4).**
+
+**TM-1 — `is_teacher_test=true` conversation flag.**
+- Server-side only. Session 1.5+2 touched neither the Lambda nor RDS.
+- Every conv write still routes through `js/storage.js:syncConvToSupabase` (unchanged).
+- **Intact.**
+
+**TM-2 — data isolation via `S.isTestMode` write-path guards.**
+- Session 1.5+2 added zero new write paths. `js/home.js` only reads state and
+  mutates DOM. `grep -n "sync|saveConvs|saveHwTasks|localStorage.setItem" js/home.js` returns nothing.
+- The General Chat card handler calls `openGeneralChat()` from `js/conversation.js` (an existing surface;
+  itself unchanged this session). It does call `saveCurrentConv()` on entry, but that already respects TM-2
+  through `getConvs`/`saveConvs`, which branch on `S.isTestMode` (`js/storage.js:400-408`).
+- `buildCards`, `renderGreeting`, `renderDueStrip`, `renderQuickActions` all short-circuit HW/conv reads
+  on `S.isTestMode`. Test-mode suppression is uniform: no strip, no count line, no quick-actions row.
+- **Intact.**
+
+**TM-3 — locked classes route to `teacher.html?course=…&from=test-mode`.**
+- `js/home.js:renderCard` — when `!card.ready` and `S.isTestMode`, navigates to
+  `teacher.html?course=<encoded>&from=test-mode` (unchanged since Session 1).
+- Student-mode locked card → `showToast('Your teacher is still setting up.')` (D12-A; unchanged).
+- Locked cards keep their opacity + `.home-card--locked` treatment on the new card DOM.
+- **Intact.**
+
+**TM-4 — persistent banner + exit button.**
+- `#testModeBanner` (in `#chatPanel`) — app.js still flips visible when `S.isTestMode`. Visible in class view and General Chat surfaces because both mount `#chatPanel`.
+- `#homeTestBanner` (in `#homeView`) — preserved in the new markup; flip-visible logic unchanged.
+- `#settingsExitTestBtn` — unchanged. Exit button lives in Settings drawer per §4.5.
+- General Chat entry from the quick-action card reuses `#classViewHeader` with the label "General Chat / Across your classes" — back button still routes home via `navHome()`. TM banner still visible in-chat.
+- **Intact.**
+
+**`?mode=test` deep-link.**
+- Zero new `pushState` calls in commits 1–4. Router unchanged. `buildRouteUrl` still preserves `location.search` verbatim.
+- The General Chat click handler does NOT `pushState`; it swaps DOM only. Back button (already wired to `navHome()` in Session 1) restores `?mode=test` naturally since the current URL still carries it.
+- **Intact.**
+
+**Suites (commit 4).**
+- Root: **133 tests pass** (+25 from Session 1: relativeTs, dueLabel, isUrgentDue, buildCards {ready/last-conv/next-hw/urgent}, sortCards {urgent/recency/alpha, test-mode D10-B}, timeOfDayGreeting, hashPalette, weekSummary, pickDueSoon).
+- Lambda: **158 tests pass** (unchanged — no Lambda changes).
+- All commits gated on both suites green.
+
+**Manual verification list (extends §12.7 for the new surface).**
+
+Toggle: `localStorage.setItem('lumi_home_redesign_v1','true'); location.reload();`
+
+- **B11.** Flag ON → header shows serif greeting title ("Good <tod>, <First>") + date + count line ("N things due this week across M classes"). Zero HW → count line drops silently.
+- **B12.** Due-soon strip renders up to 4 chips; urgent (≤24h) items get terracotta border + terracotta ink on the day badge. Empty → whole section hidden.
+- **B13.** Quick-actions row shows Tonight's Study Plan (navy, disabled with "Coming soon" tooltip) + General Chat (cream). General Chat click → chat surface, back button returns home.
+- **B14.** Search input filters cards live by course/teacher substring; blank query restores all.
+- **B15.** Accent-bar color is stable across renders for the same course (`hashPalette` determinism).
+- **B16.** `?mode=test` → strip / count line / quick-actions all suppressed; only the class grid renders (D10-B sort holds).
+- **B17.** Mobile ≤640px → header stacks; grid single-column; strip single-column; quick-actions stack.
