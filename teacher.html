@@ -1136,165 +1136,13 @@ async function rdsFetch(path, { method = 'GET', body } = {}) {
   return res.json();
 }
 
-// ─── CURRICULUM (same as app.js) ─────────────────────────────────────────────
-const MENLO_CURRICULUM = {
-  "English": {
-    "English 1": ["Rachel Blumenthal","Whitney Newton","Margaret Ramsey","Andrew Warren"],
-    "English 2": ["Jay Bush","Lily Chan","Rebecca Gertmenian","Meghann Schroers-Martin"],
-    "Junior English Seminar": ["Tom Garvey","Oscar King","Maura Sincoff","Lily Chan","Cara Plamondon"],
-    "Cafe Society": ["Bridgett Longust"],
-    "Contemporary World Literature": ["Lily Chan"],
-    "Creative Nonfiction Workshop (H)": ["Whitney Newton"],
-    "Dystopian Fiction & Film": ["Cara Plamondon"],
-    "East Asian Pop Culture": ["Oscar King"],
-    "Fairy Tales": ["Oscar King"],
-    "Global Mythologies": ["Jay Bush"],
-    "Humanities I: Renaissances": ["Rebecca Gertmenian"],
-    "Humanities II: Self-Portraits": ["Rebecca Gertmenian"],
-    "Literature & Science": ["Andrew Warren"],
-    "Literature in the Age of AI": ["Rachel Blumenthal"],
-    "Literature of the American Wilderness (H)": ["Whitney Newton"],
-    "Lyric & Lifeline": ["Margaret Ramsey"],
-    "Media & Cultural Studies (H)": ["Oscar King"],
-    "Medicine & Narrative": ["Rachel Blumenthal"],
-    "Modernist Poetry Workshop (H)": ["Jay Bush"],
-    "Novella Workshop (H)": ["Oscar King"],
-    "On Being": ["Margaret Ramsey"],
-    "Science Fiction & the Classics (H)": ["Tom Garvey"],
-    "Shakespeare Now (H)": ["Andrew Warren"],
-    "5 Months, 4 Books": ["Cara Plamondon"],
-    "Argumentation & Communication (H)": ["Maura Sincoff"]
-  },
-  "History & Social Sciences": {
-    "Modern World History": ["Sabahat Adil","Franco Cruz-Ochoa","Katharine Hanson","Nicholas Merlesena"],
-    "US History": ["Miles Bennett-Smith","Glenn Davis","Trevor McNeil","Nicholas Merlesena","Joseph Mitchell"],
-    "US History (H)": ["Glenn Davis","Trevor McNeil","Nicholas Merlesena","Joseph Mitchell"],
-    "Government & Politics (H)": ["Miles Bennett-Smith","Joseph Mitchell","Matthew Nelson"],
-    "Modern Europe (H)": ["Katharine Hanson"],
-    "Philosophy I": ["Jack Bowen"],
-    "Philosophy II": ["Jack Bowen"],
-    "Psychology I": ["Dylan Citrin Cummins","Joseph Mitchell"],
-    "Psychology II": ["Dylan Citrin Cummins","Joseph Mitchell"],
-    "Economic Theory": ["Charles Hanson"],
-    "American Economic History": ["Charles Hanson"],
-    "Environmental & Development Economics": ["Charles Hanson"],
-    "History of US Foreign Relations": ["Charles Hanson"],
-    "Ethnic Studies I": ["Glenn Davis"],
-    "Ethnic Studies II": ["Glenn Davis"],
-    "Gender Studies": ["Matthew Nelson"],
-    "Global Issues for Global Citizens": ["Matthew Nelson"],
-    "In Gods We Trust": ["Matthew Nelson"],
-    "Comparative Legal Systems": ["Trevor McNeil"],
-    "Current Affairs & Civil Discourse": ["John Schafer"],
-    "Pursuit of Happiness": ["Peter Brown"],
-    "Sultans, Shahs, and Sovereigns": ["Sabahat Adil"],
-    "Humanities I: Renaissances": ["Rebecca Gertmenian"],
-    "Humanities II: Self-Portraits": ["Rebecca Gertmenian"],
-    "IP Capstone Seminar (H)": ["Peter Brown","Matthew Nelson"],
-    "Democratic Backsliding (Test Course)": ["Test Teacher"]
-  },
-  "Math": {
-    "Integrated Geometry & Algebra": ["Christine Walters"],
-    "Analytic Geometry & Algebra": ["Rebecca Akers","Joe Rabison"],
-    "Analytic Geometry & Algebra (H)": ["Sujata Ganpule"],
-    "Algebra 2": ["Randall Joss","Nandhini Namasivayam"],
-    "Algebra 2 with Trig": ["Rebecca Akers","Jacqueline Arreaga","Richard Harris"],
-    "Algebra 2 with Trig (H)": ["Danielle Jensen"],
-    "Precalculus": ["Yu-Loung Chang","Christine Walters"],
-    "Introductory Calculus": ["Jacqueline Arreaga","Dave Lowell"],
-    "Introductory Calculus (H)": ["Reeve Garrett"],
-    "Calculus": ["Jude Loeffler"],
-    "Advanced Calculus I (H)": ["Sujata Ganpule","Dave Lowell"],
-    "Advanced Calculus II (H)": ["Yu-Loung Chang","Reeve Garrett"],
-    "Advanced Topics in Math (H)": ["Reeve Garrett"],
-    "Probability & Statistics (H)": ["Dennis Millstein"],
-    "Advanced Topics in Statistics (H)": ["Dennis Millstein"],
-    "Applied Statistics & Epidemiology": ["Dennis Millstein"],
-    "Intro to Applied Math & Data Science": ["Jude Loeffler"]
-  },
-  "Computer Science": {
-    "CS1: Intro to Computer Science": ["Douglas Kiang","Nandhini Namasivayam"],
-    "CS2: Data Structures & Algorithms (H)": ["Nandhini Namasivayam"],
-    "Advanced Topics in CS (H)": ["Zachary Blickensderfer"],
-    "Principles of Game Design": ["Douglas Kiang"]
-  },
-  "Science": {
-    "Living Systems: Biology in Balance": ["Chrissy Orangio"],
-    "Chemistry": ["Laura Huntley","Mary McKenna"],
-    "Chemistry (H)": ["Zachary Eagleton","Eugenia McCauley"],
-    "Conceptual Physics": ["Zachary Eagleton"],
-    "Physics 1": ["Nina Arnberg","Laura Huntley","Zane Moore","Matthew Varvir"],
-    "Physics 2 (H)": ["Matthew Varvir"],
-    "Molecular Mechanisms in Biology": ["Nina Arnberg","Todd Hardie","Cristina Weaver"],
-    "Advanced Biology (H)": ["Tatyana Buxton"],
-    "Advanced Chemistry (H)": ["Eugenia McCauley"],
-    "Advanced Physics (H)": ["James Dann"],
-    "Environmental Science": ["Chrissy Orangio"],
-    "Anatomy & Physiology": ["Todd Hardie"],
-    "Neuroscience": ["Cristina Weaver"],
-    "BioTech Research (H)": ["Tatyana Buxton"]
-  },
-  "Applied Science & Engineering": {
-    "Mechanical & Electrical Engineering": ["James Formato","Leo Jaimez"],
-    "Applied Science Research (H)": ["James Dann"],
-    "Sustainable Engineering": ["James Dann"],
-    "Design": ["James Formato"]
-  },
-  "World Language": {
-    "Spanish 1": ["Janet Tennyson"],
-    "Spanish 2": ["Janet Tennyson","Adolfo Guevara"],
-    "Heritage Spanish 3": ["Perla Amaral"],
-    "Heritage Spanish 4": ["Perla Amaral"],
-    "Advanced Spanish (H)": ["Patricia Frias"],
-    "French 1": ["Marie Sajja"],
-    "French 2": ["Corinne Chung"],
-    "French 3": ["Marie Sajja"],
-    "French 4": ["Corinne Chung"],
-    "Advanced French (H)": ["Corinne Chung"],
-    "Mandarin 1": ["Rita Yeh"],
-    "Mandarin 2": ["Rita Yeh"],
-    "Mandarin 3": ["Mingjung Chen"],
-    "Mandarin 4": ["Rita Yeh"],
-    "Mandarin 5": ["Mingjung Chen"],
-    "Advanced Mandarin (H)": ["Mingjung Chen"],
-    "Latin 1": ["Tom Garvey"],
-    "Latin 2": ["Jennifer Jordt"],
-    "Latin 3": ["Jennifer Jordt"],
-    "Latin 4": ["Jennifer Jordt"],
-    "Advanced Latin (H)": ["Tom Garvey","Jennifer Jordt"]
-  }
-};
-
-// Teacher directory — fetched from the Lambda at runtime (Compliance Phase 2b);
-// window.TEACHER_EMAIL_MAP is populated by loadTeacherDirectory() in the auth
-// IIFE below. Read it LIVE (not a parse-time snapshot), and build TEACHER_DATABASE
-// only AFTER that await resolves.
-function buildTeacherDatabase() {
-  const db = {};
-  for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
-    for (const [course, teachers] of Object.entries(courses)) {
-      for (const teacher of teachers) {
-        const email = window.TEACHER_EMAIL_MAP[teacher];
-        if (!email) continue;
-        if (!db[email]) db[email] = { name: teacher, classes: [] };
-        if (!db[email].classes.includes(course)) db[email].classes.push(course);
-      }
-    }
-  }
-  // Admin/dev account gets all classes
-  const allClasses = [];
-  for (const courses of Object.values(MENLO_CURRICULUM)) {
-    for (const course of Object.keys(courses)) {
-      if (!allClasses.includes(course)) allClasses.push(course);
-    }
-  }
-  // Compliance Phase 2b: admin identity comes from the runtime directory.
-  db[window.ADMIN_EMAIL] = { name: window.ADMIN_NAME, classes: allClasses };
-  return db;
-}
-// Built after loadTeacherDirectory() resolves in the auth IIFE (was an eager
-// parse-time call, which would now capture an empty directory).
-let TEACHER_DATABASE = {};
+// ─── TEACHER SCOPING (data-driven) ───────────────────────────────────────────
+// The hardcoded MENLO_CURRICULUM catalog and the TEACHER_DATABASE access map
+// (built from it × TEACHER_EMAIL_MAP) were removed. Portal access + a teacher's
+// class list are now derived from the DB in handleUser(): a caller is a teacher
+// iff they own >=1 teacher_profiles row (SIS-seeded stub or a prior onboarding —
+// the same standing isProvisionedTeacher trusts) or they are the admin. The
+// onboarding WRITE is independently gated server-side, so this client gate is UX.
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let tUser = null;
@@ -1352,23 +1200,35 @@ function showView(name) {
     wireSigninBtn();
     return;
   }
-  // Compliance Phase 2b: fetch the teacher directory before the gate reads it.
+  // Fetch the directory for the admin identity (window.ADMIN_EMAIL) the gate
+  // below consults. Fail-open — a missing directory only affects the admin
+  // bypass; a real teacher is still admitted by their teacher_profiles rows.
   try { await window.loadTeacherDirectory(); }
   catch (e) { console.error('[teacher] directory load failed:', e); }
-  TEACHER_DATABASE = buildTeacherDatabase();
   handleUser(session.user);
 })();
 
 async function handleUser(user) {
   tUser = user;
   const email = user.email.toLowerCase();
-  const found = TEACHER_DATABASE[email];
-  if (!found) {
+  // Data-driven teacher gate (replaces the hardcoded TEACHER_DATABASE). Load the
+  // caller's own teacher_profiles rows; a caller may enter the portal iff the
+  // SERVER already recognizes them as a teacher — they own >=1 such row (a
+  // SIS-seeded stub or a prior authorized onboarding, the same standing
+  // isProvisionedTeacher trusts) or they are the admin. A student can never mint
+  // a teacher_profiles row (POST /teacher-profile is gated by isProvisionedTeacher),
+  // so a student always falls through to unknownView. Their class list is exactly
+  // those rows' course_names — the classes they were provisioned to onboard.
+  await loadAllTeacherProfiles(); // populates tProfiles keyed by course_name
+  const classes = Object.keys(tProfiles);
+  const isAdmin = window.ADMIN_EMAIL && email === String(window.ADMIN_EMAIL).toLowerCase();
+  if (classes.length === 0 && !isAdmin) {
     document.getElementById('unknownEmail').textContent = email;
     showView('unknownView');
     return;
   }
-  tTeacher = found;
+  const meta = user.user_metadata || {};
+  tTeacher = { name: meta.full_name || meta.name || email.split('@')[0], classes };
   await bootHome();
 }
 
@@ -1428,7 +1288,7 @@ async function bootHome() {
     avatarEl.textContent = firstName[0].toUpperCase();
   }
 
-  await loadAllTeacherProfiles();
+  // tProfiles was already loaded by the gate in handleUser() — no re-fetch here.
   renderClassCards();
   await loadAllEnrollments();
   renderMyStudents();
@@ -1519,10 +1379,10 @@ function hasAllWorkSampleTiers(profileId) {
   });
 }
 
+// Subject is no longer derivable from a hardcoded curriculum. teacher_profiles
+// carries no subject column, so class cards show a neutral label. (Cosmetic only
+// — the card's course name and onboarding status are the meaningful fields.)
 function lookupSubjectForCourse(courseName) {
-  for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
-    if (courses[courseName]) return subject;
-  }
   return 'General';
 }
 
