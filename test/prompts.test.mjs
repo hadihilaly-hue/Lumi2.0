@@ -151,6 +151,8 @@ test('buildTutorSystem omits the <<LUMI_WORK_ARTIFACTS>> marker without a profil
   // The generic fallback branch carries no injection markers.
   const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', null);
   assert.ok(!p.includes('<<LUMI_WORK_ARTIFACTS>>'));
+});
+
 test('buildTutorSystem includes the <<LUMI_PROGRESS_NOTE>> marker in the dynamic tail', () => {
   // Phase 5: the rolling progress note is spliced server-side at this marker.
   // Per docs/PROMPT_CACHING_PLAN.md §3c it must sit immediately AFTER the

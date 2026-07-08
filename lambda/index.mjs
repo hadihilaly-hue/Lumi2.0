@@ -652,6 +652,8 @@ function buildArtifactSection(data, firstName) {
     }
   }
   return out;
+}
+
 // === Phase 5: rolling progress-note summarizer (Layer 3, server-internal) ===
 // The write + read sides of student_progress_notes. Like teacher notes, a
 // progress note NEVER reaches the browser: it exists only to be injected into
@@ -988,8 +990,7 @@ async function softDeleteUserRows(uid, em) {
 // soft-deleted so a guardian request during the 30-day grace still resolves.
 async function buildUserExport(uid, em) {
   const q = (sql, params) => dbQuery(sql, params).then(r => r.rows);
-  const [app_user, profile, teacher_profiles, work_samples, work_artifacts, conversations, homework_tasks, enrollments, api_usage] = await Promise.all([
-  const [app_user, profile, teacher_profiles, work_samples, conversations, homework_tasks, enrollments, api_usage, progress_notes] = await Promise.all([
+  const [app_user, profile, teacher_profiles, work_samples, work_artifacts, conversations, homework_tasks, enrollments, api_usage, progress_notes] = await Promise.all([
     q("SELECT lumi_id, email, created_at, updated_at, deleted_at FROM public.app_users WHERE lumi_id = $1", [uid]),
     q("SELECT * FROM public.profiles WHERE id = $1", [uid]),
     q("SELECT * FROM public.teacher_profiles WHERE teacher_email = $1", [em]),
@@ -2718,6 +2719,8 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
       }
     }
     systemPrompt = systemPrompt.split(WORK_ARTIFACTS_MARKER).join(artifactSection);
+  }
+
   // Server-side progress-note injection (Phase 5, Layer 3) — same posture as
   // teacher notes: the note NEVER reaches the browser; it exists only to be
   // spliced in here. Marker is ALWAYS stripped, even when the feature is off or
