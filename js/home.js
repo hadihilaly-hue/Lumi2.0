@@ -14,11 +14,18 @@
 //   • Test mode preserves D10-B (ready first, locked second, alpha within).
 //   • Empty-state D1-B "Say hi to [teacher]" chip when no conv + no HW.
 //
+// Session 1.5+2, commit 3/4:
+//   • Greeting header: name from localStorage.lumi_name, time-of-day, date,
+//     count line "N things due this week across M classes".
+//   • Due-soon strip: next ~4 items across all classes, urgent styling ≤24h.
+//   • Quick actions: Tonight's Study Plan (stubbed disabled) + General Chat.
+//   • Deterministic accent-bar palette hashed from course name.
+//   • Client-side search filter over the visible grid.
+//
 // Deferred to later sessions:
-//   Commit 3/4: due-soon strip + greeting + General Chat card + accent-bar
-//     palette hash.
 //   Session 6: tomorrow-schedule peek (D4-A hidden silently until then).
 
+import { openGeneralChat } from './conversation.js';
 import { navClass } from './router.js';
 import { S } from './state.js';
 import { getConvs, getSchedule } from './storage.js';
@@ -110,6 +117,71 @@ export function isUrgentDue(dueDateStr, now = new Date()) {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const days = Math.round((due - today) / (24 * 60 * 60 * 1000));
   return days <= 1;
+}
+
+/**
+ * "Good morning/afternoon/evening" based on local hour. Injectable for tests.
+ *   < 12  → morning
+ *   < 17  → afternoon
+ *   else  → evening
+ */
+export function timeOfDayGreeting(now = new Date()) {
+  const h = now.getHours();
+  if (h < 12) return 'morning';
+  if (h < 17) return 'afternoon';
+  return 'evening';
+}
+
+/**
+ * Deterministic 8-slot accent-bar palette seeded from the mockup's colors.
+ * Same course name → same color across every render, so students learn to
+ * recognize their classes by tile hue. `hashPalette` is pure.
+ */
+export const ACCENT_PALETTE = [
+  '#C76D3D', '#6B8A6B', '#4A7A7A', '#3D6AAB',
+  '#9A6B4A', '#B8893D', '#8A5A6B', '#7A8A4A',
+];
+export function hashPalette(course, palette = ACCENT_PALETTE) {
+  const s = String(course || '');
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  const idx = Math.abs(h) % palette.length;
+  return palette[idx];
+}
+
+/**
+ * "N things due this week across M classes". Returns { things, classes,
+ * sentence } — the sentence is null when there is no due HW to summarize,
+ * so the caller renders no subline.
+ */
+export function weekSummary(tasks, scheduleLen, now = new Date()) {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const cutoff = new Date(today);
+  cutoff.setDate(today.getDate() + 7);
+  const inWindow = tasks.filter(t => {
+    if (!t || t.isComplete || !t.dueDate) return false;
+    const d = new Date(t.dueDate + 'T00:00:00');
+    if (Number.isNaN(d.getTime())) return false;
+    return d >= today && d <= cutoff;
+  });
+  const things = inWindow.length;
+  const classes = scheduleLen | 0;
+  if (things === 0) return { things: 0, classes, sentence: null };
+  const noun = things === 1 ? 'thing' : 'things';
+  const cnoun = classes === 1 ? 'class' : 'classes';
+  const sentence = `You have <strong>${things} ${noun}</strong> due this week across ${classes} ${cnoun}.`;
+  return { things, classes, sentence };
+}
+
+/**
+ * Pick the next N (default 4) incomplete tasks with a real dueDate across
+ * all classes, ordered by dueDate asc. Each entry keeps the task and adds
+ * `isUrgent` for the ≤24h styling. `now` injectable for tests.
+ */
+export function pickDueSoon(tasks, n = 4, now = new Date()) {
+  const rows = tasks.filter(t => t && !t.isComplete && t.dueDate);
+  rows.sort((a, b) => a.dueDate < b.dueDate ? -1 : 1);
+  return rows.slice(0, n).map(t => ({ task: t, isUrgent: isUrgentDue(t.dueDate, now) }));
 }
 
 // ── Data collection ─────────────────────────────────────────────────────────
@@ -294,6 +366,7 @@ function renderCard(card) {
 
   const body = el('div', { class: 'home-card-body' }, [head, snippet, chipRow]);
   const accent = el('div', { class: 'home-card-accent' });
+  accent.style.background = hashPalette(card.course);
 
   const cls = ['home-card'];
   if (!card.ready) cls.push('home-card--locked');
@@ -327,6 +400,178 @@ function renderCard(card) {
   return node;
 }
 
+// ── Greeting header ─────────────────────────────────────────────────────────
+
+/**
+ * Populate the greeting title + subline from real data. The subline reads
+ * "Wednesday, July 8 · You have N things due this week across M classes."
+ * Count line is omitted when there are no due tasks.
+ */
+function renderGreeting() {
+  const titleEl = document.getElementById('homeGreetingTitle');
+  const subEl = document.getElementById('homeGreetingSub');
+  if (!titleEl || !subEl) return;
+
+  const rawName = (typeof localStorage !== 'undefined'
+    ? (localStorage.getItem('lumi_name') || '')
+    : '').trim();
+  const first = rawName ? rawName.split(/\s+/)[0] : '';
+  const now = new Date();
+  const tod = timeOfDayGreeting(now);
+  titleEl.textContent = first ? `Good ${tod}, ${first}` : `Good ${tod}`;
+
+  const date = now.toLocaleDateString(undefined, {
+    weekday: 'long', month: 'long', day: 'numeric',
+  });
+  // In test mode we deliberately suppress the "N things due" line — the
+  // teacher isn't actually enrolled, so any HW rows are noise (§4.5).
+  const tasks = S.isTestMode ? [] : getHwTasks();
+  const scheduleLen = S.isTestMode
+    ? (S.testSchedule || []).length
+    : getSchedule().length;
+  const { sentence } = weekSummary(tasks, scheduleLen, now);
+  subEl.innerHTML = sentence
+    ? `${escHtml(date)} · ${sentence}`
+    : escHtml(date);
+}
+
+// ── Due-soon strip ──────────────────────────────────────────────────────────
+
+function renderDueStrip() {
+  const section = document.getElementById('homeDueSection');
+  const strip = document.getElementById('homeDueStrip');
+  if (!section || !strip) return;
+
+  // Test mode suppresses the strip (§4.5 — HW rows are noise for a teacher).
+  if (S.isTestMode) { section.style.display = 'none'; return; }
+
+  const now = new Date();
+  const items = pickDueSoon(getHwTasks(), 4, now);
+  strip.innerHTML = '';
+  if (items.length === 0) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  for (const { task, isUrgent } of items) {
+    const dueDate = new Date(task.dueDate + 'T00:00:00');
+    const dayAbbrev = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dueDate.getDay()];
+    const dayNum = String(dueDate.getDate()).padStart(2, '0');
+    const badge = el('div', { class: 'home-due-badge' }, [
+      el('span', { class: 'home-due-badge-day', text: dayAbbrev }),
+      el('span', { class: 'home-due-badge-num', text: dayNum }),
+    ]);
+    const when = dueLabel(task.dueDate, now);
+    const whenTitle = when ? when[0].toUpperCase() + when.slice(1) : '';
+    const metaParts = [whenTitle, task.className || ''].filter(Boolean);
+    const text = el('div', { class: 'home-due-text' }, [
+      el('div', { class: 'home-due-title', text: task.title || 'Task' }),
+      el('div', { class: 'home-due-meta', text: metaParts.join(' · ') }),
+    ]);
+    const card = el('button', {
+      class: 'home-due-card' + (isUrgent ? ' home-due-card--urgent' : ''),
+      type: 'button',
+      'data-hw-id': task.id || '',
+    }, [badge, text]);
+    // Tap → navigate to the class view for that task; the HW panel wiring
+    // (scroll-to-task) is Session 3 territory (§4.8).
+    card.addEventListener('click', () => {
+      const schedule = getSchedule();
+      const match = schedule.find(s => s.course === task.className);
+      if (match) navClass(match.course, match.teacher);
+      else showToast(`No matching class on your schedule for "${task.className || 'this task'}".`);
+    });
+    strip.appendChild(card);
+  }
+}
+
+// ── Quick actions ───────────────────────────────────────────────────────────
+
+// Small SVG icons (calendar / speech-bubble) inlined so we don't depend on an
+// icon library. Same shapes as the mockup.
+const ICON_CAL = '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+const ICON_CHAT = '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+
+function renderQuickActions() {
+  const row = document.getElementById('homeQuickActions');
+  if (!row) return;
+  row.innerHTML = '';
+  // Suppress in test mode — the strip is scoped to real student surfaces.
+  if (S.isTestMode) { row.style.display = 'none'; return; }
+  row.style.display = '';
+
+  // Tonight's Study Plan — Hadi's decision: STUB disabled (Session 4 wire).
+  const plan = el('button', {
+    class: 'home-qa home-qa--navy',
+    type: 'button',
+    disabled: 'disabled',
+    'aria-disabled': 'true',
+    title: 'Coming soon',
+  }, [
+    el('div', { class: 'home-qa-icon', html: ICON_CAL }),
+    el('div', { class: 'home-qa-body' }, [
+      el('div', { class: 'home-qa-title', text: "Tonight's Study Plan" }),
+      el('div', { class: 'home-qa-sub', text: 'Coming soon — Session 4' }),
+    ]),
+  ]);
+  row.appendChild(plan);
+
+  // General Chat — wire to the existing openGeneralChat() in conversation.js.
+  // Small in-flight stopgap: reuse #classViewHeader with "General Chat" label
+  // so the back button is still visible. Proper #general router route lands
+  // in Session 4 (§4.1.3).
+  const chat = el('button', {
+    class: 'home-qa home-qa--cream',
+    type: 'button',
+  }, [
+    el('div', { class: 'home-qa-icon', html: ICON_CHAT }),
+    el('div', { class: 'home-qa-body' }, [
+      el('div', { class: 'home-qa-title', text: 'General Chat' }),
+      el('div', { class: 'home-qa-sub', text: 'Chat with Lumi across your classes.' }),
+    ]),
+  ]);
+  chat.addEventListener('click', () => {
+    const home = document.getElementById('homeView');
+    const panel = document.getElementById('chatPanel');
+    const header = document.getElementById('classViewHeader');
+    const courseEl = document.getElementById('classViewCourse');
+    const teacherEl = document.getElementById('classViewTeacher');
+    if (home) home.style.display = 'none';
+    if (courseEl) courseEl.textContent = 'General Chat';
+    if (teacherEl) teacherEl.textContent = 'Across your classes';
+    if (header) header.style.display = '';
+    if (panel) panel.style.display = '';
+    openGeneralChat();
+  });
+  row.appendChild(chat);
+}
+
+// ── Search filter ───────────────────────────────────────────────────────────
+
+let _searchWired = false;
+function wireSearchOnce() {
+  if (_searchWired) return;
+  const input = document.getElementById('homeSearch');
+  if (!input) return;
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    const grid = document.getElementById('homeGrid');
+    if (!grid) return;
+    const cards = grid.querySelectorAll('.home-card');
+    for (const c of cards) {
+      const course = String(c.getAttribute('data-course') || '').toLowerCase();
+      const teacher = String(c.getAttribute('data-teacher') || '').toLowerCase();
+      const match = !q || course.includes(q) || teacher.includes(q);
+      c.style.display = match ? '' : 'none';
+    }
+  });
+  _searchWired = true;
+}
+
+// ── HTML escape ─────────────────────────────────────────────────────────────
+// Tiny helper for the greeting subline (we set .innerHTML so <strong> renders).
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // ── Screen mount ────────────────────────────────────────────────────────────
 
 /** (Re)render the grid inside #homeGrid. */
@@ -354,7 +599,11 @@ export function mountHome() {
   if (home) home.style.display = '';
   if (chat) chat.style.display = 'none';
   if (header) header.style.display = 'none';
+  renderGreeting();
+  renderDueStrip();
+  renderQuickActions();
   renderHome();
+  wireSearchOnce();
 }
 
 /** Hide the home view. The router calls this before mounting a class view. */

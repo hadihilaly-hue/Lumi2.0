@@ -10,6 +10,7 @@ import { S } from '../js/state.js';
 import { reset, seedLocalStorage } from './harness.mjs';
 import {
   buildCards, sortCards, relativeTs, dueLabel, isUrgentDue,
+  timeOfDayGreeting, hashPalette, ACCENT_PALETTE, weekSummary, pickDueSoon,
 } from '../js/home.js';
 
 // Fixed "today" for date-math tests. Mid-week so weekday-name output
@@ -203,4 +204,96 @@ test('buildCards: test mode ignores HW rows (spec §4.2 test-mode override)', ()
   const cards = buildCards(NOW);
   assert.equal(cards[0].nextHw, null);
   assert.equal(cards[0].hasUrgentHw, false);
+});
+
+// ── timeOfDayGreeting ────────────────────────────────────────────────────────
+test('timeOfDayGreeting: morning / afternoon / evening buckets', () => {
+  const at = (h) => new Date(2026, 6, 8, h, 0, 0);
+  assert.equal(timeOfDayGreeting(at(6)), 'morning');
+  assert.equal(timeOfDayGreeting(at(11)), 'morning');
+  assert.equal(timeOfDayGreeting(at(12)), 'afternoon');
+  assert.equal(timeOfDayGreeting(at(16)), 'afternoon');
+  assert.equal(timeOfDayGreeting(at(17)), 'evening');
+  assert.equal(timeOfDayGreeting(at(23)), 'evening');
+});
+
+// ── hashPalette ──────────────────────────────────────────────────────────────
+test('hashPalette: deterministic for the same course', () => {
+  assert.equal(hashPalette('Algebra II'), hashPalette('Algebra II'));
+  assert.equal(hashPalette('Biology'), hashPalette('Biology'));
+});
+
+test('hashPalette: distributes across the 8-slot palette', () => {
+  const seen = new Set(
+    ['Algebra II', 'Biology', 'English 10', 'US History', 'Spanish II',
+     'Music Theory', 'Intro to Computer Science', 'Physical Education 9']
+      .map(c => hashPalette(c))
+  );
+  // Not required to hit all 8, but the test data should hit ≥ 4 distinct hues
+  // — otherwise the "students recognize their classes by tile hue" goal fails.
+  assert.ok(seen.size >= 4, `expected ≥4 distinct palette hits, got ${seen.size}`);
+  for (const color of seen) {
+    assert.ok(ACCENT_PALETTE.includes(color), `unexpected color ${color}`);
+  }
+});
+
+test('hashPalette: empty / whitespace course still returns a palette entry', () => {
+  assert.ok(ACCENT_PALETTE.includes(hashPalette('')));
+  assert.ok(ACCENT_PALETTE.includes(hashPalette('   ')));
+});
+
+// ── weekSummary ──────────────────────────────────────────────────────────────
+test('weekSummary: counts incomplete tasks in the next 7 days', () => {
+  const tasks = [
+    { id: 'a', dueDate: iso(0), isComplete: false },
+    { id: 'b', dueDate: iso(3), isComplete: false },
+    { id: 'c', dueDate: iso(6), isComplete: false },
+    { id: 'd', dueDate: iso(8), isComplete: false },  // out of window
+    { id: 'e', dueDate: iso(1), isComplete: true },   // completed
+    { id: 'f', dueDate: iso(-1), isComplete: false }, // overdue
+    { id: 'g', dueDate: '',    isComplete: false },   // no date
+  ];
+  const s = weekSummary(tasks, 8, NOW);
+  assert.equal(s.things, 3);
+  assert.equal(s.classes, 8);
+  assert.match(s.sentence, /3 things/);
+  assert.match(s.sentence, /8 classes/);
+});
+
+test('weekSummary: singular vs plural nouns', () => {
+  const single = weekSummary(
+    [{ id: 'a', dueDate: iso(2), isComplete: false }], 1, NOW
+  );
+  assert.match(single.sentence, /1 thing\b/);
+  assert.match(single.sentence, /1 class\b/);
+});
+
+test('weekSummary: zero tasks → null sentence (caller drops the line)', () => {
+  const s = weekSummary([], 3, NOW);
+  assert.equal(s.things, 0);
+  assert.equal(s.sentence, null);
+});
+
+// ── pickDueSoon ──────────────────────────────────────────────────────────────
+test('pickDueSoon: sorted ascending by dueDate, sliced to N, urgent flagged', () => {
+  const tasks = [
+    { id: 'a', title: 'A', dueDate: iso(5), isComplete: false, className: 'X' },
+    { id: 'b', title: 'B', dueDate: iso(1), isComplete: false, className: 'Y' },
+    { id: 'c', title: 'C', dueDate: iso(0), isComplete: false, className: 'Z' },
+    { id: 'd', title: 'D', dueDate: iso(3), isComplete: false, className: 'W' },
+    { id: 'e', title: 'E', dueDate: iso(10), isComplete: false, className: 'V' },
+    { id: 'f', title: 'F', dueDate: iso(0), isComplete: true,  className: 'U' }, // done — skipped
+    { id: 'g', title: 'G', dueDate: '',    isComplete: false, className: 'T' }, // no date — skipped
+  ];
+  const picks = pickDueSoon(tasks, 4, NOW);
+  assert.equal(picks.length, 4);
+  assert.deepEqual(picks.map(p => p.task.id), ['c', 'b', 'd', 'a']);
+  assert.equal(picks[0].isUrgent, true);   // today
+  assert.equal(picks[1].isUrgent, true);   // tomorrow
+  assert.equal(picks[2].isUrgent, false);  // +3d
+  assert.equal(picks[3].isUrgent, false);  // +5d
+});
+
+test('pickDueSoon: empty input returns empty array (no throw)', () => {
+  assert.deepEqual(pickDueSoon([], 4, NOW), []);
 });
