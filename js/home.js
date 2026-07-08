@@ -1,17 +1,17 @@
-// Student home grid (Session 1 slice per docs/STUDENT_HOME_REDESIGN.md §4.1.1
-// and §4.8). Renders one card per enrolled class; tapping a ready card
-// routes to that class's view.
+// Student home grid (docs/STUDENT_HOME_REDESIGN.md §4.1.1). Renders one card
+// per enrolled class; tapping a ready card routes to that class's view.
 //
-// Deferred to later sessions (do not add here — the spec's session boundaries
-// exist so each PR reviews cleanly):
-//   Session 2: "Where you left off" line, "next due" line, priority sort,
-//              red dot on urgent-HW cards.
-//   Session 4: Planner card, General Chat card, due-soon strip.
+// Layout translates design-handoff/home-v2/Lumi Home.dc.html — the mockup is
+// a static rendering target; its {{ }} placeholders, support.js runtime, and
+// hardcoded persona strings are never copied.
+//
+// Deferred to later sessions:
 //   Session 6: tomorrow-schedule peek (D4-A hidden silently until then).
 //
-// Session 1 sort:
+// Session 1 sort (this file, current):
 //   - Student mode: alphabetical by course name.
 //   - Test mode (D10-B): ready first, then locked, alphabetical within each.
+// Session 2 adds urgent-HW→recency priority; test-mode override preserved.
 
 import { navClass } from './router.js';
 import { S } from './state.js';
@@ -86,18 +86,52 @@ export function sortCards(cards, isTestMode) {
 
 // ── Card rendering ──────────────────────────────────────────────────────────
 
+// Course-name → 1-char glyph for the icon tile. Falls back to the first letter
+// of the course. Deterministic and pure so tests / snapshots are stable.
+function courseGlyph(course) {
+  const c = String(course || '').trim();
+  if (!c) return '·';
+  const first = c[0].toUpperCase();
+  return first;
+}
+
 function renderCard(card) {
+  const head = el('div', { class: 'home-card-head' }, [
+    el('div', { class: 'home-card-icon', text: courseGlyph(card.course) }),
+    el('div', { class: 'home-card-titles' }, [
+      el('div', { class: 'home-card-course', text: card.course }),
+      el('div', {
+        class: 'home-card-meta',
+        text: [displayTeacher(card.teacher), card.block ? 'Block ' + card.block : '']
+          .filter(Boolean).join(' · '),
+      }),
+    ]),
+    // Red urgent dot lives in the head row (top-right); Session 2 fills it in.
+  ]);
+
+  // Snippet slot ("where you left off") — Session 2 populates.
+  const snippet = el('div', { class: 'home-card-snippet' }, [
+    el('span', { class: 'home-card-snippet-bullet' }),
+    el('span', { class: 'home-card-snippet-text', text: '' }),
+  ]);
+  snippet.style.display = 'none';
+
+  // Chip slot (due chip or "setting up" lock label) — Session 2 wires the
+  // due chip; commit 1 only shows the locked label.
+  const chipRow = el('div', { class: 'home-card-chip-row' });
+  if (!card.ready) {
+    chipRow.appendChild(el('span', { class: 'home-card-lock', text: 'Setting up' }));
+  }
+
+  const body = el('div', { class: 'home-card-body' }, [head, snippet, chipRow]);
+  const accent = el('div', { class: 'home-card-accent' });
+
   const node = el('button', {
     class: 'home-card' + (card.ready ? '' : ' home-card--locked'),
     'data-course': card.course,
     'data-teacher': card.teacher,
     type: 'button',
-  }, [
-    el('div', { class: 'home-card-course', text: card.course }),
-    el('div', { class: 'home-card-teacher', text: displayTeacher(card.teacher) }),
-    card.block ? el('div', { class: 'home-card-block', text: 'Block ' + card.block }) : null,
-    card.ready ? null : el('div', { class: 'home-card-lock', text: 'Setting up' }),
-  ]);
+  }, [accent, body]);
 
   node.addEventListener('click', () => {
     if (card.ready) {

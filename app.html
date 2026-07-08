@@ -248,21 +248,57 @@
 
     <!-- ─── STUDENT HOME (redesign v1, flag-gated) ────────
          Hidden by default; router mounts it when
-         S.homeRedesign is true. Sibling to #chatPanel. -->
+         S.homeRedesign is true. Sibling to #chatPanel.
+         Layout mirrors design-handoff/home-v2/Lumi Home.dc.html — the mockup
+         is a static rendering target; its {{ }} placeholders, support.js
+         runtime, and hardcoded content are never copied. -->
     <div class="home-view" id="homeView" style="display:none">
-      <header class="home-header">
-        <div class="home-logo-name">Lumi</div>
-        <button class="home-user-chip" id="homeUserChip" type="button" title="Settings">
-          <span class="home-user-chip-avatar" id="homeUserAvatar"></span>
-          <span class="home-user-chip-name" id="homeUserName">Menu</span>
-        </button>
-      </header>
-      <!-- TM-4: test-mode banner (mirrors #testModeBanner in #chatPanel so the
-           label is visible on both surfaces). -->
-      <div class="home-test-banner" id="homeTestBanner" style="display:none">
-        TEST MODE — you're chatting with your own AI persona.
+      <div class="home-shell">
+
+        <!-- Header: brand + greeting + user chip (Settings entry) -->
+        <header class="home-header">
+          <div class="home-greeting">
+            <div class="home-brand">
+              <div class="home-brand-mark" aria-hidden="true"><div class="home-brand-dot"></div></div>
+              <span class="home-brand-name">Lumi</span>
+              <span class="home-brand-school">Menlo School</span>
+            </div>
+            <h1 class="home-greeting-title" id="homeGreetingTitle">Welcome back</h1>
+            <p class="home-greeting-sub" id="homeGreetingSub"></p>
+          </div>
+          <button class="home-user-chip" id="homeUserChip" type="button" title="Settings">
+            <span class="home-user-chip-avatar" id="homeUserAvatar"></span>
+            <span class="home-user-chip-name" id="homeUserName">Menu</span>
+          </button>
+        </header>
+
+        <!-- TM-4: test-mode banner (mirrors #testModeBanner in #chatPanel so
+             the label is visible on both surfaces). -->
+        <div class="home-test-banner" id="homeTestBanner" style="display:none">
+          TEST MODE — you're chatting with your own AI persona.
+        </div>
+
+        <!-- Search (client-side filter over the visible class grid) -->
+        <div class="home-search">
+          <svg class="home-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input class="home-search-input" id="homeSearch" type="text" placeholder="Search your classes or teachers…" autocomplete="off">
+        </div>
+
+        <!-- Due-soon strip (populated by home.js; hidden when empty / test mode) -->
+        <section class="home-due-section" id="homeDueSection" style="display:none">
+          <div class="home-section-label"><span>Due soon</span><span class="home-section-rule"></span></div>
+          <div class="home-due-strip" id="homeDueStrip"></div>
+        </section>
+
+        <!-- Quick actions (Tonight's Study Plan stub + General Chat) -->
+        <section class="home-quick-actions" id="homeQuickActions"></section>
+
+        <!-- Class grid -->
+        <div class="home-grid" id="homeGrid"></div>
+
       </div>
-      <div class="home-grid" id="homeGrid"></div>
     </div>
 
     <!-- Class-view header — mounted above #chatPanel by classview.js -->

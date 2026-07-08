@@ -1446,8 +1446,11 @@ body.signin-page{
 
 /* ─── Student home redesign v1 (docs/STUDENT_HOME_REDESIGN.md §4.1) ─────────
    Flag-gated behind body.home-redesign-v1 for the 2-week rollback window.
-   Session 1 slice: header + card grid. Extras (where-you-left-off,
-   next-due, dot, strip, utility cards) land in later sessions. */
+   Layout translates design-handoff/home-v2/Lumi Home.dc.html — placeholders
+   ({{ }}), support.js runtime, and hardcoded persona data never copied.
+   Palette re-uses the existing cream/navy/orange tokens (which already match
+   the mockup): --bg #F2ECE0, --surface #FAF6EE, --text/--accent #1D2D4F,
+   --warm #C76D3D, --border #DFD7C7, --text-muted #7B7466. */
 
 /* When the flag is on, hide the pre-redesign chrome. */
 .home-redesign-v1 .sidebar,
@@ -1458,32 +1461,71 @@ body.signin-page{
 /* Home view container. Hidden by default; router.mountHome() flips display. */
 .home-view {
   height: 100vh; overflow-y: auto;
-  padding: 32px 40px 64px;
   background: var(--bg);
   color: var(--text);
   box-sizing: border-box;
 }
-
-.home-header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 32px;
+.home-shell {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 40px 40px 80px;
 }
-.home-logo-name {
+
+/* ── Header ───────────────────────────────────────────────────────────── */
+.home-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 24px; margin-bottom: 28px;
+}
+.home-greeting { min-width: 0; }
+.home-brand {
+  display: flex; align-items: center; gap: 11px; margin-bottom: 14px;
+}
+.home-brand-mark {
+  width: 30px; height: 30px; border-radius: 9px;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.home-brand-dot {
+  width: 11px; height: 11px; border-radius: 50%; background: var(--warm);
+}
+.home-brand-name {
   font-family: var(--font-serif);
-  font-size: 26px; font-weight: 600; letter-spacing: -.5px;
+  font-size: 19px; font-weight: 600; letter-spacing: -.3px;
   color: var(--text);
 }
+.home-brand-school {
+  font-size: 10px; font-weight: 600; color: var(--text-faint);
+  text-transform: uppercase; letter-spacing: 1.2px;
+  border-left: 1px solid var(--border);
+  padding-left: 11px;
+}
+.home-greeting-title {
+  font-family: var(--font-serif);
+  font-size: 34px; font-weight: 600; letter-spacing: -.8px; line-height: 1.1;
+  color: var(--text);
+  margin: 0;
+}
+.home-greeting-sub {
+  font-size: 14px; color: var(--text-muted); margin: 8px 0 0;
+}
+.home-greeting-sub strong {
+  color: var(--warm); font-weight: 600;
+}
+
 .home-user-chip {
   display: inline-flex; align-items: center; gap: 10px;
-  padding: 8px 14px 8px 8px;
-  background: none; border: 1px solid var(--border); border-radius: 999px;
+  padding: 7px 15px 7px 7px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 999px;
   color: var(--text); font-family: inherit; font-size: 13px; font-weight: 500;
-  cursor: pointer; transition: border-color .15s, background .15s;
+  cursor: pointer; flex-shrink: 0;
+  transition: border-color .15s, background .15s;
 }
-.home-user-chip:hover { border-color: var(--accent); background: var(--lumi-bg); }
+.home-user-chip:hover { border-color: var(--warm); background: var(--lumi-bg); }
 .home-user-chip-avatar {
-  width: 26px; height: 26px; border-radius: 50%;
-  background: var(--accent); color: #fff;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--warm); color: #fff;
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 12px; font-weight: 600;
   overflow: hidden;
@@ -1493,19 +1535,151 @@ body.signin-page{
 .home-test-banner {
   margin-bottom: 24px;
   padding: 10px 14px;
-  background: rgba(217, 122, 68, .12);   /* terracotta wash to match #testModeBanner */
+  background: rgba(199, 109, 61, .12);
   color: var(--text);
-  border: 1px solid rgba(217, 122, 68, .4);
+  border: 1px solid rgba(199, 109, 61, .4);
   border-radius: 8px;
   font-size: 12.5px; letter-spacing: .3px;
 }
 
-.home-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 20px;
+/* ── Search ──────────────────────────────────────────────────────────── */
+.home-search { position: relative; margin-bottom: 32px; }
+.home-search-icon {
+  width: 17px; height: 17px;
+  position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.home-search-input {
+  width: 100%;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px 14px 44px;
+  font-family: inherit; font-size: 14px;
+  color: var(--text); outline: none;
+  transition: border-color .15s;
+  box-sizing: border-box;
+}
+.home-search-input:focus { border-color: var(--warm); }
+.home-search-input::placeholder { color: var(--text-faint); }
+
+/* ── Section labels (Due soon, etc.) ─────────────────────────────────── */
+.home-section-label {
+  display: flex; align-items: center; gap: 9px; margin-bottom: 14px;
+  font-size: 11px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 1.4px;
+}
+.home-section-rule {
+  height: 1px; flex: 1; background: var(--border);
 }
 
+/* ── Due-soon strip ──────────────────────────────────────────────────── */
+.home-due-section { margin-bottom: 34px; }
+.home-due-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.home-due-card {
+  display: flex; align-items: center; gap: 13px;
+  padding: 14px 16px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 13px;
+  font-family: inherit; text-align: left; color: var(--text);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.home-due-card:hover { border-color: var(--warm); }
+.home-due-card--urgent {
+  border-color: rgba(199, 109, 61, .4);
+}
+.home-due-badge {
+  width: 42px; height: 42px; border-radius: 10px;
+  background: var(--surface-2);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.home-due-badge-day {
+  font-size: 9px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.home-due-badge-num {
+  font-family: var(--font-serif); font-size: 17px; font-weight: 600;
+  color: var(--text); line-height: 1;
+}
+.home-due-card--urgent .home-due-badge {
+  background: rgba(199, 109, 61, .14);
+}
+.home-due-card--urgent .home-due-badge-day,
+.home-due-card--urgent .home-due-badge-num {
+  color: var(--warm);
+}
+.home-due-text { min-width: 0; }
+.home-due-title {
+  font-size: 13.5px; font-weight: 600; line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.home-due-meta {
+  font-size: 12px; color: var(--text-muted); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.home-due-card--urgent .home-due-meta { color: var(--warm); font-weight: 500; }
+
+/* ── Quick actions (Study Plan + General Chat) ───────────────────────── */
+.home-quick-actions {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 40px;
+}
+.home-qa {
+  display: flex; align-items: center; gap: 15px;
+  padding: 18px 20px;
+  border: 1px solid var(--border); border-radius: 15px;
+  font-family: inherit; text-align: left;
+  cursor: pointer;
+  transition: transform .12s, box-shadow .2s, border-color .2s;
+}
+.home-qa:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(0,0,0,.06);
+  border-color: var(--warm);
+}
+.home-qa:disabled { cursor: not-allowed; opacity: .65; }
+.home-qa-icon {
+  width: 44px; height: 44px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.home-qa-icon svg { width: 22px; height: 22px; }
+.home-qa-body { min-width: 0; }
+.home-qa-title {
+  font-family: var(--font-serif); font-size: 17px; font-weight: 600;
+}
+.home-qa-sub {
+  font-size: 12.5px; margin-top: 2px;
+}
+.home-qa--navy {
+  background: var(--accent); border-color: var(--accent);
+  color: var(--bg);
+}
+.home-qa--navy .home-qa-icon {
+  background: rgba(242, 236, 224, .12);
+}
+.home-qa--navy .home-qa-icon svg { stroke: var(--bg); }
+.home-qa--navy .home-qa-sub { color: rgba(242, 236, 224, .7); }
+.home-qa--cream {
+  background: var(--surface); color: var(--text);
+}
+.home-qa--cream .home-qa-icon {
+  background: rgba(199, 109, 61, .14);
+}
+.home-qa--cream .home-qa-icon svg { stroke: var(--warm); }
+.home-qa--cream .home-qa-sub { color: var(--text-muted); }
+
+/* ── Class grid + cards ──────────────────────────────────────────────── */
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 18px;
+}
 .home-empty {
   grid-column: 1 / -1;
   padding: 40px; text-align: center;
@@ -1513,43 +1687,100 @@ body.signin-page{
 }
 
 .home-card {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
-  padding: 22px 20px;
-  min-height: 140px;
-  background: var(--card-bg, transparent);
+  display: flex; flex-direction: column;
+  padding: 0;
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  color: var(--text);
-  font-family: inherit;
-  text-align: left;
+  border-radius: 16px;
+  overflow: hidden;
   cursor: pointer;
-  transition: border-color .15s, background .15s, transform .06s;
+  text-align: left; font-family: inherit; color: var(--text);
+  position: relative;
+  transition: transform .12s, box-shadow .2s, border-color .2s;
 }
-.home-card:hover { border-color: var(--accent); background: var(--lumi-bg); }
-.home-card:active { transform: translateY(1px); }
-
-.home-card-course {
+.home-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(0,0,0,.07);
+  border-color: var(--warm);
+}
+.home-card:active { transform: translateY(-1px); }
+.home-card-accent {
+  height: 5px; background: var(--accent);
+  flex-shrink: 0;
+}
+.home-card-body {
+  padding: 20px 20px 18px;
+  display: flex; flex-direction: column; gap: 14px;
+  flex: 1;
+}
+.home-card-head {
+  display: flex; align-items: flex-start; gap: 13px;
+}
+.home-card-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: rgba(29, 45, 79, .1);
+  color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
   font-family: var(--font-serif); font-size: 20px; font-weight: 600;
-  line-height: 1.2; letter-spacing: -.3px;
+  flex-shrink: 0;
+}
+.home-card-titles { min-width: 0; flex: 1; }
+.home-card-course {
+  font-family: var(--font-serif);
+  font-size: 19px; font-weight: 600; letter-spacing: -.3px;
+  line-height: 1.15;
   color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.home-card-teacher {
-  font-size: 13px; color: var(--text-muted);
+.home-card-meta {
+  font-size: 13px; color: var(--text-muted); margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.home-card-block {
-  font-size: 10.5px; font-weight: 600;
-  color: var(--text-faint); letter-spacing: 1px; text-transform: uppercase;
-  margin-top: auto;
+.home-card-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--warm);
+  flex-shrink: 0; margin-top: 4px;
+  box-shadow: 0 0 0 4px rgba(199, 109, 61, .18);
+}
+.home-card-snippet {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; color: var(--text-muted); line-height: 1.4;
+  min-width: 0;
+}
+.home-card-snippet-bullet {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text-faint);
+  flex-shrink: 0;
+}
+.home-card-snippet-text {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  flex: 1; min-width: 0;
+}
+.home-card-chip-row {
+  display: flex; align-items: center; gap: 8px; margin-top: auto;
+}
+.home-card-chip {
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 7px; padding: 4px 9px;
+}
+.home-card-chip--urgent {
+  color: #fff; background: var(--warm); border-color: var(--warm);
+}
+.home-card-chip--caughtup {
+  color: var(--text-faint);
+}
+.home-card--urgent {
+  border-color: rgba(199, 109, 61, .45);
 }
 
-.home-card--locked {
-  opacity: .55; cursor: pointer;
+.home-card--locked { opacity: .55; }
+.home-card--locked:hover {
+  border-color: var(--border); box-shadow: none; transform: none;
 }
-.home-card--locked:hover { border-color: var(--border); background: transparent; }
 .home-card-lock {
   font-size: 10.5px; font-weight: 600;
   color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase;
-  margin-top: auto;
 }
 
 /* Class-view header (§4.1.2). Sits ABOVE the untouched #chatPanel; the
@@ -1582,8 +1813,12 @@ body.signin-page{
 
 /* Mobile: tighten the padding a touch. */
 @media (max-width: 640px) {
-  .home-view { padding: 20px 16px 40px; }
+  .home-shell { padding: 20px 16px 40px; }
+  .home-header { flex-direction: column; align-items: stretch; gap: 16px; }
+  .home-user-chip { align-self: flex-start; }
+  .home-greeting-title { font-size: 28px; }
+  .home-quick-actions { grid-template-columns: 1fr; }
   .home-grid { grid-template-columns: 1fr; gap: 14px; }
-  .home-card { min-height: 110px; padding: 18px 16px; }
+  .home-due-strip { grid-template-columns: 1fr; }
   .class-view-header { padding: 14px 16px 10px; }
 }
