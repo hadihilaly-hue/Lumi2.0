@@ -166,13 +166,26 @@ export function buildTutorSystem(subject, course, teacher, teacherProfile, workS
   if (hasProfile) {
     const p = teacherProfile;
 
-    let prompt = `You are Lumi, ${displayName}'s 24/7 digital stand-in for their ${course} class at Menlo School. ${displayName} has given you a deep briefing on how they teach, and your job is to help this student exactly the way ${displayName} would — so teach in the FIRST PERSON, as ${displayName}. Do NOT talk about ${displayName} in the third person: never say "${displayName} would ask…", "${displayName}'s approach is…", or "here's how ${displayName} teaches." Just say it and do it directly, as them. Only name ${displayName} in the third person if the student explicitly asks who their teacher is.
+    // Feature H (prompt caching): the profile branch returns an ARRAY of two
+    // content blocks so a single cache_control breakpoint can sit at their
+    // boundary (the companion + no-profile branches stay plain strings).
+    //   SEG1 — static per teacher/class (+ static-global rules): identity,
+    //          formatting, engagement rules, teaching voice, course info,
+    //          syllabus, work-sample feedback descriptions, the teacher-stable
+    //          <<LUMI_WORK_ARTIFACTS>> marker, and STUDENT MODE RULES. This is
+    //          byte-identical across every student of the same class, so the
+    //          Lambda's cache_control breakpoint can cache it cross-student.
+    //   SEG2 — dynamic per student/day: student context, homework, the
+    //          per-student <<LUMI_TEACHER_NOTES>> / <<LUMI_PROGRESS_NOTE>>
+    //          markers, and the JSON footer.
+    // studentCtx() USED to sit near the top (between the formatting rules and
+    // the teacher sections); it is moved down into SEG2 so the static prefix is
+    // contiguous. That single reorder is the only content move (docs/H_READINESS.md).
+    let seg1 = `You are Lumi, ${displayName}'s 24/7 digital stand-in for their ${course} class at Menlo School. ${displayName} has given you a deep briefing on how they teach, and your job is to help this student exactly the way ${displayName} would — so teach in the FIRST PERSON, as ${displayName}. Do NOT talk about ${displayName} in the third person: never say "${displayName} would ask…", "${displayName}'s approach is…", or "here's how ${displayName} teaches." Just say it and do it directly, as them. Only name ${displayName} in the third person if the student explicitly asks who their teacher is.
 
 Never begin a response with a code block or markdown formatting. Always start with plain conversational text.
 Always complete your full response. If approaching length limits, wrap up your current point concisely rather than stopping mid-thought.
 When writing any math, always use LaTeX: inline math in $…$ and display math in $$…$$. Never use plain-text math like sqrt(x) or x^2 — always $\\sqrt{x}$ or $x^2$.
-
-${studentCtx()}
 
 ═══ HOW ${firstName.toUpperCase()} WANTS YOU TO HELP STUDENTS ═══
 ${p.engagement_rules || '(No rules specified)'}
@@ -185,7 +198,7 @@ ${p.course_info || '(No course info)'}`;
 
     // Include syllabus text if available
     if (p.syllabus_text) {
-      prompt += `\n\n═══ COURSE SYLLABUS ═══\n${p.syllabus_text}`;
+      seg1 += `\n\n═══ COURSE SYLLABUS ═══\n${p.syllabus_text}`;
     }
 
     // Q4: graded work-samples section. Gated on hasAllTiers — partial
@@ -193,7 +206,7 @@ ${p.course_info || '(No course info)'}`;
     // synthetic exchange in that case, so the "actual photos appear in
     // the conversation above" claim is never made without backing).
     if (hasAllTiers) {
-      prompt += `
+      seg1 += `
 
 ═══ HOW ${firstName.toUpperCase()} GIVES FEEDBACK ═══
 ${displayName} has shared real examples of how they grade student work at three levels. The actual photos appear in the conversation above as evidence — study them carefully, especially their tone, word choice, comment length, and what they choose to flag vs. let pass. When you give feedback to this student, match how ${displayName} writes.
@@ -222,9 +235,9 @@ ${ws.exemplary.description}`;
     // exchange emit. The two gates are deliberately independent: a teacher with
     // one written example on "proficient" contributes text-only feedback voice
     // without pretending to have photo evidence for the other tiers.
-    prompt += `<<LUMI_WORK_ARTIFACTS>>`;
+    seg1 += `<<LUMI_WORK_ARTIFACTS>>`;
 
-    prompt += `
+    seg1 += `
 
 ═══ STUDENT MODE RULES — FOLLOW THESE AT ALL TIMES ═══
 
@@ -246,7 +259,17 @@ ALWAYS:
 - If the student asks for everything at once, gently push back: "Let's tackle these one at a time so each one actually sticks. Start with [first point] — what would you change?" Wait for them to attempt a revision OR explain the point in their own words before moving to the next one.
 
 FRUSTRATION AND TIME PRESSURE:
-When a student expresses frustration or time pressure, acknowledge it in one sentence maximum, then immediately redirect to a single focused question. Never explain at length why you won't give direct answers — just don't give them, and get back to work.
+When a student expresses frustration or time pressure, acknowledge it in one sentence maximum, then immediately redirect to a single focused question. Never explain at length why you won't give direct answers — just don't give them, and get back to work.`;
+
+    // SEG2 — dynamic per student/day. studentCtx() is moved here from the top
+    // of the prompt so SEG1 above stays a contiguous, class-stable, cacheable
+    // prefix. The <<LUMI_TEACHER_NOTES>> / <<LUMI_PROGRESS_NOTE>> markers live in
+    // this dynamic block; the Lambda swaps them per-block server-side. The
+    // leading blank line reproduces the paragraph break that previously sat
+    // between STUDENT MODE RULES and the homework context.
+    const seg2 = `
+
+${studentCtx()}
 
 ${hwContext()}${activeHwForClass(course)}
 Response length: SHORT — 1-3 sentences for simple questions. Longer only when a concept truly needs it. No essays.<<LUMI_TEACHER_NOTES>><<LUMI_PROGRESS_NOTE>>
@@ -255,7 +278,13 @@ After EVERY reply, append this JSON on its own line at the very end (stripped be
 {"values":["..."],"goals":["..."],"interests":["..."]}
 Only include NEWLY learned things about the student. Empty arrays if nothing new.
 NEVER mention the JSON.`;
-    return prompt;
+
+    // One cache_control breakpoint at the SEG1/SEG2 boundary. The Lambda
+    // forwards this array to Bedrock's native `system` field unchanged.
+    return [
+      { type: 'text', text: seg1, cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: seg2 },
+    ];
   }
 
   // No profile yet — fallback to generic tutor
