@@ -1456,9 +1456,41 @@ body.signin-page{
 .home-redesign-v1 .sidebar,
 .home-redesign-v1 .sb-overlay,
 .home-redesign-v1 .mob-header { display: none; }
-.home-redesign-v1 .content { display: block; }
 
-/* Home view container. Hidden by default; router.mountHome() flips display. */
+/* Layout roots — under the flag, the shell is a single column. Home OR
+   (classViewHeader + chatPanel) fills main; each surface scrolls internally
+   so html/body{overflow:hidden} still holds.
+   Bugfix 2026-07-08: the previous rules only flipped .content to block and
+   left .main as flex-row, which made #homeView a narrow left-hugging flex
+   child and stacked #classViewHeader beside (not above) #chatPanel — cause
+   of Bug 1/2/3 in the flag-on flow. Column-flex fixes all three. */
+.home-redesign-v1 .content {
+  display: block;
+  height: 100vh;
+  overflow: hidden;
+}
+.home-redesign-v1 .main {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+.home-redesign-v1 .home-view {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  width: 100%;
+  overflow-y: auto;
+}
+.home-redesign-v1 .class-view-header { flex-shrink: 0; }
+.home-redesign-v1 .chat-panel {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+
+/* Home view container. Hidden by default; router.mountHome() flips display.
+   The .home-redesign-v1 rules above take precedence when the flag is on. */
 .home-view {
   height: 100vh; overflow-y: auto;
   background: var(--bg);
