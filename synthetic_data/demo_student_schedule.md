@@ -14,7 +14,7 @@ localStorage schedule takes precedence and persists — no DB write, no creds.
 2. Open the browser console (F12 → Console) and paste:
 
 ```js
-localStorage.setItem('lumi_schedule', '[{"course":"Algebra II","teacher":"Dale Ferraro","subject":"Mathematics","block":"B"},{"course":"Biology","teacher":"Priya Ramaswamy","subject":"Science","block":"A"},{"course":"Music Theory","teacher":"Nadia Okonkwo","subject":"Arts","block":"E"},{"course":"English 10","teacher":"Thomas Beck","subject":"English","block":"B"},{"course":"Spanish II","teacher":"Carmen Alvarado","subject":"World Languages","block":"C"},{"course":"Intro to Computer Science","teacher":"Kevin Zhou","subject":"Computer Science","block":"A"},{"course":"US History","teacher":"Greg Halloran","subject":"History","block":"B"},{"course":"Physical Education 9","teacher":"Rick Santos","subject":"Physical Education","block":"A"}]');
+localStorage.setItem('lumi_schedule', '[{"course":"Algebra II","teacher":"Dale Ferraro","subject":"Mathematics","block":"B"},{"course":"Biology","teacher":"Priya Ramaswamy","subject":"Science","block":"A"},{"course":"Music Theory","teacher":"Nadia Okonkwo","subject":"Music","block":"E"},{"course":"English 10","teacher":"Thomas Beck","subject":"English","block":"B"},{"course":"Spanish II","teacher":"Carmen Alvarado","subject":"World Languages","block":"C"},{"course":"Intro to Computer Science","teacher":"Kevin Zhou","subject":"Computer Science","block":"A"},{"course":"US History","teacher":"Greg Halloran","subject":"History","block":"B"},{"course":"Physical Education 9","teacher":"Rick Santos","subject":"Physical Education","block":"A"}]');
 location.reload();
 ```
 

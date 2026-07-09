@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """Remove every row seed_personas.py created. Idempotent; safe to re-run.
 
-Keys entirely off the @lumidemo.test domain, so it can never touch real data.
-Deletes in FK-safe order:
+Keys entirely off the @lumidemo.test domain (plus the dedicated demo school
+name), so it can never touch real data. Deletes in FK-safe order:
   1. profiles     — student stubs (by id via the app_users email join, BEFORE
                     app_users is deleted).
-  2. teacher_profiles — the personas (cascades class_enrollments + any
-                    teacher_work_samples via ON DELETE CASCADE).
+  2. teacher_profiles — the personas (cascades class_enrollments, sections, and
+                    any teacher_work_samples via ON DELETE CASCADE).
   3. app_users    — the synthetic student identities.
   4. staff_directory — the "First Last" -> email rows for the 8 personas.
                     Keyed off the same @lumidemo.test domain so real staff is
                     untouched.
+  5. schools      — the synthetic "Lumi Demo School" row (its sections already
+                    cascaded away with the personas in step 2). Deleted by exact
+                    name so real schools (e.g. Menlo School) are untouched.
 Then prints residual counts as a check.
 
 Usage: python3 synthetic_data/cleanup_personas.py
@@ -21,6 +24,7 @@ sys.path.insert(0, __file__.rsplit("/", 1)[0])
 import lambda_admin  # noqa: E402
 
 DOMAIN_LIKE = "%@lumidemo.test"
+DEMO_SCHOOL_NAME = "Lumi Demo School"
 
 
 def main():
@@ -53,14 +57,22 @@ def main():
         [DOMAIN_LIKE])
     print("staff_directory deleted:", r.get("rowCount", 0))
 
+    # Demo school: its sections already cascaded away with the personas above.
+    # Deleted by exact name so no real school is touched.
+    r = lambda_admin.rds_sql(
+        "DELETE FROM public.schools WHERE name = $1 RETURNING id",
+        [DEMO_SCHOOL_NAME])
+    print("schools (demo) deleted:", r.get("rowCount", 0))
+
     # residual check
     v = lambda_admin.rds_sql(
         "SELECT (SELECT count(*) FROM public.teacher_profiles WHERE teacher_email LIKE $1) tp, "
         "(SELECT count(*) FROM public.app_users WHERE email LIKE $1) au, "
         "(SELECT count(*) FROM public.class_enrollments ce JOIN public.teacher_profiles tp "
         "  ON tp.id = ce.teacher_profile_id WHERE tp.teacher_email LIKE $1) enr, "
-        "(SELECT count(*) FROM public.staff_directory WHERE email LIKE $1) sd",
-        [DOMAIN_LIKE])
+        "(SELECT count(*) FROM public.staff_directory WHERE email LIKE $1) sd, "
+        "(SELECT count(*) FROM public.schools WHERE name = $2) demo_school",
+        [DOMAIN_LIKE, DEMO_SCHOOL_NAME])
     print("residual (should all be 0):", v["rows"][0])
 
 

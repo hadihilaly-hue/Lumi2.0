@@ -17,6 +17,16 @@ Writes, through the IAM-gated Lambda adminSql path (lambda_admin.rds_sql):
                      title, and welcome_message.
   5. class_enrollments — one row per (student, class): student_id, teacher_profile_id,
                      block, student_name. teacher_notes deliberately left NULL/untouched.
+  6. schools        — a single synthetic "Lumi Demo School" row (allowed_domains
+                     left '{}' so the fake domain can never actually sign in). It
+                     exists only as the NOT NULL FK target for sections.
+  7. sections       — one row per (teacher, class) carrying `subject`. This is the
+                     ONLY source GET /available-classes reads for a class's subject
+                     (a LIMIT-1 subquery on sections by teacher_profile_id); without
+                     it the route returns subject=NULL and the picker buckets every
+                     demo class under a generic header. Subject comes from the
+                     persona's `subject` field; block/course_name mirror the
+                     class_enrollments/teacher_profiles rows.
 
 All ids are deterministic (uuid5) so re-running is a no-op, not a duplicate.
 Everything is on @lumidemo.test, which cleanup_personas.py keys off of.
@@ -34,6 +44,7 @@ authenticated HTTPS GET against the Lambda Function URL (exercises the Cognito
 auth + domain gate + route authz), and reports which method(s) passed.
 """
 import argparse
+import re
 import sys
 import unicodedata
 import uuid
@@ -47,12 +58,33 @@ NS = uuid.UUID("6b1d3f8e-9a2c-5f47-b3e1-0c9d7a4e21ff")
 
 FUNCTION_URL = "https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws/"
 
+# Synthetic school + section constants. The sections rows exist purely so
+# GET /available-classes can resolve a subject per demo class; keep these
+# byte-identical to migration/seed-persona-sections.sql so running either the
+# seeder or the one-shot SQL first leaves the other a no-op.
+DEMO_SCHOOL_NAME = "Lumi Demo School"
+SECTION_TERM = "Demo AY2025-26"
+
 
 def slugify_name(name):
     """'Priya Delacroix' -> 'priya.delacroix' (accent-stripped, ascii)."""
     s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
     parts = [p for p in s.lower().replace("-", " ").split() if p]
     return ".".join(parts)
+
+
+def slugify_course(name):
+    """'AP Computer Science A' -> 'ap-computer-science-a' (for a stable sis_id).
+
+    Mirrors the SQL `regexp_replace(lower(course_name),'[^a-z0-9]+','-','g')`
+    used in migration/seed-persona-sections.sql so both write the same sis_id.
+    """
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+
+
+def section_sis_id(email, course_name):
+    """Deterministic per-(teacher,course) section id, unique within the demo school."""
+    return f"demo-{email.split('@', 1)[0]}-{slugify_course(course_name)}"
 
 
 def student_email(name):
@@ -98,9 +130,12 @@ def seed(dry_run=False):
     if dry_run:
         for p in PERSONAS:
             print(f"  staff_directory <- {p['first']} {p['last']} -> {p['email']}")
+        print(f"  schools <- {DEMO_SCHOOL_NAME}")
         for p in PERSONAS:
             for c in p["classes"]:
                 print(f"  teacher_profiles <- {p['email']} / {c['course_name']} (done=true)")
+                print(f"  sections <- {section_sis_id(p['email'], c['course_name'])} "
+                      f"subject={p['subject']} block={c['block']}")
         return
 
     # --- 1. app_users (batch) ---
@@ -145,8 +180,20 @@ def seed(dry_run=False):
         params)
     print(f"  staff_directory: {r.get('rowCount', 0)} upserted (of {len(rows)})")
 
-    # --- 4 + 5. teacher_profiles then class_enrollments per class ---
-    tp_count, enr_count = 0, 0
+    # --- 6. schools (the synthetic FK target for sections) ---
+    # allowed_domains intentionally left at the '{}' default: these are fake
+    # accounts that never sign in, and we must not open the auth gate to the
+    # fake domain. UNIQUE (name) makes this idempotent; RETURNING gives us the
+    # id regardless of whether the row is new or pre-existing.
+    r = lambda_admin.rds_sql(
+        "INSERT INTO public.schools (name) VALUES ($1) "
+        "ON CONFLICT (name) DO UPDATE SET updated_at = now() RETURNING id",
+        [DEMO_SCHOOL_NAME])
+    school_id = r["rows"][0]["id"]
+    print(f"  schools: '{DEMO_SCHOOL_NAME}' -> {school_id}")
+
+    # --- 4 + 5 + 7. teacher_profiles, class_enrollments, then sections per class ---
+    tp_count, enr_count, sec_count = 0, 0, 0
     for p in PERSONAS:
         for c in p["classes"]:
             r = lambda_admin.rds_sql(
@@ -182,8 +229,31 @@ def seed(dry_run=False):
                 "ON CONFLICT (student_id, teacher_profile_id, block) DO UPDATE SET "
                 "student_name = EXCLUDED.student_name, updated_at = now() RETURNING id", params)
             enr_count += len(enr_rows)
+
+            # sections: one row per class, carrying the subject /available-classes
+            # reads. Same column/conflict shape as the SIS importer's sections
+            # upsert (lambda/index.mjs); course_code/period/room left NULL and
+            # meeting_days defaults to '{}' since the personas have no SIS detail.
+            lambda_admin.rds_sql(
+                """INSERT INTO public.sections
+                     (school_id, sis_id, teacher_profile_id, name, course_name,
+                      subject, term, block)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+                   ON CONFLICT (school_id, sis_id) DO UPDATE SET
+                     teacher_profile_id = EXCLUDED.teacher_profile_id,
+                     name = EXCLUDED.name,
+                     course_name = EXCLUDED.course_name,
+                     subject = EXCLUDED.subject,
+                     term = EXCLUDED.term,
+                     block = EXCLUDED.block,
+                     updated_at = now()""",
+                [school_id, section_sis_id(p["email"], c["course_name"]), tp_id,
+                 f'{c["course_name"]} — Block {c["block"]}', c["course_name"],
+                 p["subject"], SECTION_TERM, c["block"]])
+            sec_count += 1
     print(f"  teacher_profiles: {tp_count} upserted")
     print(f"  class_enrollments: {enr_count} upserted")
+    print(f"  sections: {sec_count} upserted")
 
 
 def verify():
@@ -227,6 +297,18 @@ def verify():
                 [p["email"], c["course_name"]])
             n = enr["rows"][0]["n"]
 
+            # Subject resolution: run the EXACT LIMIT-1 subquery GET
+            # /available-classes uses, so a PASS means the route will report
+            # this subject (not a generic-bucket NULL).
+            subj = lambda_admin.rds_sql(
+                "SELECT (SELECT s.subject FROM public.sections s "
+                "          WHERE s.teacher_profile_id = tp.id LIMIT 1) AS subject "
+                "FROM public.teacher_profiles tp "
+                "WHERE tp.teacher_email = $1 AND tp.course_name = $2",
+                [p["email"], c["course_name"]])
+            subject = (subj.get("rows") or [{}])[0].get("subject")
+            ok = ok and subject == p["subject"]
+
             http_note = ""
             if id_token:
                 http_ok = _http_verify(id_token, p["email"], c["course_name"])
@@ -235,7 +317,8 @@ def verify():
             all_ok = all_ok and ok
             status = "PASS" if ok else "FAIL"
             print(f"  [{status}] {display_name(p):16} {c['course_name']:28} "
-                  f"done={row.get('done') if row else None}  enroll={n}{http_note}")
+                  f"done={row.get('done') if row else None}  enroll={n}  "
+                  f"subject={subject or '(none)'}{http_note}")
     print("\n" + ("ALL PERSONAS VERIFIED" if all_ok else "SOME PERSONAS FAILED VERIFICATION"))
     return all_ok
 

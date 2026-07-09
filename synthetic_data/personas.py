@@ -20,7 +20,10 @@ Design goals baked into the field text below:
     the three fields buildTutorSystem() splices into the system prompt.
 
 Quality tier is metadata for the smoke-test report; it is NOT written to
-the DB.
+the DB. The per-persona `subject` field, by contrast, IS written — it
+becomes `public.sections.subject` for every class (see seed_personas.py),
+which is the sole source /available-classes reads to group a class under a
+department header (null otherwise → generic bucket).
 """
 
 # One fabricated domain for teachers AND students so cleanup is a single
@@ -208,7 +211,7 @@ PERSONAS = [
     # ───────────────────────────────────────────────────────────────────
     {
         "quality": "thorough",
-        "subject": "Arts",
+        "subject": "Music",
         "title": "Ms.",
         "first": "Nadia",
         "last": "Okonkwo",

@@ -9,9 +9,9 @@ fake domain `@lumidemo.test`. No real Menlo people.
 |---|---|
 | `personas.py` | Single source of truth: 8 teachers, 16 classes, 78 students, per-persona smoke-test questions. |
 | `lambda_admin.py` | boto3 helper for the IAM-gated Lambda `adminSql` path (needs AWS creds w/ `lambda:InvokeFunction` on `lumi-claude-proxy`). |
-| `seed_personas.py` | Idempotent insert of app_users + profiles + teacher_profiles (`done=true`) + class_enrollments, then verify. |
+| `seed_personas.py` | Idempotent insert of app_users + profiles + teacher_profiles (`done=true`) + class_enrollments + a "Lumi Demo School" + one `sections` row per class (carries `subject` so `/available-classes` groups them by department), then verify. |
 | `smoke_test.py` | Cost-capped Bedrock voice test (≤30 calls). Mirrors `app.js buildTutorSystem()`. Writes `test-transcripts/`. |
-| `cleanup_personas.py` | Removes every synthetic row (keys off `@lumidemo.test`). |
+| `cleanup_personas.py` | Removes every synthetic row (keys off `@lumidemo.test`; sections cascade with the personas, and the "Lumi Demo School" row is dropped by name). |
 
 ## Personas (quality tiers deliberately varied)
 - **Thorough** (articulate, all NON-humanities to stress the "everything sounds like an English teacher" bias):
