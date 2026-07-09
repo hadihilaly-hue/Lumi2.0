@@ -10,10 +10,11 @@ AWS-dependent steps (3–6) and the eval-evidence regeneration were written for 
 the AWS half is prepared and handed to you with exact commands below.
 
 **Headline (the go/no-go):** the "does the `global.` inference profile actually honor
-caching" question is **UNDETERMINED** — it can only be answered by a live Bedrock call,
-which this environment cannot make. Run `cache_probe.py` (§Step 3 below) on your Mac; its
-printed verdict is authoritative. **Nothing has been deployed**, so there is no cache
-behavior in production yet either way.
+caching" question is **CONFIRMED**. Live probe run 2026-07-08 on the credentialed Mac
+against `global.anthropic.claude-sonnet-4-6` (us-east-1) — call-1
+`cache_creation_input_tokens=3279`, call-2 `cache_read_input_tokens=3279`
+(≈prefix size, ~3753 tok). **Feature H is DEPLOYED** to `lumi-claude-proxy` (2026-07-09
+00:26 UTC), source byte-diff clean, `/db-health` 200, all guarded routes 401, logs clean.
 
 ---
 
@@ -21,30 +22,21 @@ behavior in production yet either way.
 
 | # | Step | Status | Evidence |
 |---|---|---|---|
-| 1 | Docs commit — summarizer eval → VERIFIED (4/4) | ✅ **DONE** (partial: evidence JSON missing) | `docs/SUMMARIZATION_PROMPT.md` updated (header, §5 table, risk #1); commit `efb3b04` "docs: summarizer eval verified (4/4)", pushed to `origin/main`. **`test-transcripts/_summarizer_eval.json` was NOT committed** — see note ▼ |
-| 2 | Merge H into main | ✅ **DONE** | Merge commit `56866e9` (`--no-ff`), clean (no conflict). `node --check` OK on `js/prompts.js`, `js/api.js`, `js/chat.js`, `lambda/index.mjs`. **Frontend 201/201, Lambda 160/160.** Pushed to `origin/main`. |
-| 3 | Local caching probe | ⛔ **BLOCKED** (no Bedrock creds here) → prepared | `cache_probe.py` written + `py_compile`-clean; run attempt exits `2` "NO CREDENTIALS". **No verdict produced.** Script embedded below — run on your Mac. |
-| 4 | Deploy Lambda | ⛔ **NOT DONE** (no AWS access) | Not attempted. Nothing deployed from here. Runbook commands below. |
-| 5 | Post-deploy verify | ⛔ **NOT DONE** | Depends on step 4. Checklist + commands below. |
-| 6 | CloudWatch `[cache]` loop | ⛔ **NOT DONE** | Depends on step 4. The step-3 probe is the authoritative caching answer; live-traffic logs are confirmation. |
+| 1 | Docs commit — summarizer eval → VERIFIED (4/4) | ✅ **DONE** | `docs/SUMMARIZATION_PROMPT.md` updated in `efb3b04`; evidence JSON `test-transcripts/_summarizer_eval.json` committed 2026-07-09 (`e2e9d57`), pushed both remotes. |
+| 2 | Merge H into main | ✅ **DONE** | Merge commit `56866e9` (`--no-ff`). Frontend 201/201, Lambda 160/160. On `origin/main` and `hadi/main`. |
+| 3 | Local caching probe | ✅ **DONE — CACHING CONFIRMED** | Ran 2026-07-08 on the credentialed Mac. `model=global.anthropic.claude-sonnet-4-6`, prefix~3753 tok. CALL 1 `cache_creation_input_tokens=3279`; CALL 2 `cache_read_input_tokens=3279`. Verdict: prefix caching honored on the global profile. |
+| 4 | Deploy Lambda | ✅ **DONE** | Rollback snapshot at `~/Desktop/lumi-lambda-rollback-preH.zip` (2.9M); `publish-version` → v3 "pre-H caching release". `update-function-code` → poll `Successful` at 2026-07-09 00:26:37 UTC. CodeSha256: `c4m4f016jukVnswNKaqiZm8LlK71xPVPZDIIkL1GZ6s=`. |
+| 5 | Post-deploy verify | ✅ **DONE** | `/db-health` 200 `{"status":"ok","db":"reachable"}`; `/my-data`, `/consent`, `/work-artifacts`, `/available-classes`, `/teacher-directory` all 401 unauth; `POST /admin/sql` 401 (never ran SQL). Source byte-diff (`index.mjs`, `db.js`, `package.json`) all OK vs `lambda/`. `aws logs tail --since 5m` clean (INIT_START + healthy request lines, no errors). |
+| 6 | CloudWatch `[cache]` loop | 🟡 **MANUAL** | See "Remaining manual" below. Step-3 probe already confirms caching works; live-traffic logs are the production confirmation. |
 | 7 | This report | ✅ **DONE** | `docs/H_CLOSEOUT.md`. |
 
-> **"Both remotes":** this repo has a **single** git remote (`origin`) in this
-> environment. All pushes went to `origin`. If a second remote exists on your setup,
-> `git push <other> main` mirrors it.
+> **"Both remotes":** synced. `origin` (Lumi2.0) has the H merge + closeout + eval JSON;
+> `hadi` (Hadi) was fast-forwarded to match on 2026-07-09.
 
 ### Note on the step-1 evidence JSON
-The task asked to commit `test-transcripts/_summarizer_eval.json` as evidence. That file
-is **absent from the repo** and could not be regenerated here (it requires a live Bedrock
-run — no creds). Rather than fabricate it, the doc was updated from your reported per-case
-results (190 / 232 / 199 / 325 tok, all PASS). To attach the real evidence file:
-```bash
-# On the machine where the eval ran today (it writes the file on each run):
-python3 synthetic_data/eval_summarizer.py           # regenerates test-transcripts/_summarizer_eval.json
-git add test-transcripts/_summarizer_eval.json
-git commit -m "test: summarizer eval evidence (4/4, 2026-07-08)"
-git push origin main
-```
+Committed 2026-07-09 as `e2e9d57` "docs: summarizer eval evidence JSON". Pushed to both
+`origin/main` and `hadi/main`. Contents: model `global.anthropic.claude-sonnet-4-6`, all
+4 cases PASS (190 / 232 / 199 / 325 tok).
 
 ---
 
@@ -149,10 +141,14 @@ Nothing was deployed from here, so there is no live rollback to record. The pre-
 (`publish-version "pre-H caching release"` + `~/Desktop/lumi-lambda-rollback-preH.zip`) is the
 anchor you create in step 4 before `update-function-code`.
 
+## Remaining manual
+Send 2+ chat messages in one class, then:
+```bash
+aws logs tail /aws/lambda/lumi-claude-proxy --since 10m --region us-east-1 | grep cache
+```
+Turn-2 `cache_read` ≈ SEG1 size proves live savings in production traffic.
+
 ## Still open / pending
-- **The caching go/no-go** (step 3 probe) — the single most important unknown.
-- **Deploy + post-deploy verify + log watch** (steps 4–6) — the whole AWS half.
-- **Eval evidence JSON** — commit from the machine that ran the eval (command above).
 - **Pending sections-fix cloud session** — unrelated, tracked separately.
 
 ---
