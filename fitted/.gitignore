@@ -1,0 +1,27 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+
+# env
+.env
+.env.local
+.env*.local
+
+# database (SQLite dev DB)
+/prisma/*.db
+/prisma/*.db-journal
+
+# uploaded closet photos (dev image storage) — keep the folder, ignore contents
+/public/uploads/*
+!/public/uploads/.gitkeep
+
+# misc
+.DS_Store
+*.tsbuildinfo

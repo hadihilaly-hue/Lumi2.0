@@ -1,0 +1,68 @@
+// Fitted — Prisma schema.
+//
+// Dev uses SQLite. SQLite has no native array type, so list-valued fields
+// (colors, seasonSuitability, styleTags) are stored as JSON-encoded TEXT and
+// (de)serialized in src/lib/items.ts. When moving to Postgres/Supabase:
+//   - change datasource.provider to "postgresql" and DATABASE_URL,
+//   - optionally convert the JSON string fields to `String[]` (native arrays)
+//     and drop the JSON helpers.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model ClothingItem {
+  id          String   @id @default(cuid())
+  imageUrl    String
+  category    String // shirt, t-shirt, polo, sweater, hoodie, jacket, pants, jeans, shorts, shoes, accessory
+  subcategory String? // e.g. "oxford button-down", "chino shorts", "running shoes"
+
+  // JSON-encoded string arrays (see note above).
+  colors            String @default("[]") // ["navy", "white"]
+  seasonSuitability String @default("[]") // ["summer", "spring"]
+  styleTags         String @default("[]") // ["preppy", "athletic"]
+
+  pattern        String  @default("solid") // solid, striped, plaid, graphic, etc.
+  formalityScore Int     @default(5) // 1 (gym) .. 10 (black tie)
+  isAvailable    Boolean @default(true) // false = in laundry / unavailable
+
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  outfitItems OutfitItem[]
+
+  @@index([category])
+  @@index([formalityScore])
+}
+
+model Outfit {
+  id               String    @id @default(cuid())
+  eventDescription String
+  vibeLabel        String // "Safe & Sharp", "A Little Bolder", "Statement"
+  explanation      String
+  isFavorite       Boolean   @default(false)
+  wornAt           DateTime? // last time this outfit was worn (null = never)
+  createdAt        DateTime  @default(now())
+
+  items OutfitItem[]
+
+  @@index([isFavorite])
+  @@index([wornAt])
+}
+
+model OutfitItem {
+  id       String @id @default(cuid())
+  outfitId String
+  itemId   String
+  slot     String // top | bottom | shoes | outerwear | accessory
+
+  outfit Outfit       @relation(fields: [outfitId], references: [id], onDelete: Cascade)
+  item   ClothingItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([outfitId])
+  @@index([itemId])
+}
