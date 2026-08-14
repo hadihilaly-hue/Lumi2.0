@@ -60,7 +60,8 @@ place that encodes/decodes them.
 ## Build status
 
 - [x] **Step 1** — scaffold, schema, storage abstraction, app shell + nav
-- [ ] Step 2 — upload + AI classification + closet grid (edit/delete)
+- [x] **Step 2** — upload (drag-drop + mobile capture) + AI vision classification
+      with review-before-save + filterable closet grid (edit / delete / laundry)
 - [ ] Step 3 — outfit generation (3 options, item photo cards)
 - [ ] Step 4 — shuffle-a-slot, favorites, worn-recently tracking
 - [ ] Step 5 — loading/empty/error-state polish

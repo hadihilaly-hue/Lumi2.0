@@ -32,3 +32,68 @@ input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
+/* Shared form + button primitives. */
+@layer components {
+  .input {
+    width: 100%;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    background: color-mix(in srgb, var(--background) 40%, white);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.95rem;
+    outline: none;
+  }
+  .input:focus {
+    border-color: rgba(0, 0, 0, 0.5);
+  }
+  @media (prefers-color-scheme: dark) {
+    .input {
+      border-color: rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .input:focus {
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border-radius: 0.75rem;
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s ease, background 0.15s ease;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: #1c1917;
+    color: #fafaf9;
+  }
+  .btn-primary:hover:not(:disabled) {
+    opacity: 0.88;
+  }
+  @media (prefers-color-scheme: dark) {
+    .btn-primary {
+      background: #f5f5f4;
+      color: #1c1917;
+    }
+  }
+  .btn-ghost {
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    background: transparent;
+    color: inherit;
+  }
+  @media (prefers-color-scheme: dark) {
+    .btn-ghost {
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+  }
+}
