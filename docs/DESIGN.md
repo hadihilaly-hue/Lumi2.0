@@ -235,7 +235,9 @@ backdrop `rgba(0,0,0,.6)`. The only elements in the product that cast a shadow.
 - **Emoji in the interface.** Not in cards, buttons, banners, empty states,
   privacy notes, or headings. Icons are 14px or 16px stroke SVG at 1.5 stroke
   width in `currentColor`. Emoji inside a student's or teacher's own typed
-  content is their business and passes through untouched.
+  content is their business and passes through untouched. Third-party brand
+  marks (the Google sign-in mark) are exempt from `currentColor` and keep their
+  official colors.
 - **Colored status pills.** No green/amber/red fills. Status is text plus a
   neutral dot.
 - **A second accent hue.** One accent, three uses.

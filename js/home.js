@@ -136,6 +136,11 @@ export function timeOfDayGreeting(now = new Date()) {
  * Deterministic 8-slot accent-bar palette seeded from the mockup's colors.
  * Same course name → same color across every render, so students learn to
  * recognize their classes by tile hue. `hashPalette` is pure.
+ *
+ * TODO(dead code, Session 2): the colored card accent bar these fed was removed
+ * from `renderCard` — DESIGN.md allows no colored card edge. Nothing in the app
+ * calls `hashPalette` any more; both are kept only because test/home.test.mjs
+ * covers them. Delete both, and those tests, in a cleanup pass.
  */
 export const ACCENT_PALETTE = [
   '#C76D3D', '#6B8A6B', '#4A7A7A', '#3D6AAB',
@@ -286,14 +291,6 @@ export function sortCards(cards, isTestMode) {
 
 // ── Card rendering ──────────────────────────────────────────────────────────
 
-// Course-name → 1-char glyph for the icon tile. Falls back to the first letter
-// of the course. Deterministic and pure so tests / snapshots are stable.
-function courseGlyph(course) {
-  const c = String(course || '').trim();
-  if (!c) return '·';
-  return c[0].toUpperCase();
-}
-
 /**
  * Text for the snippet line. Precedence per §2.1 + §9 D1-B:
  *   • last-conv title (or preview) → "…"
@@ -341,12 +338,15 @@ function renderCard(card) {
         .filter(Boolean).join(' · '),
     }),
   ]);
-  const headChildren = [
-    el('div', { class: 'home-card-icon', text: courseGlyph(card.course) }),
-    titles,
-  ];
+  const headChildren = [titles];
+  // Urgency reads as a neutral dot plus a visible label — never a colored edge
+  // or a filled chip (DESIGN.md §6, screen 2). The label replaces the old
+  // aria-label-only dot, so the state is announced and seen the same way.
   if (card.hasUrgentHw) {
-    headChildren.push(el('span', { class: 'home-card-dot', 'aria-label': 'Due soon' }));
+    headChildren.push(el('span', { class: 'home-card-status' }, [
+      el('span', { class: 'home-card-dot' }),
+      el('span', { class: 'home-card-status-label', text: 'Due soon' }),
+    ]));
   }
   const head = el('div', { class: 'home-card-head' }, headChildren);
 
@@ -365,19 +365,16 @@ function renderCard(card) {
   }
 
   const body = el('div', { class: 'home-card-body' }, [head, snippet, chipRow]);
-  const accent = el('div', { class: 'home-card-accent' });
-  accent.style.background = hashPalette(card.course);
 
   const cls = ['home-card'];
   if (!card.ready) cls.push('home-card--locked');
-  if (card.ready && card.hasUrgentHw) cls.push('home-card--urgent');
 
   const node = el('button', {
     class: cls.join(' '),
     'data-course': card.course,
     'data-teacher': card.teacher,
     type: 'button',
-  }, [accent, body]);
+  }, [body]);
 
   node.addEventListener('click', () => {
     if (card.ready) {
