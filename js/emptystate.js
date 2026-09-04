@@ -1,7 +1,6 @@
 import { loadConv, openGeneralChat } from './conversation.js';
 import { getHwTasks } from './homework.js';
 import { dateDiffDays } from './projects.js';
-import { getStudentName } from './prompts.js';
 import { renderSidebar } from './sidebar.js';
 import { S, SB, messagesEl, msgInput } from './state.js';
 import { getConvs } from './storage.js';
@@ -12,25 +11,15 @@ import { autoGrow, escHtml, openSidebar, updateSendBtn } from './ui.js';
 export function showWelcome() {
   if (document.getElementById('welcome')) return;
   messagesEl.innerHTML = '';
-  const name = getStudentName();
-  const greeting = name !== 'there' ? `Welcome back, ${escHtml(name)}!` : `Hi, I'm Lumi!`;
   const w = document.createElement('div');
   w.className = 'empty-state'; w.id = 'welcome';
+  // Both actions stay: on a narrow viewport the sidebar is collapsed, so
+  // "choose a class" is the only way through without #emptyStudyBtn.
   w.innerHTML = `
-    <div class="empty-orb">✦</div>
-    <div class="empty-greeting">${greeting}</div>
-    <div class="empty-sub">Pick up where you left off, or start something new.</div>
-    <div class="empty-cards">
-      <div class="empty-card" id="emptyGenBtn">
-        <div class="empty-card-icon">💬</div>
-        <div class="empty-card-title">General Chat</div>
-        <div class="empty-card-sub">Just talk to Lumi about anything</div>
-      </div>
-      <div class="empty-card" id="emptyStudyBtn">
-        <div class="empty-card-icon">📚</div>
-        <div class="empty-card-title">Study with a Teacher</div>
-        <div class="empty-card-sub">Pick a subject from the sidebar</div>
-      </div>
+    <p class="empty-text">Choose a class to study with your teacher, or start a general chat.</p>
+    <div class="empty-actions">
+      <button class="empty-action" id="emptyStudyBtn" type="button">Choose a class</button>
+      <button class="empty-action" id="emptyGenBtn" type="button">Start a general chat</button>
     </div>`;
   messagesEl.appendChild(w);
   w.querySelector('#emptyGenBtn').addEventListener('click', openGeneralChat);
@@ -141,12 +130,6 @@ export function renderEmptyState(profile, course) {
     prompts[0] = hwOverride;
   }
 
-  // Skip the "Welcome back" greeting when the teacher's pinned welcome
-  // card is already going to address the student — avoids double-greeting.
-  const hasPinnedWelcome = !!profile?.welcome_message;
-  const studentName = getStudentName();
-  const showGreeting = !hasPinnedWelcome && studentName !== 'there';
-
   // "Where you left off" — most recent prior conv for this (course, teacher),
   // excluding the just-opened empty thread. Falls through silently if none.
   const teacher = S.tutorCtx?.teacher;
@@ -158,33 +141,23 @@ export function renderEmptyState(profile, course) {
       && (c.title || c.preview))
     .sort((a, b) => (b.ts || 0) - (a.ts || 0))[0] || null;
 
-  // Card category tags — fixed slot mapping per design (visual only,
-  // not derived from prompt content).
-  const TAGS = ['STUDY', 'FEEDBACK', 'CONCEPT'];
-
   const el = document.createElement('div');
   el.className = 'empty-state-prompts';
   el.id = 'emptyStatePrompts';
+  const resumeTitle = priorConv
+    ? (priorConv.title || priorConv.preview || 'Previous conversation')
+    : '';
   el.innerHTML = `
-    ${showGreeting ? `<div class="esp-greeting">Welcome back, ${escHtml(studentName)}.</div>` : ''}
-    <div class="esp-divider"><span>Your conversation will start below</span></div>
-    <div class="esp-cards">
+    <div class="esp-chips">
       ${prompts.map((p, i) => `
-        <button class="esp-card" data-index="${i}">
-          <div class="esp-card-tag">${TAGS[i] || ''}</div>
-          <div class="esp-card-text">${escHtml(p)}</div>
-        </button>`).join('')}
+        <button class="esp-chip" data-index="${i}" type="button">${escHtml(p)}</button>`).join('')}
     </div>
     ${priorConv ? `
-      <button class="esp-resume">
-        <span class="esp-resume-label">Where you left off</span>
-        <span class="esp-resume-title">${escHtml(priorConv.title || priorConv.preview || 'Previous conversation')}</span>
-        <span class="esp-resume-arrow">→</span>
-      </button>` : ''}
+      <button class="esp-resume" type="button">Pick up where you left off — ${escHtml(resumeTitle)}</button>` : ''}
   `;
 
-  // Wire card clicks
-  el.querySelectorAll('.esp-card').forEach(card => {
+  // Wire chip clicks
+  el.querySelectorAll('.esp-chip').forEach(card => {
     card.addEventListener('click', () => {
       const idx = parseInt(card.dataset.index, 10);
       msgInput.value = prompts[idx];

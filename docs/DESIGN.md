@@ -278,13 +278,17 @@ field matches the standard form field exactly. No icons in the card headers.
 
 ### 3. New thread — pinned welcome + starters
 Pinned welcome card at the top: `--surface`, 1px `--border`, `--radius-md`,
-`--space-4` padding, `FROM YOUR TEACHER` in `--t-micro` `--text-3`, body in
-`--t-prose` serif. Below it, three starter chips as secondary buttons, stacked
-left-aligned.
+`--space-4` padding, the teacher's name as `FROM MR. HARRIS` in `--t-micro`
+`--text-3`, body in `--t-prose` serif, italic serif signoff. Below it, three
+starter chips as secondary buttons, stacked left-aligned, text only.
 
-**Done:** the orange washi-tape graphic is gone. No avatar inside the card. The
-chips wrap without reflowing the card. Empty chat area below shows nothing at
-all — no placeholder, no icon.
+One ghost link may sit under the chips — "Pick up where you left off — {title}"
+— and only when there is a thread to resume. It is a feature, not decoration.
+
+**Done:** the orange washi-tape graphic is gone. No avatar inside the card, no
+"written during setup" tag, no subline, no divider. The chips wrap without
+reflowing the card. Nothing else in the empty chat area — no greeting, no
+divider, no placeholder, no icon.
 
 ### 4. Active conversation
 Lumi in serif at 68ch, student messages right in `--surface` bubbles, thinking

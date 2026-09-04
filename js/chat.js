@@ -265,7 +265,7 @@ Remember: help them THINK through the project, never do it for them. Ask guiding
 function renderError(msg) {
   const el = document.createElement('div');
   el.className = 'msg lumi';
-  el.innerHTML = `<div class="msg-bubble" style="background:rgba(255,80,80,.08);border-color:rgba(255,80,80,.25);color:#ff8585;">⚠️ ${escHtml(msg)}</div>`;
+  el.innerHTML = `<div class="msg-error">${escHtml(msg)}</div>`;
   messagesEl.appendChild(el);
   scrollBottom();
 }
@@ -318,18 +318,7 @@ export function renderPinnedWelcome(teacher, profile, course) {
   const card = document.createElement('div');
   card.className = 'pinned-welcome';
   card.innerHTML = `
-    <div class="pw-tape" aria-hidden="true"></div>
-    <div class="pw-head">
-      <div class="pw-avatar">${escHtml(initials)}</div>
-      <div class="pw-head-text">
-        <div class="pw-head-row">
-          <span class="pw-name">${escHtml(dName)}</span>
-          <span class="pw-tag">FROM ${escHtml(tagName)} · WRITTEN DURING SETUP</span>
-        </div>
-        <div class="pw-subline">Pinned to every new thread · they wrote this themselves, not AI</div>
-      </div>
-    </div>
-    <div class="pw-divider"></div>
+    <div class="pw-tag">FROM ${escHtml(tagName)}</div>
     <div class="pw-body">${bodyHtml}</div>
     <div class="pw-signoff">${escHtml(signoff)}</div>
   `;
@@ -478,14 +467,9 @@ function fmtText(text) {
 
 function makeTyping() {
   const wrap = document.createElement('div'); wrap.className = 'msg lumi typing-msg';
-  const hd   = document.createElement('div'); hd.className = 'msg-head';
-  const av   = document.createElement('div'); av.className = 'msg-avatar';
-  av.textContent = S.tutorCtx ? teacherInitials(S.tutorCtx.teacher) : '✦';
-  const nm   = document.createElement('span'); nm.className = 'msg-name';
-  nm.textContent = S.tutorCtx
+  const name = S.tutorCtx
     ? teacherDisplayName(S.tutorCtx.teacher, S.tutorCtx.teacherProfile)
     : 'Lumi';
-  hd.append(av, nm);
 
   // Subtext is dynamic when the just-sent user message had an attachment
   // (multimodal content array). Otherwise: plain "is thinking".
@@ -495,12 +479,12 @@ function makeTyping() {
   // task. Today's two-phrasing fallback is the minimum viable surface.
   const lastMsg = S.messages[S.messages.length - 1];
   const hasAttachment = Array.isArray(lastMsg?.content);
-  const subtext = `${nm.textContent} is thinking${hasAttachment ? ' · reading your packet' : ''}`;
+  const subtext = `${name} is thinking${hasAttachment ? ' · reading your packet' : ''}`;
 
   const ind = document.createElement('div');
   ind.className = 'typing';
   ind.innerHTML = `<span class="typing-dot"></span><span class="typing-text">${escHtml(subtext)}</span>`;
-  wrap.append(hd, ind);
+  wrap.appendChild(ind);
   return wrap;
 }
 
