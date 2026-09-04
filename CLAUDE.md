@@ -1051,7 +1051,11 @@ live with spoofed ids.
     but throw "not yet implemented".
   - Server-side chip generation (`GET /suggested-prompts`) also runs through
     the same forced model (`callClaude`, max_tokens 300, 8s server timeout).
-  - Streaming enabled for student chat (ReadableStream + getReader).
+  - Streaming enabled for student chat (ReadableStream + getReader) — at the
+    TRANSPORT layer only. `callAPI` (js/api.js) buffers the whole SSE stream
+    into a string and returns it; `fetchLumi` then calls `renderMsg` ONCE with
+    the complete text. Nothing renders incrementally. Token-by-token rendering
+    is unbuilt.
 - **Markdown rendering:** Custom lightweight renderer in app.js (no library)
 - **Hosting:** GitHub Pages (static deploy)
 - **Schema:** `migration/rds-schema.sql` (+ `rds-sis-tables.sql`, `rds-app-users.sql`, `rds-school-domains.sql`) is the live RDS schema; supabase_setup.sql is the historical Supabase-era definition (RLS included) — do not apply it anywhere

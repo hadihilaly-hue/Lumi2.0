@@ -565,59 +565,69 @@ a{color:inherit;text-decoration:none}
 }
 .tutor-badge strong{color:var(--text);font-weight:var(--w-semi)}
 
-/* messages */
-.msg{display:flex;flex-direction:column;max-width:78%;animation:msgIn .3s ease forwards}
-.msg.user{align-self:flex-end;align-items:flex-end}
-.msg.lumi{align-self:flex-start;align-items:flex-start}
-.msg-head{display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-1)}
+/* messages — DESIGN.md §4. Measure is set on the message, not the content,
+   so appended text can never widen the column. */
+.msg{display:flex;flex-direction:column;min-width:0;animation:msgIn var(--dur) var(--ease) forwards}
+/* min() so the measure caps the column on desktop and the viewport caps it on
+   a narrow screen — the message never exceeds either. */
+.msg.user{align-self:flex-end;align-items:flex-end;max-width:min(var(--measure-user),100%)}
+.msg.lumi{align-self:flex-start;align-items:flex-start;max-width:min(var(--measure-prose),100%)}
+.msg-head{display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2)}
 .msg-avatar{
-  width:28px;height:28px;border-radius:var(--radius-full);
+  width:20px;height:20px;border-radius:var(--radius-full);
   background:var(--surface-2);color:var(--text-2);
   display:flex;align-items:center;justify-content:center;
   font-size:var(--t-micro);font-weight:var(--w-semi);letter-spacing:var(--track-micro);flex-shrink:0;
 }
-.msg-name{font-family:var(--font-serif);font-size:var(--t-ui);font-weight:var(--w-medium);color:var(--text);letter-spacing:var(--track-title)}
-.msg-bubble{padding:var(--space-1) 0;font-size:var(--t-user);line-height:var(--lh-user);word-wrap:break-word;color:var(--text);}
-.msg.lumi .msg-bubble{font-family:var(--font-serif);font-size:var(--t-prose);line-height:var(--lh-prose);max-width:var(--measure-prose)}
+.msg-name{font-size:var(--t-strong);font-weight:var(--w-medium);color:var(--text)}
+
+/* Lumi: no bubble, no border — serif prose on the ground. */
+.msg-bubble{padding:0;word-wrap:break-word;color:var(--text);min-width:0;}
+.msg.lumi .msg-bubble{
+  width:100%;
+  font-family:var(--font-serif);font-size:var(--t-prose);line-height:var(--lh-prose);
+}
+/* Wide content scrolls inside itself; the column never widens. */
+.msg.lumi .msg-bubble pre,
+.msg.lumi .msg-bubble .katex-display{max-width:100%;overflow-x:auto}
+.msg.lumi .msg-bubble img{max-width:100%}
+
+/* Student: right-aligned card, sans. */
 .msg.user .msg-bubble{
-  padding:var(--space-3) var(--space-4);background:var(--surface);
-  border:1px solid var(--border);border-radius:var(--radius-lg);
-  font-size:var(--t-strong);line-height:var(--lh-user);color:var(--text);
+  padding:var(--space-3);background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius-md);
+  font-size:var(--t-user);line-height:var(--lh-user);color:var(--text);
 }
-/* Pinned welcome card — top of every new tutor thread. Phase 5a markup;
-   Phase 5b wires the welcome_message column into the body. */
+
+/* Error — text only, no fill, no border. */
+.msg-error{font-size:var(--t-ui);line-height:var(--lh-ui);color:var(--danger);}
+
+/* Pinned welcome — tag, prose, signoff. No tape, no avatar, no divider. */
 .pinned-welcome{
-  position:relative;width:100%;max-width:720px;align-self:center;
+  width:100%;max-width:var(--measure-prose);align-self:flex-start;
   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);
-  padding:var(--space-8) var(--space-8) var(--space-6);margin:0 auto;
+  padding:var(--space-4);
 }
-.pw-tape{
-  position:absolute;top:-9px;left:50%;
-  transform:translateX(-50%) rotate(-1.4deg);
-  width:68px;height:18px;background:var(--text-2);
-  border-radius:var(--radius-sm);opacity:.88;
-  
+.pw-tag{
+  font-size:var(--t-micro);font-weight:var(--w-semi);line-height:var(--lh-micro);
+  letter-spacing:var(--track-micro);text-transform:uppercase;color:var(--text-3);
+  margin-bottom:var(--space-3);
 }
-.pw-head{display:flex;align-items:flex-start;gap:var(--space-3);margin-bottom:var(--space-1);}
-.pw-avatar{
-  width:36px;height:36px;border-radius:var(--radius-full);
-  background:var(--surface-2);color:var(--text-2);
-  display:flex;align-items:center;justify-content:center;
-  font-size:var(--t-ui);font-weight:var(--w-semi);letter-spacing:var(--track-micro);flex-shrink:0;
-}
-.pw-head-text{flex:1;min-width:0;}
-.pw-head-row{display:flex;align-items:baseline;gap:var(--space-3);flex-wrap:wrap;}
-.pw-name{font-family:var(--font-serif);font-size:var(--t-title);font-weight:var(--w-medium);color:var(--text);letter-spacing:var(--track-title);}
-.pw-tag{font-size:var(--t-micro);font-weight:var(--w-semi);color:var(--text-2);text-transform:uppercase;letter-spacing:var(--track-micro);}
-.pw-subline{font-size:var(--t-meta);color:var(--text-2);margin-top:var(--space-1);font-style:italic;}
-.pw-divider{height:1px;border-top:1px dashed var(--border);margin:var(--space-4) 0 var(--space-4);}
-.pw-body{font-family:var(--font-serif);font-size:var(--t-user);line-height:var(--lh-prose);color:var(--text);}
+.pw-body{font-family:var(--font-serif);font-size:var(--t-prose);line-height:var(--lh-prose);color:var(--text);}
 .pw-body p{margin:0;}
 .pw-body p+p{margin-top:var(--space-3);}
-.pw-signoff{font-family:var(--font-serif);font-style:italic;font-size:var(--t-strong);color:var(--text-2);margin-top:var(--space-4);text-align:right;}
+.pw-signoff{
+  font-family:var(--font-serif);font-style:italic;font-size:var(--t-user);
+  color:var(--text-2);margin-top:var(--space-4);
+}
 
 /* feedback row below Lumi messages */
-.msg-feedback{display:flex;align-items:center;gap:var(--space-1);margin:var(--space-2) 0 var(--space-1);}
+.msg-feedback{
+  display:flex;align-items:center;gap:var(--space-1);margin:var(--space-3) 0 0;
+  opacity:0;transition:opacity var(--dur) var(--ease);
+}
+.msg:hover .msg-feedback,
+.msg:focus-within .msg-feedback{opacity:1}
 .msg-fb-btn{width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;border-radius:var(--radius-sm);color:var(--text-3);transition:color .15s,background .15s;padding:0;}
 .msg-fb-btn svg{width:14px;height:14px;}
 .msg-fb-btn:hover{color:var(--text);background:var(--surface-2);}
@@ -636,16 +646,23 @@ a{color:inherit;text-decoration:none}
 .attach-size{font-size:var(--t-micro);color:var(--text-2);margin-top:var(--space-1)}
 .attach-remove{width:22px;height:22px;background:var(--surface-2);border:none;border-radius:var(--radius-full);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-2);flex-shrink:0;transition:all .15s;font-size:var(--t-strong);line-height:1;}
 .attach-remove:hover{background:var(--surface-2);color:var(--danger)}
-.attach-btn{width:30px;height:30px;background:none;border:none;cursor:pointer;display:none;align-items:center;justify-content:center;color:var(--text-3);border-radius:var(--radius-md);transition:color .2s;flex-shrink:0;}
-.input-wrap:has(.msg-input:focus:placeholder-shown) .attach-btn{display:flex}
+.attach-btn{width:30px;height:30px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-3);border-radius:var(--radius-sm);transition:color var(--dur) var(--ease);flex-shrink:0;}
 .attach-btn:hover{color:var(--text)}
 .attach-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8}
-.input-wrap{display:flex;align-items:flex-end;gap:var(--space-2);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-2) var(--space-2) var(--space-2) var(--space-2);transition:border-color .2s;}
-.input-wrap:focus-within{border-color:var(--border-strong)}
-.msg-input{flex:1;background:none;border:none;outline:none;color:var(--text);font-family:inherit;font-size:var(--t-strong);line-height:var(--lh-user);resize:none;max-height:120px;overflow-y:auto;}
+/* Input bar — DESIGN.md §4. Focus moves the border to --accent; no glow,
+   no shadow, no background change. */
+.input-wrap{
+  display:flex;align-items:flex-end;gap:var(--space-2);
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);
+  padding:var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  transition:border-color var(--dur) var(--ease);
+}
+.input-wrap:focus-within{border-color:var(--accent)}
+.msg-input{flex:1;background:none;border:none;outline:none;color:var(--text);font-family:inherit;font-size:var(--t-user);line-height:var(--lh-user);resize:none;max-height:120px;overflow-y:auto;}
 .msg-input::placeholder{color:var(--text-3)}
-.send-btn{width:34px;height:34px;background:var(--surface-2);border:none;border-radius:var(--radius-md);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s, transform .15s;}
-.send-btn svg{width:15px;height:15px;fill:var(--text-3);transition:fill .2s}
+/* The only accent-filled surface in the product. */
+.send-btn{width:28px;height:28px;background:var(--surface-2);border:none;border-radius:var(--radius-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background var(--dur) var(--ease);}
+.send-btn svg{width:14px;height:14px;fill:var(--text-3);transition:fill var(--dur) var(--ease)}
 .send-btn:not(:disabled){background:var(--accent)}
 .send-btn:not(:disabled) svg{fill:var(--bg)}
 .send-btn:not(:disabled):hover{background:var(--accent-hover)}
@@ -711,15 +728,13 @@ a{color:inherit;text-decoration:none}
   .messages{padding:var(--space-4) var(--space-3)}
   .input-area{padding:var(--space-2) var(--space-3)}
   .msg{max-width:92%}
-  .empty-cards{flex-direction:column;align-items:stretch;max-width:100%}
-  .empty-card{min-width:unset}
+  .empty-actions{flex-direction:column;gap:var(--space-2)}
   .general-prompt-cards{grid-template-columns:1fr}
 }
 
 @media(max-width:375px){
   .sb-my-class-item{padding:var(--space-1) var(--space-1);font-size:var(--t-meta)}
   .general-prompt-cards{grid-template-columns:1fr}
-  .empty-greeting{font-size:var(--t-prose)}
 }
 
 /* ─── ONBOARDING ─────────────────────────────────────────── */
@@ -746,16 +761,19 @@ a{color:inherit;text-decoration:none}
 .ob-cta:not([disabled]):hover{opacity:.88}
 
 /* ─── EMPTY STATE ────────────────────────────────────────── */
-.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:var(--space-4);padding:var(--space-8) var(--space-6);text-align:center;}
-.empty-orb{width:58px;height:58px;border-radius:var(--radius-lg);background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:var(--t-display);margin-bottom:var(--space-1);}
-.empty-greeting{font-size:var(--t-title);font-weight:var(--w-medium);color:var(--text)}
-.empty-sub{font-size:var(--t-ui);color:var(--text-2);max-width:260px;line-height:var(--lh-prose)}
-.empty-cards{display:flex;gap:var(--space-3);margin-top:var(--space-1);width:100%;max-width:440px;justify-content:center;}
-.empty-card{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4) var(--space-4);cursor:pointer;transition:all .18s;text-align:left;min-width:140px;}
-.empty-card:hover{border-color:var(--border-strong);background:var(--surface-2);}
-.empty-card-icon{font-size:var(--t-title);margin-bottom:var(--space-2)}
-.empty-card-title{font-size:var(--t-ui);font-weight:var(--w-semi);color:var(--text);margin-bottom:var(--space-1)}
-.empty-card-sub{font-size:var(--t-meta);color:var(--text-2);line-height:var(--lh-user)}
+/* Empty state — one line, left-aligned, no icon, no illustration. */
+.empty-state{
+  display:flex;flex-direction:column;align-items:flex-start;
+  gap:var(--space-3);padding:var(--space-8) var(--space-6);
+}
+.empty-text{font-size:var(--t-ui);line-height:var(--lh-ui);color:var(--text-2);max-width:var(--measure-prose);}
+.empty-actions{display:flex;gap:var(--space-3);flex-wrap:wrap;}
+.empty-action{
+  background:none;border:none;padding:0;cursor:pointer;font-family:inherit;
+  font-size:var(--t-ui);line-height:var(--lh-ui);color:var(--text-2);
+  transition:color var(--dur) var(--ease);
+}
+.empty-action:hover{color:var(--text)}
 
 /* ─── GENERAL CHAT PROMPT CARDS ─────────────────────────── */
 .general-prompt-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--space-2);max-width:480px;width:100%;margin:var(--space-3) auto 0}
@@ -1554,68 +1572,34 @@ body.signin-page{
 .hw-detail-row{display:flex;justify-content:space-between;align-items:center;font-size:var(--t-strong);padding:var(--space-2) 0;border-bottom:1px solid var(--border)}
 .hw-detail-label{color:var(--text-2);font-weight:var(--w-medium)}
 
-/* ─── EMPTY STATE SUGGESTED PROMPTS ─────────────────────── */
+/* ─── STARTER CHIPS ──────────────────────────────────────── */
+/* DESIGN.md §6 screen 3: three chips as secondary buttons, stacked,
+   left-aligned. Nothing else in the empty area. */
 .empty-state-prompts{
-  display:flex;flex-direction:column;align-items:center;
-  padding:var(--space-2) var(--space-4) var(--space-8);width:100%;max-width:780px;margin:0 auto;
-  text-align:center;
+  display:flex;flex-direction:column;align-items:flex-start;gap:var(--space-3);
+  width:100%;max-width:var(--measure-prose);
+  padding:var(--space-4) 0 var(--space-8);
 }
-.esp-greeting{
-  font-family:var(--font-serif);font-size:var(--t-display);font-weight:var(--w-medium);
-  letter-spacing:var(--track-title);color:var(--text);margin:var(--space-4) 0 var(--space-1);
+.esp-chips{display:flex;flex-direction:column;align-items:flex-start;gap:var(--space-2);}
+.esp-chip{
+  display:inline-flex;align-items:center;
+  min-height:30px;padding:var(--space-2) var(--space-3);
+  background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);
+  color:var(--text);font-family:inherit;font-size:var(--t-ui);font-weight:var(--w-medium);
+  line-height:var(--lh-ui);text-align:left;cursor:pointer;
+  transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease);
 }
-.esp-divider{
-  display:flex;align-items:center;gap:var(--space-3);width:100%;
-  margin:var(--space-6) 0 var(--space-4);
-  font-size:var(--t-micro);font-weight:var(--w-semi);color:var(--text-3);
-  text-transform:uppercase;letter-spacing:var(--track-micro);
-}
-.esp-divider::before,.esp-divider::after{
-  content:'';flex:1;border-top:1px dashed var(--border);
-}
-.esp-cards{
-  display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-3);width:100%;
-}
-@media (max-width:720px){
-  .esp-cards{grid-template-columns:1fr;}
-}
-.esp-card{
-  display:flex;flex-direction:column;align-items:flex-start;gap:var(--space-2);
-  padding:var(--space-4) var(--space-4);min-height:106px;
-  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);
-  font-family:inherit;cursor:pointer;text-align:left;
-  transition:border-color .15s,background .15s,transform .15s;
-}
-.esp-card:hover{
-  border-color:var(--border-strong);background:var(--surface);
-  
-}
-.esp-card-tag{
-  font-size:var(--t-micro);font-weight:var(--w-semi);color:var(--text-2);
-  text-transform:uppercase;letter-spacing:var(--track-micro);
-}
-.esp-card-text{
-  font-family:var(--font-serif);font-size:var(--t-user);font-weight:var(--w-medium);
-  line-height:var(--lh-micro);color:var(--text);
-}
+.esp-chip:hover{background:var(--surface);border-color:var(--border-strong);}
+/* Resume — a ghost link, not a card. Rendered only when there is a thread
+   to resume (DESIGN.md §6 screen 3). */
 .esp-resume{
-  display:flex;align-items:center;gap:var(--space-3);width:100%;
-  margin-top:var(--space-3);padding:var(--space-3) var(--space-4);
-  background:none;border:1px solid var(--border);border-radius:var(--radius-md);
-  color:var(--text);font-family:inherit;font-size:var(--t-ui);
-  text-align:left;cursor:pointer;
-  transition:border-color .15s,background .15s;
+  background:none;border:none;padding:0;cursor:pointer;font-family:inherit;
+  font-size:var(--t-ui);line-height:var(--lh-ui);color:var(--text-2);
+  text-align:left;max-width:100%;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  transition:color var(--dur) var(--ease);
 }
-.esp-resume:hover{border-color:var(--border-strong);background:var(--surface);}
-.esp-resume-label{
-  font-size:var(--t-micro);font-weight:var(--w-semi);color:var(--text-3);
-  text-transform:uppercase;letter-spacing:var(--track-micro);flex-shrink:0;
-}
-.esp-resume-title{
-  flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  font-weight:var(--w-medium);color:var(--text);
-}
-.esp-resume-arrow{color:var(--text-3);font-size:var(--t-strong);flex-shrink:0;}
+.esp-resume:hover{color:var(--text)}
 
 /* ─── Student home redesign v1 (docs/STUDENT_HOME_REDESIGN.md §4.1) ─────────
    Flag-gated behind body.home-redesign-v1 for the 2-week rollback window.
