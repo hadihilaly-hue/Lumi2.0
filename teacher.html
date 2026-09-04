@@ -13,659 +13,8 @@
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js" defer></script>
-<style>
-/* ─── TEACHER PORTAL OVERRIDES ─────────────────────────────── */
-body { overflow: auto; display: block; }
-
-/* ─── AUTH LOADING ─────────────────────────────────────────── */
-#authLoading {
-  position: fixed; inset: 0; background: var(--bg);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 999; flex-direction: column; gap: 14px;
-}
-.auth-spinner {
-  width: 36px; height: 36px; border: 3px solid var(--border);
-  border-top-color: var(--accent); border-radius: 50%;
-  animation: spin .8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ─── SIGN-IN VIEW ─────────────────────────────────────────── */
-#signinView {
-  min-height: 100vh; display: flex; align-items: center;
-  justify-content: center; padding: 24px;
-}
-.t-signin-box {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 20px; padding: 48px 40px; max-width: 400px; width: 100%;
-  box-shadow: var(--shadow); text-align: center;
-}
-.t-logo { margin-bottom: 32px; }
-.t-logo-mark {
-  width: 52px; height: 52px; background: var(--accent); border-radius: 14px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 22px; margin: 0 auto 12px;
-  box-shadow: 0 0 22px var(--accent-glow);
-  animation: lumiBreathe 3s ease-in-out infinite;
-}
-@keyframes lumiBreathe {
-  0%,100%{box-shadow:0 0 14px var(--accent-glow)}50%{box-shadow:0 0 28px var(--accent-glow)}
-}
-.t-logo h1 { font-size: 22px; font-weight: 600; letter-spacing: -.4px; margin-bottom: 4px; }
-.t-logo p  { font-size: 13px; color: var(--text-muted); }
-.t-signin-title { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
-.t-signin-sub   { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; }
-.t-google-btn {
-  display: flex; align-items: center; justify-content: center; gap: 10px;
-  width: 100%; padding: 12px 20px;
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 10px; color: var(--text);
-  font-family: inherit; font-size: 14px; font-weight: 500;
-  cursor: pointer; transition: all .2s;
-}
-.t-google-btn:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
-.t-google-btn:disabled { opacity: .55; cursor: not-allowed; }
-.t-signin-foot { margin-top: 16px; font-size: 11.5px; color: var(--text-faint); }
-.t-error {
-  display: none; background: rgba(255,80,80,.08); border: 1px solid rgba(255,80,80,.22);
-  border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #B3261E;
-  margin-bottom: 16px; text-align: left;
-}
-:root.dark-mode .t-error { color: #ff8585; }
-
-/* ─── UNKNOWN VIEW ─────────────────────────────────────────── */
-#unknownView {
-  min-height: 100vh; display: flex; align-items: center;
-  justify-content: center; padding: 24px;
-}
-.t-unknown-box {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 20px; padding: 48px 40px; max-width: 400px; width: 100%;
-  box-shadow: var(--shadow); text-align: center;
-}
-.t-unknown-icon { font-size: 40px; margin-bottom: 16px; }
-.t-unknown-box h2 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
-.t-unknown-box p  { font-size: 14px; color: var(--text-muted); margin-bottom: 6px; }
-.t-unknown-email { font-size: 13px; color: var(--accent); margin-bottom: 24px; }
-.t-signout-btn {
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 8px; padding: 10px 20px; color: var(--text-muted);
-  font-family: inherit; font-size: 13px; cursor: pointer; transition: all .2s;
-}
-.t-signout-btn:hover { border-color: #ff6b6b; color: #ff6b6b; }
-
-/* ─── HOME VIEW ────────────────────────────────────────────── */
-#homeView { min-height: 100vh; }
-.t-home-header {
-  background: var(--surface); border-bottom: 1px solid var(--border);
-  padding: 18px 32px; display: flex; align-items: center;
-  justify-content: space-between; gap: 16px; position: sticky; top: 0; z-index: 40;
-}
-.t-home-header-left { display: flex; align-items: center; gap: 12px; }
-.t-hdr-mark {
-  width: 32px; height: 32px; background: var(--accent); border-radius: 9px;
-  display: flex; align-items: center; justify-content: center; font-size: 14px;
-  box-shadow: 0 0 14px var(--accent-glow);
-}
-.t-hdr-title { font-size: 15px; font-weight: 600; }
-.t-hdr-sub   { font-size: 11px; color: var(--text-muted); font-weight: 400; }
-.t-hdr-right { display: flex; align-items: center; gap: 12px; }
-.t-hdr-user  {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 13px; color: var(--text-muted);
-}
-.t-hdr-avatar {
-  width: 30px; height: 30px; border-radius: 50%;
-  background: var(--accent); display: flex; align-items: center;
-  justify-content: center; font-size: 12px; font-weight: 600;
-  overflow: hidden; flex-shrink: 0;
-}
-.t-hdr-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.t-hdr-signout {
-  background: none; border: 1px solid var(--border);
-  border-radius: 7px; padding: 6px 12px; color: var(--text-muted);
-  font-family: inherit; font-size: 12px; cursor: pointer; transition: all .15s;
-}
-.t-hdr-signout:hover { border-color: #ff6b6b; color: #ff6b6b; }
-
-.t-home-body { max-width: 900px; margin: 0 auto; padding: 36px 24px 60px; }
-.t-welcome    { margin-bottom: 32px; }
-.t-welcome h2 { font-size: 24px; font-weight: 600; letter-spacing: -.4px; margin-bottom: 6px; }
-.t-welcome p  { font-size: 14px; color: var(--text-muted); }
-
-.t-section-label {
-  font-size: 11px; font-weight: 600; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: .8px; margin-bottom: 14px;
-}
-.t-cards-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 14px; margin-bottom: 40px;
-}
-.t-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 14px; padding: 18px 20px; cursor: pointer;
-  transition: all .2s; display: flex; flex-direction: column; gap: 10px;
-}
-.t-card:hover {
-  border-color: var(--accent); background: var(--surface-2);
-  transform: translateY(-1px); box-shadow: 0 6px 20px var(--accent-glow);
-}
-.t-card-subject {
-  font-size: 10px; font-weight: 600; color: var(--accent);
-  text-transform: uppercase; letter-spacing: .6px;
-}
-.t-card-course { font-size: 14px; font-weight: 600; line-height: 1.3; }
-.t-card-meta   { display: flex; align-items: center; gap: 8px; }
-.t-card-status {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 11.5px; font-weight: 500; padding: 3px 9px;
-  border-radius: 20px;
-}
-.t-card-status.complete {
-  background: rgba(52,211,153,.1); color: #34d399; border: 1px solid rgba(52,211,153,.2);
-}
-.t-card-status.partial {
-  background: rgba(251,191,36,.1); color: #fbbf24; border: 1px solid rgba(251,191,36,.2);
-}
-.t-card-status.empty {
-  background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border);
-}
-.t-card-preview {
-  font-size: 12px; color: var(--text-muted); line-height: 1.5;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-
-/* ─── STATUS DOTS ──────────────────────────────────────────────────────────── */
-.t-status-dot {
-  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; display: inline-block;
-}
-.t-status-dot.not_started { background: #9CA3AF; box-shadow: 0 0 5px rgba(156,163,175,.35); }
-.t-status-dot.in_progress { background: #fbbf24; box-shadow: 0 0 5px rgba(251,191,36,.45); }
-.t-status-dot.complete    { background: #34d399; box-shadow: 0 0 5px rgba(52,211,153,.45); }
-
-/* ─── WIZARD VIEW ─────────────────────────────────────────── */
-#wizardView {
-  min-height: 100vh; display: flex; flex-direction: column;
-}
-.wizard-header {
-  background: var(--surface); border-bottom: 1px solid var(--border);
-  padding: 16px 32px; display: flex; align-items: center; justify-content: space-between;
-  position: sticky; top: 0; z-index: 40;
-}
-.wizard-header-left { display: flex; align-items: center; gap: 12px; }
-.wizard-back-btn {
-  display: flex; align-items: center; gap: 6px; padding: 8px 12px;
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 8px; color: var(--text-muted); font-family: inherit;
-  font-size: 13px; cursor: pointer; transition: all .15s;
-}
-.wizard-back-btn:hover { border-color: var(--accent); color: var(--accent); }
-.wizard-class-name { font-size: 15px; font-weight: 600; }
-.wizard-class-subject { font-size: 11px; color: var(--text-muted); }
-
-.wizard-progress {
-  display: flex; align-items: center; gap: 8px;
-}
-.wizard-step-dot {
-  width: 10px; height: 10px; border-radius: 50%; background: var(--border);
-  transition: all .2s;
-}
-.wizard-step-dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
-.wizard-step-dot.completed { background: #34d399; }
-.wizard-step-label { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
-
-.wizard-body {
-  flex: 1; max-width: 700px; width: 100%; margin: 0 auto; padding: 40px 24px 80px;
-}
-
-.wizard-step { display: none; }
-.wizard-step.active { display: block; }
-
-.wizard-question-title {
-  font-size: 22px; font-weight: 600; line-height: 1.35; margin-bottom: 20px;
-}
-.wizard-sub-prompts {
-  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;
-}
-.wizard-sub-prompt {
-  padding: 6px 12px; background: var(--accent-soft); border: 1px solid var(--accent-glow);
-  border-radius: 20px; font-size: 12px; color: var(--accent); font-weight: 500;
-}
-.wizard-examples-toggle {
-  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px;
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 8px; font-size: 13px; color: var(--text-muted);
-  cursor: pointer; margin-bottom: 16px; font-family: inherit; transition: all .15s;
-}
-.wizard-examples-toggle:hover { border-color: var(--accent); color: var(--accent); }
-.wizard-examples-toggle .arrow { transition: transform .2s; }
-.wizard-examples-toggle.open .arrow { transform: rotate(180deg); }
-.wizard-examples {
-  display: none; background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 12px; padding: 16px 18px; margin-bottom: 20px;
-}
-.wizard-examples.open { display: block; }
-.wizard-example {
-  margin-bottom: 14px;
-}
-.wizard-example:last-child { margin-bottom: 0; }
-.wizard-example-label {
-  font-size: 11px; font-weight: 600; color: var(--accent);
-  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;
-}
-.wizard-example-text {
-  font-size: 13px; color: var(--text-muted); line-height: 1.55;
-  font-style: italic;
-}
-
-.wizard-textarea-wrap {
-  position: relative; margin-bottom: 12px;
-}
-.wizard-textarea {
-  width: 100%; min-height: 180px; padding: 16px; padding-right: 50px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; font-family: inherit; font-size: 14px;
-  color: var(--text); resize: vertical; outline: none; line-height: 1.6;
-  transition: border-color .15s;
-}
-.wizard-textarea:focus { border-color: var(--accent); }
-.wizard-textarea::placeholder { color: var(--text-muted); }
-.wizard-mic-btn {
-  position: absolute; right: 12px; top: 12px;
-  width: 36px; height: 36px; border-radius: 50%;
-  background: var(--surface-2); border: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; transition: all .15s;
-}
-.wizard-mic-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
-.wizard-mic-btn.recording {
-  background: rgba(239,68,68,.1); border-color: #ef4444;
-  animation: pulse 1s ease-in-out infinite;
-}
-@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.6} }
-.wizard-mic-btn svg { width: 18px; height: 18px; stroke: var(--text-muted); fill: none; }
-.wizard-mic-btn.recording svg { stroke: #ef4444; }
-
-.wizard-word-count {
-  font-size: 12px; color: var(--text-muted); margin-bottom: 20px;
-}
-.wizard-word-count.valid { color: #34d399; }
-.wizard-word-count.invalid { color: #ef4444; }
-
-.wizard-nav {
-  display: flex; justify-content: space-between; align-items: center; gap: 12px;
-}
-.wizard-prev-btn {
-  padding: 12px 20px; background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 10px; font-family: inherit; font-size: 14px; font-weight: 500;
-  color: var(--text-muted); cursor: pointer; transition: all .15s;
-}
-.wizard-prev-btn:hover { border-color: var(--accent); color: var(--accent); }
-.wizard-next-btn {
-  padding: 12px 24px; background: var(--accent); border: none;
-  border-radius: 10px; font-family: inherit; font-size: 14px; font-weight: 600;
-  color: #fff; cursor: pointer; transition: all .15s;
-}
-.wizard-next-btn:hover:not(:disabled) { opacity: .9; }
-.wizard-next-btn:disabled { opacity: .4; cursor: not-allowed; }
-
-/* ─── SYLLABUS UPLOAD ─────────────────────────────────────── */
-.syllabus-upload-area {
-  margin-bottom: 12px; padding: 20px;
-  background: var(--surface-2); border: 2px dashed var(--border);
-  border-radius: 12px; text-align: center; transition: all .15s;
-  cursor: pointer;
-}
-.syllabus-upload-area:hover { border-color: var(--accent); background: var(--accent-soft); }
-.syllabus-upload-area.full { opacity: .5; cursor: not-allowed; }
-.syllabus-upload-area.full:hover { border-color: var(--border); background: var(--surface-2); }
-.syllabus-upload-area.dragover {
-  border-style: solid; border-color: var(--accent); background: var(--accent-soft);
-}
-.syllabus-upload-icon { font-size: 32px; margin-bottom: 8px; }
-.syllabus-upload-text { font-size: 14px; color: var(--text-muted); margin-bottom: 4px; }
-.syllabus-upload-hint { font-size: 12px; color: var(--text-faint); }
-.syllabus-file-list {
-  display: flex; flex-direction: column; gap: 8px;
-  margin-bottom: 12px;
-}
-.syllabus-file-list:empty { display: none; }
-.syllabus-file-row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 14px;
-  background: rgba(52,211,153,.08);
-  border: 1px solid rgba(52,211,153,.2);
-  border-radius: 8px; font-size: 13px;
-}
-.syllabus-file-row.pending {
-  background: var(--accent-soft);
-  border-color: var(--accent-glow);
-}
-.syllabus-file-icon { font-size: 16px; flex-shrink: 0; }
-.syllabus-file-name-cell {
-  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  color: var(--text);
-}
-.syllabus-file-size { font-size: 12px; color: var(--text-faint); flex-shrink: 0; }
-.syllabus-file-x {
-  background: rgba(0,0,0,.05); border: none; color: var(--text-muted);
-  width: 22px; height: 22px; border-radius: 50%;
-  cursor: pointer; font-size: 14px; line-height: 1;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.syllabus-file-x:hover { background: #ef4444; color: #fff; }
-#syllabusFileInput { display: none; }
-
-/* ─── WORK SAMPLES (Q4) ────────────────────────────────────── */
-.wizard-ferpa-callout {
-  background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.3);
-  border-radius: 10px; padding: 12px 14px; margin-bottom: 24px;
-  font-size: 13px; color: var(--text); line-height: 1.55;
-}
-.wizard-subhead {
-  font-size: 14px; color: var(--text-muted); line-height: 1.6;
-  margin-bottom: 24px;
-}
-.tier-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; padding: 18px; margin-bottom: 16px;
-}
-.tier-card.invalid { border-color: rgba(239,68,68,.4); }
-.tier-heading {
-  font-size: 15px; font-weight: 600; margin-bottom: 4px;
-}
-.tier-desc {
-  font-size: 12px; color: var(--text-muted); margin-bottom: 14px;
-}
-.tier-thumbs {
-  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
-  min-height: 0;
-}
-.tier-thumbs:empty { margin-bottom: 0; }
-.tier-thumb {
-  position: relative; width: 80px; height: 80px;
-  border-radius: 8px; overflow: hidden; border: 1px solid var(--border);
-  background: var(--surface-2);
-}
-.tier-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.tier-thumb .tier-thumb-x {
-  position: absolute; top: 4px; right: 4px;
-  width: 22px; height: 22px; border-radius: 50%;
-  background: rgba(0,0,0,.7); color: #fff; border: none;
-  font-size: 14px; line-height: 1; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-}
-.tier-thumb .tier-thumb-x:hover { background: #ef4444; }
-.tier-add-btn {
-  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px;
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 8px; font-size: 13px; color: var(--text-muted);
-  cursor: pointer; font-family: inherit; transition: all .15s;
-  margin-bottom: 12px;
-}
-.tier-add-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.tier-add-btn:disabled { opacity: .4; cursor: not-allowed; }
-.tier-add-count {
-  font-size: 11px; color: var(--text-faint); margin-left: 6px;
-}
-.tier-input-file { display: none; }
-.tier-textarea {
-  width: 100%; min-height: 80px; padding: 12px;
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 8px; font-family: inherit; font-size: 13px;
-  color: var(--text); resize: vertical; outline: none; line-height: 1.55;
-  transition: border-color .15s;
-}
-.tier-textarea:focus { border-color: var(--accent); }
-.tier-textarea::placeholder { color: var(--text-muted); }
-.tier-converting {
-  display: none; font-size: 12px; color: var(--text-muted);
-  margin-top: 8px;
-}
-.tier-converting.active { display: block; }
-
-/* ─── WORK-SAMPLE BUTTON ROW + WRITTEN-EXAMPLE EDITORS (Q4 v2) ── */
-.tier-btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
-.tier-btn-row .tier-add-btn { margin-bottom: 12px; }
-.tier-artifacts { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
-.tier-artifacts:empty { margin-bottom: 0; }
-.tier-artifact {
-  border: 1px solid var(--border); border-radius: 8px;
-  padding: 10px; background: var(--surface-2);
-}
-.tier-artifact-row {
-  display: flex; gap: 8px; align-items: center; margin-bottom: 8px;
-}
-.tier-artifact-type {
-  padding: 6px 8px; background: var(--surface); border: 1px solid var(--border);
-  border-radius: 6px; font-family: inherit; font-size: 12px; color: var(--text);
-  outline: none;
-}
-.tier-artifact-label {
-  flex: 1; min-width: 0; padding: 6px 8px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 6px; font-family: inherit; font-size: 12px; color: var(--text);
-  outline: none;
-}
-.tier-artifact-label:focus, .tier-artifact-type:focus { border-color: var(--accent); }
-.tier-artifact-remove {
-  width: 26px; height: 26px; flex: none; border-radius: 6px;
-  background: var(--surface); border: 1px solid var(--border);
-  color: var(--text-muted); font-size: 15px; line-height: 1; cursor: pointer;
-}
-.tier-artifact-remove:hover { border-color: #ef4444; color: #ef4444; }
-.tier-artifact-text {
-  width: 100%; min-height: 70px; padding: 10px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 6px; font-family: inherit; font-size: 13px; color: var(--text);
-  resize: vertical; outline: none; line-height: 1.55;
-}
-.tier-artifact-text:focus { border-color: var(--accent); }
-.tier-artifact-count {
-  font-size: 11px; color: var(--text-faint); text-align: right; margin-top: 4px;
-}
-.tier-artifact-count.over { color: #ef4444; }
-.tier-privacy {
-  display: flex; align-items: center; gap: 6px; margin-top: 10px;
-  font-size: 12px; color: var(--text-muted);
-}
-.wizard-privacy-note {
-  font-size: 13px; color: var(--text-muted); margin: -8px 0 18px;
-}
-
-/* ─── TEMPLATE BANNER ─────────────────────────────────────── */
-.template-banner {
-  display: none; background: var(--accent-soft);
-  border: 1px solid var(--accent-glow); border-radius: 12px;
-  padding: 16px 18px; margin-bottom: 20px;
-}
-.template-banner.show { display: block; }
-.template-banner-icon { font-size: 20px; margin-bottom: 8px; }
-.template-banner-text { font-size: 14px; color: var(--text); margin-bottom: 12px; line-height: 1.5; }
-.template-banner-buttons { display: flex; gap: 10px; }
-.template-use-btn {
-  padding: 8px 16px; background: var(--accent); border: none;
-  border-radius: 8px; font-family: inherit; font-size: 13px; font-weight: 500;
-  color: #fff; cursor: pointer; transition: all .15s;
-}
-.template-use-btn:hover { opacity: .9; }
-.template-skip-btn {
-  padding: 8px 16px; background: var(--surface); border: 1px solid var(--border);
-  border-radius: 8px; font-family: inherit; font-size: 13px; font-weight: 500;
-  color: var(--text-muted); cursor: pointer; transition: all .15s;
-}
-.template-skip-btn:hover { border-color: var(--accent); color: var(--accent); }
-
-/* ─── SUMMARY VIEW ─────────────────────────────────────────── */
-.summary-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 14px; padding: 20px 22px; margin-bottom: 16px;
-}
-.summary-card-header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 12px;
-}
-.summary-card-label {
-  font-size: 12px; font-weight: 600; color: var(--accent);
-  text-transform: uppercase; letter-spacing: .5px;
-}
-.summary-card-edit {
-  padding: 6px 12px; background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 6px; font-family: inherit; font-size: 12px;
-  color: var(--text-muted); cursor: pointer; transition: all .15s;
-}
-.summary-card-edit:hover { border-color: var(--accent); color: var(--accent); }
-.summary-card-content {
-  font-size: 14px; color: var(--text); line-height: 1.6;
-  white-space: pre-wrap;
-}
-
-.summary-share-row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 16px 18px; background: var(--surface-2);
-  border: 1px solid var(--border); border-radius: 12px;
-  margin-bottom: 24px;
-}
-.summary-share-checkbox {
-  width: 20px; height: 20px; accent-color: var(--accent);
-}
-.summary-share-label {
-  font-size: 14px; color: var(--text); flex: 1;
-}
-.summary-share-hint {
-  font-size: 12px; color: var(--text-muted); margin-top: 2px;
-}
-
-.summary-save-btn {
-  width: 100%; padding: 14px 24px; background: var(--accent);
-  border: none; border-radius: 12px; font-family: inherit;
-  font-size: 15px; font-weight: 600; color: #fff;
-  cursor: pointer; transition: all .15s;
-}
-.summary-save-btn:hover { opacity: .9; }
-.summary-save-btn:disabled { opacity: .5; cursor: not-allowed; }
-
-/* ─── TOAST ───────────────────────────────────────────────── */
-.t-toast {
-  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-  background: var(--surface); border: 1px solid var(--border);
-  padding: 12px 20px; border-radius: 10px; font-size: 14px;
-  box-shadow: 0 8px 30px rgba(0,0,0,.2);
-  opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 100;
-}
-.t-toast.show { opacity: 1; }
-.t-toast.success { border-color: #34d399; color: #34d399; }
-.t-toast.error { border-color: #ef4444; color: #ef4444; }
-
-/* ─── MY STUDENTS + ROSTER + NOTE CHAT ─────────────────────── */
-.t-students-section { display: flex; flex-direction: column; gap: 12px; }
-.t-student-class-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 14px; padding: 16px 20px; cursor: pointer;
-  transition: all .15s;
-}
-.t-student-class-card:hover { border-color: var(--accent); }
-.t-student-class-card.expanded { border-color: var(--accent); background: var(--accent-soft); }
-.t-student-class-header {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-}
-.t-student-class-name { font-size: 15px; font-weight: 600; color: var(--text); }
-.t-student-class-meta {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 13px; color: var(--text-muted);
-}
-.t-student-class-chevron { transition: transform .2s; display: inline-block; }
-.t-student-class-card.expanded .t-student-class-chevron { transform: rotate(90deg); }
-.t-block-list {
-  display: flex; flex-direction: column; gap: 6px;
-  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);
-}
-.t-block-row {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 14px; border-radius: 10px; cursor: pointer;
-  background: var(--surface); border: 1px solid var(--border);
-  transition: all .15s; color: var(--text);
-}
-.t-block-row:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.t-block-row-label { font-size: 14px; font-weight: 500; }
-.t-block-row-count { font-size: 12px; color: var(--text-muted); }
-.t-block-row:hover .t-block-row-count { color: var(--accent); }
-.t-students-empty {
-  padding: 32px 20px; text-align: center; border: 1px dashed var(--border);
-  border-radius: 14px; color: var(--text-muted); font-size: 14px; line-height: 1.5;
-}
-
-/* Roster view */
-.t-roster-list {
-  display: flex; flex-direction: column;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
-  overflow: hidden;
-}
-.t-roster-item {
-  padding: 14px 20px; cursor: pointer; border-bottom: 1px solid var(--border);
-  font-size: 14px; color: var(--text); transition: all .15s;
-}
-.t-roster-item:last-child { border-bottom: none; }
-.t-roster-item:hover { background: var(--accent-soft); color: var(--accent); }
-
-/* Note chat view */
-.t-notechat-body {
-  max-width: 720px; margin: 0 auto; padding: 24px;
-  display: flex; flex-direction: column; gap: 12px;
-}
-.t-note-messages {
-  min-height: 360px; max-height: calc(100vh - 260px);
-  overflow-y: auto; padding: 16px;
-  display: flex; flex-direction: column; gap: 10px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
-}
-.t-note-bubble {
-  align-self: flex-end; max-width: 80%;
-  background: var(--accent); color: #fff;
-  padding: 10px 14px; border-radius: 14px;
-  font-size: 14px; line-height: 1.45;
-  white-space: pre-wrap; word-wrap: break-word;
-}
-.t-note-empty {
-  margin: auto; text-align: center; color: var(--text-muted);
-  font-size: 14px; line-height: 1.5; max-width: 340px;
-}
-.t-note-input-row { display: flex; gap: 8px; align-items: flex-end; }
-.t-note-input-row textarea {
-  flex: 1; padding: 12px 14px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-  font-family: inherit; font-size: 14px; color: var(--text);
-  resize: vertical; min-height: 48px; max-height: 160px; outline: none;
-  transition: border-color .15s;
-}
-.t-note-input-row textarea:focus { border-color: var(--accent); }
-.t-note-input-row button { flex: 0 0 auto; }
-
-/* ─── A11Y: keyboard focus + reduced motion + status contrast ── */
-/* Click-only list items are given role=button + tabindex in JS;
-   these give them a visible keyboard focus ring (WCAG 2.4.7). */
-.t-card:focus-visible,
-.t-student-class-header:focus-visible,
-.t-block-row:focus-visible,
-.t-roster-item:focus-visible,
-.syllabus-upload-area:focus-visible,
-.wizard-mic-btn:focus-visible,
-.t-filter-pill:focus-visible {
-  outline: 2px solid var(--accent); outline-offset: 2px;
-}
-#tClassSearch:focus { border-color: var(--accent); }
-/* Status-pill text: brighten/darken per theme so 11.5px labels reach
-   AA contrast against the tinted pill on the light card (WCAG 1.4.3). */
-.t-card-status.complete { color: #0F7A52; }
-.t-card-status.partial  { color: #8A5A00; }
-:root.dark-mode .t-card-status.complete { color: #34d399; }
-:root.dark-mode .t-card-status.partial  { color: #fbbf24; }
-@media (prefers-reduced-motion: reduce) {
-  .t-logo-mark, .wizard-mic-btn.recording { animation: none; }
-}
-</style>
 </head>
-<body>
+<body class="t-portal">
 
 <!-- AUTH LOADING -->
 <div id="authLoading">
@@ -683,7 +32,7 @@ body { overflow: auto; display: block; }
     <div class="t-signin-title">Sign in to set up your classes</div>
     <div class="t-signin-sub">Use your @menloschool.org email</div>
     <div class="t-error" id="tSigninError" role="alert"></div>
-    <button class="t-google-btn" id="tSigninBtn">
+    <button class="btn btn--secondary t-google-btn" id="tSigninBtn">
       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -699,11 +48,10 @@ body { overflow: auto; display: block; }
 <!-- UNKNOWN TEACHER VIEW -->
 <div id="unknownView" style="display:none">
   <div class="t-unknown-box">
-    <div class="t-unknown-icon">👋</div>
-    <h2>Not a registered teacher</h2>
+        <h2>Not a registered teacher</h2>
     <p>Your email isn't in our teacher database yet.</p>
     <p class="t-unknown-email" id="unknownEmail"></p>
-    <button class="t-signout-btn" onclick="doSignOut()">Sign out</button>
+    <button class="btn btn--ghost t-signout-btn" onclick="doSignOut()">Sign out</button>
   </div>
 </div>
 
@@ -767,7 +115,7 @@ body { overflow: auto; display: block; }
 <div id="rosterView" style="display:none">
   <div class="t-home-header">
     <div class="t-home-header-left">
-      <button class="wizard-back-btn" onclick="rosterBack()">
+      <button class="btn btn--ghost wizard-back-btn" onclick="rosterBack()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
         Back
       </button>
@@ -786,7 +134,7 @@ body { overflow: auto; display: block; }
 <div id="noteChatView" style="display:none">
   <div class="t-home-header">
     <div class="t-home-header-left">
-      <button class="wizard-back-btn" onclick="noteChatBack()">
+      <button class="btn btn--ghost wizard-back-btn" onclick="noteChatBack()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
         Back
       </button>
@@ -800,7 +148,7 @@ body { overflow: auto; display: block; }
     <div id="noteChatMessages" class="t-note-messages"></div>
     <div class="t-note-input-row">
       <textarea id="noteChatInput" rows="2" aria-label="Add an observation about this student" placeholder="Type an observation..."></textarea>
-      <button id="noteChatSend" class="wizard-next-btn" disabled>Send</button>
+      <button id="noteChatSend" class="btn btn--primary wizard-next-btn" disabled>Send</button>
     </div>
   </div>
 </div>
@@ -809,7 +157,7 @@ body { overflow: auto; display: block; }
 <div id="wizardView" style="display:none">
   <div class="wizard-header">
     <div class="wizard-header-left">
-      <button class="wizard-back-btn" onclick="goHome()">
+      <button class="btn btn--ghost wizard-back-btn" onclick="goHome()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
         Back
       </button>
@@ -819,13 +167,7 @@ body { overflow: auto; display: block; }
       </div>
     </div>
     <div class="wizard-progress">
-      <div class="wizard-step-dot" data-step="1"></div>
-      <div class="wizard-step-dot" data-step="2"></div>
-      <div class="wizard-step-dot" data-step="3"></div>
-      <div class="wizard-step-dot" data-step="4"></div>
-      <div class="wizard-step-dot" data-step="5"></div>
-      <div class="wizard-step-dot" data-step="6"></div>
-      <span class="wizard-step-label" id="wizardStepLabel">Step 1 of 6</span>
+      <span class="wizard-step-label" id="wizardStepLabel">STEP 1 OF 6</span>
     </div>
   </div>
 
@@ -865,15 +207,15 @@ body { overflow: auto; display: block; }
         </div>
       </div>
       <div class="wizard-textarea-wrap">
-        <textarea class="wizard-textarea" id="engagementRulesInput" aria-label="How you want students to engage with Lumi" placeholder="Describe how you want Lumi to work with your students…"></textarea>
-        <button type="button" class="wizard-mic-btn" aria-label="Dictate your answer with the microphone" onclick="toggleMic('engagementRulesInput')">
+        <textarea class="field-textarea wizard-textarea" id="engagementRulesInput" aria-label="How you want students to engage with Lumi" placeholder="Describe how you want Lumi to work with your students…"></textarea>
+        <button type="button" class="btn btn--ghost wizard-mic-btn" aria-label="Dictate your answer with the microphone" onclick="toggleMic('engagementRulesInput')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
         </button>
       </div>
-      <div class="wizard-word-count" id="engagementRulesCount">0 / 50 words minimum</div>
+      <div class="field-count wizard-word-count" id="engagementRulesCount">0 / 50 words minimum</div>
       <div class="wizard-nav">
         <div></div>
-        <button class="wizard-next-btn" id="step1NextBtn" onclick="nextStep()" disabled>Continue</button>
+        <button class="btn btn--primary wizard-next-btn" id="step1NextBtn" onclick="nextStep()" disabled>Continue</button>
       </div>
     </div>
 
@@ -901,15 +243,15 @@ body { overflow: auto; display: block; }
         </div>
       </div>
       <div class="wizard-textarea-wrap">
-        <textarea class="wizard-textarea" id="teachingVoiceInput" aria-label="What your teaching voice sounds like" placeholder="Describe your teaching style and voice…"></textarea>
-        <button type="button" class="wizard-mic-btn" aria-label="Dictate your answer with the microphone" onclick="toggleMic('teachingVoiceInput')">
+        <textarea class="field-textarea wizard-textarea" id="teachingVoiceInput" aria-label="What your teaching voice sounds like" placeholder="Describe your teaching style and voice…"></textarea>
+        <button type="button" class="btn btn--ghost wizard-mic-btn" aria-label="Dictate your answer with the microphone" onclick="toggleMic('teachingVoiceInput')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
         </button>
       </div>
-      <div class="wizard-word-count" id="teachingVoiceCount">0 / 50 words minimum</div>
+      <div class="field-count wizard-word-count" id="teachingVoiceCount">0 / 50 words minimum</div>
       <div class="wizard-nav">
-        <button class="wizard-prev-btn" onclick="prevStep()">Back</button>
-        <button class="wizard-next-btn" id="step2NextBtn" onclick="nextStep()" disabled>Continue</button>
+        <button class="btn btn--secondary wizard-prev-btn" onclick="prevStep()">Back</button>
+        <button class="btn btn--primary wizard-next-btn" id="step2NextBtn" onclick="nextStep()" disabled>Continue</button>
       </div>
     </div>
 
@@ -925,11 +267,10 @@ body { overflow: auto; display: block; }
 
       <!-- Template Banner -->
       <div class="template-banner" id="templateBanner">
-        <div class="template-banner-icon">📋</div>
-        <div class="template-banner-text">Another teacher shared their course info for <strong id="templateCourseName"></strong>. Want to use it as a starting point?</div>
+                <div class="template-banner-text">Another teacher shared their course info for <strong id="templateCourseName"></strong>. Want to use it as a starting point?</div>
         <div class="template-banner-buttons">
-          <button class="template-use-btn" onclick="useTemplate()">Use as starting point</button>
-          <button class="template-skip-btn" onclick="skipTemplate()">Start fresh</button>
+          <button class="btn btn--primary template-use-btn" onclick="useTemplate()">Use as starting point</button>
+          <button class="btn btn--ghost template-skip-btn" onclick="skipTemplate()">Start fresh</button>
         </div>
       </div>
 
@@ -942,8 +283,7 @@ body { overflow: auto; display: block; }
            ondragover="handleSyllabusDragOver(event)"
            ondragleave="handleSyllabusDragLeave(event)"
            ondrop="handleSyllabusDrop(event)">
-        <div class="syllabus-upload-icon">📄</div>
-        <div class="syllabus-upload-text">Got a syllabus? Upload up to 20 PDFs <span id="syllabusCount">(0/20)</span></div>
+                <div class="syllabus-upload-text">Got a syllabus? Upload up to 20 PDFs <span id="syllabusCount">(0/20)</span></div>
         <div class="syllabus-upload-hint">We'll extract the text to help fill in your course info. PDFs only, max 10MB each.</div>
       </div>
       <input type="file" id="syllabusFileInput" accept="application/pdf" multiple onchange="handleSyllabusUpload(event)">
@@ -963,15 +303,15 @@ body { overflow: auto; display: block; }
         </div>
       </div>
       <div class="wizard-textarea-wrap">
-        <textarea class="wizard-textarea" id="courseInfoInput" aria-label="What students need to know about your course" placeholder="Describe your course structure, topics, and common student challenges…"></textarea>
-        <button type="button" class="wizard-mic-btn" aria-label="Dictate your answer with the microphone" onclick="toggleMic('courseInfoInput')">
+        <textarea class="field-textarea wizard-textarea" id="courseInfoInput" aria-label="What students need to know about your course" placeholder="Describe your course structure, topics, and common student challenges…"></textarea>
+        <button type="button" class="btn btn--ghost wizard-mic-btn" aria-label="Dictate your answer with the microphone" onclick="toggleMic('courseInfoInput')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
         </button>
       </div>
-      <div class="wizard-word-count" id="courseInfoCount">0 / 50 words minimum</div>
+      <div class="field-count wizard-word-count" id="courseInfoCount">0 / 50 words minimum</div>
       <div class="wizard-nav">
-        <button class="wizard-prev-btn" onclick="prevStep()">Back</button>
-        <button class="wizard-next-btn" id="step3NextBtn" onclick="nextStep()" disabled>Continue</button>
+        <button class="btn btn--secondary wizard-prev-btn" onclick="prevStep()">Back</button>
+        <button class="btn btn--primary wizard-next-btn" id="step3NextBtn" onclick="nextStep()" disabled>Continue</button>
       </div>
     </div>
 
@@ -994,15 +334,15 @@ body { overflow: auto; display: block; }
         </div>
       </div>
       <div class="wizard-textarea-wrap">
-        <textarea class="wizard-textarea" id="welcomeMessageInput" aria-label="Welcome message students see first" placeholder="Hey — welcome to your class…"></textarea>
-        <button type="button" class="wizard-mic-btn" aria-label="Dictate your answer with the microphone" onclick="toggleMic('welcomeMessageInput')">
+        <textarea class="field-textarea wizard-textarea" id="welcomeMessageInput" aria-label="Welcome message students see first" placeholder="Hey — welcome to your class…"></textarea>
+        <button type="button" class="btn btn--ghost wizard-mic-btn" aria-label="Dictate your answer with the microphone" onclick="toggleMic('welcomeMessageInput')">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
         </button>
       </div>
-      <div class="wizard-word-count" id="welcomeMessageCount">0 / 600 characters</div>
+      <div class="field-count wizard-word-count" id="welcomeMessageCount">0 / 600 characters</div>
       <div class="wizard-nav">
-        <button class="wizard-prev-btn" onclick="prevStep()">Back</button>
-        <button class="wizard-next-btn" id="step4NextBtn" onclick="nextStep()" disabled>Continue</button>
+        <button class="btn btn--secondary wizard-prev-btn" onclick="prevStep()">Back</button>
+        <button class="btn btn--primary wizard-next-btn" id="step4NextBtn" onclick="nextStep()" disabled>Continue</button>
       </div>
     </div>
 
@@ -1013,62 +353,62 @@ body { overflow: auto; display: block; }
       </div>
       <h2 class="wizard-question-title">Show me how you grade</h2>
       <p class="wizard-subhead">Share examples of how you assess student work at three performance levels — a photo of graded work, or a written example like a report-card comment, essay feedback, or what you'd say out loud. Lumi uses these as evidence of your authentic feedback voice. No photo required: a written example alone works for any subject.</p>
-      <p class="wizard-privacy-note">🔒 Only Lumi sees these examples — students never see them. They only shape how Lumi gives feedback in your voice.</p>
+      <p class="wizard-privacy-note">Only Lumi sees these examples — students never see them. They only shape how Lumi gives feedback in your voice.</p>
 
-      <div class="tier-card" data-tier="progressing">
+      <div class="card tier-card" data-tier="progressing">
         <div class="tier-heading">Progressing</div>
         <div class="tier-desc">Students still developing the skill</div>
         <div class="tier-thumbs" id="tierThumbs-progressing"></div>
         <div class="tier-btn-row">
-          <button type="button" class="tier-add-btn" id="tierAddBtn-progressing" onclick="document.getElementById('tierFiles-progressing').click()">
+          <button type="button" class="btn btn--secondary tier-add-btn" id="tierAddBtn-progressing" onclick="document.getElementById('tierFiles-progressing').click()">
             + Add photos<span class="tier-add-count" id="tierCount-progressing">(optional)</span>
           </button>
-          <button type="button" class="tier-add-btn" onclick="addTextArtifact('progressing')">+ Add written example</button>
+          <button type="button" class="btn btn--secondary tier-add-btn" onclick="addTextArtifact('progressing')">+ Add written example</button>
         </div>
         <input type="file" id="tierFiles-progressing" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('progressing', event)">
         <div class="tier-converting" id="tierConverting-progressing">Converting HEIC photo…</div>
         <div class="tier-artifacts" id="tierArtifacts-progressing"></div>
-        <textarea class="tier-textarea" id="tierDesc-progressing" aria-label="Grading notes for the Progressing level" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
-        <div class="tier-privacy">🔒 Only Lumi sees this — students never see these examples.</div>
+        <textarea class="field-textarea tier-textarea" id="tierDesc-progressing" aria-label="Grading notes for the Progressing level" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
+        <div class="tier-privacy">Only Lumi sees this — students never see these examples.</div>
       </div>
 
-      <div class="tier-card" data-tier="proficient">
+      <div class="card tier-card" data-tier="proficient">
         <div class="tier-heading">Proficient</div>
         <div class="tier-desc">Students meeting expectations</div>
         <div class="tier-thumbs" id="tierThumbs-proficient"></div>
         <div class="tier-btn-row">
-          <button type="button" class="tier-add-btn" id="tierAddBtn-proficient" onclick="document.getElementById('tierFiles-proficient').click()">
+          <button type="button" class="btn btn--secondary tier-add-btn" id="tierAddBtn-proficient" onclick="document.getElementById('tierFiles-proficient').click()">
             + Add photos<span class="tier-add-count" id="tierCount-proficient">(optional)</span>
           </button>
-          <button type="button" class="tier-add-btn" onclick="addTextArtifact('proficient')">+ Add written example</button>
+          <button type="button" class="btn btn--secondary tier-add-btn" onclick="addTextArtifact('proficient')">+ Add written example</button>
         </div>
         <input type="file" id="tierFiles-proficient" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('proficient', event)">
         <div class="tier-converting" id="tierConverting-proficient">Converting HEIC photo…</div>
         <div class="tier-artifacts" id="tierArtifacts-proficient"></div>
-        <textarea class="tier-textarea" id="tierDesc-proficient" aria-label="Grading notes for the Proficient level" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
-        <div class="tier-privacy">🔒 Only Lumi sees this — students never see these examples.</div>
+        <textarea class="field-textarea tier-textarea" id="tierDesc-proficient" aria-label="Grading notes for the Proficient level" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
+        <div class="tier-privacy">Only Lumi sees this — students never see these examples.</div>
       </div>
 
-      <div class="tier-card" data-tier="exemplary">
+      <div class="card tier-card" data-tier="exemplary">
         <div class="tier-heading">Exemplary</div>
         <div class="tier-desc">Students exceeding expectations</div>
         <div class="tier-thumbs" id="tierThumbs-exemplary"></div>
         <div class="tier-btn-row">
-          <button type="button" class="tier-add-btn" id="tierAddBtn-exemplary" onclick="document.getElementById('tierFiles-exemplary').click()">
+          <button type="button" class="btn btn--secondary tier-add-btn" id="tierAddBtn-exemplary" onclick="document.getElementById('tierFiles-exemplary').click()">
             + Add photos<span class="tier-add-count" id="tierCount-exemplary">(optional)</span>
           </button>
-          <button type="button" class="tier-add-btn" onclick="addTextArtifact('exemplary')">+ Add written example</button>
+          <button type="button" class="btn btn--secondary tier-add-btn" onclick="addTextArtifact('exemplary')">+ Add written example</button>
         </div>
         <input type="file" id="tierFiles-exemplary" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('exemplary', event)">
         <div class="tier-converting" id="tierConverting-exemplary">Converting HEIC photo…</div>
         <div class="tier-artifacts" id="tierArtifacts-exemplary"></div>
-        <textarea class="tier-textarea" id="tierDesc-exemplary" aria-label="Grading notes for the Exemplary level" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
-        <div class="tier-privacy">🔒 Only Lumi sees this — students never see these examples.</div>
+        <textarea class="field-textarea tier-textarea" id="tierDesc-exemplary" aria-label="Grading notes for the Exemplary level" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
+        <div class="tier-privacy">Only Lumi sees this — students never see these examples.</div>
       </div>
 
       <div class="wizard-nav">
-        <button class="wizard-prev-btn" onclick="prevStep()">Back</button>
-        <button class="wizard-next-btn" id="step5NextBtn" onclick="nextStep()">Review & Save</button>
+        <button class="btn btn--secondary wizard-prev-btn" onclick="prevStep()">Back</button>
+        <button class="btn btn--primary wizard-next-btn" id="step5NextBtn" onclick="nextStep()">Review & Save</button>
       </div>
     </div>
 
@@ -1077,57 +417,57 @@ body { overflow: auto; display: block; }
       <h2 class="wizard-question-title">Review your profile</h2>
       <p style="color:var(--text-muted);margin-bottom:24px">Make sure everything looks good before saving.</p>
 
-      <div class="summary-card">
-        <div class="summary-card-header">
-          <span class="summary-card-label">Title</span>
-          <button class="summary-card-edit" onclick="editField(1)">Edit</button>
+      <div class="card summary-card">
+        <div class="card-head summary-card-header">
+          <span class="card-meta summary-card-label">Title</span>
+          <button class="btn btn--ghost summary-card-edit" onclick="editField(1)">Edit</button>
         </div>
         <div class="summary-card-content" id="summaryTitle"></div>
       </div>
 
-      <div class="summary-card">
-        <div class="summary-card-header">
-          <span class="summary-card-label">Engagement Rules</span>
-          <button class="summary-card-edit" onclick="editField(1)">Edit</button>
+      <div class="card summary-card">
+        <div class="card-head summary-card-header">
+          <span class="card-meta summary-card-label">Engagement Rules</span>
+          <button class="btn btn--ghost summary-card-edit" onclick="editField(1)">Edit</button>
         </div>
         <div class="summary-card-content" id="summaryEngagementRules"></div>
       </div>
 
-      <div class="summary-card">
-        <div class="summary-card-header">
-          <span class="summary-card-label">Teaching Voice</span>
-          <button class="summary-card-edit" onclick="editField(2)">Edit</button>
+      <div class="card summary-card">
+        <div class="card-head summary-card-header">
+          <span class="card-meta summary-card-label">Teaching Voice</span>
+          <button class="btn btn--ghost summary-card-edit" onclick="editField(2)">Edit</button>
         </div>
         <div class="summary-card-content" id="summaryTeachingVoice"></div>
       </div>
 
-      <div class="summary-card">
-        <div class="summary-card-header">
-          <span class="summary-card-label">Course Info</span>
-          <button class="summary-card-edit" onclick="editField(3)">Edit</button>
+      <div class="card summary-card">
+        <div class="card-head summary-card-header">
+          <span class="card-meta summary-card-label">Course Info</span>
+          <button class="btn btn--ghost summary-card-edit" onclick="editField(3)">Edit</button>
         </div>
         <div class="summary-card-content" id="summaryCourseInfo"></div>
       </div>
 
-      <div class="summary-card">
-        <div class="summary-card-header">
-          <span class="summary-card-label">Welcome Message</span>
-          <button class="summary-card-edit" onclick="editField(4)">Edit</button>
+      <div class="card summary-card">
+        <div class="card-head summary-card-header">
+          <span class="card-meta summary-card-label">Welcome Message</span>
+          <button class="btn btn--ghost summary-card-edit" onclick="editField(4)">Edit</button>
         </div>
         <div class="summary-card-content" id="summaryWelcomeMessage"></div>
       </div>
 
-      <div class="summary-card">
-        <div class="summary-card-header">
-          <span class="summary-card-label">Graded Work Samples</span>
-          <button class="summary-card-edit" onclick="editField(5)">Edit</button>
+      <div class="card summary-card">
+        <div class="card-head summary-card-header">
+          <span class="card-meta summary-card-label">Graded Work Samples</span>
+          <button class="btn btn--ghost summary-card-edit" onclick="editField(5)">Edit</button>
         </div>
         <div class="summary-card-content" id="summaryWorkSamples"></div>
       </div>
 
-      <div id="summarySyllabusCard" class="summary-card" style="display:none">
-        <div class="summary-card-header">
-          <span class="summary-card-label">Syllabus Uploaded</span>
+      <div id="summarySyllabusCard" class="card summary-card" style="display:none">
+        <div class="card-head summary-card-header">
+          <span class="card-meta summary-card-label">Syllabus Uploaded</span>
         </div>
         <div class="summary-card-content" id="summarySyllabusName"></div>
       </div>
@@ -1141,8 +481,8 @@ body { overflow: auto; display: block; }
       </div>
 
       <div class="wizard-nav">
-        <button class="wizard-prev-btn" onclick="prevStep()">Back</button>
-        <button class="summary-save-btn" id="saveProfileBtn" onclick="saveTeacherProfile()">Save and Finish</button>
+        <button class="btn btn--secondary wizard-prev-btn" onclick="prevStep()">Back</button>
+        <button class="btn btn--primary summary-save-btn" id="saveProfileBtn" onclick="saveTeacherProfile()">Save and Finish</button>
       </div>
     </div>
   </div>
@@ -1488,8 +828,7 @@ function renderClassCards() {
     if (filterBar) filterBar.style.display = 'none';
     grid.innerHTML = `
       <div style="grid-column:1/-1;text-align:center;padding:60px 20px">
-        <div style="font-size:48px;margin-bottom:16px">📚</div>
-        <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px">No classes yet</div>
+                <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px">No classes yet</div>
         <div style="font-size:14px;color:var(--text-muted);max-width:340px;margin:0 auto;line-height:1.6">
           Your classes will appear here once an administrator adds them to your account.
         </div>
@@ -1525,29 +864,28 @@ function renderClassCards() {
 
     const card = document.createElement('div');
     card.className = 't-card';
-    card.style.borderLeft = '3px solid ' + (status === 'complete' ? '#34d399' : '#9CA3AF');
     card.innerHTML = `
       <div class="t-card-subject">${escHtml(subject)}</div>
       <div class="t-card-course">${escHtml(course)}</div>
       <div class="t-card-meta">
         <span class="t-status-dot ${dotClass}"></span>
-        <span style="font-size:11.5px;color:var(--text-muted);font-weight:500">${statusLabel}</span>
+        <span class="card-meta">${statusLabel}</span>
       </div>
       ${previewText ? `<div class="t-card-preview">${escHtml(previewText)}</div>` : ''}
-      ${status === 'complete' ? `<div style="font-size:10px;color:#34d399;font-weight:600;margin-top:4px">✓ Setup complete</div>` : ''}
+      ${status === 'complete' ? `<div class="t-card-done">Setup complete</div>` : ''}
       ${needsWelcome ? `
-        <div data-add-welcome="1" style="margin-top:10px;padding:10px 12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;cursor:pointer">
-          <div style="font-size:12px;font-weight:600;color:#F59E0B;margin-bottom:4px">⚡ New step added</div>
-          <div style="font-size:12px;color:var(--text);line-height:1.5">Add a welcome message so students see your voice when they open the class.</div>
-          <div style="font-size:11px;color:#F59E0B;font-weight:600;margin-top:6px">Add welcome message →</div>
+        <div data-add-welcome="1" class="t-card-notice">
+          <div class="t-card-notice-head">New step added</div>
+          <div class="t-card-notice-body">Add a welcome message so students see your voice when they open the class.</div>
+          <div class="t-card-notice-cta">Add welcome message →</div>
         </div>` : ''}
       ${needsSamples ? `
-        <div data-add-samples="1" style="margin-top:10px;padding:10px 12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;cursor:pointer">
-          <div style="font-size:12px;font-weight:600;color:#F59E0B;margin-bottom:4px">⚡ New step added</div>
-          <div style="font-size:12px;color:var(--text);line-height:1.5">Please add a few graded work samples so Lumi can match your feedback voice.</div>
-          <div style="font-size:11px;color:#F59E0B;font-weight:600;margin-top:6px">Add samples →</div>
+        <div data-add-samples="1" class="t-card-notice">
+          <div class="t-card-notice-head">New step added</div>
+          <div class="t-card-notice-body">Please add a few graded work samples so Lumi can match your feedback voice.</div>
+          <div class="t-card-notice-cta">Add samples →</div>
         </div>` : ''}
-      <div style="margin-top:8px;font-size:12px;font-weight:600;color:var(--accent)">${escHtml(btnLabel)} →</div>
+      <div class="t-card-cta">${escHtml(btnLabel)} →</div>
     `;
     keyActivate(card, (e) => {
       const samplesEl = e.target?.closest?.('[data-add-samples]');
@@ -1718,14 +1056,7 @@ function showStep(n) {
   document.querySelectorAll('.wizard-step').forEach(el => el.classList.remove('active'));
   document.querySelector(`.wizard-step[data-step="${n}"]`).classList.add('active');
 
-  document.querySelectorAll('.wizard-step-dot').forEach(dot => {
-    const step = parseInt(dot.dataset.step);
-    dot.classList.remove('active', 'completed');
-    if (step === n) dot.classList.add('active');
-    else if (step < n) dot.classList.add('completed');
-  });
-
-  document.getElementById('wizardStepLabel').textContent = `Step ${n} of 6`;
+  document.getElementById('wizardStepLabel').textContent = `STEP ${n} OF 6`;
 
   // Re-render Step 5 (work samples) when entering it — handles edit-flow
   // pre-population and ensures thumbs/counts/validation are fresh.
@@ -1787,8 +1118,6 @@ function updateWordCount(inputId, countId, btnId) {
 
   countEl.textContent = `${count} / 50 words minimum`;
   const wordsMet = count >= 50;
-  countEl.classList.toggle('valid', wordsMet);
-  countEl.classList.toggle('invalid', !wordsMet);
 
   // Step 1 also requires title selection
   const titleOk = btnId !== 'step1NextBtn' || !!document.getElementById('titleSelect').value;
@@ -1806,8 +1135,6 @@ function updateCharCount(inputId, countId, btnId, softLimit = 600, minRequired =
   if (!countEl || !btn) return;
 
   countEl.textContent = `${count} / ${softLimit} characters`;
-  countEl.classList.toggle('valid', count >= minRequired);
-  countEl.classList.toggle('invalid', count < minRequired);
   btn.disabled = count < minRequired;
 }
 
@@ -2302,7 +1629,7 @@ function makeSyllabusRow({ filename, sizeBytes, pending, onRemove }) {
   row.className = 'syllabus-file-row' + (pending ? ' pending' : '');
   const icon = document.createElement('span');
   icon.className = 'syllabus-file-icon';
-  icon.textContent = '📄';
+  icon.textContent = '';
   row.appendChild(icon);
   const name = document.createElement('div');
   name.className = 'syllabus-file-name-cell';
@@ -2366,7 +1693,7 @@ function useTemplate() {
   // Show notice about using shared content
   const notice = document.createElement('div');
   notice.className = 'template-notice';
-  notice.innerHTML = '📋 Using shared course info. Upload your own PDFs below if you want Lumi to use them as syllabus context.';
+  notice.innerHTML = 'Using shared course info. Upload your own PDFs below if you want Lumi to use them as syllabus context.';
   notice.style.cssText = 'padding:12px 16px;background:var(--accent-soft);border:1px solid var(--accent-glow);border-radius:8px;font-size:13px;color:var(--text);margin-bottom:16px;';
   const uploadArea = document.querySelector('.syllabus-upload-area');
   if (uploadArea && !document.querySelector('.template-notice')) {
