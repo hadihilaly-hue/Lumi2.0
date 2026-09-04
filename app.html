@@ -348,7 +348,6 @@
         <span class="test-mode-banner-text" id="testModeBannerText">TEST MODE — open a class to test your AI persona.</span>
       </div>
       <div class="drop-overlay" id="dropOverlay">
-        <div class="drop-overlay-icon">📎</div>
         <div class="drop-overlay-label">Drop to upload</div>
         <div class="drop-overlay-sub">Images, PDFs, and text files</div>
       </div>
@@ -359,19 +358,18 @@
       </div>
       <div class="voice-confirm-bar" id="voiceConfirmBar">
         <div class="voice-confirm-text">
-          <span class="voice-confirm-icon">🎤</span>
           <span class="voice-confirm-transcript" id="voiceConfirmText"></span>
         </div>
         <div class="voice-confirm-actions">
-          <button class="voice-confirm-btn send" id="voiceConfirmSend" aria-label="Send recording">
+          <button class="btn btn--primary voice-confirm-btn send" id="voiceConfirmSend" aria-label="Send recording">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             Send
           </button>
-          <button class="voice-confirm-btn rerecord" id="voiceConfirmRerecord" aria-label="Re-record">
+          <button class="btn btn--secondary voice-confirm-btn rerecord" id="voiceConfirmRerecord" aria-label="Re-record">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
             Re-record
           </button>
-          <button class="voice-confirm-btn cancel" id="voiceConfirmCancel" aria-label="Cancel recording">
+          <button class="btn btn--ghost voice-confirm-btn cancel" id="voiceConfirmCancel" aria-label="Cancel recording">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             Cancel
           </button>

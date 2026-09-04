@@ -132,27 +132,6 @@ export function timeOfDayGreeting(now = new Date()) {
   return 'evening';
 }
 
-/**
- * Deterministic 8-slot accent-bar palette seeded from the mockup's colors.
- * Same course name → same color across every render, so students learn to
- * recognize their classes by tile hue. `hashPalette` is pure.
- *
- * TODO(dead code, Session 2): the colored card accent bar these fed was removed
- * from `renderCard` — DESIGN.md allows no colored card edge. Nothing in the app
- * calls `hashPalette` any more; both are kept only because test/home.test.mjs
- * covers them. Delete both, and those tests, in a cleanup pass.
- */
-export const ACCENT_PALETTE = [
-  '#C76D3D', '#6B8A6B', '#4A7A7A', '#3D6AAB',
-  '#9A6B4A', '#B8893D', '#8A5A6B', '#7A8A4A',
-];
-export function hashPalette(course, palette = ACCENT_PALETTE) {
-  const s = String(course || '');
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-  const idx = Math.abs(h) % palette.length;
-  return palette[idx];
-}
 
 /**
  * "N things due this week across M classes". Returns { things, classes,
