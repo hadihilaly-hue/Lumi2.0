@@ -391,7 +391,6 @@ a{color:inherit;text-decoration:none}
   
   min-width:120px;
 ;box-shadow:var(--shadow-overlay)}
-:root.dark-mode .hist-dropdown{}
 .hist-dd-item{
   display:flex;align-items:center;gap:var(--space-2);
   padding:var(--space-2) var(--space-2);border-radius:var(--radius-sm);cursor:pointer;
@@ -410,7 +409,6 @@ a{color:inherit;text-decoration:none}
 .ic-cancel:hover{opacity:.8}
 .ic-delete{background:var(--surface-2);color:var(--text)}
 .ic-delete:hover{opacity:.85}
-:root.dark-mode .inline-confirm{}
 
 /* Sidebar project delete button */
 .sb-proj-del{width:20px;height:20px;flex-shrink:0;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-3);border-radius:var(--radius-sm);opacity:0;transition:opacity .13s,color .13s;font-size:var(--t-ui)}
@@ -549,9 +547,8 @@ a{color:inherit;text-decoration:none}
   opacity:0;transition:opacity .18s ease;
 }
 .drop-overlay.active{opacity:1;pointer-events:all}
-.drop-overlay-icon{font-size:var(--t-display);line-height:1}
-.drop-overlay-label{font-size:var(--t-user);font-weight:var(--w-medium);color:var(--text)}
-.drop-overlay-sub{font-size:var(--t-meta);color:var(--text-2)}
+.drop-overlay-label{font-size:var(--t-ui);line-height:var(--lh-ui);color:var(--text)}
+.drop-overlay-sub{font-size:var(--t-meta);line-height:var(--lh-meta);color:var(--text-3)}
 .messages{flex:1;overflow-y:auto;padding:var(--space-6) var(--space-8);display:flex;flex-direction:column;gap:var(--space-6);scroll-behavior:smooth;}
 
 /* welcome */
@@ -718,7 +715,6 @@ a{color:inherit;text-decoration:none}
 .seg-opt{flex:1;padding:var(--space-2) var(--space-1);background:none;border:none;border-radius:var(--radius-sm);font-family:inherit;font-size:var(--t-ui);font-weight:var(--w-medium);color:var(--text-2);cursor:pointer;transition:all .15s;}
 .seg-opt:hover{color:var(--text)}
 .seg-opt.active{background:var(--surface);color:var(--text);}
-:root.dark-mode .seg-opt.active{}
 
 /* ─── MOBILE ──────────────────────────────────────────────── */
 @media(max-width:768px){
@@ -1128,20 +1124,13 @@ body.signin-page{
 .voice-listening-bar.active{display:flex}
 .voice-dot{width:7px;height:7px;border-radius:var(--radius-full);background:var(--text-3);flex-shrink:0;}
 /* Voice confirmation bar */
-.voice-confirm-bar{display:none;flex-direction:column;gap:var(--space-2);padding:var(--space-3) var(--space-3);background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;animation:voice-confirm-in .22s ease}
+.voice-confirm-bar{display:none;flex-direction:column;gap:var(--space-3);margin:0 var(--space-4) var(--space-3);padding:var(--space-4);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);flex-shrink:0;animation:voice-confirm-in var(--dur-2) var(--ease)}
 .voice-confirm-bar.active{display:flex}
 .voice-confirm-text{display:flex;align-items:flex-start;gap:var(--space-2);font-size:var(--t-ui);line-height:var(--lh-ui)}
-.voice-confirm-icon{flex-shrink:0;margin-top:var(--space-1)}
 .voice-confirm-transcript{flex:1;color:var(--text);font-style:italic}
 .voice-confirm-actions{display:flex;gap:var(--space-2)}
-.voice-confirm-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:var(--space-1);padding:var(--space-2) var(--space-1);border:none;border-radius:var(--radius-md);font-size:var(--t-ui);font-weight:var(--w-semi);cursor:pointer;font-family:inherit;transition:all .15s;min-height:42px}
+.voice-confirm-btn{flex:1}
 .voice-confirm-btn svg{width:15px;height:15px;flex-shrink:0}
-.voice-confirm-btn.send{background:var(--surface-2);color:var(--text)}
-.voice-confirm-btn.send:hover{opacity:.88}
-.voice-confirm-btn.rerecord{background:var(--surface-2);color:var(--text);border:1px solid var(--border)}
-.voice-confirm-btn.rerecord:hover{border-color:var(--text-2);color:var(--text)}
-.voice-confirm-btn.cancel{background:var(--surface-2);color:var(--text-2);border:1px solid var(--border)}
-.voice-confirm-btn.cancel:hover{background:var(--surface-2);color:var(--danger);border-color:var(--danger)}
 
 /* ─── MY CLASSES SIDEBAR ─────────────────────────────────── */
 .sb-my-class-item{display:flex;flex-direction:column;align-items:flex-start;gap:var(--space-1);padding:var(--space-2) var(--space-6) var(--space-2) var(--space-2);border-radius:var(--radius-md);cursor:pointer;color:var(--text);transition:all .15s;min-height:44px;position:relative;}
@@ -2338,7 +2327,7 @@ g);
 body.t-portal{overflow:auto;display:block}
 #authLoading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:var(--space-3)}
 #signinView{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:var(--space-6)}
-.t-signin-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-12) var(--space-8);max-width:400px;width:100%;text-align:center;max-width:400px;margin-inline:auto;margin-block:10vh auto}
+.t-signin-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-12) var(--space-8);max-width:400px;width:100%;text-align:center}
 .t-logo{margin-bottom:var(--space-8)}
 .t-logo-mark{width:52px;height:52px;background:var(--surface-2);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;font-size:var(--t-title);margin:0 auto var(--space-3)}
 .t-logo h1{font-size:var(--t-title);font-weight:var(--w-semi);letter-spacing:var(--track-title);margin-bottom:var(--space-1)}
@@ -2480,3 +2469,124 @@ body.t-portal{overflow:auto;display:block}
 .t-card-notice-cta{font-size:var(--t-meta);font-weight:var(--w-medium);color:var(--text-2);margin-top:var(--space-1)}
 .t-card-done{font-size:var(--t-micro);font-weight:var(--w-semi);letter-spacing:var(--track-micro);text-transform:uppercase;color:var(--text-3);margin-top:var(--space-1)}
 .t-card-cta{margin-top:var(--space-2);font-size:var(--t-meta);font-weight:var(--w-medium);color:var(--text-2)}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ADMIN CONSOLE
+   Was 144 lines inline in admin.html, plus 20 inline style attributes in the
+   body. Buttons, the search field and the empty state use the shared
+   primitives; what remains is admin-only — stat grid, roster table, import
+   log, FERPA panel.
+   ═══════════════════════════════════════════════════════════════════════════ */
+body.a-admin{display:block;overflow:auto;height:auto}
+#authLoading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:var(--space-3)}
+#adminHeader{background:var(--surface);border-bottom:1px solid var(--border);padding:var(--space-4) var(--space-8);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40}
+.a-hdr-left{display:flex;align-items:center;gap:var(--space-3)}
+.a-hdr-mark{width:32px;height:32px;background:var(--surface-2);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;font-size:var(--t-strong)}
+.a-hdr-title{font-size:var(--t-user);font-weight:var(--w-semi)}
+.a-hdr-sub{font-size:var(--t-micro);color:var(--text-2)}
+.a-hdr-right{display:flex;align-items:center;gap:var(--space-3)}
+.a-signout{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:var(--space-1) var(--space-3);color:var(--text-2);font-family:inherit;font-size:var(--t-meta);cursor:pointer;transition:all .15s}
+.a-signout:hover{border-color:var(--border-strong);color:var(--text)}
+.a-refresh-info{font-size:var(--t-micro);color:var(--text-3)}
+#adminBody{max-width:960px;margin:0 auto;padding:var(--space-8) var(--space-6) var(--space-16)}
+.a-stats{display:grid;grid-template-columns:repeat(4, 1fr);gap:var(--space-3);margin-bottom:var(--space-6)}
+.a-stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-4) var(--space-4)}
+.a-stat-num{font-size:var(--t-display);font-weight:var(--w-semi);letter-spacing:var(--track-title);line-height:1;margin-bottom:var(--space-1)}
+.a-stat-label{font-size:var(--t-micro);color:var(--text-2);font-weight:var(--w-medium);text-transform:uppercase;letter-spacing:var(--track-micro)}
+.a-stat-num.green{color:var(--text-2)}
+.a-stat-num.yellow{color:var(--text-2)}
+.a-stat-num.red{color:var(--text-2)}
+.a-search-row{display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-4)}
+.a-search{flex:1}
+.a-section-label{font-size:var(--t-micro);font-weight:var(--w-semi);color:var(--text-2);text-transform:uppercase;letter-spacing:var(--track-micro);margin-bottom:var(--space-3)}
+.a-teacher-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:var(--space-2);overflow:hidden;transition:border-color .15s}
+.a-teacher-card:hover{border-color:var(--border-strong)}
+.a-teacher-header{display:flex;align-items:center;justify-content:space-between;padding:var(--space-3) var(--space-4);cursor:pointer;user-select:none;gap:var(--space-3)}
+.a-teacher-header-left{display:flex;align-items:center;gap:var(--space-3);min-width:0}
+.a-teacher-avatar{width:34px;height:34px;border-radius:var(--radius-full);background:var(--surface-2);border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;font-size:var(--t-ui);font-weight:var(--w-semi);color:var(--text);flex-shrink:0}
+.a-teacher-name{font-size:var(--t-strong);font-weight:var(--w-semi)}
+.a-teacher-email{font-size:var(--t-micro);color:var(--text-2);margin-top:var(--space-1)}
+.a-teacher-header-right{display:flex;align-items:center;gap:var(--space-2);flex-shrink:0}
+.a-mini-dots{display:flex;gap:var(--space-1);align-items:center}
+.a-chevron{font-size:var(--t-meta);color:var(--text-3);transition:transform .2s}
+.a-chevron.open{transform:rotate(180deg)}
+.a-teacher-classes{display:none;border-top:1px solid var(--border);padding:var(--space-1) 0 var(--space-2)}
+.a-teacher-classes.open{display:block}
+.a-class-row{display:flex;align-items:center;justify-content:space-between;padding:var(--space-2) var(--space-4);gap:var(--space-3)}
+.a-class-row:hover{background:var(--surface-2)}
+.a-class-name{font-size:var(--t-ui);color:var(--text);min-width:0;flex:1}
+.a-class-subject{font-size:var(--t-micro);color:var(--text-2);margin-top:var(--space-1)}
+.a-class-status{display:flex;align-items:center;gap:var(--space-1);flex-shrink:0}
+.a-status-dot{width:8px;height:8px;border-radius:var(--radius-full)}
+.a-status-dot.not_started{background:var(--surface-2)}
+.a-status-dot.in_progress{background:var(--surface-2)}
+.a-status-dot.complete{background:var(--surface-2)}
+.a-status-label{font-size:var(--t-meta);font-weight:var(--w-medium)}
+.a-status-label.not_started{color:var(--text-2)}
+.a-status-label.in_progress{color:var(--text-2)}
+.a-status-label.complete{color:var(--text-2)}
+.a-class-updated{font-size:var(--t-micro);color:var(--text-3);flex-shrink:0}
+.a-stats{grid-template-columns:repeat(2, 1fr)}
+#adminHeader{padding:var(--space-3) var(--space-4)}
+#adminBody{padding:var(--space-4) var(--space-3) var(--space-16)}
+.a-teacher-header:focus-visible{outline:1px solid var(--border-strong);outline-offset:-2px}
+.a-sum.complete{color:var(--text-2)}
+.a-sum.progress{color:var(--text-2)}
+.a-sum.not{color:var(--text-2)}
+@keyframes spin{ to { transform: rotate(360deg); } }/* FERPA data-request panel — was 12 inline style attributes. Destructive
+   action, so the markup, ids, handlers and confirmation flow are unchanged;
+   only presentation moved out. */
+.a-ferpa{border:1px solid var(--border);border-radius:var(--radius-md);padding:var(--space-4);margin-bottom:var(--space-6);background:var(--surface)}
+.a-ferpa-title{font-weight:var(--w-semi);margin-bottom:var(--space-1)}
+.a-ferpa-note{font-size:var(--t-meta);line-height:var(--lh-meta);color:var(--text-3);margin-bottom:var(--space-3)}
+.a-ferpa-row{display:flex;gap:var(--space-2);flex-wrap:wrap;align-items:center}
+.a-ferpa-email{flex:1;min-width:240px}
+.a-ferpa-confirm{display:none;margin-top:var(--space-3);padding:var(--space-3);border:1px solid var(--danger);border-radius:var(--radius-sm)}
+.a-ferpa-confirm-label{font-size:var(--t-ui);margin-bottom:var(--space-2)}
+.a-ferpa-confirm-input{width:130px}
+.a-ferpa-result{margin-top:var(--space-3);font-size:var(--t-ui);line-height:var(--lh-ui);color:var(--text)}
+.a-ferpa-result.is-error{color:var(--danger)}
+.a-ferpa-result.is-ok{color:var(--text-2)}
+.a-note{font-size:var(--t-ui);color:var(--text-2);margin-top:var(--space-2)}
+.a-subtle{color:var(--text-2);font-weight:var(--w-normal)}
+.a-inline-link{font-size:var(--t-meta);font-weight:var(--w-medium);color:var(--text-2);padding:var(--space-1) var(--space-3);border:1px solid var(--border);border-radius:var(--radius-sm)}
+.a-inline-link:hover{color:var(--text);border-color:var(--border-strong)}
+.a-accent-strong{color:var(--text);font-weight:var(--w-semi)}
+.a-tiny{font-size:var(--t-micro);color:var(--text-3)}
+
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRIVACY POLICY
+   Was 60 lines inline in privacy.html. Compliance-facing, so the copy and
+   document structure are untouched — presentation only. The consent bar's
+   button uses the shared primitives; the bar keeps the one permitted
+   overlay shadow because it is a fixed overlay.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html{height:auto;overflow-y:auto}
+body.privacy-page{background:var(--bg);color:var(--text);font-family:'Inter', system-ui, sans-serif;margin:0;line-height:var(--lh-user);display:block;height:auto;min-height:100vh;overflow-y:auto}
+.pp-wrap{max-width:760px;margin:0 auto;padding:var(--space-12) var(--space-6) var(--space-16)}
+.pp-logo{display:flex;align-items:baseline;gap:var(--space-2);margin-bottom:var(--space-2)}
+.pp-name{font-size:var(--t-title);font-weight:var(--w-semi);letter-spacing:var(--track-title)}
+.pp-school{color:var(--text-2);font-size:var(--t-ui)}
+h1{font-size:var(--t-display);letter-spacing:var(--track-title);margin:var(--space-6) 0 var(--space-1)}
+.pp-sub{color:var(--text-2);font-size:var(--t-strong);margin-bottom:var(--space-6)}
+.pp-draft{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);margin-bottom:var(--space-8);font-size:var(--t-ui);line-height:var(--lh-ui);color:var(--text-2)}
+.pp-draft strong{color:var(--text);font-weight:var(--w-semi)}
+h2{font-size:var(--t-title);margin:var(--space-8) 0 var(--space-2);letter-spacing:var(--track-title);border-bottom:1px solid var(--border);padding-bottom:var(--space-1)}
+h3{font-size:var(--t-user);margin:var(--space-4) 0 var(--space-1)}
+p, li{font-size:var(--t-user);color:var(--text)}
+ul{padding-left:var(--space-4)}
+li{margin-bottom:var(--space-1)}
+a{color:var(--accent)}
+table{width:100%;border-collapse:collapse;margin:var(--space-3) 0;font-size:var(--t-ui)}
+th, td{text-align:left;padding:var(--space-2) var(--space-2);border-bottom:1px solid var(--border);vertical-align:top}
+th{color:var(--text-2);font-weight:var(--w-semi)}
+.pp-foot{margin-top:var(--space-12);padding-top:var(--space-4);border-top:1px solid var(--border);color:var(--text-3);font-size:var(--t-ui)}
+code, .pp-ph{background:var(--surface-2);border-radius:var(--radius-sm);padding:var(--space-1) var(--space-1);font-size:var(--t-ui)}
+.consent-bar{display:none}
+body.consent-mode .consent-bar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--surface);border-top:1px solid var(--border);padding:var(--space-3) var(--space-6);justify-content:center;box-shadow:var(--shadow-overlay)}
+body.consent-mode .pp-wrap{padding-bottom:var(--space-16)}
+.consent-bar-inner{width:100%;max-width:760px;display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);flex-wrap:wrap}
+.consent-hint{font-size:var(--t-ui);color:var(--text-2)}

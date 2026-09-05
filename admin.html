@@ -8,173 +8,27 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <script>document.write('<link rel="stylesheet" href="style.css?t=' + Date.now() + '">');</script>
-<style>
-body { overflow: auto; display: block; }
-
-#authLoading {
-  position: fixed; inset: 0; background: var(--bg);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 999; flex-direction: column; gap: 14px;
-}
-.auth-spinner {
-  width: 36px; height: 36px; border: 3px solid var(--border);
-  border-top-color: var(--accent); border-radius: 50%;
-  animation: spin .8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ─── HEADER ───────────────────────────────────────────────────────────────── */
-#adminHeader {
-  background: var(--surface); border-bottom: 1px solid var(--border);
-  padding: 16px 32px; display: flex; align-items: center;
-  justify-content: space-between; position: sticky; top: 0; z-index: 40;
-}
-.a-hdr-left { display: flex; align-items: center; gap: 12px; }
-.a-hdr-mark {
-  width: 32px; height: 32px; background: var(--accent); border-radius: 9px;
-  display: flex; align-items: center; justify-content: center; font-size: 14px;
-  box-shadow: 0 0 14px var(--accent-glow);
-}
-.a-hdr-title { font-size: 15px; font-weight: 600; }
-.a-hdr-sub   { font-size: 11px; color: var(--text-muted); }
-.a-hdr-right { display: flex; align-items: center; gap: 12px; }
-.a-signout {
-  background: none; border: 1px solid var(--border); border-radius: 7px;
-  padding: 6px 12px; color: var(--text-muted); font-family: inherit;
-  font-size: 12px; cursor: pointer; transition: all .15s;
-}
-.a-signout:hover { border-color: #ff6b6b; color: #ff6b6b; }
-.a-refresh-info { font-size: 11px; color: var(--text-faint); }
-
-/* ─── BODY ─────────────────────────────────────────────────────────────────── */
-#adminBody { max-width: 960px; margin: 0 auto; padding: 32px 24px 80px; }
-
-/* ─── STATS BAR ────────────────────────────────────────────────────────────── */
-.a-stats {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px;
-}
-.a-stat {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; padding: 16px 18px;
-}
-.a-stat-num  { font-size: 26px; font-weight: 700; letter-spacing: -.5px; line-height: 1; margin-bottom: 4px; }
-.a-stat-label{ font-size: 11px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
-.a-stat-num.green  { color: #0F7A52; }
-.a-stat-num.yellow { color: #8A5A00; }
-.a-stat-num.red    { color: #C62828; }
-
-/* ─── SEARCH ───────────────────────────────────────────────────────────────── */
-.a-search-row { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
-.a-search {
-  flex: 1; background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 10px 14px; color: var(--text);
-  font-family: inherit; font-size: 14px; outline: none; transition: border-color .15s;
-}
-.a-search:focus { border-color: var(--accent); }
-.a-section-label {
-  font-size: 11px; font-weight: 600; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: .8px; margin-bottom: 12px;
-}
-
-/* ─── TEACHER ROWS ─────────────────────────────────────────────────────────── */
-.a-teacher-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 14px; margin-bottom: 10px; overflow: hidden; transition: border-color .15s;
-}
-.a-teacher-card:hover { border-color: var(--accent); }
-.a-teacher-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 18px; cursor: pointer; user-select: none; gap: 12px;
-}
-.a-teacher-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.a-teacher-avatar {
-  width: 34px; height: 34px; border-radius: 50%; background: var(--accent-soft);
-  border: 1px solid var(--accent-glow); display: flex; align-items: center;
-  justify-content: center; font-size: 13px; font-weight: 600; color: var(--accent);
-  flex-shrink: 0;
-}
-.a-teacher-name  { font-size: 14px; font-weight: 600; }
-.a-teacher-email { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
-.a-teacher-header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.a-mini-dots { display: flex; gap: 5px; align-items: center; }
-.a-chevron { font-size: 12px; color: var(--text-faint); transition: transform .2s; }
-.a-chevron.open { transform: rotate(180deg); }
-
-.a-teacher-classes {
-  display: none; border-top: 1px solid var(--border);
-  padding: 6px 0 10px;
-}
-.a-teacher-classes.open { display: block; }
-.a-class-row {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 18px; gap: 12px;
-}
-.a-class-row:hover { background: var(--surface-2); }
-.a-class-name { font-size: 13px; color: var(--text); min-width: 0; flex: 1; }
-.a-class-subject { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
-.a-class-status { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.a-status-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-}
-.a-status-dot.not_started { background: #ef4444; box-shadow: 0 0 4px rgba(239,68,68,.5); }
-.a-status-dot.in_progress { background: #fbbf24; box-shadow: 0 0 4px rgba(251,191,36,.5); }
-.a-status-dot.complete    { background: #34d399; box-shadow: 0 0 4px rgba(52,211,153,.5); }
-.a-status-label { font-size: 11.5px; font-weight: 500; }
-.a-status-label.not_started { color: #C62828; }
-.a-status-label.in_progress { color: #8A5A00; }
-.a-status-label.complete    { color: #0F7A52; }
-.a-class-updated { font-size: 10.5px; color: var(--text-faint); flex-shrink: 0; }
-
-/* ─── EMPTY ────────────────────────────────────────────────────────────────── */
-.a-empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 14px; }
-
-@media (max-width: 600px) {
-  .a-stats { grid-template-columns: repeat(2, 1fr); }
-  #adminHeader { padding: 14px 16px; }
-  #adminBody { padding: 20px 14px 60px; }
-}
-
-/* ─── A11Y ─────────────────────────────────────────────────────
-   Visible keyboard focus for the expandable teacher header
-   (made a button in JS) — WCAG 2.4.7. */
-.a-teacher-header:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-/* Per-teacher status summary in the email line. Darkened for AA
-   contrast on the light card; bright again in dark mode. */
-.a-sum.complete { color: #0F7A52; }
-.a-sum.progress { color: #8A5A00; }
-.a-sum.not      { color: #C62828; }
-:root.dark-mode .a-status-label.not_started,
-:root.dark-mode .a-sum.not      { color: #ef4444; }
-:root.dark-mode .a-status-label.in_progress,
-:root.dark-mode .a-sum.progress { color: #fbbf24; }
-:root.dark-mode .a-status-label.complete,
-:root.dark-mode .a-sum.complete { color: #34d399; }
-:root.dark-mode .a-stat-num.green  { color: #34d399; }
-:root.dark-mode .a-stat-num.yellow { color: #fbbf24; }
-:root.dark-mode .a-stat-num.red    { color: #ef4444; }
-</style>
 </head>
-<body>
+<body class="a-admin">
 
 <div id="authLoading">
   <div class="auth-spinner"></div>
-  <div style="font-size:13px;color:var(--text-muted);margin-top:8px">Loading…</div>
+  <div class="a-note">Loading…</div>
 </div>
 
 <div id="adminApp" style="display:none">
   <!-- HEADER -->
   <div id="adminHeader">
     <div class="a-hdr-left">
-      <div class="a-hdr-mark">✦</div>
-      <div>
-        <div class="a-hdr-title">Lumi <span style="color:var(--text-muted);font-weight:400">·</span> Admin Dashboard</div>
+            <div>
+        <div class="a-hdr-title">Lumi <span class="a-subtle">·</span> Admin Dashboard</div>
         <div class="a-hdr-sub">Menlo School · Teacher Profile Status</div>
       </div>
     </div>
     <div class="a-hdr-right">
       <span class="a-refresh-info" id="refreshInfo">Auto-refreshes every 60s</span>
-      <a href="teacher.html" style="font-size:12px;font-weight:500;color:var(--accent);text-decoration:none;padding:6px 12px;border:1px solid var(--accent-glow);border-radius:7px;background:var(--accent-soft)">🍎 Teacher Portal</a>
-      <button class="a-signout" onclick="doSignOut()">Sign out</button>
+      <a href="teacher.html" class="a-inline-link"> Teacher Portal</a>
+      <button class="btn btn--ghost a-signout" onclick="doSignOut()">Sign out</button>
     </div>
   </div>
 
@@ -201,39 +55,39 @@ body { overflow: auto; display: block; }
     </div>
 
     <!-- FERPA DATA REQUESTS -->
-    <div style="border:1px solid var(--border,#e7e2d8);border-radius:12px;padding:16px 18px;margin-bottom:22px;background:var(--card,#fff)">
-      <div style="font-weight:600;margin-bottom:4px">FERPA data requests</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+    <div class="a-ferpa">
+      <div class="a-ferpa-title">FERPA data requests</div>
+      <div class="a-ferpa-note">
         Export or erase all Lumi data for one student, by email. Deletion is a
         <b>soft-delete</b> — access is revoked immediately and data is permanently removed
         after a 30-day grace period, so a mistake is recoverable within that window.
         Teacher notes about the student are excluded from the export.
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <div class="a-ferpa-row">
         <input id="ferpaEmail" type="email" placeholder="student@menloschool.org" aria-label="Student email"
-               style="flex:1;min-width:240px;padding:8px 11px;border:1px solid var(--border,#ccc);border-radius:8px;font-size:14px">
+               class="field-input a-ferpa-email">
         <button onclick="ferpaExport()"
-                style="padding:8px 14px;border:1px solid var(--accent-glow,#ccc);border-radius:8px;background:var(--accent-soft,#f4f4f4);color:var(--accent,#333);font-weight:500;cursor:pointer">Export data</button>
+                class="btn btn--secondary">Export data</button>
         <button onclick="ferpaShowConfirm()"
-                style="padding:8px 14px;border:1px solid #e0b4b4;border-radius:8px;background:#fdf3f3;color:#b3261e;font-weight:500;cursor:pointer">Delete student data…</button>
+                class="btn btn--danger">Delete student data…</button>
       </div>
-      <div id="ferpaConfirm" style="display:none;margin-top:12px;padding:12px 14px;border:1px solid #e0b4b4;background:#fdf3f3;border-radius:8px">
-        <div style="font-size:13px;margin-bottom:9px">Type <b>DELETE</b> to erase all data for <b id="ferpaConfirmEmail"></b>.</div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <div id="ferpaConfirm" class="a-ferpa-confirm">
+        <div class="a-ferpa-confirm-label">Type <b>DELETE</b> to erase all data for <b id="ferpaConfirmEmail"></b>.</div>
+        <div class="a-ferpa-row">
           <input id="ferpaConfirmInput" type="text" placeholder="DELETE" oninput="ferpaConfirmSync()" aria-label="Type DELETE to confirm"
-                 style="padding:7px 10px;border:1px solid #ccc;border-radius:8px;font-size:14px;width:130px">
+                 class="field-input a-ferpa-confirm-input">
           <button id="ferpaConfirmBtn" onclick="ferpaDelete()" disabled
-                  style="padding:8px 14px;border:none;border-radius:8px;background:#b3261e;color:#fff;font-weight:600;cursor:pointer;opacity:.5">Confirm delete</button>
+                  class="btn btn--danger">Confirm delete</button>
           <button onclick="ferpaHideConfirm()"
-                  style="padding:8px 12px;border:1px solid #ccc;border-radius:8px;background:#fff;color:var(--text-muted);cursor:pointer">Cancel</button>
+                  class="btn btn--ghost">Cancel</button>
         </div>
       </div>
-      <div id="ferpaResult" style="margin-top:12px;font-size:13px;line-height:1.5"></div>
+      <div id="ferpaResult" class="a-ferpa-result"></div>
     </div>
 
     <!-- SEARCH -->
     <div class="a-search-row">
-      <input class="a-search" id="teacherSearch" type="text" placeholder="Search teachers…" aria-label="Search teachers" oninput="renderDashboard()">
+      <input class="field-input a-search" id="teacherSearch" type="text" placeholder="Search teachers…" aria-label="Search teachers" oninput="renderDashboard()">
     </div>
     <div class="a-section-label" id="teacherCount">All teachers</div>
 
@@ -378,7 +232,11 @@ async function adminApi(path, opts = {}) {
 
 function ferpaSetResult(html, kind) {
   const el = document.getElementById('ferpaResult');
-  el.style.color = kind === 'error' ? '#b3261e' : kind === 'ok' ? '#1a7f37' : 'var(--text)';
+  // Tone via class, not an inline colour — 'ok' reads as ordinary text
+  // (DESIGN.md allows no success green); only errors take --danger.
+  el.classList.remove('is-error', 'is-ok');
+  if (kind === 'error') el.classList.add('is-error');
+  else if (kind === 'ok') el.classList.add('is-ok');
   el.innerHTML = html;
 }
 
@@ -395,7 +253,7 @@ async function ferpaExport() {
     const url  = URL.createObjectURL(blob);
     ferpaSetResult(
       `Export ready for <b>${escHtml(email)}</b> — ${escHtml(counts)}. ` +
-      `<a href="${url}" download="lumi-export-${encodeURIComponent(email)}.json" style="color:var(--accent);font-weight:600">Download JSON</a>`,
+      `<a href="${url}" download="lumi-export-${encodeURIComponent(email)}.json" class="a-accent-strong">Download JSON</a>`,
       'ok');
   } catch (e) {
     ferpaSetResult(`Export failed: ${escHtml(e.message)}`, 'error');
@@ -474,7 +332,7 @@ function renderDashboard() {
   list.innerHTML = '';
 
   if (entries.length === 0) {
-    list.innerHTML = '<div class="a-empty">No teachers found.</div>';
+    list.innerHTML = '<div class="empty-text a-empty">No teachers found.</div>';
     return;
   }
 
@@ -490,7 +348,7 @@ function renderDashboard() {
     const dotsHtml = classes.slice(0, 8).map((c, i) => {
       const s = statuses[i];
       return `<span class="a-status-dot ${s}" title="${escHtml(c)}"></span>`;
-    }).join('') + (classes.length > 8 ? `<span style="font-size:10px;color:var(--text-faint)">+${classes.length - 8}</span>` : '');
+    }).join('') + (classes.length > 8 ? `<span class="a-tiny">+${classes.length - 8}</span>` : '');
 
     const classesHtml = classes.map(course => {
       const s      = getStatus(email, course);

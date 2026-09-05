@@ -604,7 +604,11 @@ function showView(name) {
   ['authLoading','signinView','unknownView','homeView','wizardView','rosterView','noteChatView'].forEach(id => {
     document.getElementById(id).style.display = 'none';
   });
-  document.getElementById(name).style.display = name === 'authLoading' ? 'flex' : (name === 'wizardView' ? 'flex' : 'block');
+  // Each view gets the display its own CSS asks for. The old two-branch
+  // ternary forced 'block' on everything else, which silently overrode
+  // #signinView's display:flex and killed its centring.
+  const VIEW_DISPLAY = { authLoading: 'flex', signinView: 'flex', wizardView: 'flex' };
+  document.getElementById(name).style.display = VIEW_DISPLAY[name] || 'block';
 }
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────

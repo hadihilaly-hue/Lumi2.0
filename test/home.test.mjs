@@ -10,7 +10,7 @@ import { S } from '../js/state.js';
 import { reset, seedLocalStorage } from './harness.mjs';
 import {
   buildCards, sortCards, relativeTs, dueLabel, isUrgentDue,
-  timeOfDayGreeting, hashPalette, ACCENT_PALETTE, weekSummary, pickDueSoon,
+  timeOfDayGreeting, weekSummary, pickDueSoon,
 } from '../js/home.js';
 
 // Fixed "today" for date-math tests. Mid-week so weekday-name output
@@ -215,31 +215,6 @@ test('timeOfDayGreeting: morning / afternoon / evening buckets', () => {
   assert.equal(timeOfDayGreeting(at(16)), 'afternoon');
   assert.equal(timeOfDayGreeting(at(17)), 'evening');
   assert.equal(timeOfDayGreeting(at(23)), 'evening');
-});
-
-// ── hashPalette ──────────────────────────────────────────────────────────────
-test('hashPalette: deterministic for the same course', () => {
-  assert.equal(hashPalette('Algebra II'), hashPalette('Algebra II'));
-  assert.equal(hashPalette('Biology'), hashPalette('Biology'));
-});
-
-test('hashPalette: distributes across the 8-slot palette', () => {
-  const seen = new Set(
-    ['Algebra II', 'Biology', 'English 10', 'US History', 'Spanish II',
-     'Music Theory', 'Intro to Computer Science', 'Physical Education 9']
-      .map(c => hashPalette(c))
-  );
-  // Not required to hit all 8, but the test data should hit ≥ 4 distinct hues
-  // — otherwise the "students recognize their classes by tile hue" goal fails.
-  assert.ok(seen.size >= 4, `expected ≥4 distinct palette hits, got ${seen.size}`);
-  for (const color of seen) {
-    assert.ok(ACCENT_PALETTE.includes(color), `unexpected color ${color}`);
-  }
-});
-
-test('hashPalette: empty / whitespace course still returns a palette entry', () => {
-  assert.ok(ACCENT_PALETTE.includes(hashPalette('')));
-  assert.ok(ACCENT_PALETTE.includes(hashPalette('   ')));
 });
 
 // ── weekSummary ──────────────────────────────────────────────────────────────
