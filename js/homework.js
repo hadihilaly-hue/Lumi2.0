@@ -616,7 +616,7 @@ export function renderHwPopupTasks() {
   list.innerHTML = '';
   if (!tasks.length) {
     const empty = document.createElement('div');
-    empty.style.cssText = 'font-size:13px;color:var(--text-muted);padding:4px 0 12px';
+    empty.style.cssText = 'font-size:13px;color:var(--text-2);padding:4px 0 12px';
     empty.textContent = 'Nothing yet — add your assignments below.';
     list.appendChild(empty);
     return;
