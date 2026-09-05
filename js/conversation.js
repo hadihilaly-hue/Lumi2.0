@@ -317,10 +317,16 @@ async function finishOpenTutor(subjectId, course, teacher, subjectName) {
     // R4 fail-visible: the Lambda fetch failed. Show a small banner in the
     // chat area instead of the misleading "teacher hasn't set up" message.
     console.error('[openTutor] teacher-profile fetch failed:', teacher, course, profile.message);
+    // Same shape renderError() produces in js/chat.js: a .msg.lumi carrying a
+    // .msg-error child — --danger text, no fill and no border. The old inline
+    // cssText was a light-mode treatment — pale pink fill, dark red text — that
+    // painted a light box on the dark ground, and DESIGN.md bars emoji from banners.
     const errBanner = document.createElement('div');
-    errBanner.className = 'lambda-error-banner';
-    errBanner.style.cssText = 'margin:12px;padding:10px 14px;border:1px solid #c0392b;background:#fdecea;color:#902;border-radius:8px;font-size:13px;line-height:1.45';
-    errBanner.textContent = `⚠️ Couldn't load ${course}: ${profile.message}. Check the console for details.`;
+    errBanner.className = 'msg lumi lambda-error-banner';
+    const errText = document.createElement('div');
+    errText.className = 'msg-error';
+    errText.textContent = `Couldn't load ${course}: ${profile.message}. Check the console for details.`;
+    errBanner.appendChild(errText);
     messagesEl.appendChild(errBanner);
     S.tutorCtx.teacherProfile = null;
     msgInput.disabled = true;
