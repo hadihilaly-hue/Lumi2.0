@@ -230,8 +230,18 @@ If they uploaded a rubric or project instructions it will be attached to their f
 Remember: help them THINK through the project, never do it for them. Ask guiding questions, help them brainstorm, review their work, but the thinking must be theirs.`);
       }
     }
-    const { clean, data } = await callAPI(buildApiMessages(S), system);
-    typing.remove();
+    // Stream into a transient node. On the first chunk it replaces the typing
+    // indicator; on completion it is REMOVED and renderMsg runs exactly as it
+    // did before, so the finished message is byte-identical to the old path
+    // rather than something this function has to keep in sync.
+    let stream = null;
+    const onChunk = (visible) => {
+      if (!stream) { typing.remove(); stream = makeStreamingMsg(); messagesEl.appendChild(stream.el); }
+      stream.body.textContent = visible;
+      scrollBottom();
+    };
+    const { clean, data } = await callAPI(buildApiMessages(S), system, onChunk);
+    if (stream) stream.el.remove(); else typing.remove();
     S.messages.push({ role: 'assistant', content: clean });
     S.exchangeCount++;
     saveCurrentConv();
@@ -251,7 +261,12 @@ Remember: help them THINK through the project, never do it for them. Ask guiding
       if (msgText) generateTitle(S.currentId, msgText);
     }
   } catch (err) {
+    // Either the typing indicator or the streaming node is on screen — clear
+    // whichever it is, then fall back to renderError exactly as before. A
+    // mid-stream `data: {"error":...}` now reaches here; it used to be dropped
+    // and the message came back empty.
     typing.remove();
+    document.querySelectorAll('.streaming-msg').forEach(n => n.remove());
     const errMsg = err.message || 'Something went wrong.';
     renderError(`API error: ${errMsg}`);
     showToast(errMsg);
@@ -463,6 +478,28 @@ function fmtText(text) {
   // Restore math blocks (may be inside <p>, <code>, etc. — KaTeX auto-render handles that)
   mathBlocks.forEach((block, i) => { html = html.replace(`\x00MATH${i}\x00`, block); });
   return html;
+}
+
+// Session 6: the element that carries text while it streams. Same head markup
+// renderMsg builds for a Lumi message, so replacing it with the finished render
+// is seamless. Body is plain text only — no markdown, no KaTeX, no innerHTML.
+function makeStreamingMsg() {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg lumi streaming-msg';
+  wrap.style.animation = 'none';
+  const hd = document.createElement('div'); hd.className = 'msg-head';
+  const av = document.createElement('div'); av.className = 'msg-avatar';
+  av.textContent = S.tutorCtx ? teacherInitials(S.tutorCtx.teacher) : 'L';
+  const nm = document.createElement('span'); nm.className = 'msg-name';
+  nm.textContent = S.tutorCtx
+    ? teacherDisplayName(S.tutorCtx.teacher, S.tutorCtx.teacherProfile)
+    : 'Lumi';
+  hd.append(av, nm);
+  const bubble = document.createElement('div'); bubble.className = 'msg-bubble';
+  const body = document.createElement('div'); body.className = 'msg-stream';
+  bubble.appendChild(body);
+  wrap.append(hd, bubble);
+  return { el: wrap, body };
 }
 
 function makeTyping() {
