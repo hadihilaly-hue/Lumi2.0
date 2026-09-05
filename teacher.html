@@ -17,13 +17,13 @@
 <body class="t-portal">
 
 <!-- AUTH LOADING -->
-<div id="authLoading">
+<div id="authLoading" class="t-view is-active">
   <div class="auth-spinner"></div>
   <div style="font-size:13px;color:var(--text-muted);margin-top:8px">Loading…</div>
 </div>
 
 <!-- SIGN-IN VIEW -->
-<div id="signinView" style="display:none">
+<div id="signinView" class="t-view">
   <div class="t-signin-box">
     <div class="t-logo">
       <h1>Lumi</h1>
@@ -46,7 +46,7 @@
 </div>
 
 <!-- UNKNOWN TEACHER VIEW -->
-<div id="unknownView" style="display:none">
+<div id="unknownView" class="t-view">
   <div class="t-unknown-box">
         <h2>Not a registered teacher</h2>
     <p>Your email isn't in our teacher database yet.</p>
@@ -56,7 +56,7 @@
 </div>
 
 <!-- HOME VIEW -->
-<div id="homeView" style="display:none">
+<div id="homeView" class="t-view">
   <div class="t-home-header">
     <div class="t-home-header-left">
       <div>
@@ -112,7 +112,7 @@
 </div>
 
 <!-- ROSTER VIEW (students in one block) -->
-<div id="rosterView" style="display:none">
+<div id="rosterView" class="t-view">
   <div class="t-home-header">
     <div class="t-home-header-left">
       <button class="btn btn--ghost wizard-back-btn" onclick="rosterBack()">
@@ -131,7 +131,7 @@
 </div>
 
 <!-- NOTE CHAT VIEW (per-student notes) -->
-<div id="noteChatView" style="display:none">
+<div id="noteChatView" class="t-view">
   <div class="t-home-header">
     <div class="t-home-header-left">
       <button class="btn btn--ghost wizard-back-btn" onclick="noteChatBack()">
@@ -154,7 +154,7 @@
 </div>
 
 <!-- WIZARD VIEW -->
-<div id="wizardView" style="display:none">
+<div id="wizardView" class="t-view">
   <div class="wizard-header">
     <div class="wizard-header-left">
       <button class="btn btn--ghost wizard-back-btn" onclick="goHome()">
@@ -601,14 +601,11 @@ let tExistingArtifactsByTier = {};
 
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
 function showView(name) {
-  ['authLoading','signinView','unknownView','homeView','wizardView','rosterView','noteChatView'].forEach(id => {
-    document.getElementById(id).style.display = 'none';
-  });
-  // Each view gets the display its own CSS asks for. The old two-branch
-  // ternary forced 'block' on everything else, which silently overrode
-  // #signinView's display:flex and killed its centring.
-  const VIEW_DISPLAY = { authLoading: 'flex', signinView: 'flex', wizardView: 'flex' };
-  document.getElementById(name).style.display = VIEW_DISPLAY[name] || 'block';
+  // Visibility is a class, never an inline style — the stylesheet decides what
+  // each view's display value is. Writing display inline is what let the old
+  // implementation override #signinView's flex centring without anyone noticing.
+  document.querySelectorAll('.t-view').forEach(el => el.classList.remove('is-active'));
+  document.getElementById(name).classList.add('is-active');
 }
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
