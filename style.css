@@ -2390,7 +2390,7 @@ body.t-portal{overflow:auto;display:block}
 .t-welcome h2{font-size:var(--t-display);font-weight:var(--w-semi);letter-spacing:var(--track-title);margin-bottom:var(--space-1)}
 .t-welcome p{font-size:var(--t-strong);color:var(--text-2)}
 .t-section-label{font-size:var(--t-micro);font-weight:var(--w-semi);color:var(--text-2);text-transform:uppercase;letter-spacing:var(--track-micro);margin-bottom:var(--space-3)}
-.t-status-dot{width:9px;height:9px;border-radius:var(--radius-full);flex-shrink:0;display:inline-block}
+.t-status-dot{width:6px;height:6px;border-radius:var(--radius-full);flex-shrink:0;display:inline-block}
 /* DESIGN.md §1: status is a label plus a dot, and the dot is --text-2/--text-3
    — never green or amber. All three states were --surface-2, which is 1.07:1
    on a card and read as no dot at all. */
