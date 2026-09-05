@@ -28,8 +28,8 @@ Every color in the product is defined once, here. No hex literal appears in any
 
   /* Text */
   --text:          #EDEDED;  /* body, headings, active nav      15.3:1 on bg */
-  --text-2:        #A1A1A1;  /* secondary, meta, inactive nav    6.9:1 on bg */
-  --text-3:        #8A8A8A;  /* labels, placeholders, timestamps 5.2:1 on bg */
+  --text-2:        #B3B3B3;  /* secondary, meta, inactive nav    8.6:1 on bg */
+  --text-3:        #9A9A9A;  /* labels, placeholders, timestamps 6.4:1 on bg */
 
   /* Accent — three uses only, see below */
   --accent:        #7F89E2;  /*                                  5.6:1 on bg */
@@ -73,8 +73,30 @@ entire point of having one.
 **Every foreground token clears 4.5:1 on every ground token.** All 24 pairs
 (`--text`, `--text-2`, `--text-3`, `--accent`, `--accent-hover`, `--danger`
 against `--bg`, `--bg-sidebar`, `--surface`, `--surface-2`) measure 4.50:1 or
-better; the floor is `--text-3` on `--surface-2`. Changing any one of these
-nine values means re-running that sweep.
+better; the floor is `--danger` on `--surface-2` at 4.66:1. Changing any one of
+these nine values means re-running that sweep.
+
+| | `--bg` | `--bg-sidebar` | `--surface` | `--surface-2` |
+|---|---|---|---|---|
+| `--text` `#EDEDED`         | 15.31 | 14.86 | 14.23 | 13.25 |
+| `--text-2` `#B3B3B3`       |  8.55 |  8.30 |  7.95 |  7.40 |
+| `--text-3` `#9A9A9A`       |  6.37 |  6.18 |  5.92 |  5.51 |
+| `--accent` `#7F89E2`       |  5.61 |  5.45 |  5.22 |  4.86 |
+| `--accent-hover` `#9099E9` |  6.76 |  6.56 |  6.28 |  5.85 |
+| `--danger` `#EC5D62`       |  5.38 |  5.22 |  5.00 |  4.66 |
+
+`--text-2` and `--text-3` were raised from `#A1A1A1` / `#8A8A8A`. At those
+values `--text-3` on `--surface-2` measured 4.4965:1 — the one pair in the
+grid that did not actually clear the floor this section claims. The lift
+also widens the gap between body text and the secondary/tertiary rungs on
+the student home, where meta lines and section labels carry most of the
+reading load.
+
+**A muted state is a text-color change, never a whole-element dim.** Opacity
+on a container fades its border and background along with its text, which
+pushes those pairs below the floor and cannot be measured from the table
+above. A "not ready" card keeps full-strength chrome and steps its title down
+from `--text` to `--text-2`.
 
 Status is never communicated by a colored pill. Status is a text label plus a
 6px dot, and the dot is `--text-2` / `--text-3` — not green, amber, or red.
