@@ -17,26 +17,26 @@ Every color in the product is defined once, here. No hex literal appears in any
 ```css
 :root {
   /* Ground */
-  --bg:            #0A0A0A;  /* app background */
-  --bg-sidebar:    #0E0E0E;  /* sidebar, rails — one step off the ground */
-  --surface:       #141414;  /* cards, input bar, user message, popovers */
-  --surface-2:     #1C1C1C;  /* hover on surface, skeletons, disabled fills */
+  --bg:            #171717;  /* app background */
+  --bg-sidebar:    #1A1A1A;  /* sidebar, rails — one step off the ground */
+  --surface:       #1E1E1E;  /* cards, input bar, user message, popovers */
+  --surface-2:     #242424;  /* hover on surface, skeletons, disabled fills */
 
   /* Lines */
-  --border:        #262626;  /* every border in the product */
-  --border-strong: #333333;  /* hover state on interactive bordered elements */
+  --border:        #2D2D2D;  /* every border in the product */
+  --border-strong: #3A3A3A;  /* hover state on interactive bordered elements */
 
   /* Text */
-  --text:          #EDEDED;  /* body, headings, active nav      16.9:1 on bg */
-  --text-2:        #A1A1A1;  /* secondary, meta, inactive nav    7.7:1 on bg */
-  --text-3:        #808080;  /* labels, placeholders, timestamps 5.0:1 on bg */
+  --text:          #EDEDED;  /* body, headings, active nav      15.3:1 on bg */
+  --text-2:        #A1A1A1;  /* secondary, meta, inactive nav    6.9:1 on bg */
+  --text-3:        #8A8A8A;  /* labels, placeholders, timestamps 5.2:1 on bg */
 
   /* Accent — three uses only, see below */
-  --accent:        #6E79DB;  /*                                  5.1:1 on bg */
-  --accent-hover:  #7F89E2;
+  --accent:        #7F89E2;  /*                                  5.6:1 on bg */
+  --accent-hover:  #9099E9;  /*                                  6.8:1 on bg */
 
   /* Danger — text and borders only, never a fill */
-  --danger:        #E5484D;  /*                                  5.1:1 on bg */
+  --danger:        #EC5D62;  /*                                  5.4:1 on bg */
 
   /* Elevation — modals and dropdowns only. Nothing else casts a shadow. */
   --shadow-overlay: 0 8px 24px rgba(0,0,0,.6);
@@ -53,14 +53,28 @@ It is not a button fill for primary actions, not a focus ring, not a selected
 state, not a badge, not a chart color. Focus is `--border` → `--accent` on the
 border only. Selected nav is `--surface` background plus `--text` foreground.
 
-**Why `#6E79DB` and not Linear's `#5E6AD2`:** Linear's own indigo measures
-4.2:1 against `#0A0A0A`, under the 4.5:1 threshold for body-size text. Link
-text has to clear it. One notch lighter does.
+**Why the ground is `#171717` and not `#0A0A0A`:** near-black read as a hole
+rather than a surface, and it left the ladder's lower rungs too close together
+to separate a card from the page. `#171717` is the same register Claude and
+ChatGPT sit in. Each rung above it was solved to hold the ratio it had against
+its neighbour before the lift — a flat offset would have compressed the
+hierarchy, since perceptual separation per code unit shrinks as luminance rises.
 
-**Why primary buttons are not accent-filled:** white on `#6E79DB` is 3.9:1 —
-fine for a 15px glyph, not for 13px button text. Primary buttons are
-`--text` fill with `--bg` text (16.9:1). This also keeps the accent scarce,
-which is the entire point of having one.
+**Why `#7F89E2` and not Linear's `#5E6AD2`:** Linear's own indigo measures
+3.8:1 against `#171717`, under the 4.5:1 threshold for body-size text. Link
+text has to clear it, on `--surface` as well as on the ground. `#7F89E2` holds
+5.2:1 on `--surface` with room to spare.
+
+**Why primary buttons are not accent-filled:** `--text` on `#7F89E2` is 2.7:1 —
+not usable for 13px button text at any size. Primary buttons are `--text` fill
+with `--bg` text (15.3:1). This also keeps the accent scarce, which is the
+entire point of having one.
+
+**Every foreground token clears 4.5:1 on every ground token.** All 24 pairs
+(`--text`, `--text-2`, `--text-3`, `--accent`, `--accent-hover`, `--danger`
+against `--bg`, `--bg-sidebar`, `--surface`, `--surface-2`) measure 4.50:1 or
+better; the floor is `--text-3` on `--surface-2`. Changing any one of these
+nine values means re-running that sweep.
 
 Status is never communicated by a colored pill. Status is a text label plus a
 6px dot, and the dot is `--text-2` / `--text-3` — not green, amber, or red.
