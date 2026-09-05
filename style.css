@@ -2555,3 +2555,38 @@ body.a-admin{display:block;overflow:auto;height:auto}
 .a-accent-strong{color:var(--text);font-weight:var(--w-semi)}
 .a-tiny{font-size:var(--t-micro);color:var(--text-3)}
 
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRIVACY POLICY
+   Was 60 lines inline in privacy.html. Compliance-facing, so the copy and
+   document structure are untouched — presentation only. The consent bar's
+   button uses the shared primitives; the bar keeps the one permitted
+   overlay shadow because it is a fixed overlay.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html{height:auto;overflow-y:auto}
+body.privacy-page{background:var(--bg);color:var(--text);font-family:'Inter', system-ui, sans-serif;margin:0;line-height:var(--lh-user);display:block;height:auto;min-height:100vh;overflow-y:auto}
+.pp-wrap{max-width:760px;margin:0 auto;padding:var(--space-12) var(--space-6) var(--space-16)}
+.pp-logo{display:flex;align-items:baseline;gap:var(--space-2);margin-bottom:var(--space-2)}
+.pp-name{font-size:var(--t-title);font-weight:var(--w-semi);letter-spacing:var(--track-title)}
+.pp-school{color:var(--text-2);font-size:var(--t-ui)}
+h1{font-size:var(--t-display);letter-spacing:var(--track-title);margin:var(--space-6) 0 var(--space-1)}
+.pp-sub{color:var(--text-2);font-size:var(--t-strong);margin-bottom:var(--space-6)}
+.pp-draft{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);margin-bottom:var(--space-8);font-size:var(--t-ui);line-height:var(--lh-ui);color:var(--text-2)}
+.pp-draft strong{color:var(--text);font-weight:var(--w-semi)}
+h2{font-size:var(--t-title);margin:var(--space-8) 0 var(--space-2);letter-spacing:var(--track-title);border-bottom:1px solid var(--border);padding-bottom:var(--space-1)}
+h3{font-size:var(--t-user);margin:var(--space-4) 0 var(--space-1)}
+p, li{font-size:var(--t-user);color:var(--text)}
+ul{padding-left:var(--space-4)}
+li{margin-bottom:var(--space-1)}
+a{color:var(--accent)}
+table{width:100%;border-collapse:collapse;margin:var(--space-3) 0;font-size:var(--t-ui)}
+th, td{text-align:left;padding:var(--space-2) var(--space-2);border-bottom:1px solid var(--border);vertical-align:top}
+th{color:var(--text-2);font-weight:var(--w-semi)}
+.pp-foot{margin-top:var(--space-12);padding-top:var(--space-4);border-top:1px solid var(--border);color:var(--text-3);font-size:var(--t-ui)}
+code, .pp-ph{background:var(--surface-2);border-radius:var(--radius-sm);padding:var(--space-1) var(--space-1);font-size:var(--t-ui)}
+.consent-bar{display:none}
+body.consent-mode .consent-bar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--surface);border-top:1px solid var(--border);padding:var(--space-3) var(--space-6);justify-content:center;box-shadow:var(--shadow-overlay)}
+body.consent-mode .pp-wrap{padding-bottom:var(--space-16)}
+.consent-bar-inner{width:100%;max-width:760px;display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);flex-wrap:wrap}
+.consent-hint{font-size:var(--t-ui);color:var(--text-2)}
