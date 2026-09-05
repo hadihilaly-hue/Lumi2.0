@@ -125,7 +125,7 @@ function obRenderMsg(role, rawText, animate = false) {
   if (hasCalBtn) {
     const calBtn = document.createElement('button');
     calBtn.className = 'ob-cal-btn';
-    calBtn.textContent = '📅 Connect Google Calendar';
+    calBtn.textContent = 'Connect Google Calendar';
     calBtn.addEventListener('click', async () => {
       calBtn.disabled = true;
       calBtn.textContent = 'Connecting…';

@@ -131,22 +131,18 @@
       <div class="sched-subheading">We'll build your schedule around this</div>
       <div class="sched-style-grid" id="ssStyleGrid">
         <div class="sched-style-card" data-work="25" data-break="5" data-label="Short Bursts">
-          <div class="sched-style-icon">🎯</div>
           <div class="sched-style-name">Short Bursts</div>
           <div class="sched-style-desc">25 min work · 5 min break</div>
         </div>
         <div class="sched-style-card" data-work="45" data-break="10" data-label="Longer Sessions">
-          <div class="sched-style-icon">📚</div>
           <div class="sched-style-name">Longer Sessions</div>
           <div class="sched-style-desc">45 min work · 10 min break</div>
         </div>
         <div class="sched-style-card" data-work="50" data-break="10" data-label="Power Sessions">
-          <div class="sched-style-icon">⚡</div>
           <div class="sched-style-name">Power Sessions</div>
           <div class="sched-style-desc">50 min work · 10 min break</div>
         </div>
         <div class="sched-style-card" data-work="custom" data-break="custom" data-label="Custom">
-          <div class="sched-style-icon">🎨</div>
           <div class="sched-style-name">Custom</div>
           <div class="sched-style-desc">Set my own times</div>
         </div>
@@ -422,7 +418,7 @@
       </div>
       <button class="danger-btn" id="signOutBtn" style="margin-top:10px">Sign out</button>
       <button class="settings-save-btn" id="updateScheduleBtn" style="margin-top:8px">Update My Schedule</button>
-      <a href="teacher.html" id="teacherModeLink" style="display:none;margin-top:8px;text-align:center;font-size:13px;color:var(--accent);text-decoration:none;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);display:none">🍎 Switch to Teacher Mode</a>
+      <a href="teacher.html" id="teacherModeLink" style="display:none;margin-top:8px;text-align:center;font-size:13px;color:var(--accent);text-decoration:none;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);display:none">Switch to Teacher Mode</a>
       <!-- Home redesign v1 TM-4: the sidebar (and its #sbExitTestBtn) is
            CSS-hidden when the flag is on, so the exit-test-mode action moves
            into Settings per spec §4.5 ("the exit button lives on the user chip
@@ -448,7 +444,6 @@
       <div class="settings-section-title">Calendar Integration</div>
       <div id="calConnectedState" style="display:none">
         <div class="cal-connected-chip">
-          <span class="cal-connected-icon">✅</span>
           <span class="cal-connected-label">Google Calendar connected</span>
         </div>
         <button class="danger-btn" id="calDisconnectBtn" style="margin-top:8px">Disconnect Calendar</button>
@@ -491,7 +486,7 @@
 <div class="hw-backdrop" id="hwBackdrop"></div>
 <div class="hw-popup" id="hwPopup" style="display:none">
   <div class="hw-popup-head">
-    <div class="hw-popup-title">📚 Homework Check-in</div>
+    <div class="hw-popup-title">Homework Check-in</div>
     <button class="hw-popup-close" id="hwPopupClose">×</button>
   </div>
   <div class="hw-popup-body">
@@ -514,12 +509,10 @@
   <div class="hw-modal-body">
     <div class="hw-type-grid">
       <button class="hw-type-card" id="hwTypeProject">
-        <div class="hw-type-icon">📝</div>
         <div class="hw-type-label">Project or Essay</div>
         <div class="hw-type-desc">Multi-day plan + guidance</div>
       </button>
       <button class="hw-type-card" id="hwTypeHomework">
-        <div class="hw-type-icon">📚</div>
         <div class="hw-type-label">Tonight's Homework</div>
         <div class="hw-type-desc">Quick add to tonight's list</div>
       </button>
@@ -584,12 +577,10 @@
       <div class="proj-dropzone" id="projDropzone">
         <input type="file" id="projFileInput" accept="image/*,.pdf,.txt,.md,.doc,.docx,application/pdf,text/plain" style="display:none">
         <div class="proj-dropzone-empty" id="projDropzoneEmpty">
-          <div class="proj-dropzone-icon">📎</div>
           <div class="proj-dropzone-text">Drag & drop a file here</div>
           <div class="proj-dropzone-hint">or <span class="proj-dropzone-link">browse</span> · PDF, image, or text</div>
         </div>
         <div class="proj-dropzone-preview" id="projDropzonePreview" style="display:none">
-          <div class="proj-dropzone-file-icon" id="projFileIcon">📄</div>
           <div class="proj-dropzone-file-info">
             <div class="proj-dropzone-file-name" id="projFileName"></div>
             <div class="proj-dropzone-file-size" id="projFileSize"></div>
