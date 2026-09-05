@@ -600,6 +600,14 @@ a{color:inherit;text-decoration:none}
   font-size:var(--t-user);line-height:var(--lh-user);color:var(--text);
 }
 
+/* Session 6: plain-text body while a reply streams. pre-wrap so newlines
+   show without any markdown being interpreted mid-stream.
+   The node is pinned to the full measure because .msg.lumi only sets
+   max-width — it shrink-wraps, so without this the message would widen
+   with every chunk and the text would reflow as it typed. */
+.streaming-msg{width:min(var(--measure-prose),100%)}
+.msg-stream{white-space:pre-wrap}
+
 /* Error — text only, no fill, no border. */
 .msg-error{font-size:var(--t-ui);line-height:var(--lh-ui);color:var(--danger);}
 

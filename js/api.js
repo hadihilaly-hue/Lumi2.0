@@ -36,7 +36,7 @@ export async function fetchClaudeProxy(body, options = {}) {
 }
 
 // ─── API CALL ────────────────────────────────────────────────────────────────
-export async function callAPI(msgs, system) {
+export async function callAPI(msgs, system, onChunk) {
   const res = await fetchClaudeProxy({
     model: CONFIG.models.chat,
     max_tokens: 2500,
@@ -63,19 +63,73 @@ export async function callAPI(msgs, system) {
 
   const reader = res.body.getReader(), dec = new TextDecoder();
   let buf = '', full = '';
+  let streamErr = null;
+  outer:
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     buf += dec.decode(value, { stream: true });
-    let nl;
-    while ((nl = buf.indexOf('\n')) !== -1) {
-      const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
-      if (!line.startsWith('data: ')) continue;
-      const raw = line.slice(6); if (raw === '[DONE]') continue;
-      try { const ev = JSON.parse(raw); if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') full += ev.delta.text; } catch {}
+    const { events, rest } = consumeSseBuffer(buf);
+    buf = rest;
+    for (const ev of events) {
+      if (ev.type === 'text') {
+        full += ev.text;
+        // Session 6: the caller renders as it arrives. Hand it only the text a
+        // student should see — the trailing profile blob is stripped here the
+        // same way parseResponse strips it from the final string.
+        if (onChunk) { try { onChunk(streamVisibleText(full)); } catch (e) { console.warn('[stream] onChunk threw:', e); } }
+      } else if (ev.type === 'error') {
+        // Previously dropped on the floor: an error event carries no `type`, so
+        // the old delta test skipped it and the stream ended with empty text.
+        streamErr = ev.message; break outer;
+      } else if (ev.type === 'done') {
+        break outer;
+      }
     }
   }
+  if (streamErr) throw new Error(streamErr);
   return parseResponse(full);
+}
+
+// ─── SSE ─────────────────────────────────────────────────────────────────────
+// Pure. Takes everything decoded so far, returns the complete events found plus
+// the unconsumed remainder — a partial line is held back for the next read, so a
+// delta split across two network reads survives.
+export function consumeSseBuffer(buffer) {
+  const events = [];
+  let rest = String(buffer ?? '');
+  let nl;
+  while ((nl = rest.indexOf('\n')) !== -1) {
+    const line = rest.slice(0, nl).trim();
+    rest = rest.slice(nl + 1);
+    if (!line.startsWith('data: ')) continue;
+    const raw = line.slice(6);
+    if (raw === '[DONE]') { events.push({ type: 'done' }); continue; }
+    let ev;
+    try { ev = JSON.parse(raw); } catch { continue; }   // malformed line: skip, keep streaming
+    if (ev && typeof ev.error === 'string') { events.push({ type: 'error', message: ev.error }); continue; }
+    // Strict on purpose: real Bedrock/Anthropic deltas carry delta.type.
+    if (ev?.type === 'content_block_delta' && ev.delta?.type === 'text_delta' && typeof ev.delta.text === 'string') {
+      events.push({ type: 'text', text: ev.delta.text });
+    }
+  }
+  return { events, rest };
+}
+
+// Pure. What the student should see mid-stream. The system prompt makes Lumi
+// append a profile JSON blob after every reply; parseResponse strips it from the
+// finished string, but mid-stream it would otherwise type itself out on screen.
+// Hide from the last "\n{" when the tail is that blob — or any prefix of it,
+// since it arrives a character at a time.
+const PROFILE_START = '{"values"';
+export function streamVisibleText(accumulated) {
+  const text = String(accumulated ?? '');
+  const i = text.lastIndexOf('\n{');
+  if (i === -1) return text;
+  const tail = text.slice(i + 1);
+  const isBlob = tail.startsWith(PROFILE_START)
+    || PROFILE_START.startsWith(tail.slice(0, PROFILE_START.length));
+  return isBlob ? text.slice(0, i) : text;
 }
 
 // ─── PARSE ───────────────────────────────────────────────────────────────────
