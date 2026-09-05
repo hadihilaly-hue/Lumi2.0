@@ -2325,8 +2325,16 @@ g);
    the wizard shell, tier editors, syllabus upload, roster and note chat.
    ═══════════════════════════════════════════════════════════════════════════ */
 body.t-portal{overflow:auto;display:block}
-#authLoading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:var(--space-3)}
-#signinView{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:var(--space-6)}
+/* Teacher-portal view switching. showView() toggles .is-active and nothing
+   else; the stylesheet owns every display value. Keep these rules free of
+   id-level `display` or they will outrank .t-view on specificity. */
+.t-view{display:none}
+.t-view.is-active{display:block}
+#authLoading.is-active,
+#signinView.is-active,
+#wizardView.is-active{display:flex}
+#authLoading{position:fixed;inset:0;background:var(--bg);align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:var(--space-3)}
+#signinView{min-height:100vh;align-items:center;justify-content:center;padding:var(--space-6)}
 .t-signin-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-12) var(--space-8);max-width:400px;width:100%;text-align:center}
 .t-logo{margin-bottom:var(--space-8)}
 .t-logo-mark{width:52px;height:52px;background:var(--surface-2);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;font-size:var(--t-title);margin:0 auto var(--space-3)}
@@ -2358,7 +2366,7 @@ body.t-portal{overflow:auto;display:block}
 .t-status-dot.not_started{background:var(--surface-2)}
 .t-status-dot.in_progress{background:var(--surface-2)}
 .t-status-dot.complete{background:var(--surface-2)}
-#wizardView{min-height:100vh;display:flex;flex-direction:column}
+#wizardView{min-height:100vh;flex-direction:column}
 .wizard-header{background:var(--surface);border-bottom:1px solid var(--border);padding:var(--space-4) var(--space-8);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40}
 .wizard-header-left{display:flex;align-items:center;gap:var(--space-3)}
 .wizard-class-name{font-size:var(--t-user);font-weight:var(--w-semi)}
@@ -2479,7 +2487,7 @@ body.t-portal{overflow:auto;display:block}
    log, FERPA panel.
    ═══════════════════════════════════════════════════════════════════════════ */
 body.a-admin{display:block;overflow:auto;height:auto}
-#authLoading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:var(--space-3)}
+body.a-admin #authLoading{display:flex}
 #adminHeader{background:var(--surface);border-bottom:1px solid var(--border);padding:var(--space-4) var(--space-8);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40}
 .a-hdr-left{display:flex;align-items:center;gap:var(--space-3)}
 .a-hdr-mark{width:32px;height:32px;background:var(--surface-2);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;font-size:var(--t-strong)}
