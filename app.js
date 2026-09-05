@@ -13,7 +13,7 @@ import { mountPlan } from './js/studyplanview.js';
 import { initRouter } from './js/router.js';
 import { $, S, SB, currentUser, fileInput, msgInput, sbSearch, sendBtn, setCurrentProjId, setCurrentUser, themeToggle } from './js/state.js';
 import { flushProgressNote, genId, getSchedule, loadConvsFromSupabase, loadProfileFromSupabase, loadTestModeSchedule, migrateOldData, saveCurrentConv } from './js/storage.js';
-import { isTeacherModeAllowed, preloadAvailableClasses, preloadProfileStatuses, rdsFetch } from './js/teachers.js';
+import { isTeacherModeAllowed, preloadAvailableClasses, preloadProfileStatuses, rdsFetch, signedInDestination } from './js/teachers.js';
 import { autoGrow, closeSettings, closeSidebar, openSettings, openSidebar, showToast, updateSendBtn } from './js/ui.js';
 import { initVoice, wireVoiceListeners } from './js/voice.js';
 
@@ -50,6 +50,15 @@ import { initVoice, wireVoiceListeners } from './js/voice.js';
     sessionStorage.setItem('lumi_test_mode', 'true');
   }
   S.isTestMode = sessionStorage.getItem('lumi_test_mode') === 'true';
+
+  // Session 2b: one sign-in button, routed by email. index.html always returns
+  // here, so this is where a teacher gets forwarded to their portal. Runs after
+  // loadTeacherDirectory (the allowlist) and after S.isTestMode is resolved —
+  // test mode is exempt, otherwise the Student-mode toggle in teacher.html would
+  // bounce straight back. Forwarding before startApp() so no student-app state
+  // is built for someone who is leaving.
+  const _dest = signedInDestination({ email: session.user.email, isTestMode: S.isTestMode });
+  if (_dest) { window.location.replace(_dest); return; }
 
   // Home redesign v1 (docs/STUDENT_HOME_REDESIGN.md §4.7). Flag is read at
   // module load from localStorage; here we mirror it onto <body> so the CSS

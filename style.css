@@ -847,13 +847,6 @@ body.signin-page{
 .signin-google-btn:hover:not(:disabled){background:var(--surface);border-color:var(--border-strong)}
 .signin-google-btn:disabled{opacity:.5;cursor:not-allowed}
 .signin-google-btn svg{flex-shrink:0}
-/* Ghost link. Temporary bridge until Session 2b routes teachers by email. */
-.signin-teacher-link{
-  display:block;text-align:center;padding:var(--space-2);
-  font-size:var(--t-ui);line-height:var(--lh-ui);color:var(--text-2);
-  transition:color var(--dur) var(--ease);
-}
-.signin-teacher-link:hover{color:var(--text)}
 .signin-footer{
   font-size:var(--t-meta);line-height:var(--lh-meta);color:var(--text-3);text-align:center;
 }
