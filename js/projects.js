@@ -468,7 +468,7 @@ export function renderProjectPlan(project) {
   // Due date line
   const dueLine = document.createElement('div');
   dueLine.className = 'proj-day-card';
-  dueLine.style.cssText = 'background:rgba(99,102,241,.08);border-color:rgba(99,102,241,.25);text-align:center';
+  dueLine.style.cssText = 'background:var(--surface-2);border-color:var(--border-strong);text-align:center';
   dueLine.innerHTML = `<div class="proj-day-date" style="color:var(--accent)">📅 ${fmtDateShort(project.dueDate)} — Submit to ${project.teacherName.split(' ')[0]}</div>`;
   body.appendChild(dueLine);
 

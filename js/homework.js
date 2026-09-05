@@ -855,7 +855,7 @@ function renderStudyPlan(plan) {
     el.className = 'hw-plan-block' + (block.type === 'break' ? ' break' : block.type === 'bedtime' ? ' bedtime-block' : '');
 
     if (block.type === 'bedtime') {
-      el.style.cssText = 'background:rgba(99,102,241,.08);border-color:rgba(99,102,241,.25)';
+      el.style.cssText = 'background:var(--surface-2);border-color:var(--border-strong)';
       const timeEl = document.createElement('div');
       timeEl.className = 'hw-plan-block-time';
       timeEl.textContent = '10:30 PM';
