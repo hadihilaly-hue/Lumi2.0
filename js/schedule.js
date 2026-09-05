@@ -281,7 +281,7 @@ export function initScheduleSetup(onDone, prefill = []) {
     // Also add a search hint inside electives
     const searchHint = document.createElement('div');
     searchHint.className = 'sched-electives-search-hint';
-    searchHint.textContent = '💡 Use the search bar above to find any class instantly';
+    searchHint.textContent = 'Use the search bar above to find any class instantly';
 
     electivesToggle.addEventListener('click', () => {
       expanded = !expanded;
@@ -541,15 +541,15 @@ export function checkSemesterBanner() {
   const dismissed = localStorage.getItem('lumi_banner_dismissed');
   if (dismissed && (Date.now() - parseInt(dismissed, 10)) < 30 * 24 * 60 * 60 * 1000) return;
 
-  let type = null, icon = '', text = '', dismissLabel = 'Dismiss';
+  let type = null, text = '', dismissLabel = 'Dismiss';
 
   // Add/drop window (more specific) takes priority
   if ((m === 9 && d >= 1 && d <= 14) || (m === 2 && d >= 1 && d <= 14)) {
-    type = 'add-drop'; icon = '📋';
+    type = 'add-drop';
     text = 'Add/drop period is open — did your schedule change?';
     dismissLabel = 'No changes';
   } else if ((m === 8 && d >= 1) || m === 9 || m === 1 || (m === 2 && d <= 15)) {
-    type = 'new-sem'; icon = '🎒';
+    type = 'new-sem';
     text = 'New semester starting — is your schedule still accurate?';
   }
 
@@ -559,7 +559,7 @@ export function checkSemesterBanner() {
   banner.id = 'semesterBanner';
   banner.className = `semester-banner ${type}`;
   banner.innerHTML = `
-    <div class="semester-banner-text">${icon} ${text}</div>
+    <div class="semester-banner-text">${text}</div>
     <div class="semester-banner-btns">
       <button class="semester-banner-btn primary" id="bannerUpdate">Update Schedule</button>
       <button class="semester-banner-btn ghost" id="bannerDismiss">${dismissLabel}</button>

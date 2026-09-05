@@ -42,13 +42,6 @@ const HOMEWORK_PRIORITY = {
   }
 };
 
-const TIER_DOT = {
-  TIER_1_CRITICAL: '🔴',
-  TIER_2_IMPORTANT: '🟠',
-  TIER_3_STANDARD: '🟡',
-  TIER_4_LIGHT: '🟢'
-};
-
 const TIER_ORDER = { TIER_1_CRITICAL: 0, TIER_2_IMPORTANT: 1, TIER_3_STANDARD: 2, TIER_4_LIGHT: 3 };
 
 function classifyTask(title) {
@@ -270,7 +263,7 @@ function renderTimeline() {
       const timeEl = document.createElement('div'); timeEl.className = 'tl-time'; timeEl.textContent = '10:30';
       const bar    = document.createElement('div'); bar.className = 'tl-bar';
       const ct     = document.createElement('div'); ct.className = 'tl-content';
-      const t      = document.createElement('div'); t.className = 'tl-title'; t.textContent = '🌙 Bedtime — lights out!';
+      const t      = document.createElement('div'); t.className = 'tl-title'; t.textContent = 'Bedtime — lights out!';
       const m2     = document.createElement('div'); m2.className = 'tl-meta'; m2.textContent = '8 hours of sleep is non-negotiable.';
       ct.appendChild(t); ct.appendChild(m2);
       el.appendChild(timeEl); el.appendChild(bar); el.appendChild(ct);
@@ -296,19 +289,18 @@ function renderTimeline() {
     const metaEl  = document.createElement('div'); metaEl.className = 'tl-meta';
 
     if (block.type === 'hw') {
-      const dot = TIER_DOT[block.tier] || '⚪';
       const chunk = block.chunkNum ? ` pt ${block.chunkNum}/${block.totalChunks}` : '';
-      titleEl.textContent = `${dot} ${block.title}${chunk}`;
+      titleEl.textContent = `${block.title}${chunk}`;
       metaEl.textContent  = `${block.duration} min${block.className ? ' · ' + block.className.split(' ').slice(0,2).join(' ') : ''}`;
       el.addEventListener('click', () => {
         const entry = getSchedule().find(s => s.course === block.className);
         if (entry) { openTutor(lookupSubjectForCourse(entry.course).subjectId, entry.course, entry.teacher); closeTimelineModal(); }
       });
     } else if (block.type === 'break') {
-      titleEl.textContent = '🔋 Break';
+      titleEl.textContent = 'Break';
       metaEl.textContent  = block.duration + ' min';
     } else if (block.type === 'cal') {
-      titleEl.textContent = '📅 ' + block.title;
+      titleEl.textContent = block.title;
       metaEl.textContent  = block.duration + ' min · Calendar';
     } else if (block.type === 'gap') {
       titleEl.textContent = 'Free gap';
@@ -623,7 +615,6 @@ export function renderHwPopupTasks() {
   }
   tasks.forEach(task => {
     const tier      = classifyTask(task.title);
-    const dot       = TIER_DOT[tier] || '⚪';
     const isTonight = task.dueDate === today || !task.dueDate;
 
     const card = document.createElement('div');
@@ -639,13 +630,13 @@ export function renderHwPopupTasks() {
     info.className = 'hw-task-info';
     const title = document.createElement('div');
     title.className = 'hw-task-title';
-    title.textContent = `${dot} ${task.title}`;
+    title.textContent = task.title;
     const meta = document.createElement('div');
     meta.className = 'hw-task-meta';
     const parts = [];
     if (task.className)        parts.push(task.className.split(' ').slice(0,2).join(' '));
     if (task.estimatedMinutes) parts.push(`~${task.estimatedMinutes} min`);
-    if (task.dueDate)          parts.push(isTonight ? '⚡ tonight' : '📅 ' + task.dueDate);
+    if (task.dueDate)          parts.push(isTonight ? 'tonight' : task.dueDate);
     meta.textContent = parts.join(' · ');
     info.appendChild(title);
     info.appendChild(meta);
@@ -824,7 +815,7 @@ function renderStudyPlan(plan) {
     const el = document.createElement('div');
     el.className = 'hw-plan-warning bedtime';
     el.style.cssText = 'font-size:14px;line-height:1.6;margin:0';
-    el.textContent = "🌙 " + (warnings[0] && warnings[0].text || "It's 10:30 — time to wrap up and get to sleep.");
+    el.textContent = (warnings[0] && warnings[0].text || "It's 10:30 — time to wrap up and get to sleep.");
     body.appendChild(el);
     return;
   }
@@ -833,8 +824,7 @@ function renderStudyPlan(plan) {
   warnings.forEach(w => {
     const el = document.createElement('div');
     el.className = 'hw-plan-warning ' + w.type;
-    const icon = w.type === 'bedtime-overload' ? '⏰ ' : w.type === 'heavy' ? '⚠️ ' : '🔴 ';
-    el.textContent = icon + w.text;
+    el.textContent = w.text;
     body.appendChild(el);
   });
 
@@ -861,7 +851,7 @@ function renderStudyPlan(plan) {
       timeEl.textContent = '10:30 PM';
       const titleEl = document.createElement('div');
       titleEl.className = 'hw-plan-block-title';
-      titleEl.textContent = '🌙 Bedtime — lights out!';
+      titleEl.textContent = 'Bedtime — lights out!';
       const metaEl = document.createElement('div');
       metaEl.className = 'hw-plan-block-meta';
       metaEl.textContent = '8 hours of sleep is non-negotiable.';
@@ -879,23 +869,22 @@ function renderStudyPlan(plan) {
     titleEl.className = 'hw-plan-block-title';
 
     if (block.type === 'break') {
-      titleEl.textContent = '🔋 Break';
+      titleEl.textContent = 'Break';
       const metaEl = document.createElement('div');
       metaEl.className = 'hw-plan-block-meta';
       metaEl.textContent = 'Step away, stretch, hydrate.';
       el.appendChild(timeEl); el.appendChild(titleEl); el.appendChild(metaEl);
     } else {
-      const dot = TIER_DOT[block.task.tier] || '⚪';
       const chunkLabel = block.chunkNum ? ` (part ${block.chunkNum} of ${block.totalChunks})` : '';
-      const truncNote  = block.truncated ? ' ⚠️' : '';
-      titleEl.textContent = `${dot} ${block.task.title}${chunkLabel}${truncNote}`;
+      const truncNote  = block.truncated ? ' (truncated)' : '';
+      titleEl.textContent = `${block.task.title}${chunkLabel}${truncNote}`;
       const metaEl = document.createElement('div');
       metaEl.className = 'hw-plan-block-meta';
       const parts = [];
       if (block.task.className) parts.push(block.task.className.split(' ').slice(0, 2).join(' '));
       const tierInfo = HOMEWORK_PRIORITY[block.task.tier];
       if (tierInfo) parts.push(tierInfo.label);
-      if (block.task.dueDate) parts.push(block.task.isTonight ? '⚡ tonight' : '📅 ' + block.task.dueDate);
+      if (block.task.dueDate) parts.push(block.task.isTonight ? 'tonight' : block.task.dueDate);
       metaEl.textContent = parts.join(' · ');
       el.appendChild(timeEl); el.appendChild(titleEl);
       if (parts.length) el.appendChild(metaEl);
@@ -903,7 +892,7 @@ function renderStudyPlan(plan) {
       // Edit pencil button
       const editBtn = document.createElement('button');
       editBtn.className = 'hw-plan-block-edit-btn';
-      editBtn.innerHTML = '✏️';
+      editBtn.textContent = 'Edit';
       editBtn.title = 'Edit block';
       const blockIdx = i;
       editBtn.addEventListener('click', (e) => {
@@ -973,7 +962,7 @@ function toggleBlockEditMode(el, blockIdx, blocks, startMinutes, plan) {
   const delBtn = document.createElement('button');
   delBtn.className = 'hw-plan-edit-del';
   delBtn.title = 'Delete block';
-  delBtn.textContent = '🗑️';
+  delBtn.textContent = 'Delete';
   delBtn.addEventListener('click', () => {
     blocks.splice(blockIdx, 1);
     saveEditedPlan(blocks, startMinutes);
@@ -1047,7 +1036,7 @@ export function startPlannerStrip(blocks) {
 function updatePlannerStrip() {
   if (_plannerBlockIdx >= _plannerBlocks.length) {
     closePlannerStrip();
-    showToast('All blocks done! 🎉', 'ok');
+    showToast('All blocks done!', 'ok');
     return;
   }
   const block = _plannerBlocks[_plannerBlockIdx];
@@ -1076,7 +1065,7 @@ export function advancePlannerBlock() {
   _plannerBlockIdx++;
   if (_plannerBlockIdx >= _plannerBlocks.length) {
     closePlannerStrip();
-    showToast('All blocks done! 🎉', 'ok');
+    showToast('All blocks done!', 'ok');
     return;
   }
   _plannerStartedAt = Date.now();
@@ -1140,8 +1129,7 @@ export function renderHwSidebar(container) {
 
     toShow.forEach(task => {
       const tier      = task.tier || classifyTask(task.title);
-      const dot       = TIER_DOT[tier] || '⚪';
-      const isTonight = task.isTonight !== undefined ? task.isTonight : (task.dueDate === today || !task.dueDate);
+        const isTonight = task.isTonight !== undefined ? task.isTonight : (task.dueDate === today || !task.dueDate);
 
       const item = document.createElement('div');
       item.className = 'sb-hw-item' + (task.isComplete ? ' done' : '');
@@ -1150,10 +1138,6 @@ export function renderHwSidebar(container) {
       check.className = 'sb-hw-check' + (task.isComplete ? ' done' : '');
       check.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
       check.addEventListener('click', e => { e.stopPropagation(); toggleHwTask(task.id); });
-
-      const dotEl = document.createElement('span');
-      dotEl.className = 'sb-hw-tier-dot';
-      dotEl.textContent = dot;
 
       const titleEl = document.createElement('div');
       titleEl.className = 'sb-hw-item-title';
@@ -1174,7 +1158,6 @@ export function renderHwSidebar(container) {
       urgencyEl.textContent = urgencyText;
 
       item.appendChild(check);
-      item.appendChild(dotEl);
       item.appendChild(titleEl);
       item.appendChild(urgencyEl);
       item.addEventListener('click', e => {
@@ -1217,17 +1200,13 @@ export function renderHwSidebar(container) {
       item.className = 'sb-hw-item';
       item.style.cursor = 'pointer';
 
-      const dot = document.createElement('span');
-      dot.className = 'sb-hw-tier-dot';
-      dot.textContent = '📝';
-
       const titleEl = document.createElement('div');
       titleEl.className = 'sb-hw-item-title';
       titleEl.textContent = proj.title;
 
       const metaEl = document.createElement('div');
       metaEl.className = 'sb-hw-item-urgency';
-      metaEl.textContent = daysLeft <= 2 ? '🔴' : daysLeft <= 5 ? '🟠' : '📅';
+      metaEl.textContent = fmtDateShort(proj.dueDate);
       metaEl.title = `Due ${fmtDateShort(proj.dueDate)} · ${completedDays}/${totalDays} done`;
 
       const delBtn = document.createElement('button');
@@ -1239,7 +1218,6 @@ export function renderHwSidebar(container) {
         deleteProject(proj.id, delBtn);
       });
 
-      item.appendChild(dot);
       item.appendChild(titleEl);
       item.appendChild(delBtn);
       item.appendChild(metaEl);
@@ -1267,9 +1245,8 @@ export function hwContext() {
   const lines = tasks.map(t => {
     const tier     = classifyTask(t.title);
     const tierInfo = HOMEWORK_PRIORITY[tier];
-    const dot      = TIER_DOT[tier] || '⚪';
     const isTonight = t.dueDate === today || !t.dueDate;
-    const parts = [`${dot} ${t.title}`];
+    const parts = [t.title];
     if (t.className)        parts.push(`(${t.className})`);
     if (t.estimatedMinutes) parts.push(`~${t.estimatedMinutes} min`);
     if (t.dueDate)          parts.push(isTonight ? '[DUE TONIGHT]' : `due ${t.dueDate}`);

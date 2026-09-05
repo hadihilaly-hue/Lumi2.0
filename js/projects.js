@@ -261,7 +261,6 @@ function handleProjFile(file) {
     $('projDropzonePreview').style.display = 'flex';
     $('projFileName').textContent = file.name;
     $('projFileSize').textContent = fmtBytes(file.size);
-    $('projFileIcon').textContent = isPdf ? '📕' : isImage ? '🖼️' : '📄';
   };
   reader.readAsDataURL(file);
 }
@@ -367,7 +366,7 @@ export function renderProjectPlan(project) {
   if (incompletePast.length > 0) {
     const banner = document.createElement('div');
     banner.className = 'proj-carryover-banner';
-    banner.textContent = `⚠️ You have ${incompletePast.length} missed session${incompletePast.length > 1 ? 's' : ''}. Remaining work has been redistributed to upcoming days.`;
+    banner.textContent = `You have ${incompletePast.length} missed session${incompletePast.length > 1 ? 's' : ''}. Remaining work has been redistributed to upcoming days.`;
     body.appendChild(banner);
   }
 
@@ -469,7 +468,7 @@ export function renderProjectPlan(project) {
   const dueLine = document.createElement('div');
   dueLine.className = 'proj-day-card';
   dueLine.style.cssText = 'background:var(--surface-2);border-color:var(--border-strong);text-align:center';
-  dueLine.innerHTML = `<div class="proj-day-date" style="color:var(--accent)">📅 ${fmtDateShort(project.dueDate)} — Submit to ${project.teacherName.split(' ')[0]}</div>`;
+  dueLine.innerHTML = `<div class="proj-day-date" style="color:var(--accent)">${fmtDateShort(project.dueDate)} — Submit to ${project.teacherName.split(' ')[0]}</div>`;
   body.appendChild(dueLine);
 
   // Delete project button at bottom
