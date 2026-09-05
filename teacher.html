@@ -19,7 +19,7 @@
 <!-- AUTH LOADING -->
 <div id="authLoading" class="t-view is-active">
   <div class="auth-spinner"></div>
-  <div style="font-size:13px;color:var(--text-muted);margin-top:8px">Loading…</div>
+  <div style="font-size:13px;color:var(--text-2);margin-top:8px">Loading…</div>
 </div>
 
 <!-- SIGN-IN VIEW -->
@@ -60,7 +60,7 @@
   <div class="t-home-header">
     <div class="t-home-header-left">
       <div>
-        <div class="t-hdr-title">Lumi <span style="color:var(--text-muted);font-weight:400">·</span> Teacher Portal</div>
+        <div class="t-hdr-title">Lumi <span style="color:var(--text-2);font-weight:400">·</span> Teacher Portal</div>
         <div class="t-hdr-sub">Menlo School</div>
       </div>
     </div>
@@ -100,9 +100,9 @@
     <div id="tFilterBar" style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
       <input type="text" id="tClassSearch" placeholder="Search classes…" aria-label="Search classes" style="flex:1;max-width:220px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;color:var(--text)">
       <div style="display:flex;gap:6px">
-        <button type="button" class="t-filter-pill active" data-status="all" aria-pressed="true" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--accent-soft);color:var(--accent);transition:all .15s">All</button>
-        <button type="button" class="t-filter-pill" data-status="not_started" aria-pressed="false" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);transition:all .15s">Not Started</button>
-        <button type="button" class="t-filter-pill" data-status="complete" aria-pressed="false" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);transition:all .15s">Complete</button>
+        <button type="button" class="t-filter-pill active" data-status="all" aria-pressed="true">All</button>
+        <button type="button" class="t-filter-pill" data-status="not_started" aria-pressed="false">Not Started</button>
+        <button type="button" class="t-filter-pill" data-status="complete" aria-pressed="false">Complete</button>
       </div>
     </div>
     <div class="t-cards-grid" id="classCards"></div>
@@ -415,7 +415,7 @@
     <!-- STEP 6: Summary -->
     <div class="wizard-step" data-step="6">
       <h2 class="wizard-question-title">Review your profile</h2>
-      <p style="color:var(--text-muted);margin-bottom:24px">Make sure everything looks good before saving.</p>
+      <p style="color:var(--text-2);margin-bottom:24px">Make sure everything looks good before saving.</p>
 
       <div class="card summary-card">
         <div class="card-head summary-card-header">
@@ -712,15 +712,15 @@ async function bootHome() {
   document.getElementById('tClassSearch')?.addEventListener('input', renderClassCards);
   document.querySelectorAll('.t-filter-pill').forEach(pill => {
     pill.addEventListener('click', () => {
+      // .active is the only source of pill appearance — the inline writes that
+      // used to live here overrode the stylesheet and painted the selected
+      // pill's label with --accent, a fourth use of an accent DESIGN.md §1
+      // limits to three.
       document.querySelectorAll('.t-filter-pill').forEach(p => {
         p.classList.remove('active');
-        p.style.background = 'var(--surface)';
-        p.style.color = 'var(--text-muted)';
         p.setAttribute('aria-pressed', 'false');
       });
       pill.classList.add('active');
-      pill.style.background = 'var(--accent-soft)';
-      pill.style.color = 'var(--accent)';
       pill.setAttribute('aria-pressed', 'true');
       renderClassCards();
     });
@@ -830,7 +830,7 @@ function renderClassCards() {
     grid.innerHTML = `
       <div style="grid-column:1/-1;text-align:center;padding:60px 20px">
                 <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px">No classes yet</div>
-        <div style="font-size:14px;color:var(--text-muted);max-width:340px;margin:0 auto;line-height:1.6">
+        <div style="font-size:14px;color:var(--text-2);max-width:340px;margin:0 auto;line-height:1.6">
           Your classes will appear here once an administrator adds them to your account.
         </div>
       </div>`;
@@ -863,8 +863,13 @@ function renderClassCards() {
     // Phase 5b: same treatment for the new welcome_message step.
     const needsWelcome = status === 'complete' && !(profile?.welcome_message || '').trim();
 
+    // The card is a plain container composing .card / .card--interactive; each
+    // action is a real button. Previously the whole card was role="button" and
+    // the notices were nested clickable divs — which meant keyActivate always
+    // fired with e.target === the card, so closest('[data-add-samples]') was
+    // never non-null and the jump-to-step actions were reachable by mouse only.
     const card = document.createElement('div');
-    card.className = 't-card';
+    card.className = 'card card--interactive t-card';
     card.innerHTML = `
       <div class="t-card-subject">${escHtml(subject)}</div>
       <div class="t-card-course">${escHtml(course)}</div>
@@ -875,25 +880,35 @@ function renderClassCards() {
       ${previewText ? `<div class="t-card-preview">${escHtml(previewText)}</div>` : ''}
       ${status === 'complete' ? `<div class="t-card-done">Setup complete</div>` : ''}
       ${needsWelcome ? `
-        <div data-add-welcome="1" class="t-card-notice">
+        <div class="t-card-notice">
           <div class="t-card-notice-head">New step added</div>
           <div class="t-card-notice-body">Add a welcome message so students see your voice when they open the class.</div>
-          <div class="t-card-notice-cta">Add welcome message →</div>
         </div>` : ''}
       ${needsSamples ? `
-        <div data-add-samples="1" class="t-card-notice">
+        <div class="t-card-notice">
           <div class="t-card-notice-head">New step added</div>
           <div class="t-card-notice-body">Please add a few graded work samples so Lumi can match your feedback voice.</div>
-          <div class="t-card-notice-cta">Add samples →</div>
         </div>` : ''}
-      <div class="t-card-cta">${escHtml(btnLabel)} →</div>
+      <div class="t-card-actions"></div>
     `;
-    keyActivate(card, (e) => {
-      const samplesEl = e.target?.closest?.('[data-add-samples]');
-      const welcomeEl = e.target?.closest?.('[data-add-welcome]');
-      const jumpStep = welcomeEl ? 4 : samplesEl ? 5 : null;
-      openWizard(course, subject, jumpStep ? { jumpToStep: jumpStep } : {});
-    }, `${course}, ${statusLabel} — open setup`);
+
+    // One ghost button per action, each its own tab stop with its own name.
+    const actions = card.querySelector('.t-card-actions');
+    const addAction = (label, jumpStep) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn--ghost';
+      btn.textContent = label;
+      btn.setAttribute('aria-label', `${label} — ${course}`);
+      btn.addEventListener('click', () => {
+        openWizard(course, subject, jumpStep ? { jumpToStep: jumpStep } : {});
+      });
+      actions.appendChild(btn);
+    };
+    addAction(btnLabel, null);
+    if (needsWelcome) addAction('Add welcome message', 4);
+    if (needsSamples) addAction('Add samples', 5);
+
     grid.appendChild(card);
   });
 }
@@ -1404,7 +1419,7 @@ function updateWorkSamplesSummary() {
     if (photoCount) parts.push(`${photoCount} photo${photoCount===1?'':'s'}`);
     if (textCount) parts.push(`${textCount} written example${textCount===1?'':'s'}`);
     const countStr = parts.length ? parts.join(', ') : (safe ? 'description only' : 'nothing added');
-    return `<div style="margin-bottom:8px"><strong style="text-transform:capitalize">${tier}</strong>: ${countStr} — ${safe || '<em style="color:var(--text-faint)">no description</em>'}</div>`;
+    return `<div style="margin-bottom:8px"><strong style="text-transform:capitalize">${tier}</strong>: ${countStr} — ${safe || '<em style="color:var(--text-3)">no description</em>'}</div>`;
   }).join('');
 }
 
@@ -1695,7 +1710,7 @@ function useTemplate() {
   const notice = document.createElement('div');
   notice.className = 'template-notice';
   notice.innerHTML = 'Using shared course info. Upload your own PDFs below if you want Lumi to use them as syllabus context.';
-  notice.style.cssText = 'padding:12px 16px;background:var(--accent-soft);border:1px solid var(--accent-glow);border-radius:8px;font-size:13px;color:var(--text);margin-bottom:16px;';
+  notice.style.cssText = 'padding:12px 16px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;font-size:13px;color:var(--text);margin-bottom:16px;';
   const uploadArea = document.querySelector('.syllabus-upload-area');
   if (uploadArea && !document.querySelector('.template-notice')) {
     uploadArea.parentNode.insertBefore(notice, uploadArea);
@@ -2146,7 +2161,7 @@ function renderMyStudents() {
 
       if (!enrollments.length) {
         const none = document.createElement('div');
-        none.style.cssText = 'padding:10px 14px;font-size:13px;color:var(--text-muted)';
+        none.style.cssText = 'padding:10px 14px;font-size:13px;color:var(--text-2)';
         none.textContent = 'No students enrolled in this class yet.';
         blockList.appendChild(none);
       } else {
@@ -2202,7 +2217,7 @@ function renderRoster() {
 
   if (!students.length) {
     const none = document.createElement('div');
-    none.style.cssText = 'padding:24px;text-align:center;color:var(--text-muted);font-size:14px';
+    none.style.cssText = 'padding:24px;text-align:center;color:var(--text-2);font-size:14px';
     none.textContent = 'No students in this block.';
     list.appendChild(none);
     return;

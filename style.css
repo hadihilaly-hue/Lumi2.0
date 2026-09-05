@@ -14,26 +14,26 @@
    The only place a literal value may appear. DESIGN.md §1–§3.            */
 :root {
   /* Ground */
-  --bg:             #0A0A0A;
-  --bg-sidebar:     #0E0E0E;
-  --surface:        #141414;
-  --surface-2:      #1C1C1C;
+  --bg:             #171717;
+  --bg-sidebar:     #1A1A1A;
+  --surface:        #1E1E1E;
+  --surface-2:      #242424;
 
   /* Lines */
-  --border:         #262626;
-  --border-strong:  #333333;
+  --border:         #2D2D2D;
+  --border-strong:  #3A3A3A;
 
-  /* Text — contrast on --bg: 16.9 / 7.7 / 5.0 */
+  /* Text — contrast on --bg: 15.3 / 6.9 / 5.2 */
   --text:           #EDEDED;
   --text-2:         #A1A1A1;
-  --text-3:         #808080;
+  --text-3:         #8A8A8A;
 
-  /* Accent — send button, inline links, thinking dot. Nothing else. 5.1 on --bg */
-  --accent:         #6E79DB;
-  --accent-hover:   #7F89E2;
+  /* Accent — send button, inline links, thinking dot. Nothing else. 5.6 on --bg */
+  --accent:         #7F89E2;
+  --accent-hover:   #9099E9;
 
-  /* Danger — text and borders only, never a fill. 5.1 on --bg */
-  --danger:         #E5484D;
+  /* Danger — text and borders only, never a fill. 5.4 on --bg */
+  --danger:         #EC5D62;
 
   /* Elevation — modals and popovers only */
   --shadow-overlay: 0 8px 24px rgba(0,0,0,.6);
@@ -200,7 +200,8 @@ a{color:inherit;text-decoration:none}
 .field-label{font-size:var(--t-meta);font-weight:var(--w-medium);color:var(--text-2)}
 .field-input,
 .field-textarea,
-.field-select{
+.field-select,
+.t-note-input-row textarea{
   width:100%;background:var(--bg);color:var(--text);
   border:1px solid var(--border);border-radius:var(--radius-sm);
   padding:var(--space-2) var(--space-3);
@@ -209,10 +210,12 @@ a{color:inherit;text-decoration:none}
 }
 .field-textarea{resize:vertical}
 .field-input::placeholder,
-.field-textarea::placeholder{color:var(--text-3)}
+.field-textarea::placeholder,
+.t-note-input-row textarea::placeholder{color:var(--text-3)}
 .field-input:focus,
 .field-textarea:focus,
-.field-select:focus{border-color:var(--accent)}
+.field-select:focus,
+.t-note-input-row textarea:focus{border-color:var(--accent)}
 .field-help{font-size:var(--t-meta);color:var(--text-3)}
 .field-count{font-size:var(--t-meta);color:var(--text-3);text-align:right}
 .field-error{font-size:var(--t-meta);color:var(--danger)}
@@ -2339,6 +2342,7 @@ body.t-portal{overflow:auto;display:block}
 .t-view.is-active{display:block}
 #authLoading.is-active,
 #signinView.is-active,
+#unknownView.is-active,
 #wizardView.is-active{display:flex}
 #authLoading{position:fixed;inset:0;background:var(--bg);align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:var(--space-3)}
 #signinView{min-height:100vh;align-items:center;justify-content:center;padding:var(--space-6)}
@@ -2350,6 +2354,23 @@ body.t-portal{overflow:auto;display:block}
 .t-signin-title{font-size:var(--t-prose);font-weight:var(--w-semi);margin-bottom:var(--space-1)}
 .t-signin-sub{font-size:var(--t-ui);color:var(--text-2);margin-bottom:var(--space-6)}
 .t-signin-foot{margin-top:var(--space-4);font-size:var(--t-meta);color:var(--text-3)}
+/* Loading spinner. Session 4 dropped the rule; @keyframes spin survived. */
+.auth-spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:var(--radius-full);animation:spin .8s linear infinite}
+
+/* Not-a-registered-teacher. Same card treatment as the sign-in box. */
+#unknownView{min-height:100vh;align-items:center;justify-content:center;padding:var(--space-6)}
+.t-unknown-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-12) var(--space-8);max-width:400px;width:100%;margin-inline:auto;text-align:center}
+.t-unknown-box h2{font-size:var(--t-prose);font-weight:var(--w-semi);margin-bottom:var(--space-2)}
+.t-unknown-box p{font-size:var(--t-ui);line-height:var(--lh-ui);color:var(--text-2)}
+.t-unknown-box .t-unknown-email{font-size:var(--t-ui);color:var(--text);margin:var(--space-3) 0 var(--space-6)}
+
+/* Toast. Was position:static with opacity:1 — every toast rendered as bare
+   text below the fold, so saves and errors gave no feedback at all.
+   No success colour: the accent has three uses and this is not one. */
+.t-toast{position:fixed;bottom:var(--space-6);left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);font-size:var(--t-ui);color:var(--text);box-shadow:var(--shadow-overlay);opacity:0;pointer-events:none;z-index:100;transition:opacity var(--dur-2) var(--ease)}
+.t-toast.show{opacity:1}
+.t-toast.error{border-color:var(--danger);color:var(--danger)}
+
 .t-error{display:none;background:var(--surface-2);border:1px solid var(--danger);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);font-size:var(--t-ui);color:var(--danger);margin-bottom:var(--space-4);text-align:left}
 :root.dark-mode .t-error{color:var(--danger)}
 #homeView{min-height:100vh}
@@ -2370,9 +2391,12 @@ body.t-portal{overflow:auto;display:block}
 .t-welcome p{font-size:var(--t-strong);color:var(--text-2)}
 .t-section-label{font-size:var(--t-micro);font-weight:var(--w-semi);color:var(--text-2);text-transform:uppercase;letter-spacing:var(--track-micro);margin-bottom:var(--space-3)}
 .t-status-dot{width:9px;height:9px;border-radius:var(--radius-full);flex-shrink:0;display:inline-block}
-.t-status-dot.not_started{background:var(--surface-2)}
-.t-status-dot.in_progress{background:var(--surface-2)}
-.t-status-dot.complete{background:var(--surface-2)}
+/* DESIGN.md §1: status is a label plus a dot, and the dot is --text-2/--text-3
+   — never green or amber. All three states were --surface-2, which is 1.07:1
+   on a card and read as no dot at all. */
+.t-status-dot.not_started{background:var(--text-3)}
+.t-status-dot.in_progress{background:var(--text-3)}
+.t-status-dot.complete{background:var(--text-2)}
 #wizardView{min-height:100vh;flex-direction:column}
 .wizard-header{background:var(--surface);border-bottom:1px solid var(--border);padding:var(--space-4) var(--space-8);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40}
 .wizard-header-left{display:flex;align-items:center;gap:var(--space-3)}
@@ -2380,6 +2404,16 @@ body.t-portal{overflow:auto;display:block}
 .wizard-class-subject{font-size:var(--t-micro);color:var(--text-2)}
 .wizard-progress{display:flex;align-items:center}
 .wizard-step-label{font-size:var(--t-micro);font-weight:var(--w-semi);line-height:var(--lh-micro);letter-spacing:var(--track-micro);text-transform:uppercase;color:var(--text-3)}
+/* Layout rules Session 4 dropped while the markup kept using them. */
+.wizard-nav{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);margin-top:var(--space-6)}
+.wizard-textarea-wrap{position:relative;margin-bottom:var(--space-3)}
+.wizard-textarea-wrap .wizard-textarea{padding-right:var(--space-12)}
+.wizard-mic-btn{position:absolute;top:var(--space-2);right:var(--space-2);width:32px;height:32px;padding:0;border-radius:var(--radius-full);border:1px solid var(--border);background:var(--surface-2)}
+.wizard-mic-btn:hover{border-color:var(--border-strong)}
+.tier-btn-row{display:flex;flex-wrap:wrap;gap:var(--space-2);margin-bottom:var(--space-3)}
+.tier-input-file{display:none}
+.summary-card-content{white-space:pre-wrap;font-size:var(--t-ui);line-height:var(--lh-ui);color:var(--text)}
+
 .wizard-body{flex:1;max-width:700px;width:100%;margin:0 auto;padding:var(--space-8) var(--space-6) var(--space-16)}
 .wizard-step{display:none}
 .wizard-step.active{display:block}
@@ -2469,21 +2503,39 @@ body.t-portal{overflow:auto;display:block}
 .t-roster-item:last-child{border-bottom:none}
 .t-roster-item:hover{background:var(--surface-2);color:var(--text)}
 .t-notechat-body{max-width:720px;margin:0 auto;padding:var(--space-6);display:flex;flex-direction:column;gap:var(--space-3)}
-.t-note-messages{min-height:360px;max-height:calc(100vh - 260px);overflow-y:auto;padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-2);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg)}
-.t-note-bubble{align-self:flex-end;max-width:80%;background:var(--surface-2);color:var(--text);padding:var(--space-2) var(--space-3);border-radius:var(--radius-lg);font-size:var(--t-strong);line-height:var(--lh-ui);white-space:pre-wrap;word-wrap:break-word}
+/* Messages sit on the ground and the observation is a user message — the same
+   composition the student thread uses, so a teacher note reads like a chat turn.
+   The container was --surface with a --surface-2 bubble on it (1.15:1, invisible). */
+.t-note-messages{min-height:360px;max-height:calc(100vh - 260px);overflow-y:auto;padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-3);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg)}
+/* Declarations match .msg.user + .msg.user .msg-bubble. */
+.t-note-bubble{align-self:flex-end;max-width:min(var(--measure-user),100%);padding:var(--space-3);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);font-size:var(--t-user);line-height:var(--lh-user);color:var(--text);white-space:pre-wrap;word-wrap:break-word}
 .t-note-empty{margin:auto;text-align:center;color:var(--text-2);font-size:var(--t-strong);line-height:var(--lh-user);max-width:340px}
 #tClassSearch:focus{border-color:var(--border-strong)}
 @keyframes spin{ to { transform: rotate(360deg); } }
 .wizard-textarea{min-height:240px;resize:vertical}
 .tier-textarea{min-height:120px;resize:vertical}
-.t-note-input-row textarea{min-height:64px;resize:vertical}
+.t-note-input-row{display:flex;gap:var(--space-2);align-items:flex-end}
+.t-note-input-row textarea{flex:1;min-height:64px;resize:vertical}
+.t-note-input-row .btn{flex:0 0 auto}
+/* YOUR CLASSES cards. The card chrome is .card / .card--interactive — these
+   rules add only what is portal-specific: the grid, the internal stack, and
+   the action row pinned to a common baseline so cards in a row end level. */
+.t-cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--space-3)}
+.t-card{display:flex;flex-direction:column;gap:var(--space-1);height:100%}
+.t-card-subject{font-size:var(--t-meta);color:var(--text-3)}
+.t-card-course{font-size:var(--t-strong);font-weight:var(--w-medium);color:var(--text)}
+.t-card-meta{display:flex;align-items:center;gap:var(--space-2)}
+.t-card-preview{font-size:var(--t-ui);line-height:var(--lh-ui);color:var(--text-2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.t-card-actions{display:flex;flex-wrap:wrap;gap:var(--space-2);margin-top:auto;padding-top:var(--space-3)}
+.t-filter-pill{padding:var(--space-1) var(--space-3);border-radius:var(--radius-full);border:1px solid var(--border);background:transparent;color:var(--text-2);font-family:inherit;font-size:var(--t-micro);font-weight:var(--w-semi);cursor:pointer;transition:color var(--dur) var(--ease),border-color var(--dur) var(--ease),background var(--dur) var(--ease)}
+.t-filter-pill:hover{border-color:var(--border-strong);color:var(--text)}
+.t-filter-pill.active{background:var(--surface-2);border-color:var(--border-strong);color:var(--text)}
+
 /* Card notices — real state, carried as text. No fill, no colored edge. */
-.t-card-notice{margin-top:var(--space-3);cursor:pointer}
+.t-card-notice{margin-top:var(--space-3)}
 .t-card-notice-head{font-size:var(--t-meta);font-weight:var(--w-medium);color:var(--text-2);margin-bottom:var(--space-1)}
 .t-card-notice-body{font-size:var(--t-meta);line-height:var(--lh-meta);color:var(--text-3)}
-.t-card-notice-cta{font-size:var(--t-meta);font-weight:var(--w-medium);color:var(--text-2);margin-top:var(--space-1)}
 .t-card-done{font-size:var(--t-micro);font-weight:var(--w-semi);letter-spacing:var(--track-micro);text-transform:uppercase;color:var(--text-3);margin-top:var(--space-1)}
-.t-card-cta{margin-top:var(--space-2);font-size:var(--t-meta);font-weight:var(--w-medium);color:var(--text-2)}
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
