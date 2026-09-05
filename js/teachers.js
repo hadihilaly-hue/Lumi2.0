@@ -21,6 +21,23 @@ export function isTeacherModeAllowed(email) {
   return (globalThis.ALLOWED_TEACHER_EMAILS || []).some(a => a.toLowerCase() === e);
 }
 
+// Post-sign-in routing (Session 2b). Pure: no globals unless `allowed` is
+// omitted, no DOM, no network — so the decision is unit-testable on its own.
+//
+// Returns the page to forward to, or null for "stay where you are".
+//
+// The isTestMode short-circuit is load-bearing, not defensive. Teacher Test Mode
+// sends a teacher to app.html?mode=test on purpose (teacher.html:73 and :93);
+// without this guard the forward below would bounce them straight back and the
+// feature would be unreachable.
+export function signedInDestination({ email, isTestMode = false, allowed = null } = {}) {
+  if (isTestMode) return null;
+  const list = allowed ?? globalThis.ALLOWED_TEACHER_EMAILS ?? [];
+  if (!email) return null;
+  const e = String(email).trim().toLowerCase();
+  return list.some(a => String(a).trim().toLowerCase() === e) ? 'teacher.html' : null;
+}
+
 // ── Test-mode teacher overlay (AUDIT_FRONTEND F2) ────────────────────────────
 // In test mode the signed-in teacher's own display name → email pairing used to
 // be written straight into the shared TEACHER_EMAIL_MAP at runtime, which
