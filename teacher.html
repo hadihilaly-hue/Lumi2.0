@@ -613,6 +613,7 @@ let tExistingSamplesByTier = {};
 // (set at wizard open) so the save handler can soft-delete removed ones.
 let tExistingArtifactsByTier = {};
 let tWizardSnapshot = null;
+let tSaving = false;
 
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
 function showView(name) {
@@ -677,7 +678,9 @@ async function enterStudentMode() {
   // Loading the portal ends any student-view test session. Without this a
   // teacher who used browser Back to escape student mode kept the tab flagged
   // as test mode for every later visit to app.html.
-  sessionStorage.removeItem('lumi_test_mode');
+  const clearTestMode = () => sessionStorage.removeItem('lumi_test_mode');
+  clearTestMode();
+  window.addEventListener('pageshow', clearTestMode);
   const { data: { session } } = await sb.auth.getSession();
   if (!session) {
     showView('signinView');
@@ -1024,13 +1027,17 @@ function isWizardDirty() {
 
 window.addEventListener('beforeunload', (ev) => {
   if (!document.getElementById('wizardView').classList.contains('is-active')) return;
-  if (!isWizardDirty()) return;
+  if (!tSaving && !isWizardDirty()) return;
   ev.preventDefault();
   ev.returnValue = '';
 });
 
 async function goHome(opts) {
   const force = !!(opts && opts.force);
+  if (!force && tSaving) {
+    showToast('Still saving — one moment.', '');
+    return;
+  }
   if (!force && isWizardDirty()) {
     const leave = await tConfirm({
       title: 'Leave without saving?',
@@ -1941,6 +1948,8 @@ ${syllabusText || '(not provided)'}`;
 
 // ─── SAVE PROFILE ────────────────────────────────────────────────────────────
 async function saveTeacherProfile() {
+  if (tSaving) return;
+  tSaving = true;
   const btn = document.getElementById('saveProfileBtn');
   btn.disabled = true;
   btn.textContent = 'Saving…';
@@ -2237,6 +2246,8 @@ async function saveTeacherProfile() {
     showToast('Could not save your class. Nothing was lost — check your connection and click Save and Finish again.', 'error');
     btn.disabled = false;
     btn.textContent = 'Save and Finish';
+  } finally {
+    tSaving = false;
   }
 }
 
