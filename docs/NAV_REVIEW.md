@@ -177,11 +177,12 @@ Merged copy for the new wizard screen 2:
 > US History (H) · Teacher `[Jordan Harris ▾]` · Block `[C ▾]`
 > Chemistry (H) · Teacher `[Daniel Lee ▾]` · Block `[C ▾]`
 > Junior English Seminar · Teacher `[Maya Fox ▾]` · Block `[C ▾]`
-> *Not sure of a block? Leave it — you can fix it later in Settings.*
+> *Not sure of your block? It's the letter on your printed schedule.*
 > `[Back]` `[Continue]`
 
-(Default-select the teacher when a course has exactly one; block stays required for the
-enrollment row per `CLAUDE.md`, but the "fix later" copy stops the stall.)
+(Default-select the teacher when a course has exactly one. Block stays required — an entry
+without one is skipped by `syncEnrollments` and the student vanishes from the teacher's roster —
+so Continue stays disabled until every row has a block; the hint just tells them where to look.)
 
 Locked-card copy: replace "Say hi to Lee" + "SETTING UP" with a single line
 **"Dr. Lee is still setting up — check back soon"**, card non-interactive (no toast needed).
