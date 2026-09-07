@@ -88,6 +88,9 @@
   /* Measures */
   --measure-prose: 68ch;
   --measure-user:  60ch;
+  /* Width of the centred chat column: thread, composer and rail-side gutters
+     all resolve against it. */
+  --measure-thread: 780px;
 }
 
 
@@ -552,7 +555,10 @@ a{color:inherit;text-decoration:none}
 .drop-overlay.active{opacity:1;pointer-events:all}
 .drop-overlay-label{font-size:var(--t-ui);line-height:var(--lh-ui);color:var(--text)}
 .drop-overlay-sub{font-size:var(--t-meta);line-height:var(--lh-meta);color:var(--text-3)}
-.messages{flex:1;overflow-y:auto;padding:var(--space-6) var(--space-8);display:flex;flex-direction:column;gap:var(--space-6);scroll-behavior:smooth;}
+/* The thread is a centred column: gutters grow with the panel so the prose
+   never hugs the left edge of a wide viewport. */
+.messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:var(--space-6);scroll-behavior:smooth;
+  padding:var(--space-8) max(var(--space-8),calc((100% - var(--measure-thread)) / 2)) var(--space-6);}
 
 /* welcome */
 .welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:var(--space-3);text-align:center;padding:var(--space-12);}
@@ -649,7 +655,8 @@ a{color:inherit;text-decoration:none}
 .msg-fb-btn.active{color:var(--text);}
 
 /* input */
-.input-area{padding:var(--space-3) var(--space-4);border-top:1px solid var(--border);background:var(--bg)}
+.input-area{border-top:1px solid var(--border);background:var(--bg);
+  padding:var(--space-3) max(var(--space-4),calc((100% - var(--measure-thread)) / 2)) var(--space-4);}
 .attach-preview{display:none;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2);padding:var(--space-2) var(--space-2);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);position:relative;}
 .attach-preview.visible{display:flex}
 .attach-thumb{width:44px;height:44px;object-fit:cover;border-radius:var(--radius-sm);flex-shrink:0;}
@@ -718,11 +725,16 @@ a{color:inherit;text-decoration:none}
 .settings-input{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:var(--t-meta);padding:var(--space-2) var(--space-3);outline:none;transition:border-color .2s;margin-bottom:var(--space-2);}
 .settings-input:focus{border-color:var(--border-strong)}
 .settings-input::placeholder{color:var(--text-3)}
-.settings-save-btn{width:100%;padding:var(--space-2);background:var(--surface-2);color:var(--text);border:none;border-radius:var(--radius-sm);font-family:inherit;font-size:var(--t-meta);font-weight:var(--w-medium);cursor:pointer;transition:opacity .2s;}
+.settings-save-btn{width:100%;min-height:32px;padding:var(--space-2);background:var(--surface-2);color:var(--text);border:none;border-radius:var(--radius-sm);font-family:inherit;font-size:var(--t-meta);font-weight:var(--w-medium);cursor:pointer;transition:opacity .2s;}
 .settings-save-btn:hover{opacity:.85}
 .settings-hint{font-size:var(--t-micro);color:var(--text-3);margin-top:var(--space-2);line-height:var(--lh-user)}
-.danger-btn{width:100%;padding:var(--space-2);background:none;border:1px solid var(--danger);color:var(--danger);border-radius:var(--radius-sm);font-family:inherit;font-size:var(--t-meta);cursor:pointer;transition:all .2s;}
-.danger-btn:hover{background:var(--surface-2)}
+/* Destructive actions read as neutral secondary buttons until intent is shown;
+   the danger colour is carried by the label, and the border only on hover. */
+.danger-btn{width:100%;min-height:32px;padding:var(--space-2);background:none;border:1px solid var(--border);color:var(--danger);border-radius:var(--radius-sm);font-family:inherit;font-size:var(--t-meta);font-weight:var(--w-medium);cursor:pointer;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease);}
+.danger-btn:hover{background:var(--surface-2);border-color:var(--danger)}
+/* Signing out is not destructive. */
+.settings-secondary-btn{width:100%;min-height:32px;padding:var(--space-2);background:none;border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);font-family:inherit;font-size:var(--t-meta);font-weight:var(--w-medium);cursor:pointer;transition:border-color var(--dur) var(--ease),background var(--dur) var(--ease);}
+.settings-secondary-btn:hover{background:var(--surface-2);border-color:var(--border-strong)}
 
 /* segmented control (used in Voice setting) */
 .seg-control{display:flex;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:var(--space-1);gap:var(--space-1);}
@@ -793,11 +805,19 @@ a{color:inherit;text-decoration:none}
 .empty-action:hover{color:var(--text)}
 
 /* ─── GENERAL CHAT PROMPT CARDS ─────────────────────────── */
-.general-prompt-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--space-2);max-width:480px;width:100%;margin:var(--space-3) auto 0}
-.general-prompt-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-3);cursor:pointer;transition:all .18s;text-align:left}
-.general-prompt-card:hover{border-color:var(--border-strong);background:var(--surface-2);}
-.general-prompt-card-icon{font-size:var(--t-title);margin-bottom:var(--space-1)}
-.general-prompt-card-text{font-size:var(--t-meta);color:var(--text-2);line-height:var(--lh-user)}
+/* Starter prompts in general chat use the same stacked secondary chips as the
+   class empty state (DESIGN.md §6 screen 3). */
+.general-prompt-cards{display:flex;flex-direction:column;align-items:flex-start;gap:var(--space-2);
+  width:100%;max-width:var(--measure-prose);margin:var(--space-2) 0 0}
+.general-prompt-card{
+  display:inline-flex;align-items:center;min-height:30px;
+  padding:var(--space-2) var(--space-3);
+  background:transparent;border:1px solid var(--border);border-radius:var(--radius-sm);
+  color:var(--text);font-family:inherit;font-size:var(--t-ui);font-weight:var(--w-medium);
+  line-height:var(--lh-ui);text-align:left;cursor:pointer;
+  transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease);
+}
+.general-prompt-card:hover{background:var(--surface);border-color:var(--border-strong);}
 
 /* ─── PENDING PROFILE CHAT BUTTON ──────────────────────── */
 .pending-gen-chat-btn{display:inline-block;margin-top:var(--space-3);padding:var(--space-2) var(--space-4);background:var(--surface-2);color:var(--text);border:none;border-radius:var(--radius-md);font-family:inherit;font-size:var(--t-ui);font-weight:var(--w-semi);cursor:pointer;transition:opacity .15s}
@@ -928,15 +948,18 @@ body.signin-page{
 .sched-dot.active{background:var(--text-3);}
 .sched-dot.done{background:var(--text-3);opacity:.45}
 
-/* step containers */
+/* step containers — auto block margins centre the active step vertically in
+   the space left under the header, and still allow scrolling when a step is
+   taller than the viewport. */
 .sched-step{display:none;width:100%;max-width:560px;padding:0 var(--space-6) var(--space-8);animation:schedIn .25s ease}
+.sched-step.active{margin-block:auto}
 .sched-step.active{display:block}
 .sched-step-inner{display:flex;flex-direction:column;gap:var(--space-4);padding-top:var(--space-8)}
 
 /* headings */
 .sched-heading{font-size:var(--t-title);font-weight:var(--w-semi);color:var(--text);letter-spacing:var(--track-title);line-height:var(--lh-micro)}
 .sched-subheading{font-size:var(--t-strong);color:var(--text-2);margin-top:calc(-1 * var(--space-3))}
-.sched-hint{font-size:var(--t-meta);color:var(--text-2);text-align:center}
+.sched-hint{font-size:var(--t-meta);color:var(--text-2)}
 
 /* back button */
 .sched-back-btn{
@@ -1516,11 +1539,14 @@ body.signin-page{
 .ob-chat-subtitle{font-size:var(--t-meta);color:var(--text-2);margin-left:var(--space-1)}
 .ob-chat-messages{flex:1;overflow-y:auto;padding:var(--space-4) var(--space-4);display:flex;flex-direction:column;gap:var(--space-3);scroll-behavior:smooth}
 .ob-chat-foot{display:flex;align-items:flex-end;gap:var(--space-2);padding:var(--space-3) var(--space-4);border-top:1px solid var(--border);flex-shrink:0}
-.ob-chat-input{flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-2) var(--space-3);font-size:var(--t-strong);color:var(--text);resize:none;outline:none;font-family:inherit;line-height:var(--lh-ui);transition:border-color .15s;min-height:42px;max-height:120px}
-.ob-chat-input:focus{border-color:var(--border-strong)}
-.ob-chat-send{width:40px;height:40px;border-radius:var(--radius-lg);background:var(--surface-2);border:none;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity .15s}
-.ob-chat-send:hover{opacity:.85}
-.ob-chat-send:disabled{opacity:.35;cursor:default}
+/* Composer mirrors the main chat input bar: same radius, same focus border,
+   same armed accent send button. */
+.ob-chat-input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);font-size:var(--t-user);color:var(--text);resize:none;outline:none;font-family:inherit;line-height:var(--lh-user);transition:border-color var(--dur) var(--ease);min-height:36px;max-height:120px}
+.ob-chat-input:focus{border-color:var(--accent)}
+.ob-chat-send{width:36px;height:36px;border-radius:var(--radius-md);background:var(--surface-2);border:none;color:var(--text-3);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background var(--dur) var(--ease),color var(--dur) var(--ease)}
+.ob-chat-send:not(:disabled){background:var(--accent);color:var(--bg)}
+.ob-chat-send:not(:disabled):hover{background:var(--accent-hover)}
+.ob-chat-send:disabled{cursor:default}
 .ob-chat-send svg{width:16px;height:16px}
 
 /* Chat bubbles */
@@ -1837,9 +1863,12 @@ body.home-redesign-v1:has(#homeView.home-view:not([style*="none"])) .home-view {
   color:var(--text-2);
 }
 .home-due-text { min-width:0; }
+/* Two lines, then clamp — assignment titles are long enough that a single
+   ellipsised line hides which assignment it is. */
 .home-due-title {
-  font-size:var(--t-ui); font-weight:var(--w-semi); line-height:var(--lh-micro);
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  font-size:var(--t-ui); font-weight:var(--w-semi); line-height:var(--lh-strong);
+  display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+  overflow:hidden;
 }
 .home-due-meta {
   font-size:var(--t-meta); color:var(--text-2); margin-top:var(--space-1);
