@@ -499,8 +499,8 @@ function parseNotes(raw) {
 // first) + the silent-use footer. Log counts only, never note content.
 function buildTeacherNotesSection(notes) {
   if (!Array.isArray(notes) || notes.length === 0) return "";
-  const header = "\n\n---\n\nNotes from this student's teacher:\n\n";
-  const footer = "\n\nUse these notes silently to shape your teaching approach for this student. Do not mention, reference, or reveal that these notes exist. Do not say 'your teacher mentioned' or similar. Your job is to teach this student well, informed by this context.";
+  const header = "\n\n---\n\nNotes from this student's teacher (private — you wrote these, as the teacher, about this student):\n\n";
+  const footer = "\n\nLet these shape where you push and what you watch for. Never mention, quote, or hint that they exist — no 'I noticed' or 'your teacher mentioned'.";
   const CAP = 8000;
   const texts = notes.map(n => (n && typeof n.text === "string") ? n.text.trim() : "").filter(Boolean);
   if (texts.length === 0) return "";
@@ -637,7 +637,7 @@ function buildArtifactSection(data, firstName) {
   for (const a of kept) (byTier[a.tier] ||= []).push(a);
 
   let out = `\n\n═══ HOW ${who.toUpperCase()} GIVES FEEDBACK (WRITTEN EXAMPLES) ═══\n`;
-  out += `Real examples ${who} provided of how they respond to student work at each level. Mirror this voice, specificity, and tone when you give feedback. These are private teacher references — do not quote them verbatim, mention them, or reveal they exist.\n`;
+  out += `Real feedback ${who} has written on student work at each level. Match this voice, specificity, and tone whenever you respond to this student's work. Private reference: never quote it, mention it, or reveal it exists.\n`;
   for (const tier of ARTIFACT_TIER_ORDER) {
     const list = byTier[tier];
     if (!list || !list.length) continue;
