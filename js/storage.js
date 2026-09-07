@@ -5,6 +5,22 @@ import { fetchTeacherProfilesByEmails, rdsFetch, resolveTeacherEmail, setTestMod
 import { showToast } from './ui.js';
 
 
+const WORK_SAMPLE_TIERS = ['progressing', 'proficient', 'exemplary'];
+
+// Mirrors teacher.html hasAllWorkSampleTiers (Q4 v2, Decision D6): a tier is
+// complete with ≥1 artifact of ANY type — a photo in teacher_work_samples OR a
+// written example in teacher_work_artifacts. The description is not required.
+export function hasAllWorkSampleTiers(samplesByTier, artifactsByTier) {
+  const samples = samplesByTier || {};
+  const artifacts = artifactsByTier || {};
+  return WORK_SAMPLE_TIERS.every(tier => {
+    const r = samples[tier];
+    const hasPhoto = !!r && Array.isArray(r.photo_paths) && r.photo_paths.length > 0;
+    const hasText = Array.isArray(artifacts[tier]) && artifacts[tier].length > 0;
+    return hasPhoto || hasText;
+  });
+}
+
 // ─── SCHEDULE STORAGE ────────────────────────────────────────────────────────
 // Schedule: [{ course, teacher, subject }]
 export function getSchedule() {
@@ -33,34 +49,38 @@ export async function loadTestModeSchedule() {
       return;
     }
 
-    // TM-3: also pull work samples so we can decide which classes are
-    // "ready to test" (= done + welcome_message + all 3 work-sample
-    // tiers complete with photos and descriptions). Locked classes
-    // still appear in the sidebar but route to teacher.html for
-    // completion instead of opening a chat.
+    // TM-3: also pull work samples + text artifacts so we can decide which
+    // classes are "ready to test" (= done + welcome_message + all 3 tiers
+    // holding at least one artifact of any type). Locked classes still
+    // appear in the sidebar but route to teacher.html for completion
+    // instead of opening a chat.
     const profileIds = data.map(p => p.id).filter(Boolean);
     const samplesByProfile = {};
+    const artifactsByProfile = {};
     if (profileIds.length) {
+      const idsQs = profileIds.map(encodeURIComponent).join(',');
       let sampleRows = null;
       try {
-        sampleRows = await rdsFetch(`work-samples?teacher_profile_ids=${profileIds.map(encodeURIComponent).join(',')}`);
+        sampleRows = await rdsFetch(`work-samples?teacher_profile_ids=${idsQs}`);
       } catch (err) {
         console.warn('[test-mode] work_samples fetch failed:', err.message);
       }
       (sampleRows || []).forEach(r => {
         (samplesByProfile[r.teacher_profile_id] ||= {})[r.tier] = r;
       });
-    }
-    const TIERS = ['progressing', 'proficient', 'exemplary'];
-    const hasAllTiers = (profileId) => {
-      const byTier = samplesByProfile[profileId];
-      if (!byTier) return false;
-      return TIERS.every(tier => {
-        const r = byTier[tier];
-        return r && Array.isArray(r.photo_paths) && r.photo_paths.length > 0
-            && (r.description || '').trim().length > 0;
+      let artifactRows = null;
+      try {
+        artifactRows = await rdsFetch(`work-artifacts?teacher_profile_ids=${idsQs}`);
+      } catch (err) {
+        console.warn('[test-mode] work_artifacts fetch failed:', err.message);
+      }
+      (artifactRows || []).forEach(r => {
+        const byTier = (artifactsByProfile[r.teacher_profile_id] ||= {});
+        (byTier[r.tier] ||= []).push(r);
       });
-    };
+    }
+    const hasAllTiers = (profileId) =>
+      hasAllWorkSampleTiers(samplesByProfile[profileId], artifactsByProfile[profileId]);
 
     // Display name for synthetic schedule entries — prefer the session
     // full_name; fall back to the email local-part. Register the

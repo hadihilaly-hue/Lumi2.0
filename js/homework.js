@@ -505,12 +505,23 @@ export function showHwPopup() {
   renderHwPopupTasks();
 }
 
+// home.js listens for 'lumi:hw-changed' to refresh the due strip and class
+// cards without importing this module (home.js already imports getHwTasks).
+function dispatchHwChanged() {
+  try {
+    if (typeof document !== 'undefined' && document.dispatchEvent) {
+      document.dispatchEvent(new CustomEvent('lumi:hw-changed'));
+    }
+  } catch { /* offline test env */ }
+}
+
 export function closeHwPopup() {
   const popup = $('hwPopup');
   popup.classList.remove('open');
   closeHwBackdrop();
   setTimeout(() => { popup.style.display = 'none'; }, 200);
   renderSidebar(); // refresh sidebar checklist
+  dispatchHwChanged();
   syncHwToRds();
 }
 

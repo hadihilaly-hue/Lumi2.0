@@ -88,6 +88,15 @@ function renderList(plan, container, list) {
       class: 'study-plan-empty',
       text: "Nothing due — you're clear tonight.",
     }));
+    const add = el('button', {
+      class: 'study-plan-hint',
+      type: 'button',
+      title: 'Add homework',
+    }, [
+      el('span', { class: 'study-plan-hint-text', text: 'Got homework? Add it and Lumi will plan tonight.' }),
+    ]);
+    add.addEventListener('click', () => showHwPopup());
+    list.appendChild(add);
     return;
   }
 

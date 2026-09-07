@@ -93,7 +93,8 @@ export async function loadConv(id) {
   messagesEl.innerHTML = '';
   S.values.clear(); S.goals.clear(); S.interests.clear();
 
-  S.messages.forEach(m => renderMsg(m.role, m.content, false));
+  // Stored roles are user/assistant; renderMsg styles the tutor side as 'lumi'.
+  S.messages.forEach(m => renderMsg(m.role === 'assistant' ? 'lumi' : m.role, m.content, false));
   (conv.values    || []).forEach(v => S.values.add(v));
   (conv.goals     || []).forEach(g => S.goals.add(g));
   (conv.interests || []).forEach(i => S.interests.add(i));
@@ -223,7 +224,22 @@ export async function openTutor(subjectId, course, teacher) {
   await finishOpenTutor(subjectId, course, teacher, subjectName);
 }
 
+let _introHandler = null;
+
+/** Hide a pending intro slide and forget the half-opened class so the next
+ *  visit runs openTutor again. Called when the route changes underneath it. */
+export function cancelIntroSlide() {
+  if (!_introHandler) return;
+  $('introGoBtn').removeEventListener('click', _introHandler);
+  _introHandler = null;
+  $('introSlide').style.display = 'none';
+  $('chatPanel').style.display = '';
+  S.tutorCtx = null;
+  SB.activeTeacher = null;
+}
+
 function showIntroSlide(course, onGo) {
+  if (_introHandler) $('introGoBtn').removeEventListener('click', _introHandler);
   const slide = $('introSlide');
   const name = getStudentName();
   $('introGreeting').textContent = name !== 'there'
@@ -236,10 +252,12 @@ function showIntroSlide(course, onGo) {
   const goBtn = $('introGoBtn');
   const handler = () => {
     goBtn.removeEventListener('click', handler);
+    _introHandler = null;
     slide.style.display = 'none';
     $('chatPanel').style.display = '';
     onGo();
   };
+  _introHandler = handler;
   goBtn.addEventListener('click', handler);
 }
 

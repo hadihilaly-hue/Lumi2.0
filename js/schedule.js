@@ -1,5 +1,5 @@
 import { MENLO_CURRICULUM } from './data.js';
-import { getStudyStyle, saveStudyStyle, syncStudyStyleToRds } from './homework.js';
+import { getStudyStyle, saveStudyStyle, syncStudyStyleToRds, todayStr } from './homework.js';
 import { setSidebarUserSubtitle } from './prompts.js';
 import { renderSidebar } from './sidebar.js';
 import { $ } from './state.js';
@@ -311,15 +311,31 @@ export function initScheduleSetup(onDone, prefill = []) {
 
   $('ssStep2Next').addEventListener('click', () => {
     teacherIdx = 0;
-    showTeacherStep();
-    setStep(2);
+    showTeacherStep(1);
   });
 
   // ── Step 3: Teachers ──────────────────────────────────────────────────────
   function getSelectedArray() { return [...selectedClasses]; }
 
-  function showTeacherStep() {
+  function teachersFor(course) {
+    for (const [, courses] of Object.entries(activeCurriculum)) {
+      if (courses[course]) return courses[course];
+    }
+    return [];
+  }
+
+  function showClassStep() {
+    buildClassGrid($('ssClassSearch').value);
+    updateClassHint();
+    setStep(1);
+  }
+
+  // `dir` is the direction of travel (+1 forward, -1 back). Classes with a
+  // single teacher are chosen automatically and skipped in that direction, so
+  // this step is only ever shown with a real choice on screen.
+  function showTeacherStep(dir = 1) {
     const arr = getSelectedArray();
+    if (teacherIdx < 0) { showClassStep(); return; }
     if (teacherIdx >= arr.length) {
       blockIdx = 0;
       showBlockStep();
@@ -327,21 +343,17 @@ export function initScheduleSetup(onDone, prefill = []) {
       return;
     }
     const course = arr[teacherIdx];
-    $('ssTeacherProg').textContent   = `${course} — ${teacherIdx + 1} of ${arr.length} classes`;
-    $('ssTeacherCourseName').textContent = '';
+    const teachers = teachersFor(course);
 
-    let teachers = [];
-    for (const [, courses] of Object.entries(activeCurriculum)) {
-      if (courses[course]) { teachers = courses[course]; break; }
-    }
-
-    // If only one teacher, skip and auto-advance
-    if (teachers.length === 1) {
-      teacherChoices[course] = teachers[0];
-      teacherIdx++;
-      showTeacherStep();
+    if (teachers.length <= 1) {
+      if (teachers.length === 1) teacherChoices[course] = teachers[0];
+      teacherIdx += dir;
+      showTeacherStep(dir);
       return;
     }
+
+    $('ssTeacherProg').textContent   = `${course} — ${teacherIdx + 1} of ${arr.length} classes`;
+    $('ssTeacherCourseName').textContent = '';
 
     const grid = $('ssTeacherGrid');
     grid.innerHTML = '';
@@ -354,21 +366,16 @@ export function initScheduleSetup(onDone, prefill = []) {
         grid.querySelectorAll('.sched-teacher-card').forEach(c => c.classList.remove('selected'));
         card.classList.add('selected');
         teacherChoices[course] = t;
-        setTimeout(() => { teacherIdx++; showTeacherStep(); }, 200);
+        setTimeout(() => { teacherIdx++; showTeacherStep(1); }, 200);
       });
       grid.appendChild(card);
     });
+    setStep(2);
   }
 
   $('ssStep3Back').addEventListener('click', () => {
-    if (teacherIdx === 0) {
-      buildClassGrid($('ssClassSearch').value);
-      updateClassHint();
-      setStep(1);
-    } else {
-      teacherIdx--;
-      showTeacherStep();
-    }
+    teacherIdx--;
+    showTeacherStep(-1);
   });
 
   // ── Step 4: Block (A–G section) ───────────────────────────────────────────
@@ -403,9 +410,8 @@ export function initScheduleSetup(onDone, prefill = []) {
 
   $('ssStepBlockBack').addEventListener('click', () => {
     if (blockIdx === 0) {
-      teacherIdx = Math.max(0, getSelectedArray().length - 1);
-      showTeacherStep();
-      setStep(2);
+      teacherIdx = getSelectedArray().length - 1;
+      showTeacherStep(-1);
     } else {
       blockIdx--;
       showBlockStep();
@@ -513,6 +519,10 @@ export function initScheduleSetup(onDone, prefill = []) {
       };
     });
     saveScheduleLocal(schedule);
+    // A schedule confirmed just now is accurate — don't immediately ask again.
+    localStorage.setItem('lumi_banner_dismissed', String(Date.now()));
+    // First-run: let the student see their home before the daily homework check-in.
+    if (!localStorage.getItem('lumi_hw_date')) localStorage.setItem('lumi_hw_date', todayStr());
     if (chosenGrade) localStorage.setItem('lumi_grade', chosenGrade);
     setSidebarUserSubtitle();
     saveStudyStyle(chosenStyle);
