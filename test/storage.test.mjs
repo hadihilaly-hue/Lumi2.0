@@ -16,6 +16,7 @@ import {
   saveConvs,
   saveCurrentConv,
   migrateOldData,
+  hasAllWorkSampleTiers,
 } from '../js/storage.js';
 import { S } from '../js/state.js';
 import { reset } from './harness.mjs';
@@ -232,4 +233,30 @@ test('migrateOldData skips legacy data with no messages (leaves it in place)', (
   assert.deepEqual(getConvs(), {});
   // Current behavior: returns before removing lumi_data when there are no messages.
   assert.ok(globalThis.localStorage.getItem('lumi_data'));
+});
+
+// ── hasAllWorkSampleTiers (Q4 v2, Decision D6) ───────────────────────────────
+const photoRow = { photo_paths: ['a.jpg'], description: '' };
+const textRow = { artifact_type: 'comment', text_content: 'Strong thesis.' };
+
+test('hasAllWorkSampleTiers: photo-only tiers count, description not required', () => {
+  const samples = { progressing: photoRow, proficient: photoRow, exemplary: photoRow };
+  assert.equal(hasAllWorkSampleTiers(samples, {}), true);
+});
+
+test('hasAllWorkSampleTiers: text-only tiers count (no work_samples row at all)', () => {
+  const artifacts = { progressing: [textRow], proficient: [textRow], exemplary: [textRow] };
+  assert.equal(hasAllWorkSampleTiers(undefined, artifacts), true);
+});
+
+test('hasAllWorkSampleTiers: mixed photo + text across tiers counts', () => {
+  const samples = { progressing: photoRow, exemplary: { photo_paths: [], description: 'x' } };
+  const artifacts = { proficient: [textRow], exemplary: [textRow] };
+  assert.equal(hasAllWorkSampleTiers(samples, artifacts), true);
+});
+
+test('hasAllWorkSampleTiers: a tier with only a description is incomplete', () => {
+  const samples = { progressing: photoRow, proficient: photoRow, exemplary: { photo_paths: [], description: 'looks for X' } };
+  assert.equal(hasAllWorkSampleTiers(samples, {}), false);
+  assert.equal(hasAllWorkSampleTiers({}, {}), false);
 });

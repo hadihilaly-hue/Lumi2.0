@@ -1,5 +1,5 @@
 import { doSend, handleFileSelect } from './js/chat.js';
-import { newChat } from './js/conversation.js';
+import { cancelIntroSlide, newChat } from './js/conversation.js';
 import { showWelcome } from './js/emptystate.js';
 import { _calEvents, addHwTask, advancePlannerBlock, buildStudyPlan, buildStudyPlanWithCalendar, checkDailyHwPrompt, closeHwAddModal, closeHwBackdrop, closeHwPlanModal, closeHwPopup, closeTimelineModal, genHwId, getHwTasks, loadCalendarEvents, renderHwPopupTasks, setCalendarConnected, showHwAddModal, showHwPlanModal, showHwPopup, startPlannerStrip, todayStr, updateCalUi, wireCalListeners } from './js/homework.js';
 import { initOnboarding } from './js/onboarding.js';
@@ -7,7 +7,7 @@ import { _projPendingFile, clearAllChats, clearCompletedProjects, clearProjFile,
 import { setSidebarUserSubtitle } from './js/prompts.js';
 import { checkSemesterBanner, initScheduleSetup } from './js/schedule.js';
 import { activeDropdownEl, closeOpenMenu, renderSearchDropdown, renderSidebar, showInlineConfirm } from './js/sidebar.js';
-import { mountHome } from './js/home.js';
+import { mountHome, renderHome } from './js/home.js';
 import { mountClass, mountGeneral } from './js/classview.js';
 import { mountPlan } from './js/studyplanview.js';
 import { initRouter } from './js/router.js';
@@ -202,9 +202,11 @@ function init() {
     return;
   }
 
-  // Has name from the new onboarding flow — already completed
+  // Has name from the new onboarding flow — already completed. A student who
+  // reloaded mid-wizard still has no schedule; resume there, not on an empty home.
   if (hasOnboarded) {
     $('onboarding').style.display = 'none';
+    if (!hasSchedule && !S.isTestMode) { initScheduleSetup(() => startApp()); return; }
     startApp();
     return;
   }
@@ -253,7 +255,11 @@ function wireListeners() {
 
   $('updateScheduleBtn').addEventListener('click', () => {
     closeSettings();
-    initScheduleSetup(() => { renderSidebar(); }, getSchedule());
+    initScheduleSetup(() => {
+      renderSidebar();
+      preloadAvailableClasses().finally(() => preloadProfileStatuses());
+      renderHome();
+    }, getSchedule());
   });
 
   $('signOutBtn').addEventListener('click', async () => {
@@ -381,7 +387,12 @@ function startApp() {
     // The router honors any existing hash so a hard refresh at
     // #class/<b64>/<b64> re-mounts the same class (D5-A: on boot, if a hash
     // is present, route to it; else land on home).
-    initRouter({ onHome: mountHome, onClass: mountClass, onPlan: mountPlan, onGeneral: mountGeneral });
+    initRouter({
+      onHome:    (r) => { cancelIntroSlide(); mountHome(r); },
+      onClass:   mountClass,
+      onPlan:    (r) => { cancelIntroSlide(); mountPlan(r); },
+      onGeneral: (r) => { cancelIntroSlide(); mountGeneral(r); },
+    });
   } else {
     showWelcome();
   }
@@ -397,11 +408,21 @@ function startApp() {
 // ── Wire all homework event listeners ─────────────────────
 function wireHwListeners() {
   $('hwPopupClose').addEventListener('click', closeHwPopup);
-  $('hwBackdrop').addEventListener('click', () => {
+  const closeAllHwOverlays = () => {
     closeHwPopup();
     closeWorkTypeChooser();
+    closeHwAddModal();
     closeProjectCreateModal();
     closeProjectPlanModal();
+  };
+  $('hwBackdrop').addEventListener('click', closeAllHwOverlays);
+
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if ($('hwPlanModal').classList.contains('open')) { closeHwPlanModal(); return; }
+    if ($('timelineModal').classList.contains('open')) { closeTimelineModal(); return; }
+    if ($('settingsDrawer').classList.contains('open')) { closeSettings(); return; }
+    if ($('hwBackdrop').classList.contains('open')) closeAllHwOverlays();
   });
 
   // ── "+ Add homework" now opens type chooser ────────────

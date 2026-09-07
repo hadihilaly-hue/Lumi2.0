@@ -513,6 +513,22 @@ function renderQuickActions() {
 
 // ── Search filter ───────────────────────────────────────────────────────────
 
+// homework.js dispatches 'lumi:hw-changed' when the check-in closes. Re-render
+// the due strip + cards if home is on screen so due counts never go stale.
+let _hwWired = false;
+function wireHwRefreshOnce() {
+  if (_hwWired) return;
+  if (typeof document === 'undefined' || !document.addEventListener) return;
+  document.addEventListener('lumi:hw-changed', () => {
+    const home = document.getElementById('homeView');
+    if (!home || home.style.display === 'none') return;
+    renderDueStrip();
+    renderQuickActions();
+    renderHome();
+  });
+  _hwWired = true;
+}
+
 let _searchWired = false;
 function wireSearchOnce() {
   if (_searchWired) return;
@@ -585,6 +601,7 @@ export function mountHome() {
   renderQuickActions();
   renderHome();
   wireSearchOnce();
+  wireHwRefreshOnce();
 }
 
 /** Hide the home view. The router calls this before mounting a class view. */
