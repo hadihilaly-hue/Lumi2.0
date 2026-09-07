@@ -147,7 +147,7 @@ export function getTeachers(subjectName, course) {
 }
 
 // ─── CURRICULUM SEARCH ───────────────────────────────────────────────────────
-// Searches hardcoded MENLO_CURRICULUM data — no Supabase needed.
+// Searches hardcoded MENLO_CURRICULUM data — no network needed.
 // The chat checks for a complete profile separately; search shows all teachers.
 export function searchCurriculum(query) {
   const q = query.toLowerCase().trim();

@@ -1,3 +1,5 @@
+-- HISTORICAL — Supabase-era public schema dump (pre 2026-07-01 RDS cutover). DO NOT APPLY.
+-- Live schema: migration/rds-schema.sql.
 --
 -- PostgreSQL database dump
 --

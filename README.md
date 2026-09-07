@@ -80,7 +80,7 @@ The live schema is **`migration/rds-schema.sql`** (plus `rds-sis-tables.sql`,
 Supabase extensions, no RLS, no `auth.*` references; per-route authz in the
 Lambda replaces what RLS used to enforce.
 
-`supabase_setup.sql` and `migration/supabase-schema.sql` are kept only as
+`docs/archive/supabase_setup.sql` and `docs/archive/supabase-schema.sql` are kept only as
 **historical** records of the retired Supabase era — do not apply them.
 
 Direct DB access for migrations/ops goes through the Lambda's IAM-gated

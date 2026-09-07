@@ -1,6 +1,6 @@
 # Lumi PII Inventory — v1, 2026-05-21
 
-Single-page inventory of every piece of student and teacher data Lumi collects, where it lives, and who has access. Companion to MIGRATION_HARDENING.md and RLS_AUDIT.md; serves as the foundation for the NDPA / data privacy agreement.
+Single-page inventory of every piece of student and teacher data Lumi collects, where it lives, and who has access. Companion to docs/archive/MIGRATION_HARDENING.md and docs/archive/RLS_AUDIT.md; serves as the foundation for the NDPA / data privacy agreement.
 
 ## Scope
 

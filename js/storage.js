@@ -91,7 +91,7 @@ export async function loadTestModeSchedule() {
   }
 }
 
-export function syncScheduleToSupabase(schedule) {
+export function syncScheduleToRds(schedule) {
   if (!currentUser) return;
   // TM-2: never write a teacher's synthetic schedule into their auth
   // user's profiles row — they're not a student.
@@ -197,8 +197,8 @@ function syncEnrollments(schedule) {
     .catch(err => console.error('Enrollment sync failed:', err));
 }
 
-// Load all conversations from Supabase into localStorage (called once on fresh device)
-export async function loadConvsFromSupabase() {
+// Load all conversations from RDS into localStorage (called once on fresh device)
+export async function loadConvsFromRds() {
   if (!currentUser) return;
   try {
     // TM-2: filter by is_teacher_test so test convs never appear in
@@ -228,7 +228,7 @@ export async function loadConvsFromSupabase() {
         ? { ...lookupSubjectForCourse(row.course), course: row.course, teacher: row.teacher }
         : null;
 
-      // Use Supabase UUID as both local ID and sbId
+      // Use the RDS row UUID as both local ID and sbId
       const localId = 'sb_' + row.id.replace(/-/g, '').slice(0, 16);
       convs[localId] = {
         id:           localId,
@@ -246,14 +246,14 @@ export async function loadConvsFromSupabase() {
     });
     saveConvs(convs);
   } catch (err) {
-    console.warn('Supabase conversation load failed (using localStorage):', err);
+    console.warn('Conversation load failed (using localStorage):', err);
   }
 }
 
-// Sync a single conversation to Supabase — INSERT first time, UPDATE after
-export function syncConvToSupabase(convId) {
+// Sync a single conversation to RDS — INSERT first time, UPDATE after
+export function syncConvToRds(convId) {
   if (!currentUser) return;
-  _doSyncConv(convId).catch(err => console.warn('Supabase conv sync:', err));
+  _doSyncConv(convId).catch(err => console.warn('Conv sync:', err));
 }
 
 async function _doSyncConv(convId) {
@@ -296,8 +296,8 @@ async function _doSyncConv(convId) {
   }
 }
 
-// Delete a conversation from Supabase by its sbId
-export function deleteConvFromSupabase(convId) {
+// Delete a conversation from RDS by its sbId
+export function deleteConvFromRds(convId) {
   if (!currentUser) return;
   const convs = getConvs();
   const sbId  = convs[convId]?.sbId;
@@ -310,8 +310,8 @@ export function deleteConvFromSupabase(convId) {
     });
 }
 
-// Sync user profile (name, grade, accumulated values) to Supabase
-function syncProfileToSupabase() {
+// Sync user profile (name, grade, accumulated values) to RDS
+function syncProfileToRds() {
   if (!currentUser) return;
   // TM-2: a teacher in test mode is not a student. Don't overwrite their
   // auth user record's profiles row with synthetic student fields.
@@ -351,8 +351,8 @@ function syncProfileToSupabase() {
   });
 }
 
-// Load profile from Supabase on new device (only if localStorage has no name)
-export async function loadProfileFromSupabase() {
+// Load profile from RDS on new device (only if localStorage has no name)
+export async function loadProfileFromRds() {
   if (!currentUser) return;
   // TM-2: this pulls student profile state (name, grade, schedule, etc.)
   // into localStorage. In test mode that would overwrite the browser's
@@ -364,7 +364,7 @@ export async function loadProfileFromSupabase() {
     // (no profile yet).
     const data = await rdsFetch('profiles');
     if (!data) return;
-    // Always restore name/grade (overwrite if Supabase is newer)
+    // Always restore name/grade (overwrite if the server copy is newer)
     if (!hasName && data.name)  localStorage.setItem('lumi_name',  data.name);
     if (!hasName && data.grade) localStorage.setItem('lumi_grade', data.grade);
     setSidebarUserSubtitle();
@@ -391,7 +391,7 @@ export async function loadProfileFromSupabase() {
     if (data.onboarding_complete && !localStorage.getItem('lumi_onboarding_complete'))
       localStorage.setItem('lumi_onboarding_complete', 'true');
   } catch (err) {
-    console.warn('Supabase profile load failed:', err);
+    console.warn('Profile load failed:', err);
   }
 }
 
@@ -421,7 +421,7 @@ export function saveCurrentConv() {
         : '');
   convs[S.currentId] = {
     id:           S.currentId,
-    sbId:         existing.sbId || null,    // preserve Supabase UUID across saves
+    sbId:         existing.sbId || null,    // preserve RDS row UUID across saves
     ts:           existing.ts || Date.now(),
     title:        existing.title || null,
     preview:      previewText.slice(0, 60) || 'New chat',
@@ -437,7 +437,7 @@ export function saveCurrentConv() {
   if (keys.length > 50) keys.slice(0, keys.length - 50).forEach(k => delete convs[k]);
   saveConvs(convs);
   localStorage.setItem('lumi_current', S.currentId);
-  syncConvToSupabase(S.currentId);
+  syncConvToRds(S.currentId);
 }
 
 // ─── PHASE 5: ROLLING PROGRESS-NOTE FLUSH (best-effort session-end trigger) ────

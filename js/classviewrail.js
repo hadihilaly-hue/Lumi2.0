@@ -19,7 +19,7 @@
 import { loadConv, openTutor, lookupSubjectForCourse } from './conversation.js';
 import { getHwTasks } from './homework.js';
 import { getProjects, showProjectPlanModal } from './projects.js';
-import { S, SB, messagesEl } from './state.js';
+import { S, SB } from './state.js';
 import { getConvs } from './storage.js';
 import { showToast } from './ui.js';
 

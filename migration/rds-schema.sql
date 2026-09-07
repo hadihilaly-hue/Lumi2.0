@@ -1,6 +1,6 @@
 --
 -- Lumi RDS schema
--- Derived from migration/supabase-schema.sql (Supabase public schema dump, PG 17.6).
+-- Derived from docs/archive/supabase-schema.sql (Supabase public schema dump, PG 17.6).
 -- Target: AWS RDS PostgreSQL 18. No Supabase extensions, RLS, auth.*, or storage.* deps.
 --
 -- Transformations applied:
