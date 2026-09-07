@@ -257,8 +257,10 @@ function wireListeners() {
     closeSettings();
     initScheduleSetup(() => {
       renderSidebar();
-      preloadAvailableClasses().finally(() => preloadProfileStatuses());
       renderHome();
+      preloadAvailableClasses()
+        .finally(() => preloadProfileStatuses())
+        .finally(() => renderHome());
     }, getSchedule());
   });
 

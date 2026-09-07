@@ -525,6 +525,7 @@ function wireHwRefreshOnce() {
     renderDueStrip();
     renderQuickActions();
     renderHome();
+    applySearchFilter();
   });
   _hwWired = true;
 }
@@ -534,19 +535,22 @@ function wireSearchOnce() {
   if (_searchWired) return;
   const input = document.getElementById('homeSearch');
   if (!input) return;
-  input.addEventListener('input', () => {
-    const q = input.value.trim().toLowerCase();
-    const grid = document.getElementById('homeGrid');
-    if (!grid) return;
-    const cards = grid.querySelectorAll('.home-card');
-    for (const c of cards) {
-      const course = String(c.getAttribute('data-course') || '').toLowerCase();
-      const teacher = String(c.getAttribute('data-teacher') || '').toLowerCase();
-      const match = !q || course.includes(q) || teacher.includes(q);
-      c.style.display = match ? '' : 'none';
-    }
-  });
+  input.addEventListener('input', applySearchFilter);
   _searchWired = true;
+}
+
+function applySearchFilter() {
+  const input = document.getElementById('homeSearch');
+  const grid = document.getElementById('homeGrid');
+  if (!input || !grid) return;
+  const q = input.value.trim().toLowerCase();
+  const cards = grid.querySelectorAll('.home-card');
+  for (const c of cards) {
+    const course = String(c.getAttribute('data-course') || '').toLowerCase();
+    const teacher = String(c.getAttribute('data-teacher') || '').toLowerCase();
+    const match = !q || course.includes(q) || teacher.includes(q);
+    c.style.display = match ? '' : 'none';
+  }
 }
 
 // ── HTML escape ─────────────────────────────────────────────────────────────
