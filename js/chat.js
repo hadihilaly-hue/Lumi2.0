@@ -237,7 +237,9 @@ Remember: help them THINK through the project, never do it for them. Ask guiding
     let stream = null;
     const onChunk = (visible) => {
       if (!stream) { typing.remove(); stream = makeStreamingMsg(); messagesEl.appendChild(stream.el); }
-      stream.body.textContent = visible;
+      stream.body.replaceChildren(...visible.split(/\n\n+/).map(t => {
+        const p = document.createElement('p'); p.textContent = t; return p;
+      }));
       scrollBottom();
     };
     const { clean, data } = await callAPI(buildApiMessages(S), system, onChunk);
