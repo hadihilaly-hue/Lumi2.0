@@ -1530,6 +1530,11 @@ async function handleSyllabusUpload(event) {
   // Reset the input first so the same file can be re-selected later if needed.
   event.target.value = '';
   if (!files.length) return;
+  if (tSyllabusProcessing) {
+    showToast('Still reading the previous selection — try again in a moment.', 'error');
+    return;
+  }
+  tSyllabusProcessing = true;
 
   let added = 0;
   let firstNewExtractedText = '';
@@ -1579,6 +1584,7 @@ async function handleSyllabusUpload(event) {
   }
 
   setSyllabusBusy(null);
+  tSyllabusProcessing = false;
   if (added > 0) {
     showToast(`Added ${added} ${added === 1 ? 'syllabus' : 'syllabi'}.`, 'success');
   }
@@ -1588,6 +1594,7 @@ async function handleSyllabusUpload(event) {
 // Swaps the dropzone hint for a progress line while pdf.js reads a file;
 // pass null to restore the default hint.
 let tSyllabusDefaultHint = null;
+let tSyllabusProcessing = false;
 function setSyllabusBusy(message) {
   const area = document.getElementById('syllabusUploadArea');
   const hint = document.getElementById('syllabusUploadHint');
