@@ -155,6 +155,16 @@ a{color:inherit;text-decoration:none}
 /* Lumi prose — the one serif surface in the product. Hoisted from CHAT PANEL. */
 .msg-bubble p{margin:0}
 .msg-bubble p+p{margin-top:var(--space-3)}
+.msg-bubble ul,.msg-bubble ol{margin:var(--space-3) 0;padding-left:var(--space-6)}
+.msg-bubble li+li{margin-top:var(--space-1)}
+.msg-bubble li>ul,.msg-bubble li>ol{margin:var(--space-1) 0 0}
+.msg-bubble h1,.msg-bubble h2,.msg-bubble h3,.msg-bubble h4{
+  font-size:var(--t-prose);font-weight:var(--w-semi);line-height:var(--lh-prose);margin:var(--space-4) 0 var(--space-1);
+}
+.msg-bubble blockquote{margin:var(--space-3) 0;padding-left:var(--space-3);border-left:2px solid var(--border);color:var(--text-2)}
+.msg-bubble table{border-collapse:collapse;margin:var(--space-3) 0;font-size:var(--t-ui);font-family:var(--font-sans)}
+.msg-bubble th,.msg-bubble td{text-align:left;padding:var(--space-1) var(--space-2);border-bottom:1px solid var(--border);vertical-align:top}
+.msg-bubble th{color:var(--text-2);font-weight:var(--w-semi)}
 .msg-bubble strong{font-weight:var(--w-semi);color:var(--text)}
 .msg-bubble em{font-style:italic;color:var(--text)}
 .msg-bubble a{color:var(--accent)}
