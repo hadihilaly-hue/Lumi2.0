@@ -49,7 +49,7 @@
 <div id="unknownView" class="t-view">
   <div class="t-unknown-box">
         <h2>Not a registered teacher</h2>
-    <p>Your email isn't in our teacher database yet.</p>
+    <p>This account isn't set up as a Menlo teacher yet. Ask an administrator to add your classes, then sign in again.</p>
     <p class="t-unknown-email" id="unknownEmail"></p>
     <button class="btn btn--ghost t-signout-btn" onclick="doSignOut()">Sign out</button>
   </div>
@@ -94,19 +94,19 @@
     </div>
     <div class="t-welcome">
       <h2 id="welcomeHeading">Welcome</h2>
-      <p>Set up your classes so Lumi can help your students like you would.</p>
+      <p>Set up each class so Lumi can help your students the way you would.</p>
     </div>
     <div class="t-section-label">Your Classes</div>
-    <div id="tFilterBar" style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-      <input type="text" id="tClassSearch" placeholder="Search classes…" aria-label="Search classes" style="flex:1;max-width:220px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;color:var(--text)">
-      <div style="display:flex;gap:6px">
+    <div id="tFilterBar" class="t-filter-bar">
+      <input type="text" id="tClassSearch" class="field-input t-class-search" placeholder="Search classes…" aria-label="Search classes">
+      <div class="t-filter-pills">
         <button type="button" class="t-filter-pill active" data-status="all" aria-pressed="true">All</button>
         <button type="button" class="t-filter-pill" data-status="not_started" aria-pressed="false">Not Started</button>
         <button type="button" class="t-filter-pill" data-status="complete" aria-pressed="false">Complete</button>
       </div>
     </div>
     <div class="t-cards-grid" id="classCards"></div>
-    <div class="t-section-label" id="tStudentsLabel" style="margin-top:32px;display:none">My Students</div>
+    <div class="t-section-label t-section-label--students" id="tStudentsLabel" style="display:none">My Students</div>
     <div id="tStudentsSection" class="t-students-section" style="display:none"></div>
   </div>
 </div>
@@ -174,9 +174,9 @@
   <div class="wizard-body">
     <!-- STEP 1: Engagement Rules -->
     <div class="wizard-step" data-step="1">
-      <div class="wizard-title-row" style="display:flex;align-items:center;gap:12px;margin-bottom:28px">
-        <label for="titleSelect" style="font-size:14px;font-weight:500;white-space:nowrap">How do your students address you?</label>
-        <select id="titleSelect" required style="padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:14px;cursor:pointer;min-width:100px">
+      <div class="field wizard-title-field">
+        <label class="field-label" for="titleSelect">How do students address you?</label>
+        <select id="titleSelect" class="field-select" required>
           <option value="" disabled selected>Select…</option>
           <option value="Mr.">Mr.</option>
           <option value="Ms.">Ms.</option>
@@ -185,7 +185,8 @@
           <option value="Dr.">Dr.</option>
         </select>
       </div>
-      <h2 class="wizard-question-title">How do you want students to engage with Lumi?</h2>
+      <h2 class="wizard-question-title">How should Lumi work with your students?</h2>
+      <p class="wizard-subhead">These become Lumi's ground rules for your class: what it does first, what it never does, and how far it goes when a student is stuck.</p>
       <div class="wizard-sub-prompts">
         <span class="wizard-sub-prompt">What's off-limits?</span>
         <span class="wizard-sub-prompt">What should Lumi always do first?</span>
@@ -212,7 +213,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
         </button>
       </div>
-      <div class="field-count wizard-word-count" id="engagementRulesCount">0 / 50 words minimum</div>
+      <div class="field-count wizard-word-count" id="engagementRulesCount" aria-live="polite">0 of 50 words</div>
       <div class="wizard-nav">
         <div></div>
         <button class="btn btn--primary wizard-next-btn" id="step1NextBtn" onclick="nextStep()" disabled>Continue</button>
@@ -222,6 +223,7 @@
     <!-- STEP 2: Teaching Voice -->
     <div class="wizard-step" data-step="2">
       <h2 class="wizard-question-title">What does your teaching voice sound like?</h2>
+      <p class="wizard-subhead">Lumi borrows your tone, your phrases, and how you push different students. Write it the way you'd say it in class.</p>
       <div class="wizard-sub-prompts">
         <span class="wizard-sub-prompt">Warm/dry/direct?</span>
         <span class="wizard-sub-prompt">Humor?</span>
@@ -248,7 +250,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
         </button>
       </div>
-      <div class="field-count wizard-word-count" id="teachingVoiceCount">0 / 50 words minimum</div>
+      <div class="field-count wizard-word-count" id="teachingVoiceCount" aria-live="polite">0 of 50 words</div>
       <div class="wizard-nav">
         <button class="btn btn--secondary wizard-prev-btn" onclick="prevStep()">Back</button>
         <button class="btn btn--primary wizard-next-btn" id="step2NextBtn" onclick="nextStep()" disabled>Continue</button>
@@ -257,7 +259,8 @@
 
     <!-- STEP 3: Course Info + Syllabus -->
     <div class="wizard-step" data-step="3">
-      <h2 class="wizard-question-title">What do students need to know about your course?</h2>
+      <h2 class="wizard-question-title">What should Lumi know about your course?</h2>
+      <p class="wizard-subhead">Units, readings, recurring assignments, and the mistakes you see every year. Lumi uses this to answer in the context of your class.</p>
       <div class="wizard-sub-prompts">
         <span class="wizard-sub-prompt">Main units/topics?</span>
         <span class="wizard-sub-prompt">Textbook/readings?</span>
@@ -283,10 +286,10 @@
            ondragover="handleSyllabusDragOver(event)"
            ondragleave="handleSyllabusDragLeave(event)"
            ondrop="handleSyllabusDrop(event)">
-                <div class="syllabus-upload-text">Got a syllabus? Upload up to 20 PDFs <span id="syllabusCount">(0/20)</span></div>
-        <div class="syllabus-upload-hint">We'll extract the text to help fill in your course info. PDFs only, max 10MB each.</div>
+        <div class="syllabus-upload-text">Upload your syllabus <span class="syllabus-upload-count" id="syllabusCount">(0/20)</span></div>
+        <div class="syllabus-upload-hint" id="syllabusUploadHint">Drop PDFs here or click to choose. We pull the text in to start your course info. Up to 20 files, 10 MB each.</div>
       </div>
-      <input type="file" id="syllabusFileInput" accept="application/pdf" multiple onchange="handleSyllabusUpload(event)">
+      <input type="file" id="syllabusFileInput" class="tier-input-file" accept="application/pdf" multiple onchange="handleSyllabusUpload(event)">
 
       <button class="wizard-examples-toggle" onclick="toggleExamples(this)">
         <span>Show examples</span>
@@ -308,7 +311,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
         </button>
       </div>
-      <div class="field-count wizard-word-count" id="courseInfoCount">0 / 50 words minimum</div>
+      <div class="field-count wizard-word-count" id="courseInfoCount" aria-live="polite">0 of 50 words</div>
       <div class="wizard-nav">
         <button class="btn btn--secondary wizard-prev-btn" onclick="prevStep()">Back</button>
         <button class="btn btn--primary wizard-next-btn" id="step3NextBtn" onclick="nextStep()" disabled>Continue</button>
@@ -318,7 +321,7 @@
     <!-- STEP 4: Welcome Message -->
     <div class="wizard-step" data-step="4">
       <h2 class="wizard-question-title">What's the first thing every student should read?</h2>
-      <p class="wizard-subhead">Pinned to the top of every new thread in your class. The student sees it before they ask their first question. Write it the way you'd say it.</p>
+      <p class="wizard-subhead">Pinned to the top of every new thread in your class, before the first question. Write it the way you'd say it on day one.</p>
       <button class="wizard-examples-toggle" onclick="toggleExamples(this)">
         <span>Show examples</span>
         <span class="arrow">▼</span>
@@ -339,7 +342,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
         </button>
       </div>
-      <div class="field-count wizard-word-count" id="welcomeMessageCount">0 / 600 characters</div>
+      <div class="field-count wizard-word-count" id="welcomeMessageCount" aria-live="polite">0 characters — at least 80 needed</div>
       <div class="wizard-nav">
         <button class="btn btn--secondary wizard-prev-btn" onclick="prevStep()">Back</button>
         <button class="btn btn--primary wizard-next-btn" id="step4NextBtn" onclick="nextStep()" disabled>Continue</button>
@@ -348,12 +351,12 @@
 
     <!-- STEP 5: Graded Work Samples -->
     <div class="wizard-step" data-step="5">
+      <h2 class="wizard-question-title">Show Lumi how you grade</h2>
+      <p class="wizard-subhead">For each level, add a photo of graded work or a written example: a report-card comment, essay feedback, or what you'd say out loud. A written example alone is enough for any subject. This step is optional.</p>
+      <p class="wizard-privacy-note">Students never see these. They only shape how Lumi gives feedback in your voice.</p>
       <div class="wizard-ferpa-callout">
-        <strong>Before uploading:</strong> please cover or blur student names and any identifying info. Lumi only needs to see your feedback comments and your grading style — not who they were written for. A black marker, sticky note, or quick photo edit works fine.
+        <strong>Before uploading a photo,</strong> cover or blur student names and anything identifying. Lumi only needs your comments and grading marks, not who they were written for.
       </div>
-      <h2 class="wizard-question-title">Show me how you grade</h2>
-      <p class="wizard-subhead">Share examples of how you assess student work at three performance levels — a photo of graded work, or a written example like a report-card comment, essay feedback, or what you'd say out loud. Lumi uses these as evidence of your authentic feedback voice. No photo required: a written example alone works for any subject.</p>
-      <p class="wizard-privacy-note">Only Lumi sees these examples — students never see them. They only shape how Lumi gives feedback in your voice.</p>
 
       <div class="card tier-card" data-tier="progressing">
         <div class="tier-heading">Progressing</div>
@@ -368,8 +371,7 @@
         <input type="file" id="tierFiles-progressing" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('progressing', event)">
         <div class="tier-converting" id="tierConverting-progressing">Converting HEIC photo…</div>
         <div class="tier-artifacts" id="tierArtifacts-progressing"></div>
-        <textarea class="field-textarea tier-textarea" id="tierDesc-progressing" aria-label="Grading notes for the Progressing level" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
-        <div class="tier-privacy">Only Lumi sees this — students never see these examples.</div>
+        <textarea class="field-textarea tier-textarea" id="tierDesc-progressing" aria-label="Grading notes for the Progressing level" placeholder="What do you look for at this level? Tone, what you comment on, how much detail."></textarea>
       </div>
 
       <div class="card tier-card" data-tier="proficient">
@@ -385,8 +387,7 @@
         <input type="file" id="tierFiles-proficient" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('proficient', event)">
         <div class="tier-converting" id="tierConverting-proficient">Converting HEIC photo…</div>
         <div class="tier-artifacts" id="tierArtifacts-proficient"></div>
-        <textarea class="field-textarea tier-textarea" id="tierDesc-proficient" aria-label="Grading notes for the Proficient level" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
-        <div class="tier-privacy">Only Lumi sees this — students never see these examples.</div>
+        <textarea class="field-textarea tier-textarea" id="tierDesc-proficient" aria-label="Grading notes for the Proficient level" placeholder="What do you look for at this level? Tone, what you comment on, how much detail."></textarea>
       </div>
 
       <div class="card tier-card" data-tier="exemplary">
@@ -402,8 +403,7 @@
         <input type="file" id="tierFiles-exemplary" class="tier-input-file" accept="image/*" multiple onchange="handleSampleFiles('exemplary', event)">
         <div class="tier-converting" id="tierConverting-exemplary">Converting HEIC photo…</div>
         <div class="tier-artifacts" id="tierArtifacts-exemplary"></div>
-        <textarea class="field-textarea tier-textarea" id="tierDesc-exemplary" aria-label="Grading notes for the Exemplary level" placeholder="What are you looking for at this level? (tone, what kinds of comments you write, how detailed)"></textarea>
-        <div class="tier-privacy">Only Lumi sees this — students never see these examples.</div>
+        <textarea class="field-textarea tier-textarea" id="tierDesc-exemplary" aria-label="Grading notes for the Exemplary level" placeholder="What do you look for at this level? Tone, what you comment on, how much detail."></textarea>
       </div>
 
       <div class="wizard-nav">
@@ -414,8 +414,8 @@
 
     <!-- STEP 6: Summary -->
     <div class="wizard-step" data-step="6">
-      <h2 class="wizard-question-title">Review your profile</h2>
-      <p style="color:var(--text-2);margin-bottom:24px">Make sure everything looks good before saving.</p>
+      <h2 class="wizard-question-title">Review and save</h2>
+      <p class="wizard-subhead">Read each answer once more. Edit anything that doesn't sound like you.</p>
 
       <div class="card summary-card">
         <div class="card-head summary-card-header">
@@ -467,7 +467,7 @@
 
       <div id="summarySyllabusCard" class="card summary-card" style="display:none">
         <div class="card-head summary-card-header">
-          <span class="card-meta summary-card-label">Syllabus Uploaded</span>
+          <span class="card-meta summary-card-label">Syllabus</span>
         </div>
         <div class="summary-card-content" id="summarySyllabusName"></div>
       </div>
@@ -475,8 +475,8 @@
       <div class="summary-share-row">
         <input type="checkbox" class="summary-share-checkbox" id="shareCourseInfoCheckbox">
         <div>
-          <div class="summary-share-label">Let other teachers of this course use my course info and syllabus as a starting point</div>
-          <div class="summary-share-hint">They won't see your name — but anything you write here will be visible to them</div>
+          <div class="summary-share-label">Let other teachers of this course start from my course info and syllabus</div>
+          <div class="summary-share-hint">Your name is not shown, but the course info and syllabus text will be visible to them.</div>
         </div>
       </div>
 
@@ -828,11 +828,9 @@ function renderClassCards() {
   if (!tTeacher.classes || tTeacher.classes.length === 0) {
     if (filterBar) filterBar.style.display = 'none';
     grid.innerHTML = `
-      <div style="grid-column:1/-1;text-align:center;padding:60px 20px">
-                <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px">No classes yet</div>
-        <div style="font-size:14px;color:var(--text-2);max-width:340px;margin:0 auto;line-height:1.6">
-          Your classes will appear here once an administrator adds them to your account.
-        </div>
+      <div class="empty t-grid-empty">
+        <div class="empty-title">No classes yet</div>
+        <div class="empty-text">Your classes will appear here once an administrator adds them to your account.</div>
       </div>`;
     return;
   }
@@ -878,7 +876,6 @@ function renderClassCards() {
         <span class="card-meta">${statusLabel}</span>
       </div>
       ${previewText ? `<div class="t-card-preview">${escHtml(previewText)}</div>` : ''}
-      ${status === 'complete' ? `<div class="t-card-done">Setup complete</div>` : ''}
       ${needsWelcome ? `
         <div class="t-card-notice">
           <div class="t-card-notice-head">New step added</div>
@@ -1101,7 +1098,7 @@ function showStep(n) {
     if (allNames.length) {
       document.getElementById('summarySyllabusCard').style.display = 'block';
       document.getElementById('summarySyllabusName').textContent =
-        allNames.length === 1 ? allNames[0] : `${allNames.length} files: ${allNames.join(', ')}`;
+        allNames.length === 1 ? allNames[0] : `${allNames.length} files\n${allNames.join('\n')}`;
     } else {
       document.getElementById('summarySyllabusCard').style.display = 'none';
     }
@@ -1132,8 +1129,10 @@ function updateWordCount(inputId, countId, btnId) {
   const countEl = document.getElementById(countId);
   const btn = document.getElementById(btnId);
 
-  countEl.textContent = `${count} / 50 words minimum`;
   const wordsMet = count >= 50;
+  countEl.textContent = wordsMet
+    ? `${count} words`
+    : `${count} of 50 words${count > 0 ? ' — keep going' : ''}`;
 
   // Step 1 also requires title selection
   const titleOk = btnId !== 'step1NextBtn' || !!document.getElementById('titleSelect').value;
@@ -1150,7 +1149,13 @@ function updateCharCount(inputId, countId, btnId, softLimit = 600, minRequired =
   const btn = document.getElementById(btnId);
   if (!countEl || !btn) return;
 
-  countEl.textContent = `${count} / ${softLimit} characters`;
+  if (count < minRequired) {
+    countEl.textContent = `${count} character${count === 1 ? '' : 's'} — at least ${minRequired} needed`;
+  } else if (count > softLimit) {
+    countEl.textContent = `${count} / ${softLimit} characters — long for a first read`;
+  } else {
+    countEl.textContent = `${count} / ${softLimit} characters`;
+  }
   btn.disabled = count < minRequired;
 }
 
@@ -1545,6 +1550,7 @@ async function handleSyllabusUpload(event) {
     }
 
     let extractedText = '';
+    setSyllabusBusy(`Reading ${file.name}…`);
     try {
       const arrayBuffer = await file.arrayBuffer();
       extractedText = await extractPdfText(arrayBuffer);
@@ -1572,10 +1578,24 @@ async function handleSyllabusUpload(event) {
     }
   }
 
+  setSyllabusBusy(null);
   if (added > 0) {
     showToast(`Added ${added} ${added === 1 ? 'syllabus' : 'syllabi'}.`, 'success');
   }
   renderSyllabusList();
+}
+
+// Swaps the dropzone hint for a progress line while pdf.js reads a file;
+// pass null to restore the default hint.
+let tSyllabusDefaultHint = null;
+function setSyllabusBusy(message) {
+  const area = document.getElementById('syllabusUploadArea');
+  const hint = document.getElementById('syllabusUploadHint');
+  if (!area || !hint) return;
+  if (tSyllabusDefaultHint == null) tSyllabusDefaultHint = hint.textContent;
+  area.classList.toggle('busy', !!message);
+  area.setAttribute('aria-busy', message ? 'true' : 'false');
+  hint.textContent = message || tSyllabusDefaultHint;
 }
 
 // Drag-and-drop handlers — funnel into handleSyllabusUpload via a synthesized
@@ -1709,14 +1729,13 @@ function useTemplate() {
   // Show notice about using shared content
   const notice = document.createElement('div');
   notice.className = 'template-notice';
-  notice.innerHTML = 'Using shared course info. Upload your own PDFs below if you want Lumi to use them as syllabus context.';
-  notice.style.cssText = 'padding:12px 16px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:8px;font-size:13px;color:var(--text);margin-bottom:16px;';
+  notice.textContent = 'Using shared course info. Upload your own PDFs below if you want Lumi to read your syllabus too.';
   const uploadArea = document.querySelector('.syllabus-upload-area');
   if (uploadArea && !document.querySelector('.template-notice')) {
     uploadArea.parentNode.insertBefore(notice, uploadArea);
   }
 
-  showToast('Template loaded!', 'success');
+  showToast('Shared course info loaded.', 'success');
 }
 
 function skipTemplate() {
@@ -2217,8 +2236,8 @@ function renderRoster() {
 
   if (!students.length) {
     const none = document.createElement('div');
-    none.style.cssText = 'padding:24px;text-align:center;color:var(--text-2);font-size:14px';
-    none.textContent = 'No students in this block.';
+    none.className = 'empty-text t-roster-empty';
+    none.textContent = 'No students in this block yet.';
     list.appendChild(none);
     return;
   }
@@ -2226,7 +2245,14 @@ function renderRoster() {
   students.forEach(e => {
     const row = document.createElement('div');
     row.className = 't-roster-item';
-    row.textContent = e.student_name || 'Unknown Student';
+    const name = document.createElement('span');
+    name.className = 't-roster-name';
+    name.textContent = e.student_name || 'Unknown Student';
+    const meta = document.createElement('span');
+    meta.className = 't-roster-meta';
+    const n = parseNotes(e.teacher_notes).length;
+    meta.textContent = n === 0 ? 'No notes' : `${n} note${n === 1 ? '' : 's'}`;
+    row.append(name, meta);
     keyActivate(row, () => openNoteChat(e.id), `${e.student_name || 'Unknown Student'} — open notes`);
     list.appendChild(row);
   });
@@ -2260,13 +2286,22 @@ function renderNoteChat() {
   if (!notes.length) {
     const empty = document.createElement('div');
     empty.className = 't-note-empty';
-    empty.textContent = `No notes yet. Start typing to track observations about ${name}.`;
+    empty.textContent = `No notes yet. Anything you write here about ${name} is private to you and shapes how Lumi works with them.`;
     msgs.appendChild(empty);
   } else {
     notes.forEach(note => {
       const bubble = document.createElement('div');
       bubble.className = 't-note-bubble';
-      bubble.textContent = note.text || '';
+      const when = note.timestamp ? new Date(note.timestamp) : null;
+      if (when && !isNaN(when)) {
+        const time = document.createElement('div');
+        time.className = 't-note-time';
+        time.textContent = when.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+        bubble.appendChild(time);
+      }
+      const text = document.createElement('div');
+      text.textContent = note.text || '';
+      bubble.appendChild(text);
       msgs.appendChild(bubble);
     });
     requestAnimationFrame(() => { msgs.scrollTop = msgs.scrollHeight; });
