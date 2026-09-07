@@ -298,7 +298,11 @@ async function ferpaDelete() {
 function getStatus(email, course) {
   const row = aProfiles[`${email}|${course}`];
   if (!row) return 'not_started';
-  return row.done ? 'complete' : 'not_started';
+  if (row.done) return 'complete';
+  // SIS import creates a row per class before the teacher has typed anything,
+  // so "row exists" alone is not progress — the wizard's first answers are.
+  const started = (row.engagement_rules || '').trim() || (row.teaching_voice || '').trim();
+  return started ? 'in_progress' : 'not_started';
 }
 
 function renderDashboard() {
