@@ -1204,6 +1204,10 @@ async function openWizard(course, subject, opts) {
 }
 
 function showStep(n) {
+  if (tSaving) {
+    showToast('Still saving — one moment.', '');
+    return;
+  }
   tCurrentStep = n;
   document.querySelectorAll('.wizard-step').forEach(el => el.classList.remove('active'));
   document.querySelector(`.wizard-step[data-step="${n}"]`).classList.add('active');
@@ -2237,17 +2241,15 @@ async function saveTeacherProfile() {
     generateSuggestedPrompts(courseInfo, combinedText, tUser.email, tCurrentClass.course);
 
     tWizardSnapshot = null;
-    setTimeout(() => {
-      goHome({ force: true });
-    }, 1000);
+    goHome({ force: true });
 
   } catch (err) {
     console.error('Save error:', err);
     showToast('Could not save your class. Nothing was lost — check your connection and click Save and Finish again.', 'error');
-    btn.disabled = false;
-    btn.textContent = 'Save and Finish';
   } finally {
     tSaving = false;
+    btn.disabled = false;
+    btn.textContent = 'Save and Finish';
   }
 }
 
