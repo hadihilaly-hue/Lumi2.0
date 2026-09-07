@@ -70,7 +70,7 @@
            app.html?mode=test which flips the test-mode flag in
            sessionStorage at the student-app boot path. -->
       <button id="tTestModeToggle" class="t-test-mode-toggle" type="button"
-        onclick="window.location.href='app.html?mode=test'"
+        onclick="enterStudentMode()"
         title="Open the student app as yourself for testing">
         <span class="t-test-mode-label">Student mode</span>
         <span class="t-test-mode-switch"><span class="t-test-mode-knob"></span></span>
@@ -126,6 +126,7 @@
     </div>
   </div>
   <div class="t-home-body">
+    <p class="t-roster-intro">Select a student to read or add private notes. Notes are only visible to you; Lumi uses them to adjust how it works with that student.</p>
     <div id="rosterList" class="t-roster-list"></div>
   </div>
 </div>
@@ -147,8 +148,21 @@
   <div class="t-notechat-body">
     <div id="noteChatMessages" class="t-note-messages"></div>
     <div class="t-note-input-row">
-      <textarea id="noteChatInput" rows="2" aria-label="Add an observation about this student" placeholder="Type an observation..."></textarea>
-      <button id="noteChatSend" class="btn btn--primary wizard-next-btn" disabled>Send</button>
+      <textarea id="noteChatInput" rows="2" aria-label="Add an observation about this student" placeholder="Type an observation…"></textarea>
+      <button id="noteChatSend" class="btn btn--primary wizard-next-btn" disabled>Save note</button>
+    </div>
+    <p class="t-note-hint" id="noteChatHint">Enter adds a line. Press Ctrl+Enter or click Save note to keep it. Notes are private to you and never shown to the student.</p>
+  </div>
+</div>
+
+<!-- CONFIRM DIALOG (shared by Student mode and unsaved-changes prompts) -->
+<div id="tConfirm" class="overlay-backdrop t-confirm" style="display:none" role="dialog" aria-modal="true" aria-labelledby="tConfirmTitle">
+  <div class="overlay-panel t-confirm-panel">
+    <h3 class="t-confirm-title" id="tConfirmTitle"></h3>
+    <p class="t-confirm-body" id="tConfirmBody"></p>
+    <div class="t-confirm-actions">
+      <button type="button" class="btn btn--secondary" id="tConfirmCancel"></button>
+      <button type="button" class="btn btn--primary" id="tConfirmOk"></button>
     </div>
   </div>
 </div>
@@ -598,6 +612,7 @@ let tExistingSamplesByTier = {};
 // Q4 v2: snapshot of the current course's existing text artifacts per tier
 // (set at wizard open) so the save handler can soft-delete removed ones.
 let tExistingArtifactsByTier = {};
+let tWizardSnapshot = null;
 
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
 function showView(name) {
@@ -608,8 +623,61 @@ function showView(name) {
   document.getElementById(name).classList.add('is-active');
 }
 
+// ─── CONFIRM DIALOG ───────────────────────────────────────────────────────────
+// Resolves true when the teacher confirms. Cancel, Escape and a backdrop click
+// all resolve false.
+function tConfirm({ title, body, confirmLabel = 'Continue', cancelLabel = 'Cancel' }) {
+  return new Promise(resolve => {
+    const root = document.getElementById('tConfirm');
+    const ok = document.getElementById('tConfirmOk');
+    const cancel = document.getElementById('tConfirmCancel');
+    document.getElementById('tConfirmTitle').textContent = title;
+    document.getElementById('tConfirmBody').textContent = body;
+    ok.textContent = confirmLabel;
+    cancel.textContent = cancelLabel;
+    const previouslyFocused = document.activeElement;
+    const finish = (result) => {
+      root.style.display = 'none';
+      ok.onclick = cancel.onclick = root.onclick = null;
+      document.removeEventListener('keydown', onKey);
+      if (previouslyFocused && typeof previouslyFocused.focus === 'function') previouslyFocused.focus();
+      resolve(result);
+    };
+    const onKey = (ev) => { if (ev.key === 'Escape') finish(false); };
+    ok.onclick = () => finish(true);
+    cancel.onclick = () => finish(false);
+    root.onclick = (ev) => { if (ev.target === root) finish(false); };
+    document.addEventListener('keydown', onKey);
+    root.style.display = 'flex';
+    cancel.focus();
+  });
+}
+
+// ─── STUDENT MODE ─────────────────────────────────────────────────────────────
+// app.html?mode=test skips the teacher redirect and drops the teacher into the
+// student app as themselves. A first-time teacher lands in student onboarding,
+// which has no visible way back, so explain the round trip before leaving.
+async function enterStudentMode() {
+  const anyReady = Object.values(tProfiles).some(p => p?.done);
+  const body = 'You will see Lumi exactly as your students do, signed in as yourself. '
+    + 'The first time, Lumi walks you through the short student setup (name, grade, classes) before you can chat. '
+    + 'To come back here, use Exit test mode in the student sidebar, or your browser\u2019s Back button during setup.'
+    + (anyReady ? '' : ' None of your classes is set up yet, so they will show as Setting Up in the student view.');
+  const go = await tConfirm({
+    title: 'Preview Lumi as a student',
+    body,
+    confirmLabel: 'Open student view',
+    cancelLabel: 'Stay here',
+  });
+  if (go) window.location.href = 'app.html?mode=test';
+}
+
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 (async () => {
+  // Loading the portal ends any student-view test session. Without this a
+  // teacher who used browser Back to escape student mode kept the tab flagged
+  // as test mode for every later visit to app.html.
+  sessionStorage.removeItem('lumi_test_mode');
   const { data: { session } } = await sb.auth.getSession();
   if (!session) {
     showView('signinView');
@@ -878,13 +946,13 @@ function renderClassCards() {
       ${previewText ? `<div class="t-card-preview">${escHtml(previewText)}</div>` : ''}
       ${needsWelcome ? `
         <div class="t-card-notice">
-          <div class="t-card-notice-head">New step added</div>
+          <div class="t-card-notice-head">Missing welcome message</div>
           <div class="t-card-notice-body">Add a welcome message so students see your voice when they open the class.</div>
         </div>` : ''}
       ${needsSamples ? `
         <div class="t-card-notice">
-          <div class="t-card-notice-head">New step added</div>
-          <div class="t-card-notice-body">Please add a few graded work samples so Lumi can match your feedback voice.</div>
+          <div class="t-card-notice-head">Optional: ${escHtml(missingTiersLabel(profile?.id))}</div>
+          <div class="t-card-notice-body">Add a photo or written example for each level so Lumi can match your feedback voice.</div>
         </div>` : ''}
       <div class="t-card-actions"></div>
     `;
@@ -910,9 +978,72 @@ function renderClassCards() {
   });
 }
 
-function goHome() {
+// Tiers with no artifact of any type, for the class-card notice.
+function missingTiersLabel(profileId) {
+  const samplesByTier = tSamplesByProfile[profileId] || {};
+  const artifactsByTier = tArtifactsByProfile[profileId] || {};
+  const missing = ['progressing','proficient','exemplary'].filter(tier => {
+    const r = samplesByTier[tier];
+    const hasPhoto = r && Array.isArray(r.photo_paths) && r.photo_paths.length > 0;
+    const hasText = Array.isArray(artifactsByTier[tier]) && artifactsByTier[tier].length > 0;
+    return !(hasPhoto || hasText);
+  });
+  if (missing.length === 3) return 'no graded work samples yet';
+  const names = missing.map(t => t[0].toUpperCase() + t.slice(1));
+  return `no ${names.join(' or ')} example yet`;
+}
+
+// Snapshot of every wizard field, compared by isWizardDirty() before the
+// header Back button or a page unload can discard unsaved edits.
+function wizardSnapshot() {
+  const tiers = ['progressing','proficient','exemplary'].map(tier => {
+    const s = tWorkSamples[tier];
+    return {
+      description: s.description || '',
+      photos: s.photos.length,
+      existing: s.existingPaths.slice(),
+      text: (s.textArtifacts || []).map(a => `${a.type}|${a.label}|${a.text}`),
+    };
+  });
+  return JSON.stringify({
+    title: document.getElementById('titleSelect').value,
+    rules: document.getElementById('engagementRulesInput').value,
+    voice: document.getElementById('teachingVoiceInput').value,
+    course: document.getElementById('courseInfoInput').value,
+    welcome: document.getElementById('welcomeMessageInput').value,
+    share: document.getElementById('shareCourseInfoCheckbox').checked,
+    syllabusNew: tSyllabusNewFiles.length,
+    syllabusExisting: tSyllabusExistingPaths.slice(),
+    tiers,
+  });
+}
+
+function isWizardDirty() {
+  return tWizardSnapshot !== null && wizardSnapshot() !== tWizardSnapshot;
+}
+
+window.addEventListener('beforeunload', (ev) => {
+  if (!document.getElementById('wizardView').classList.contains('is-active')) return;
+  if (!isWizardDirty()) return;
+  ev.preventDefault();
+  ev.returnValue = '';
+});
+
+async function goHome(opts) {
+  const force = !!(opts && opts.force);
+  if (!force && isWizardDirty()) {
+    const leave = await tConfirm({
+      title: 'Leave without saving?',
+      body: `Your changes to ${tCurrentClass?.course || 'this class'} have not been saved. To keep them, continue to step 6 and click Save and Finish.`,
+      confirmLabel: 'Discard changes',
+      cancelLabel: 'Keep editing',
+    });
+    if (!leave) return;
+  }
+  tWizardSnapshot = null;
   showView('homeView');
   renderClassCards();
+  window.scrollTo(0, 0);
 }
 
 // ─── WIZARD ────────────────────────────────────────────────────────────────────
@@ -1000,8 +1131,8 @@ async function openWizard(course, subject, opts) {
           tWorkSamples[meta.tier].existingThumbUrls.push(url);
         });
 
-        // Re-render if Step 4 is currently visible.
-        if (tCurrentStep === 4) {
+        // Re-render if the work-samples step is currently visible.
+        if (tCurrentStep === 5) {
           ['progressing','proficient','exemplary'].forEach(renderTierUI);
         }
       } catch (err) {
@@ -1062,12 +1193,14 @@ async function openWizard(course, subject, opts) {
 
   showStep(opts.jumpToStep || 1);
   showView('wizardView');
+  tWizardSnapshot = wizardSnapshot();
 }
 
 function showStep(n) {
   tCurrentStep = n;
   document.querySelectorAll('.wizard-step').forEach(el => el.classList.remove('active'));
   document.querySelector(`.wizard-step[data-step="${n}"]`).classList.add('active');
+  window.scrollTo(0, 0);
 
   document.getElementById('wizardStepLabel').textContent = `STEP ${n} OF 6`;
 
@@ -1130,12 +1263,11 @@ function updateWordCount(inputId, countId, btnId) {
   const btn = document.getElementById(btnId);
 
   const wordsMet = count >= 50;
-  countEl.textContent = wordsMet
-    ? `${count} words`
-    : `${count} of 50 words${count > 0 ? ' — keep going' : ''}`;
-
   // Step 1 also requires title selection
   const titleOk = btnId !== 'step1NextBtn' || !!document.getElementById('titleSelect').value;
+  countEl.textContent = wordsMet
+    ? (titleOk ? `${count} words` : `${count} words — choose how students address you above`)
+    : `${count} of 50 words${count > 0 ? ' — keep going' : ''}`;
   btn.disabled = !(wordsMet && titleOk);
 }
 
@@ -2095,13 +2227,14 @@ async function saveTeacherProfile() {
     // Generate suggested prompts in background (non-blocking)
     generateSuggestedPrompts(courseInfo, combinedText, tUser.email, tCurrentClass.course);
 
+    tWizardSnapshot = null;
     setTimeout(() => {
-      goHome();
+      goHome({ force: true });
     }, 1000);
 
   } catch (err) {
     console.error('Save error:', err);
-    showToast('Failed to save: ' + err.message, 'error');
+    showToast('Could not save your class. Nothing was lost — check your connection and click Save and Finish again.', 'error');
     btn.disabled = false;
     btn.textContent = 'Save and Finish';
   }
@@ -2130,7 +2263,7 @@ async function loadAllEnrollments() {
     tEnrollments = await res.json();
   } catch (err) {
     console.error('loadAllEnrollments failed:', err);
-    showToast('Could not load students — see console', 'error');
+    showToast('Could not load your students right now. Refresh the page to try again.', 'error');
     tEnrollments = [];
   }
 }
@@ -2258,7 +2391,12 @@ function renderRoster() {
     const meta = document.createElement('span');
     meta.className = 't-roster-meta';
     const n = parseNotes(e.teacher_notes).length;
-    meta.textContent = n === 0 ? 'No notes' : `${n} note${n === 1 ? '' : 's'}`;
+    meta.textContent = n === 0 ? 'Add a note' : `${n} note${n === 1 ? '' : 's'}`;
+    const chevron = document.createElement('span');
+    chevron.className = 't-roster-chevron';
+    chevron.setAttribute('aria-hidden', 'true');
+    chevron.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>';
+    meta.appendChild(chevron);
     row.append(name, meta);
     keyActivate(row, () => openNoteChat(e.id), `${e.student_name || 'Unknown Student'} — open notes`);
     list.appendChild(row);
