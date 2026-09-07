@@ -403,17 +403,18 @@ export function openGeneralChat() {
   promptCards.className = 'general-prompt-cards';
   promptCards.id = 'generalPromptCards';
   const prompts = [
-    { icon: '\ud83d\udcda', text: 'Help me study for a test' },
-    { icon: '\ud83d\udca1', text: 'Explain a concept I\'m stuck on' },
-    { icon: '\u270f\ufe0f', text: 'Help me outline an essay' },
-    { icon: '\u2705', text: 'Review my homework approach' }
+    'Help me study for a test',
+    'Explain a concept I\'m stuck on',
+    'Help me outline an essay',
+    'Review my homework approach'
   ];
   prompts.forEach(p => {
-    const card = document.createElement('div');
+    const card = document.createElement('button');
+    card.type = 'button';
     card.className = 'general-prompt-card';
-    card.innerHTML = `<div class="general-prompt-card-icon">${p.icon}</div><div class="general-prompt-card-text">${p.text}</div>`;
+    card.textContent = p;
     card.addEventListener('click', () => {
-      msgInput.value = p.text;
+      msgInput.value = p;
       msgInput.focus();
       promptCards.remove();
     });
