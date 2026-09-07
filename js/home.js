@@ -522,6 +522,7 @@ function wireHwRefreshOnce() {
   document.addEventListener('lumi:hw-changed', () => {
     const home = document.getElementById('homeView');
     if (!home || home.style.display === 'none') return;
+    renderGreeting();
     renderDueStrip();
     renderQuickActions();
     renderHome();
