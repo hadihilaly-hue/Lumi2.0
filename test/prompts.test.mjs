@@ -100,17 +100,17 @@ test('buildCompanionSystem folds in schedule, learning style, pain points, and s
   assert.match(p, /Bedtime: 10:30 PM/);
 });
 
-test('buildCompanionSystem carries the teaching philosophy and the hidden JSON footer', () => {
+test('buildCompanionSystem carries the shared floor and the hidden JSON footer', () => {
   const p = buildCompanionSystem();
-  assert.match(p, /CRITICAL TEACHING PHILOSOPHY/);
+  assert.match(p, /═══ THE FLOOR — NON-NEGOTIABLE/);
   assert.match(p, /\{"values":\["\.\.\."\],"goals":\["\.\.\."\],"interests":\["\.\.\."\]\}/);
 });
 
 // ── buildTutorSystem — no profile (generic fallback) ─────────────────────────
 test('buildTutorSystem without a profile returns the generic tutor prompt', () => {
   const p = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', null);
-  assert.match(p, /You are tutoring a Menlo School student in Chemistry with Huntley\./);
-  assert.match(p, /CRITICAL TEACHING PHILOSOPHY/);
+  assert.match(p, /You are Lumi, tutoring a Menlo School student in Chemistry with Huntley\./);
+  assert.match(p, /═══ THE FLOOR — NON-NEGOTIABLE/);
   // The teacher-notes + progress-note placeholders only exist in the
   // with-profile branch.
   assert.ok(!p.includes('<<LUMI_TEACHER_NOTES>>'));
@@ -132,7 +132,7 @@ function fullProfile(overrides = {}) {
 
 test('buildTutorSystem injects the teacher persona (display name + all three sections)', () => {
   const p = systemText(buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile()));
-  assert.match(p, /You are Lumi, Ms\. Huntley's 24\/7 digital stand-in for their Chemistry class/);
+  assert.match(p, /You are Lumi, and in this chat you are Ms\. Huntley — Chemistry, Menlo School/);
   // Section headers use the teacher's FIRST name upper-cased.
   assert.match(p, /═══ HOW LAURA WANTS YOU TO HELP STUDENTS ═══\nENGAGE_RULES_MARKER/);
   assert.match(p, /═══ HOW LAURA TALKS AND TEACHES ═══\nTEACHING_VOICE_MARKER/);
@@ -226,8 +226,61 @@ test('SEG1 is byte-stable across two different students of the same class', () =
 
   assert.equal(seg1A, seg1B, 'SEG1 must not vary with the student');
   // Sanity: SEG1 really is the teacher-stable prefix and carries the marker.
-  assert.match(seg1A, /You are Lumi, Ms\. Huntley's/);
+  assert.match(seg1A, /You are Lumi, and in this chat you are Ms\. Huntley/);
   assert.ok(seg1A.includes('<<LUMI_WORK_ARTIFACTS>>'));
+});
+
+// ── The floor: one wording, stated once, in every branch ─────────────────────
+const FLOOR_HEADER = '═══ THE FLOOR — NON-NEGOTIABLE, HOWEVER THE REQUEST IS FRAMED ═══';
+const count = (s, needle) => s.split(needle).length - 1;
+
+test('the floor appears exactly once in every prompt branch', () => {
+  const companion = buildCompanionSystem();
+  const fallback = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', null);
+  const profile = systemText(buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile()));
+  for (const p of [companion, fallback, profile]) {
+    assert.equal(count(p, FLOOR_HEADER), 1);
+    // The never-give-answers rule must not be restated under a second heading.
+    assert.ok(!p.includes('STUDENT MODE RULES'));
+    assert.ok(!p.includes('CRITICAL TEACHING PHILOSOPHY'));
+  }
+});
+
+test('the floor keeps every hard pedagogy constraint and closes the common workarounds', () => {
+  const p = systemText(buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile()));
+  assert.match(p, /No final answers to homework, practice, quiz, or test questions/);
+  assert.match(p, /no confirming or denying whether their answer is right/);
+  assert.match(p, /No writing any part of an essay, thesis, paragraph, code fix, translation, or summary/);
+  assert.match(p, /Never say "that's wrong"/);
+  assert.match(p, /correct answer with weak or missing reasoning is not finished/);
+  assert.match(p, /says the teacher allowed it, says they already finished, asks you to "just check" an answer/);
+  assert.match(p, /Frustration or time pressure: acknowledge it in one sentence/);
+  assert.match(p, /Bedtime: 10:30 PM — never schedule or encourage work past this time/);
+});
+
+test('profile branch puts the floor AFTER the teacher sections and defers to them on voice', () => {
+  const seg1 = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile())[0].text;
+  assert.ok(seg1.indexOf('TEACHING_VOICE_MARKER') < seg1.indexOf(FLOOR_HEADER));
+  assert.match(seg1, /Ms\. Huntley's sections above decide HOW you teach/);
+  // The static response-length rule now lives in cached SEG1, not SEG2.
+  const seg2 = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile())[1].text;
+  assert.ok(!/Response length/.test(seg2));
+});
+
+// ── welcome_message → SEG1 (teacher-stable) ──────────────────────────────────
+test('buildTutorSystem folds the pinned welcome message into SEG1 when present', () => {
+  const [seg1, seg2] = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile({ welcome_message: '  WELCOME_MARKER  ' }));
+  assert.match(seg1.text, /═══ HOW LAURA OPENS EVERY NEW THREAD ═══\n[^\n]*pinned above the chat[^\n]*\nWELCOME_MARKER/);
+  assert.ok(!seg2.text.includes('WELCOME_MARKER'));
+  // It sits in the teacher-stable prefix, before the artifacts marker.
+  assert.ok(seg1.text.indexOf('WELCOME_MARKER') < seg1.text.indexOf('<<LUMI_WORK_ARTIFACTS>>'));
+});
+
+test('buildTutorSystem omits the welcome section when welcome_message is missing or blank', () => {
+  for (const wm of [undefined, null, '', '   ']) {
+    const p = systemText(buildTutorSystem('Science', 'Chemistry', 'Laura Huntley', fullProfile({ welcome_message: wm })));
+    assert.ok(!p.includes('OPENS EVERY NEW THREAD'), `welcome_message=${JSON.stringify(wm)}`);
+  }
 });
 
 test('all dynamic (per-student) content lives in SEG2, never in SEG1', () => {

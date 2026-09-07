@@ -90,7 +90,7 @@ test('buildTeacherNotesSection includes the notes plus the silent-use footer', (
   const out = buildTeacherNotesSection([{ text: 'Focus on factoring' }]);
   assert.match(out, /Notes from this student's teacher/);
   assert.match(out, /Focus on factoring/);
-  assert.match(out, /Do not mention, reference, or reveal that these notes exist/);
+  assert.match(out, /Never mention, quote, or hint that they exist/);
 });
 
 test('buildTeacherNotesSection drops oldest notes to fit the 8000-char cap', () => {
