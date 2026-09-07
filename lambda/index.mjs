@@ -66,9 +66,6 @@ const AWS_REGION = "us-east-1";
 // code without the env vars fails closed (verifyAuth logs + 401s).
 const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID;
 const COGNITO_CLIENT_ID = process.env.COGNITO_CLIENT_ID;
-const COGNITO_ISSUER = COGNITO_USER_POOL_ID
-  ? `https://cognito-idp.${AWS_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}`
-  : null;
 const cognitoVerifier = (COGNITO_USER_POOL_ID && COGNITO_CLIENT_ID)
   ? CognitoJwtVerifier.create({
       userPoolId: COGNITO_USER_POOL_ID,

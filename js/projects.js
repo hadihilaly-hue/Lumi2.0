@@ -1,7 +1,7 @@
 import { fmtBytes, showAttachPreview } from './chat.js';
 import { lookupSubjectForCourse, openTutor } from './conversation.js';
 import { showWelcome } from './emptystate.js';
-import { closeHwAddModal, closeHwBackdrop, getHwTasks, openHwBackdrop, renderHwPopupTasks, saveHwTasks, syncHwToRds, todayStr } from './homework.js';
+import { closeHwBackdrop, getHwTasks, openHwBackdrop, saveHwTasks, syncHwToRds, todayStr } from './homework.js';
 import { renderSidebar, showInlineConfirm } from './sidebar.js';
 import { $, S, SB, _currentProjId, currentUser, messagesEl, msgInput, setCurrentProjId, setPendingAttachment } from './state.js';
 import { deleteConvFromRds, genId, getConvs, getSchedule, saveConvs } from './storage.js';
@@ -506,8 +506,7 @@ function applyCarryOver(project) {
   const incompletePast = project.plan.filter(d => d.date < today && !d.isComplete && !d.isBuffer);
   if (incompletePast.length === 0) return;
 
-  // Gather leftover work labels
-  const leftoverLabels = incompletePast.map(d => d.label);
+  // Gather leftover work
   const leftoverMinutes = incompletePast.reduce((s, d) => s + d.estimatedMinutes, 0);
 
   // Find future incomplete non-buffer days
@@ -591,28 +590,6 @@ export function createProject(title, className, teacherName, dueDate, requiremen
   injectProjectTasksToHomework();
 
   return project;
-}
-
-// ── Convert tonight's homework to project ────────────────
-
-function convertHwToProject(taskId) {
-  const tasks = getHwTasks();
-  const task = tasks.find(t => t.id === taskId);
-  if (!task) return;
-
-  // Pre-fill project modal with task info
-  closeHwAddModal();
-  showProjectCreateModal({
-    className: task.className,
-    title: task.title,
-    dueDate: '',
-    requirements: ''
-  });
-
-  // Remove from tonight's homework
-  const filtered = tasks.filter(t => t.id !== taskId);
-  saveHwTasks(filtered);
-  renderHwPopupTasks();
 }
 
 // ── Inject today's project tasks into homework ───────────

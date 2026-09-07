@@ -440,7 +440,7 @@ invariants:
 - **TM-2** (data isolation): every write path guards on `S.isTestMode`. The redesign adds no
   new write paths that touch shared tables — the class-view chat pipeline is the same
   pipeline, gated by the same helpers. **Sanity checklist in code review:** any new function
-  that calls `syncScheduleToRds`, `syncEnrollments`, `syncProfileToRds`,
+  that calls `syncScheduleToRds`, `syncEnrollments`,
   `syncConvToRds`, `saveConvs`, `loadProfileFromRds` MUST short-circuit on
   `S.isTestMode`.
 - **TM-3** (locked classes route to teacher.html): home grid respects the "ready" gate. In

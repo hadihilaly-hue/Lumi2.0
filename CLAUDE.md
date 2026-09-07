@@ -840,8 +840,7 @@ live with spoofed ids.
     after completing the wizard.
 - **Plumbing (TM-2).** Every write path is gated behind
   `if (S.isTestMode) return;` to prevent a teacher from writing
-  student-shaped state into shared tables: syncProfileToRds,
-  syncEnrollments, syncScheduleToRds, syncStudyStyleToRds,
+  student-shaped state into shared tables: syncEnrollments, syncScheduleToRds, syncStudyStyleToRds,
   loadProfileFromRds. `getSchedule` / `getConvs` / `saveConvs`
   branch to in-memory state (`S.testSchedule` / `S.testConvs`) so
   localStorage keys belonging to the student persona on a shared

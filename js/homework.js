@@ -61,8 +61,7 @@ export function getStudyStyle() {
 export function saveStudyStyle(style) { localStorage.setItem('lumi_study_style', JSON.stringify(style)); }
 export async function syncStudyStyleToRds(style) {
   if (!currentUser) return;
-  // TM-2: same as syncProfileToRds — don't write student-shaped
-  // fields into the teacher's auth user record.
+  // TM-2: don't write student-shaped fields into the teacher's auth user record.
   if (S.isTestMode) return;
   try {
     await rdsFetch('profiles', { method: 'POST', body: { study_style: style } });
@@ -188,7 +187,7 @@ export async function connectGoogleCalendar() {
   // TODO(GIS): Cognito never exposes the Google provider access token to the
   // browser, so the old provider_token flow can't be ported. Rebuild
   // with Google Identity Services initTokenClient (a direct API grant) when
-  // calendar connect is prioritized — see MIGRATION_PLAN.md Workstream I.
+  // calendar connect is prioritized — see docs/archive/MIGRATION_PLAN.md Workstream I.
   showToast('Calendar connect is temporarily unavailable.');
 }
 
@@ -923,16 +922,6 @@ function saveEditedPlan(blocks, startMinutes) {
     tier: b.task.tier || ''
   }));
   localStorage.setItem('lumi_edited_plan', JSON.stringify({ date: todayStr(), blocks: data, startMinutes }));
-}
-
-function getEditedPlan() {
-  try {
-    const raw = localStorage.getItem('lumi_edited_plan');
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    if (data.date !== todayStr()) { localStorage.removeItem('lumi_edited_plan'); return null; }
-    return data;
-  } catch { return null; }
 }
 
 function toggleBlockEditMode(el, blockIdx, blocks, startMinutes, plan) {

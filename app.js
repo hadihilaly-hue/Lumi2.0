@@ -3,7 +3,7 @@ import { newChat } from './js/conversation.js';
 import { showWelcome } from './js/emptystate.js';
 import { _calEvents, addHwTask, advancePlannerBlock, buildStudyPlan, buildStudyPlanWithCalendar, checkDailyHwPrompt, closeHwAddModal, closeHwBackdrop, closeHwPlanModal, closeHwPopup, closeTimelineModal, genHwId, getHwTasks, loadCalendarEvents, renderHwPopupTasks, setCalendarConnected, showHwAddModal, showHwPlanModal, showHwPopup, startPlannerStrip, todayStr, updateCalUi, wireCalListeners } from './js/homework.js';
 import { initOnboarding } from './js/onboarding.js';
-import { _projPendingFile, clearAllChats, clearCompletedProjects, clearProjFile, closeProjectCreateModal, closeProjectPlanModal, closeWorkTypeChooser, createProject, getProjects, injectProjectTasksToHomework, loadHwFromRds, renderProjectPlan, showProjectCreateModal, showWorkTypeChooser, wireProjDropzone } from './js/projects.js';
+import { _projPendingFile, clearAllChats, clearCompletedProjects, clearProjFile, closeProjectCreateModal, closeProjectPlanModal, closeWorkTypeChooser, createProject, injectProjectTasksToHomework, loadHwFromRds, renderProjectPlan, showProjectCreateModal, showWorkTypeChooser, wireProjDropzone } from './js/projects.js';
 import { setSidebarUserSubtitle } from './js/prompts.js';
 import { checkSemesterBanner, initScheduleSetup } from './js/schedule.js';
 import { activeDropdownEl, closeOpenMenu, renderSearchDropdown, renderSidebar, showInlineConfirm } from './js/sidebar.js';
@@ -569,19 +569,3 @@ function wireHwListeners() {
   // ── Project file dropzone ──────────────────────────────
   wireProjDropzone();
 }
-
-// ── Debug: test startProjectTutor from console ───────────
-window.testProjectButton = async function() {
-  console.log('Testing startProjectTutor...');
-  const projects = getProjects();
-  console.log('Projects found:', projects.length, projects.map(p => ({ id: p.id, title: p.title, class: p.className })));
-  if (projects.length > 0) {
-    const proj = projects[0];
-    console.log('Testing with project:', proj.id, proj.title);
-    await startProjectTutor(proj.id);
-    console.log('Done — no freeze!');
-  } else {
-    console.log('No projects found to test with');
-  }
-};
-console.log('Run window.testProjectButton() in console to test the Start Working button');
