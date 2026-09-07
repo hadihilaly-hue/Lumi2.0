@@ -1,10 +1,10 @@
 import { fmtBytes, showAttachPreview } from './chat.js';
 import { lookupSubjectForCourse, openTutor } from './conversation.js';
 import { showWelcome } from './emptystate.js';
-import { closeHwAddModal, closeHwBackdrop, getHwTasks, openHwBackdrop, renderHwPopupTasks, saveHwTasks, syncHwToSupabase, todayStr } from './homework.js';
+import { closeHwAddModal, closeHwBackdrop, getHwTasks, openHwBackdrop, renderHwPopupTasks, saveHwTasks, syncHwToRds, todayStr } from './homework.js';
 import { renderSidebar, showInlineConfirm } from './sidebar.js';
 import { $, S, SB, _currentProjId, currentUser, messagesEl, msgInput, setCurrentProjId, setPendingAttachment } from './state.js';
-import { deleteConvFromSupabase, genId, getConvs, getSchedule, saveConvs } from './storage.js';
+import { deleteConvFromRds, genId, getConvs, getSchedule, saveConvs } from './storage.js';
 import { rdsFetch } from './teachers.js';
 import { autoGrow, showToast, updateSendBtn } from './ui.js';
 
@@ -495,7 +495,7 @@ function toggleProjectDayComplete(projId, dateStr) {
   saveProjects(projects);
   renderProjectPlan(proj);
   injectProjectTasksToHomework();
-  syncHwToSupabase();
+  syncHwToRds();
 }
 
 // ── Progress carry-over ──────────────────────────────────
@@ -719,13 +719,6 @@ function handleStartWorking() {
   }, 100);
 }
 
-// ── Sync projects to Supabase ────────────────────────────
-
-// Projects are stored in localStorage only (no Supabase column exists)
-export function syncProjectsToSupabase() {
-  // no-op: projects live in localStorage only
-}
-
 export function deleteProject(projId, anchorEl) {
   const doDelete = () => {
     // Remove from projects
@@ -742,7 +735,7 @@ export function deleteProject(projId, anchorEl) {
       closeHwBackdrop();
     }
 
-    syncHwToSupabase();
+    syncHwToRds();
     renderSidebar();
     showToast('Project deleted');
   };
@@ -756,8 +749,8 @@ export function deleteProject(projId, anchorEl) {
 
 export function clearAllChats() {
   const convs = getConvs();
-  // Delete each from Supabase
-  Object.keys(convs).forEach(id => deleteConvFromSupabase(id));
+  // Delete each from RDS
+  Object.keys(convs).forEach(id => deleteConvFromRds(id));
   // Clear local
   saveConvs({});
   S.currentId = genId(); S.messages = []; S.exchangeCount = 0; S.tutorCtx = null;
@@ -779,18 +772,13 @@ export function clearCompletedProjects() {
   saveHwTasks(tasks);
   // Keep only incomplete projects
   saveProjects(projects.filter(p => !p.isComplete));
-  syncHwToSupabase();
+  syncHwToRds();
   renderSidebar();
   showToast(`${completed.length} completed project${completed.length > 1 ? 's' : ''} cleared`);
 }
 
-// Projects are stored in localStorage only (no Supabase column exists)
-export function loadProjectsFromSupabase() {
-  // no-op: projects live in localStorage only
-}
-
 // hw_tasks column does not exist in profiles table — localStorage only
-export async function loadHwFromSupabase() {
+export async function loadHwFromRds() {
   if (!currentUser) return;
   try {
     const data = await rdsFetch('homework-tasks');
@@ -800,8 +788,8 @@ export async function loadHwFromSupabase() {
       title: row.title,
       className: row.class_name || '',
       teacherName: row.teacher_name || '',
-      // RDS returns date columns as full ISO timestamps; Supabase returned
-      // YYYY-MM-DD. slice(0,10) normalizes both to the app's date-only shape.
+      // RDS returns date columns as full ISO timestamps; slice(0,10)
+      // normalizes to the app's date-only YYYY-MM-DD shape.
       dueDate: (row.due_date || '').slice(0, 10),
       estimatedMinutes: row.estimated_minutes || null,
       isComplete: !!row.is_complete,

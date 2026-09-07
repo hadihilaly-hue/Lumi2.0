@@ -1,3 +1,5 @@
+> **HISTORICAL** — snapshot of the retired Supabase RLS policies; the Lambda routes now enforce this authz server-side.
+
 # RLS Audit — captured 2026-05-21
 
 Captured from Supabase project mzrzmfkfjfdwsjwblbzz pre-RDS-migration.

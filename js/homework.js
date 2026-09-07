@@ -13,7 +13,7 @@ import { closeSidebar, showToast } from './ui.js';
 // ── Calendar state (session-only, never persisted) ─────────
 export let _calEvents  = [];    // [{title, start, end, id}]
 let _calFetched = false; // fetched once per session
-let _calToken   = null;  // Google provider_token from Supabase session
+let _calToken   = null;  // Google provider_token (never set by the Cognito shim; see connectGoogleCalendar)
 
 const HOMEWORK_PRIORITY = {
   TIER_1_CRITICAL: {
@@ -59,9 +59,9 @@ export function getStudyStyle() {
   } catch { return { work_minutes: 25, break_minutes: 5, label: 'Short Bursts' }; }
 }
 export function saveStudyStyle(style) { localStorage.setItem('lumi_study_style', JSON.stringify(style)); }
-export async function syncStudyStyleToSupabase(style) {
+export async function syncStudyStyleToRds(style) {
   if (!currentUser) return;
-  // TM-2: same as syncProfileToSupabase — don't write student-shaped
+  // TM-2: same as syncProfileToRds — don't write student-shaped
   // fields into the teacher's auth user record.
   if (S.isTestMode) return;
   try {
@@ -186,7 +186,7 @@ export function updateCalUi() {
 
 export async function connectGoogleCalendar() {
   // TODO(GIS): Cognito never exposes the Google provider access token to the
-  // browser, so the old Supabase provider_token flow can't be ported. Rebuild
+  // browser, so the old provider_token flow can't be ported. Rebuild
   // with Google Identity Services initTokenClient (a direct API grant) when
   // calendar connect is prioritized — see MIGRATION_PLAN.md Workstream I.
   showToast('Calendar connect is temporarily unavailable.');
@@ -512,7 +512,7 @@ export function closeHwPopup() {
   closeHwBackdrop();
   setTimeout(() => { popup.style.display = 'none'; }, 200);
   renderSidebar(); // refresh sidebar checklist
-  syncHwToSupabase();
+  syncHwToRds();
 }
 
 export function showHwAddModal(prefillClass) {
@@ -659,7 +659,7 @@ function toggleHwTask(id) {
   saveHwTasks(tasks);
   renderHwPopupTasks();
   renderSidebar();
-  syncHwToSupabase();
+  syncHwToRds();
 }
 
 function deleteHwTask(id) {
@@ -667,7 +667,7 @@ function deleteHwTask(id) {
   saveHwTasks(tasks);
   renderHwPopupTasks();
   renderSidebar();
-  syncHwToSupabase();
+  syncHwToRds();
 }
 
 export function addHwTask(task) {
@@ -1359,8 +1359,8 @@ export function activeHwForClass(course) {
   return `\nThe student is currently working on: ${t.title}, due ${dueStr}. Tailor your guidance toward helping them complete this assignment.`;
 }
 
-// ── Supabase sync ──────────────────────────────────────────
-export function syncHwToSupabase() {
+// ── RDS sync ──────────────────────────────────────────
+export function syncHwToRds() {
   if (!currentUser) return;
   const tasks = getHwTasks();
   const rows = tasks.map(t => ({

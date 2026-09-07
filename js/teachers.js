@@ -54,8 +54,8 @@ export function resolveTeacherEmail(name) {
   return _testModeEmailMap[name] || (globalThis.TEACHER_EMAIL_MAP || {})[name];
 }
 
-// ── Teacher profile system — single source of truth: Supabase ──
-// Seed profiles are pushed to Supabase on load; _profileCache is the in-memory fallback.
+// ── Teacher profile system — single source of truth: RDS via the Lambda ──
+// _profileCache is the in-memory fallback.
 export const _profileCache = {};
 export const _profileStatusCache = {}; // { 'course::teacher': 'ready' | 'pending' }
 
@@ -92,7 +92,7 @@ export async function preloadProfileStatuses() {
 }
 
 // Generic RDS Lambda fetch (Workstream G). Same auth idiom as
-// fetchTeacherProfileLambda below: Supabase JWT as Bearer, JSON in/out.
+// fetchTeacherProfileLambda below: Cognito ID token as Bearer, JSON in/out.
 // 404 -> null (not-found is a data state, not an error); any other non-2xx
 // throws so call sites fail VISIBLY — never silently swallow errors.
 // `path` starts without a slash (CLAUDE_PROXY_URL ends with one);
@@ -164,9 +164,8 @@ export function resolveScheduleCourse(scheduleCourse) {
   return resolveCanonicalCourse(scheduleCourse, _availableClasses);
 }
 
-// Option 2: fetch one teacher profile from the RDS-backed Lambda route, shape-matched
-// to the supabase-js path (returns the row object, or null on 404). Auth is the same
-// Supabase JWT the chat proxy already uses. The route returns an array (teacher_email
+// Fetch one teacher profile from the RDS-backed Lambda route (returns the row
+// object, or null on 404). Auth is the same Cognito ID token the chat proxy uses. The route returns an array (teacher_email
 // is non-unique); we filter by course_name server-side and take the first row.
 export async function fetchTeacherProfileLambda(email, course) {
   const { data: { session } } = await sb.auth.getSession();
@@ -196,7 +195,7 @@ export async function fetchTeacherProfilesByEmails(emails) {
   return lists.flat();
 }
 
-// Single lookup function — Supabase first, then in-memory cache.
+// Single lookup function — Lambda first, then in-memory cache.
 // Returns profile if complete, { __notReady } if in progress, null if not found.
 export async function getTeacherProfile(teacherName, course) {
   if (!teacherName || !course) return null;

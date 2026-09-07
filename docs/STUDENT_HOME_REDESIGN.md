@@ -440,8 +440,8 @@ invariants:
 - **TM-2** (data isolation): every write path guards on `S.isTestMode`. The redesign adds no
   new write paths that touch shared tables — the class-view chat pipeline is the same
   pipeline, gated by the same helpers. **Sanity checklist in code review:** any new function
-  that calls `syncScheduleToSupabase`, `syncEnrollments`, `syncProfileToSupabase`,
-  `syncConvToSupabase`, `saveConvs`, `loadProfileFromSupabase` MUST short-circuit on
+  that calls `syncScheduleToRds`, `syncEnrollments`, `syncProfileToRds`,
+  `syncConvToRds`, `saveConvs`, `loadProfileFromRds` MUST short-circuit on
   `S.isTestMode`.
 - **TM-3** (locked classes route to teacher.html): home grid respects the "ready" gate. In
   Test Mode, locked cards route to `teacher.html?course=<encoded>&from=test-mode`. **In
@@ -908,7 +908,7 @@ Written against the exact changes on this branch. Every invariant preserved.
 
 **TM-1 — `is_teacher_test=true` conversation flag.**
 - Server-side only: Lambda + RDS. Session 1 touched neither.
-- Conversation writes go through `js/storage.js:syncConvToSupabase`, unchanged.
+- Conversation writes go through `js/storage.js:syncConvToRds`, unchanged.
 - **Result: intact.**
 
 **TM-2 — data isolation via `S.isTestMode` write-path guards.**
@@ -1076,7 +1076,7 @@ Landed 2026-07-08 on `main` in four commits:
 
 **TM-1 — `is_teacher_test=true` conversation flag.**
 - Server-side only. Session 1.5+2 touched neither the Lambda nor RDS.
-- Every conv write still routes through `js/storage.js:syncConvToSupabase` (unchanged).
+- Every conv write still routes through `js/storage.js:syncConvToRds` (unchanged).
 - **Intact.**
 
 **TM-2 — data isolation via `S.isTestMode` write-path guards.**

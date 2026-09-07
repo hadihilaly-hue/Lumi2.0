@@ -112,7 +112,7 @@ export async function loadConv(id) {
   dispatchConvChanged();
 
   // AUDIT_FRONTEND H1: re-hydrate the teacher persona. Convs loaded from RDS
-  // (loadConvsFromSupabase) reconstruct tutorCtx from the teacher/course columns
+  // (loadConvsFromRds) reconstruct tutorCtx from the teacher/course columns
   // only — teacherProfile/notesInjection/workSamples are absent — so continuing
   // the chat would silently fall back to generic AI. Fetch them now.
   await hydrateTutorProfile();

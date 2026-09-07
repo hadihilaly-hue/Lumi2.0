@@ -1,6 +1,6 @@
 // js/storage.js — localStorage persistence for schedule + conversations, plus
 // the legacy-data migration. Only the pure/localStorage-backed functions are in
-// scope. The Supabase sync functions (syncConvToSupabase, loadProfileFromSupabase,
+// scope. The RDS sync functions (syncConvToRds, loadProfileFromRds,
 // loadTestModeSchedule, …) are out of scope: they require currentUser + rdsFetch
 // (network). They are gated `if (!currentUser) return`, so with the default null
 // currentUser the functions exercised here never touch the network.

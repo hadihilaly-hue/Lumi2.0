@@ -196,7 +196,7 @@ function obApplyProfile(data) {
   if (OB.profile.study_style?.work_minutes) saveStudyStyle(OB.profile.study_style);
   if (OB.profile.calendar_connected) setCalendarConnected(true);
 
-  // On completion, save personality profile to Supabase (grade/schedule saved later by initScheduleSetup)
+  // On completion, save personality profile to RDS (grade/schedule saved later by initScheduleSetup)
   if (OB.profile.onboarding_complete) {
     localStorage.setItem('lumi_onboarding_complete', 'true');
     obSaveFullProfile();

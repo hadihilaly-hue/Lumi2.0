@@ -3,7 +3,7 @@ import { newChat } from './js/conversation.js';
 import { showWelcome } from './js/emptystate.js';
 import { _calEvents, addHwTask, advancePlannerBlock, buildStudyPlan, buildStudyPlanWithCalendar, checkDailyHwPrompt, closeHwAddModal, closeHwBackdrop, closeHwPlanModal, closeHwPopup, closeTimelineModal, genHwId, getHwTasks, loadCalendarEvents, renderHwPopupTasks, setCalendarConnected, showHwAddModal, showHwPlanModal, showHwPopup, startPlannerStrip, todayStr, updateCalUi, wireCalListeners } from './js/homework.js';
 import { initOnboarding } from './js/onboarding.js';
-import { _projPendingFile, clearAllChats, clearCompletedProjects, clearProjFile, closeProjectCreateModal, closeProjectPlanModal, closeWorkTypeChooser, createProject, getProjects, injectProjectTasksToHomework, loadHwFromSupabase, loadProjectsFromSupabase, renderProjectPlan, showProjectCreateModal, showWorkTypeChooser, syncProjectsToSupabase, wireProjDropzone } from './js/projects.js';
+import { _projPendingFile, clearAllChats, clearCompletedProjects, clearProjFile, closeProjectCreateModal, closeProjectPlanModal, closeWorkTypeChooser, createProject, getProjects, injectProjectTasksToHomework, loadHwFromRds, renderProjectPlan, showProjectCreateModal, showWorkTypeChooser, wireProjDropzone } from './js/projects.js';
 import { setSidebarUserSubtitle } from './js/prompts.js';
 import { checkSemesterBanner, initScheduleSetup } from './js/schedule.js';
 import { activeDropdownEl, closeOpenMenu, renderSearchDropdown, renderSidebar, showInlineConfirm } from './js/sidebar.js';
@@ -12,7 +12,7 @@ import { mountClass, mountGeneral } from './js/classview.js';
 import { mountPlan } from './js/studyplanview.js';
 import { initRouter } from './js/router.js';
 import { $, S, SB, currentUser, fileInput, msgInput, sbSearch, sendBtn, setCurrentProjId, setCurrentUser, themeToggle } from './js/state.js';
-import { flushProgressNote, genId, getSchedule, loadConvsFromSupabase, loadProfileFromSupabase, loadTestModeSchedule, migrateOldData, saveCurrentConv } from './js/storage.js';
+import { flushProgressNote, genId, getSchedule, loadConvsFromRds, loadProfileFromRds, loadTestModeSchedule, migrateOldData, saveCurrentConv } from './js/storage.js';
 import { isTeacherModeAllowed, preloadAvailableClasses, preloadProfileStatuses, rdsFetch, signedInDestination } from './js/teachers.js';
 import { autoGrow, closeSettings, closeSidebar, openSettings, openSidebar, showToast, updateSendBtn } from './js/ui.js';
 import { initVoice, wireVoiceListeners } from './js/voice.js';
@@ -136,7 +136,7 @@ import { initVoice, wireVoiceListeners } from './js/voice.js';
     } else { homeAvatar.textContent = initials; }
   }
 
-  await loadProfileFromSupabase();
+  await loadProfileFromRds();
 
   // One-time privacy scrub: earlier builds persisted tutorCtx.teacherNotes
   // (confidential teacher observations) into localStorage via saveCurrentConv.
@@ -157,10 +157,10 @@ import { initVoice, wireVoiceListeners } from './js/voice.js';
     }
   } catch (e) { console.warn('[teacher_notes] scrub failed:', e); }
 
-  // TM-2: in test mode, always load convs fresh from Supabase (filtered
+  // TM-2: in test mode, always load convs fresh from RDS (filtered
   // to is_teacher_test=true). In student mode, only on fresh device
   // where lumi_convs hasn't been cached.
-  if (S.isTestMode || !localStorage.getItem('lumi_convs')) await loadConvsFromSupabase();
+  if (S.isTestMode || !localStorage.getItem('lumi_convs')) await loadConvsFromRds();
   // TM-2: synthesize the teacher's own classes into S.testSchedule.
   if (S.isTestMode) await loadTestModeSchedule();
 
@@ -184,7 +184,7 @@ function init() {
   console.log('[theme] init — saved:', localStorage.getItem('lumi-theme'), 'isDark:', isDark);
 
   // Onboarding + schedule setup
-  // Gate on onboarding_complete so a Supabase-restored name doesn't skip the interview
+  // Gate on onboarding_complete so a server-restored name doesn't skip the interview
   const hasOnboarded = localStorage.getItem('lumi_onboarding_complete') === 'true';
   const hasName      = !!localStorage.getItem('lumi_name');
   const hasSchedule  = getSchedule().length > 0;
@@ -366,8 +366,7 @@ function startApp() {
   // the DB's canonical course_name. Non-blocking chain: profile statuses are
   // scheduled after so their lookup keys land on canonical names.
   preloadAvailableClasses().finally(() => preloadProfileStatuses());
-  loadHwFromSupabase().then(async () => {
-    await loadProjectsFromSupabase();
+  loadHwFromRds().then(async () => {
     injectProjectTasksToHomework();
     await loadCalendarEvents();
     renderSidebar();

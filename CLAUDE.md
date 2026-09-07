@@ -71,14 +71,13 @@ gives direct answers, only guides reasoning.
   Cognito via `cognito-auth.js` (Workstream I, complete 2026-07-02);
   the `sb.auth.*` surface survives as the shim's API. **No live Supabase
   calls/clients/deps remain** (all data I/O goes through `rdsFetch` →
-  Lambda); the paused Supabase project awaits final deletion. Note: many
-  `*Supabase` function names (e.g. `syncScheduleToSupabase`,
-  `loadProfileFromSupabase`) survive in app.js as cosmetic legacy naming —
-  they all route to the Lambda now. Teacher notes are injected server-side by the
-  chat Lambda and never reach the client (see "Per-student teacher notes
-  injection").
-  `migration/SMOKE_TEST.md` and `migration/CUTOVER_PLAN.md` are historical
-  records of the executed cutover.
+  Lambda); the paused Supabase project awaits final deletion. The sync
+  helpers in `js/storage.js` / `js/homework.js` / `js/projects.js` are named
+  `*ToRds` / `*FromRds` (e.g. `syncScheduleToRds`, `loadProfileFromRds`).
+  Teacher notes are injected server-side by the chat Lambda and never reach
+  the client (see "Per-student teacher notes injection").
+  `docs/archive/SMOKE_TEST.md` and `docs/archive/CUTOVER_PLAN.md` are
+  historical records of the executed cutover.
 - Guides students through the subject WITHOUT giving direct answers
 - Always asks students to walk through their reasoning first
 - Never says "that's wrong" — instead: "walk me through how you
@@ -108,7 +107,7 @@ gives direct answers, only guides reasoning.
   `grading_philosophy`, `common_mistakes`, `explanation_methods`,
   `key_values`, `class_specific_notes`, `messages_json` were all dropped;
   the onboarding wizard writes the flat columns listed above. (Historical
-  names appear only in `supabase_setup.sql`.)
+  names appear only in `docs/archive/supabase_setup.sql`.)
 - Authz: enforced in the Lambda `/teacher-profile` routes — any
   authenticated user may read (student sessions fetch profiles); writes
   require the JWT email to match `teacher_email`. The Supabase RLS that
@@ -144,7 +143,7 @@ gives direct answers, only guides reasoning.
   ever needed, that is its own refactor, not a drive-by.
 - RLS (5 policies) — **historical Supabase model, stripped in RDS.** All
   RLS was dropped at the cutover; the Lambda `/class-enrollments` routes
-  below now replicate this authz server-side (RLS_AUDIT.md is the snapshot
+  below now replicate this authz server-side (docs/archive/RLS_AUDIT.md is the snapshot
   they were ported from):
   - student_read_own (SELECT): auth.uid() = student_id
   - student_insert_own (INSERT): auth.uid() = student_id — required so
@@ -167,7 +166,7 @@ gives direct answers, only guides reasoning.
   now enforced in the Lambda `PATCH /class-enrollments` route (2-step
   email-ownership check) instead.
 - Enrollment rows are written by syncEnrollments() in app.js, called at
-  the end of syncScheduleToSupabase() after the student finalizes their
+  the end of syncScheduleToRds() after the student finalizes their
   schedule. It looks up teacher_profiles by (teacher_email, course_name)
   and only enrolls the student in classes where a matching
   teacher_profiles row exists. Classes whose teacher hasn't onboarded
@@ -337,7 +336,7 @@ Shared contract: `verifyAuth` (Cognito ID token, verified LOCALLY via
 aws-jwt-verify's module-cached JWKS, then cognito_sub → preserved lumi uuid
 via the `app_users` bridge) → allowed-domains gate (schools.allowed_domains,
 5-min container cache; adminEmails bypass) →
-per-route authz replicating the old RLS (RLS_AUDIT.md) → parameterized query
+per-route authz replicating the old RLS (docs/archive/RLS_AUDIT.md) → parameterized query
 via `db.js` → raw row(s) on success / `{error}` + status on failure → logs
 carry `err.code` only, never PII. Identity is ALWAYS taken from the JWT and
 never from the request body (docs/archive/MIGRATION_HARDENING.md §1) — verified
@@ -841,9 +840,9 @@ live with spoofed ids.
     after completing the wizard.
 - **Plumbing (TM-2).** Every write path is gated behind
   `if (S.isTestMode) return;` to prevent a teacher from writing
-  student-shaped state into shared tables: syncProfileToSupabase,
-  syncEnrollments, syncScheduleToSupabase, syncStudyStyleToSupabase,
-  loadProfileFromSupabase. `getSchedule` / `getConvs` / `saveConvs`
+  student-shaped state into shared tables: syncProfileToRds,
+  syncEnrollments, syncScheduleToRds, syncStudyStyleToRds,
+  loadProfileFromRds. `getSchedule` / `getConvs` / `saveConvs`
   branch to in-memory state (`S.testSchedule` / `S.testConvs`) so
   localStorage keys belonging to the student persona on a shared
   browser are never touched.
@@ -1024,10 +1023,9 @@ live with spoofed ids.
   The live student app is app.html → app.js. (The legacy orphaned `lumi.html`
   copy was deleted in Compliance Phase 2b — it was unlinked dead code carrying
   hardcoded staff names.)
-- **Styling:** style.css is the single live stylesheet (~90 KB), loaded by
-  index/app/teacher/admin/privacy; Inter font via Google Fonts. `styles.css`
-  (~18 KB) is orphaned — no Lumi page loads it.
-- **Auth:** AWS Cognito (pool `lumi-users` / `us-east-1_C0xhKzu94`, app client `lumi-web`, hosted domain `lumi-auth-613136968914`) with Google as the sole IdP — code+PKCE via `cognito-auth.js` (repo root; exposes the old `sb.auth.*` surface, so call sites still read like supabase-js). `session.access_token` = the Cognito ID token; the Lambda verifies it locally (aws-jwt-verify, module-cached JWKS — zero per-request egress) and resolves it to the preserved lumi uuid via the `app_users` bridge (link-by-verified-email on first sign-in). Sign-in domains are data-driven off `schools.allowed_domains` (client UX check via `GET /allowed-domains` fails open; server enforcement in verifyCognitoAuth + the route gate fails closed; SCHOOL_CONFIG.adminEmails bypass). **Supabase is retired** (Workstream I complete 2026-07-02): no live Supabase calls/clients/deps remain (though vestigial `*Supabase` function names persist in app.js — cosmetic), project paused pending deletion; `supabase_setup.sql` + `RLS_AUDIT.md` remain in-tree as historical records (the `supabase/` dir itself is gone).
+- **Styling:** style.css is the single live stylesheet (~160 KB), loaded by
+  index/app/teacher/admin/privacy; Inter font via Google Fonts.
+- **Auth:** AWS Cognito (pool `lumi-users` / `us-east-1_C0xhKzu94`, app client `lumi-web`, hosted domain `lumi-auth-613136968914`) with Google as the sole IdP — code+PKCE via `cognito-auth.js` (repo root; exposes the old `sb.auth.*` surface, so call sites still read like supabase-js). `session.access_token` = the Cognito ID token; the Lambda verifies it locally (aws-jwt-verify, module-cached JWKS — zero per-request egress) and resolves it to the preserved lumi uuid via the `app_users` bridge (link-by-verified-email on first sign-in). Sign-in domains are data-driven off `schools.allowed_domains` (client UX check via `GET /allowed-domains` fails open; server enforcement in verifyCognitoAuth + the route gate fails closed; SCHOOL_CONFIG.adminEmails bypass). **Supabase is retired** (Workstream I complete 2026-07-02): no live Supabase calls/clients/deps remain, project paused pending deletion; `docs/archive/supabase_setup.sql` + `docs/archive/RLS_AUDIT.md` remain in-tree as historical records (the `supabase/` dir itself is gone).
 - **Database:** AWS RDS Postgres (`lumi-db`) behind the `lumi-claude-proxy` Lambda — per-route JWT authz replaced RLS (see "RDS Lambda data routes"). Direct DB access for migrations/ops: the Lambda's direct-invoke admin branch ONLY (`aws lambda invoke --payload '{"adminSql":..., "params":[...]}'` — IAM-gated, unreachable via the function URL; replaced the deleted /admin/sql + ADMIN_TOKEN at teardown).
 - **AI API:** Claude via **Amazon Bedrock** (streamed with
   `InvokeModelWithResponseStreamCommand`) behind AWS Lambda lumi-claude-proxy
@@ -1058,7 +1056,7 @@ live with spoofed ids.
     is unbuilt.
 - **Markdown rendering:** Custom lightweight renderer in app.js (no library)
 - **Hosting:** GitHub Pages (static deploy)
-- **Schema:** `migration/rds-schema.sql` (+ `rds-sis-tables.sql`, `rds-app-users.sql`, `rds-school-domains.sql`) is the live RDS schema; supabase_setup.sql is the historical Supabase-era definition (RLS included) — do not apply it anywhere
+- **Schema:** `migration/rds-schema.sql` (+ `rds-sis-tables.sql`, `rds-app-users.sql`, `rds-school-domains.sql`) is the live RDS schema; docs/archive/supabase_setup.sql is the historical Supabase-era definition (RLS included) — do not apply it anywhere
 
 ---
 

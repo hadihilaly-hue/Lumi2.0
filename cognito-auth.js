@@ -1,5 +1,5 @@
 // ─── COGNITO AUTH (Workstream I, Phase 3) ─────────────────────────────────────
-// Drop-in replacement for supabase.js + auth.js. Exposes the same globals the
+// Cognito PKCE auth shim. Exposes the same globals the
 // pages already consume: `sb` (with sb.auth.getSession / signInWithOAuth /
 // signOut / onAuthStateChange), `isAllowedEmail`, `doSignOut`.
 //
@@ -199,7 +199,7 @@ async function refreshTokens(tokens) {
   return refreshInFlight;
 }
 
-// ─── the supabase-compatible surface ─────────────────────────────────────────
+// ─── the `sb.auth.*` surface consumed by the pages ─────────────────────────────────────────
 
 const sb = {
   auth: {

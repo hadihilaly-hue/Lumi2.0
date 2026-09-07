@@ -1,3 +1,5 @@
+> **HISTORICAL** — record of the executed 2026-07-01 Supabase → RDS cutover. Not a live runbook.
+
 # Cutover plan — Supabase → RDS (Workstreams E + H)
 
 > **STATUS: EXECUTED 2026-07-01** (§§1–4 done; §5 teardown pending the 48h

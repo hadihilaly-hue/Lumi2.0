@@ -1,3 +1,5 @@
+> **HISTORICAL** — checklist used for the 2026-07-01 RDS cutover; the `USE_RDS` / `?lambda=1` flag it references no longer exists.
+
 # Manual smoke-test checklist — USE_RDS (`?lambda=1`) frontend rewiring
 
 Phase 3 (Workstream G) deliverable, 2026-07-01. Run signed in as an
