@@ -1,6 +1,5 @@
 import { fetchClaudeProxy } from './api.js';
 import { CONFIG } from './config.js';
-import { MENLO_CURRICULUM } from './data.js';
 import { connectGoogleCalendar, saveStudyStyle, setCalendarConnected } from './homework.js';
 import { $, currentUser } from './state.js';
 import { rdsFetch } from './teachers.js';
@@ -201,28 +200,6 @@ function obApplyProfile(data) {
     localStorage.setItem('lumi_onboarding_complete', 'true');
     obSaveFullProfile();
   }
-}
-
-function obMatchSchedule(rawList) {
-  return rawList.map(({ course, teacher }) => {
-    const cNorm = (course || '').toLowerCase();
-    for (const [subject, courses] of Object.entries(MENLO_CURRICULUM)) {
-      for (const [cName, teachers] of Object.entries(courses)) {
-        const cnNorm = cName.toLowerCase();
-        const words  = cNorm.split(/\s+/);
-        if (cnNorm.includes(cNorm) || words.some(w => w.length > 3 && cnNorm.includes(w))) {
-          const tNorm   = (teacher || '').toLowerCase();
-          // Try to find a match in the curriculum — if no match, keep what the student said
-          const matched = teachers.find(t =>
-            t.toLowerCase().includes(tNorm) ||
-            tNorm.includes(t.split(' ').slice(-1)[0].toLowerCase())
-          ) || teacher || '';
-          return { course: cName, teacher: matched, subject };
-        }
-      }
-    }
-    return { course: course || '', teacher: teacher || '', subject: 'Other' };
-  }).filter(s => s.course);
 }
 
 async function obSaveFullProfile() {

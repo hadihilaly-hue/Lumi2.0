@@ -234,10 +234,3 @@ export function mountPlan() {
 
   renderPlan();
 }
-
-/** Router-side hide (called by home/class mount paths — currently home takes
- *  care of its own show/hide; this stays exported for symmetry). */
-export function unmountPlan() {
-  const view = document.getElementById('studyPlanView');
-  if (view) view.style.display = 'none';
-}

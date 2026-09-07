@@ -310,47 +310,6 @@ export function deleteConvFromRds(convId) {
     });
 }
 
-// Sync user profile (name, grade, accumulated values) to RDS
-function syncProfileToRds() {
-  if (!currentUser) return;
-  // TM-2: a teacher in test mode is not a student. Don't overwrite their
-  // auth user record's profiles row with synthetic student fields.
-  if (S.isTestMode) return;
-  const name  = localStorage.getItem('lumi_name');
-  const grade = localStorage.getItem('lumi_grade');
-  const values_profile = {
-    values:    [...S.values],
-    goals:     [...S.goals],
-    interests: [...S.interests],
-  };
-  // New onboarding fields
-  const learning_style      = localStorage.getItem('lumi_learning_style') || null;
-  const typical_activities  = localStorage.getItem('lumi_activities') || null;
-  const homework_start_time = localStorage.getItem('lumi_hw_start') || null;
-  const onboarding_complete = localStorage.getItem('lumi_onboarding_complete') === 'true';
-  let pain_points = [];
-  try { pain_points = JSON.parse(localStorage.getItem('lumi_pain_points') || '[]'); } catch {}
-  let study_style = null;
-  try { study_style = JSON.parse(localStorage.getItem('lumi_study_style') || 'null'); } catch {}
-
-  const profileRow = {
-    name:           name  || null,
-    grade:          grade || null,
-    values_profile,
-    learning_style,
-    pain_points,
-    typical_activities,
-    homework_start_time,
-    study_style,
-    onboarding_complete,
-  };
-  // Hardened (§2): real error surface. id comes from the JWT.
-  rdsFetch('profiles', { method: 'POST', body: profileRow }).catch(err => {
-    console.warn('Profile sync error:', err);
-    showToast('Could not sync your profile — see console');
-  });
-}
-
 // Load profile from RDS on new device (only if localStorage has no name)
 export async function loadProfileFromRds() {
   if (!currentUser) return;

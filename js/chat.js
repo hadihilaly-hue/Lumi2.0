@@ -247,10 +247,7 @@ Remember: help them THINK through the project, never do it for them. Ask guiding
     saveCurrentConv();
     renderMsg('lumi', clean, true);
     // TTS is opt-in per message via the speaker icon next to each Lumi
-    // message — no auto-play. The previous `_voiceSetting !== 'off'`
-    // auto-trigger here defaulted everyone to "hear" mode and surprised
-    // students with audio they hadn't asked for. See _readVoiceSetting
-    // TODO above for the broader cleanup.
+    // message — no auto-play (see _readVoiceSetting in voice.js).
     renderSidebar();
     if (data) applyProfile(data);
     if (S.exchangeCount === 1) {
