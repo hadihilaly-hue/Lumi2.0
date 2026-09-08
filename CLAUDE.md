@@ -65,7 +65,7 @@ gives direct answers, only guides reasoning.
   data layer since the 2026-07-01 cutover + teardown.** The old `USE_RDS`
   flag and every Supabase data branch are deleted; all reads/writes go
   through the per-file `rdsFetch(path, {method, body})` helper (app.js +
-  teacher.html; admin.html inlines its single fetch). Failures surface
+  js/teacher/profileApi.js; js/admin/adminApi.js wraps its fetches). Failures surface
   VISIBLY (console.error + showToast at hardened writes; chat-area banner
   for the main tutor fetch) — there is no fallback store. Auth is AWS
   Cognito via `cognito-auth.js` (Workstream I, complete 2026-07-02);
@@ -1019,7 +1019,15 @@ live with spoofed ids.
 - **Frontend:** Vanilla HTML/CSS/JS — no framework
 - **Pages:** index.html (sign-in), app.html (student chat), teacher.html
   (teacher onboarding), admin.html (SIS admin console), privacy.html.
-  The live student app is app.html → app.js. (The legacy orphaned `lumi.html`
+  The live student app is app.html → app.js. teacher.html loads
+  `js/teacher/main.js` (boot/auth gate/`window` handler exposure) →
+  `state.js` (shared `T` state), `config.js`, `wizardState.js` (pure
+  gating/list helpers — unit-tested), `profileApi.js` (every `rdsFetch`),
+  `home.js`, `wizardUi.js`, `workSamples.js`, `syllabus.js`, `speech.js`,
+  `saveProfile.js`, `roster.js`, `studentMode.js`, `consentGate.js`,
+  `ui.js`. admin.html loads `js/admin/main.js` → `adminApi.js`,
+  `dashboardState.js` (pure — unit-tested), `ferpa.js`. Tests for both
+  live in `test/teacher-*.test.mjs` (incl. a module-graph boot smoke). (The legacy orphaned `lumi.html`
   copy was deleted in Compliance Phase 2b — it was unlinked dead code carrying
   hardcoded staff names.)
 - **Styling:** style.css is the single live stylesheet (~160 KB), loaded by
