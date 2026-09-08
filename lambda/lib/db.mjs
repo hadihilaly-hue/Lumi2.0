@@ -1,4 +1,4 @@
-// db.js — Postgres connection helper for lumi-claude-proxy.
+// lib/db.mjs — Postgres connection helper for lumi-claude-proxy.
 // IAM-authenticated connection to RDS Proxy, with token caching + pool reuse.
 // Designed to be imported by any Lambda data route (Workstream F).
 
