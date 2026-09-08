@@ -406,13 +406,16 @@ async function _patchConv(convId, opts = {}) {
   if (creating) await creating;
   // One PATCH in flight per conversation: a save that lands mid-request waits
   // for it to settle, then sends the newest snapshot (no stale overwrite).
-  while (_convPatching.has(convId)) await _convPatching.get(convId);
+  // The unload flush cannot afford to wait (the document may be gone before
+  // the earlier request settles), so it fires its keepalive request at once;
+  // the row's updated_at lets the server-side history show which was newest.
+  if (!opts.keepalive) { while (_convPatching.has(convId)) await _convPatching.get(convId); }
   const p = _patchConvNow(convId, opts);
   _convPatching.set(convId, p);
   try { await p; } finally { if (_convPatching.get(convId) === p) _convPatching.delete(convId); }
 }
 
-async function _patchConvNow(convId, { keepalive = false } = {}) {
+async function _patchConvNow(convId, { keepalive = false, budget = null } = {}) {
   const conv = getConvs()[convId];
   if (!conv || !conv.messages.length) { _convSyncPending.delete(convId); return; }
   if (!conv.sbId) {
@@ -429,8 +432,13 @@ async function _patchConvNow(convId, { keepalive = false } = {}) {
   // unowned/unknown id (surfaced via the rdsFetch null → warn).
   const body = { id: conv.sbId, ...row, updated_at: new Date().toISOString() };
   const json = JSON.stringify(body);
+  const bytes = new TextEncoder().encode(json).byteLength;
+  // The keepalive quota is shared by every outstanding keepalive request, so a
+  // flush of several conversations draws from one budget.
+  const fits = bytes <= (budget ? budget.remaining : KEEPALIVE_BODY_LIMIT);
+  if (keepalive && fits && budget) budget.remaining -= bytes;
   try {
-    const res = keepalive && json.length <= KEEPALIVE_BODY_LIMIT
+    const res = keepalive && fits
       ? await _rdsPatchKeepalive('conversations', json)
       : await rdsFetch('conversations', { method: 'PATCH', body });
     if (!res) { console.warn('Conversation update error:', 'conversation not found (404)'); return; }
@@ -468,11 +476,12 @@ export function flushPendingConvSyncs({ keepalive = true } = {}) {
   // queued behind it) so sign-out / unload can't strand a brand-new thread.
   const ids = [...new Set([..._convSyncPending, ..._convCreating.keys()])];
   for (const id of ids) _clearConvTimer(id);
+  const budget = { remaining: KEEPALIVE_BODY_LIMIT };
   return Promise.all(ids.map(async (id) => {
     try {
       const creating = _convCreating.get(id);
       if (creating) await creating;
-      if (_convSyncPending.has(id) || _convPatching.has(id)) await _patchConv(id, { keepalive });
+      if (_convSyncPending.has(id) || _convPatching.has(id)) await _patchConv(id, { keepalive, budget });
     } catch (err) { console.warn('Conv sync:', err); }
   }));
 }

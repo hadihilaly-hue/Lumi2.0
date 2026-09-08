@@ -345,6 +345,52 @@ test('payloads above the 64 KiB keepalive quota are flushed with a normal (non-k
   assert.equal(hasPendingConvSync('c1'), false);
 });
 
+test('keepalive size check uses UTF-8 bytes, not string length', async () => {
+  // 35k 3-byte chars: 35k JS chars (< 60 KiB) but ~105 KiB on the wire.
+  seedConv('c1', { messages: [{ role: 'user', content: '€'.repeat(35 * 1024) }] });
+  syncConvToRds('c1');
+  await flushPendingConvSyncs({ keepalive: true });
+  assert.equal(patches().length, 1);
+  assert.equal(patches()[0].keepalive, false);
+});
+
+test('the 64 KiB keepalive quota is shared across a multi-conversation flush', async () => {
+  seedConv('c1', { messages: [{ role: 'user', content: 'a'.repeat(40 * 1024) }] });
+  seedConv('c2', { sbId: 'row-2', messages: [{ role: 'user', content: 'b'.repeat(40 * 1024) }] });
+  syncConvToRds('c1');
+  syncConvToRds('c2');
+  await flushPendingConvSyncs({ keepalive: true });
+  assert.equal(patches().length, 2);
+  assert.deepEqual(patches().map(p => p.keepalive).sort(), [false, true], 'only one fits the shared budget');
+  assert.equal(hasPendingConvSync('c1'), false);
+  assert.equal(hasPendingConvSync('c2'), false);
+});
+
+test('unload flush does not wait behind an unresolved in-page PATCH', async () => {
+  seedConv('c1');
+  syncConvToRds('c1');
+  mock.timers.tick(CONV_SYNC_DEBOUNCE_MS);
+  await settle();
+  assert.equal(patches().length, 1);
+
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    const res = await origFetch(url, init);
+    if (init.method === 'PATCH' && !init.keepalive) await new Promise(() => {}); // never settles
+    return res;
+  };
+  const convs = getConvs(); convs.c1.title = 'Renamed'; saveConvs(convs);
+  syncConvToRds('c1');                       // immediate PATCH, stuck in flight
+  await settle();
+  assert.equal(patches().length, 2);
+  appendMsg('c1', 'newest');
+  syncConvToRds('c1');
+  await flushPendingConvSyncs({ keepalive: true });  // pagehide
+  assert.equal(patches().length, 3);
+  assert.equal(patches()[2].keepalive, true);
+  assert.equal(patches()[2].body.messages.length, 2);
+});
+
 test('syncConvToRds is a no-op without a signed-in user or an empty conversation', async () => {
   seedConv('c1', { messages: [] });
   syncConvToRds('c1');
