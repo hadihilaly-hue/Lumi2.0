@@ -329,15 +329,49 @@ gives direct answers, only guides reasoning.
   `saveTeacherProfile()` in teacher.html; read from openWizard's
   thumbnail batch and from `loadWorkSampleImages()` in app.js.
 
+### Lambda source layout (W3 router split)
+`lambda/index.mjs` is a thin entrypoint: parse event → direct-invoke /
+public routes → `verifyAuth` → dispatch table → route. It still exports
+`handler = awslambda.streamifyResponse(...)` and the test-only `__test__`
+surface. Everything else lives in two folders (see `lambda/README.md`):
+- `lambda/lib/` — shared helpers. `auth.mjs` (Cognito JWKS verify, app_users
+  bridge, allowed-domains cache, **`teacherStatus(user) → { isAdmin,
+  isProvisioned, isDone }`** — the ONE teacher-authz check; `isTeacher` /
+  `isProvisionedTeacher` remain as one-line wrappers), `db.mjs` (the former
+  `db.js` IAM-auth `pg` pool), `sse.mjs` (HttpResponseStream wrap + SSE
+  writers), `s3.mjs` (key building + presigned URLs), `prompt.mjs` (teacher
+  notes / work artifacts / progress-note marker swaps —
+  `assembleSystemPrompt`; the cache_control segment boundary is untouched),
+  `progressNotes.mjs` (Phase 5), `bedrock.mjs` (provider calls), `usage.mjs`
+  (rate limit + api_usage), `columns.mjs` (write allowlists), `ferpa.mjs`
+  (export / soft-delete), `config.mjs` (SCHOOL_CONFIG, safeErr).
+- `lambda/routes/` — one module per route family, each an `async (ctx)` with
+  `{ event, body, user, sendJson, responseStream }`: `chat.mjs` (default SSE
+  chat, /suggested-prompts, /progress-note/flush), `profiles.mjs`,
+  `teacherProfiles.mjs` (/teacher-profile, /work-samples, /work-artifacts),
+  `enrollments.mjs`, `conversations.mjs`, `homework.mjs`, `uploads.mjs`,
+  `admin.mjs` (adminSql direct-invoke, /admin/*, /sis-import), `misc.mjs`
+  (/db-health, /allowed-domains, /my-data, /delete-my-account, /consent,
+  /teacher-directory, /available-classes).
+- Teacher authz semantics: `isAdmin` = SCHOOL_CONFIG.adminEmails (admins are
+  always provisioned + done, zero DB hits); `isProvisioned` = sis_map roster
+  row OR teacher_profiles row with `deleted_at IS NULL` (write gate, never
+  cached); `isDone` = teacher_profiles.done = true (read gate / rate tier,
+  120s FIFO-bounded cache, invalidated on teacher-profile writes). Both
+  DB-backed flags fail closed to `false` on DB error. Callers pass
+  `{ done:false }` / `{ provisioned:false }` to skip the lookup they don't need.
+- The deploy zip must include `lib/` and `routes/` (`lambda/README.md`).
+
 ### RDS Lambda data routes (Workstream F — complete 2026-07-01)
-All six route groups live on `lumi-claude-proxy` (source: `lambda/index.mjs`),
+All six route groups live on `lumi-claude-proxy` (source: `lambda/index.mjs`
++ `lambda/routes/*`),
 each verified end-to-end with a real authed browser session against RDS.
 Shared contract: `verifyAuth` (Cognito ID token, verified LOCALLY via
 aws-jwt-verify's module-cached JWKS, then cognito_sub → preserved lumi uuid
 via the `app_users` bridge) → allowed-domains gate (schools.allowed_domains,
 5-min container cache; adminEmails bypass) →
 per-route authz replicating the old RLS (docs/archive/RLS_AUDIT.md) → parameterized query
-via `db.js` → raw row(s) on success / `{error}` + status on failure → logs
+via `lib/db.mjs` → raw row(s) on success / `{error}` + status on failure → logs
 carry `err.code` only, never PII. Identity is ALWAYS taken from the JWT and
 never from the request body (docs/archive/MIGRATION_HARDENING.md §1) — verified
 live with spoofed ids.
