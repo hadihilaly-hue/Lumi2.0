@@ -5,7 +5,6 @@ import { getSchedule } from './storage.js';
 
 // ─── SYSTEM PROMPTS ───────────────────────────────────────────────────────────
 export function getStudentName() { return localStorage.getItem('lumi_name') || 'there'; }
-function getStudentGrade() { return localStorage.getItem('lumi_grade') || null; }
 
 // Sidebar user-card subtitle: "11th · Menlo" if grade is known, else "Menlo".
 // Called at initial auth and after Supabase profile load (covers fresh-device case).

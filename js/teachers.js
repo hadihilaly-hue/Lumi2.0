@@ -153,7 +153,7 @@ export async function preloadAvailableClasses() {
         unresolved
       );
     }
-  } catch (e) { /* diagnostic only */ }
+  } catch { /* diagnostic only */ }
   return rows;
 }
 

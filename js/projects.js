@@ -153,7 +153,7 @@ function generateProjectPlan(title, className, dueDate, requirements, unavailabl
     // Fewer dates than phases — merge phases into available dates
     const phasesPerDay = Math.ceil(phases.length / availableDates.length);
     let phaseIdx = 0;
-    availableDates.forEach((date, dayIdx) => {
+    availableDates.forEach((date) => {
       const endIdx = Math.min(phaseIdx + phasesPerDay, phases.length);
       const dayPhases = phases.slice(phaseIdx, endIdx);
       if (dayPhases.length === 0) return;
@@ -628,6 +628,8 @@ export function injectProjectTasksToHomework() {
 
 // ── Open tutor for project's class ───────────────────────
 
+// TODO(lint): unreferenced — candidate for dead-code removal (see AUDIT_DEADCODE.md).
+// eslint-disable-next-line no-unused-vars
 function handleStartWorking() {
   console.log('START WORKING CLICKED');
 

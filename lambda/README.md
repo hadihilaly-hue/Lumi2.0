@@ -30,6 +30,57 @@ aws lambda update-function-code \
   --zip-file fileb://lumi-claude-proxy.zip
 ```
 
+## CI deploy (GitHub Actions)
+
+`.github/workflows/deploy-lambda.yml` does the rebuild + `update-function-code`
+above automatically on every push to `main` that touches `lambda/**` (and on
+demand via **Actions → Deploy Lambda → Run workflow**). It zips `lambda/` minus
+`test/` and waits for `aws lambda wait function-updated`.
+
+It is **inactive until two repository secrets exist**. The workflow never
+creates them; add them by hand:
+
+1. Create an IAM user (e.g. `lumi-github-lambda-deploy`) with **no console
+   access** and attach this inline policy — the minimum the workflow needs:
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": [
+           "lambda:UpdateFunctionCode",
+           "lambda:GetFunction",
+           "lambda:GetFunctionConfiguration"
+         ],
+         "Resource": "arn:aws:lambda:us-east-1:613136968914:function:lumi-claude-proxy"
+       }
+     ]
+   }
+   ```
+
+   ```bash
+   aws iam create-user --user-name lumi-github-lambda-deploy
+   aws iam put-user-policy --user-name lumi-github-lambda-deploy \
+     --policy-name lumi-claude-proxy-update-code --policy-document file://policy.json
+   aws iam create-access-key --user-name lumi-github-lambda-deploy
+   ```
+
+2. In the GitHub repo: **Settings → Secrets and variables → Actions → New
+   repository secret**, and add:
+
+   | Secret name | Value |
+   |---|---|
+   | `AWS_LAMBDA_DEPLOY_ACCESS_KEY_ID` | `AccessKeyId` from `create-access-key` |
+   | `AWS_LAMBDA_DEPLOY_SECRET_ACCESS_KEY` | `SecretAccessKey` from `create-access-key` |
+
+   Or with the CLI: `gh secret set AWS_LAMBDA_DEPLOY_ACCESS_KEY_ID` (prompts for
+   the value), then the same for the secret key.
+
+Rotate by issuing a new access key for the user, updating both secrets, and
+deleting the old key.
+
 ## Verify no drift vs. the live function
 
 A rebuilt zip's `CodeSha256` will **not** match the deployed one — zip embeds file

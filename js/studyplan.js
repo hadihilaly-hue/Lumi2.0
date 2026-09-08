@@ -92,7 +92,7 @@ const BUCKET_ORDER = { overdue: 0, tomorrow: 1, thisWeek: 2 };
  *
  * `tomorrowCourses` accepts a Set, Array, or falsy value.
  */
-export function sortStudyItems(items, tomorrowCourses, now = new Date()) {
+export function sortStudyItems(items, tomorrowCourses, _now = new Date()) {
   const set = tomorrowCourses instanceof Set
     ? tomorrowCourses
     : new Set(Array.isArray(tomorrowCourses) ? tomorrowCourses : []);
@@ -213,7 +213,7 @@ export function saveCheckedMap(map, now = new Date(), storage = _localStorage())
   if (!storage) return;
   try {
     storage.setItem(planDateKey(now), JSON.stringify(map || {}));
-  } catch {}
+  } catch { /* ignore */ }
 }
 
 /** Compute the "remaining" totals given a plan and the checked map. */

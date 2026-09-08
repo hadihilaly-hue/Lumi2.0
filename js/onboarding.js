@@ -252,7 +252,7 @@ async function startObConversation() {
     ];
     obRenderMsg('lumi', clean, true);
     if (profileData) obApplyProfile(profileData);
-  } catch (e) {
+  } catch {
     obHideTyping();
     obRenderMsg('lumi', "Hey! I'm Lumi — your Menlo study buddy. I'm having trouble connecting right now — check your internet connection and refresh the page to try again.", true);
   }

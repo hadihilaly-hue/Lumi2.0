@@ -106,10 +106,27 @@ documented in `CLAUDE.md` (Stack Notes).
 There is **no client-side Anthropic API key** — all model calls are proxied and
 authorized server-side. Do not add a key to the frontend.
 
+### Lint and tests
+
+Use **Node 22** (the root test glob silently matches nothing on Node 20).
+
+```bash
+npm ci && (cd lambda && npm ci)
+npm run lint            # ESLint (eslint.config.js) over app.js, cognito-auth.js, js/, lambda/, test/
+npm test                # frontend ES-module tests (node:test)
+(cd lambda && npm test) # Lambda tests
+```
+
+The same three commands run in CI (`.github/workflows/ci.yml`) on every pull
+request and on pushes to `main`.
+
 ---
 
 ## Deploy
 
 The site is served by **GitHub Pages** from the repository root; pushing to the
 deployment branch publishes it. The Lambda (`lambda/`) is deployed separately to
-AWS. The sign-in entry point is `index.html`.
+AWS — manually per `lambda/README.md`, or via `.github/workflows/deploy-lambda.yml`
+(runs on pushes to `main` that touch `lambda/**`, or on demand; needs the two
+AWS repo secrets described in `lambda/README.md`). The sign-in entry point is
+`index.html`.
