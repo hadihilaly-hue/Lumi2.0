@@ -24,6 +24,7 @@ import { initVoice, wireVoiceListeners } from './js/voice.js';
   if (!session) { window.location.href = 'index.html'; return; }
 
   if (!(await isAllowedEmail(session.user.email))) {
+    sessionStorage.setItem('lumi_auth_error', "Your school isn't set up with Lumi yet.");
     await sb.auth.signOut();
     window.location.href = 'index.html';
     return;
