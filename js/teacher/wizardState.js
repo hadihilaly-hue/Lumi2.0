@@ -59,6 +59,17 @@ export function charCountStatus(text, softLimit = WELCOME_SOFT_LIMIT, minRequire
   return { count, label, enabled: count >= minRequired, overSoftLimit: count > softLimit };
 }
 
+// The review step can now be entered directly (View & Edit on a completed
+// class), so the per-step Continue gates are not guaranteed to have run. Returns
+// the first of steps 1–4 whose gate fails, or null when Save may proceed.
+export function firstInvalidStep({ title = '', engagementRules = '', teachingVoice = '', courseInfo = '', welcomeMessage = '' } = {}) {
+  if (!wordCountStatus(engagementRules, { requireTitle: true, titleValue: title }).enabled) return 1;
+  if (!wordCountStatus(teachingVoice).enabled) return 2;
+  if (!wordCountStatus(courseInfo).enabled) return 3;
+  if (!charCountStatus(welcomeMessage).enabled) return 4;
+  return null;
+}
+
 // ─── STEP NAVIGATION ─────────────────────────────────────────────────────────
 // Steps 1–4 gate their own Continue button live (wordCountStatus /
 // charCountStatus); step 5 (work samples) is fully optional — Continue is never

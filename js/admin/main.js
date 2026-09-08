@@ -10,6 +10,8 @@ import { ferpaExport, ferpaShowConfirm, ferpaHideConfirm, ferpaConfirmSync, ferp
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let aUser      = null;
 let aProfiles  = {};   // "email|course" → profile row
+let aLoaded    = false; // true once any GET ?scope=all has succeeded
+let aLastError = null;  // error from the most recent load, if it failed
 const aExpanded = new Set();
 let aRefreshTimer = null;
 
@@ -37,16 +39,16 @@ async function boot() {
 
 // ─── DATA ─────────────────────────────────────────────────────────────────────
 async function loadAndRender() {
-  let loadError = null;
+  aLastError = null;
   try {
     const data = await fetchAllProfiles();
-    if (data) aProfiles = indexProfiles(data);
+    if (data) { aProfiles = indexProfiles(data); aLoaded = true; }
   } catch (err) {
     console.error('Could not load profiles:', err);
-    loadError = err;
+    aLastError = err;
   }
-  renderDashboard(loadError);
-  updateRefreshTime(loadError);
+  renderDashboard();
+  updateRefreshTime(aLastError);
 }
 
 function startAutoRefresh() {
@@ -65,12 +67,27 @@ function updateRefreshTime(loadError) {
 // ─── RENDER ───────────────────────────────────────────────────────────────────
 // A failed GET /teacher-profile?scope=all must not render as an empty school
 // (0 teachers / 0 classes); the error is shown in place of the roster.
-function renderDashboard(loadError) {
+function renderDashboard() {
+  const loadError = aLastError;
   // Rebuild the roster from the freshly-loaded profile rows each render so
   // auto-refresh picks up new/onboarded classes.
   const teacherDb = buildTeacherDatabase(aProfiles, window.TEACHER_EMAIL_MAP || {});
   const query   = (document.getElementById('teacherSearch')?.value || '').toLowerCase().trim();
   const entries = filterTeachers(teacherDb, query);
+
+  const list = document.getElementById('teacherList');
+  list.innerHTML = '';
+
+  // No successful load yet: the cache is not a dataset, so show placeholders
+  // rather than zeros. After a later refresh failure the last good data stays.
+  if (loadError && !aLoaded) {
+    ['statTotal', 'statComplete', 'statInProgress', 'statNotStarted']
+      .forEach(id => { document.getElementById(id).textContent = '—'; });
+    document.getElementById('teacherCount').textContent = 'Teachers unavailable';
+    list.innerHTML = `<div class="empty-text a-empty">Could not load teacher profiles (${escHtml(loadError.message)}). ` +
+      'Check that this account is in the Lambda admin list.</div>';
+    return;
+  }
 
   const stats = computeStats(teacherDb, aProfiles);
   document.getElementById('statTotal').textContent      = stats.total;
@@ -79,15 +96,6 @@ function renderDashboard(loadError) {
   document.getElementById('statNotStarted').textContent = stats.notStarted;
   document.getElementById('teacherCount').textContent   =
     query ? `${entries.length} teacher${entries.length !== 1 ? 's' : ''} matching "${query}"` : `All teachers (${entries.length})`;
-
-  const list = document.getElementById('teacherList');
-  list.innerHTML = '';
-
-  if (loadError && entries.length === 0) {
-    list.innerHTML = `<div class="empty-text a-empty">Could not load teacher profiles (${escHtml(loadError.message)}). ` +
-      'Check that this account is in the Lambda admin list.</div>';
-    return;
-  }
 
   if (entries.length === 0) {
     list.innerHTML = '<div class="empty-text a-empty">No teachers found.</div>';
@@ -168,7 +176,7 @@ function toggleTeacher(email) {
 
 // admin.html's inline on* attributes resolve these on window.
 Object.assign(window, {
-  renderDashboard: () => renderDashboard(null), toggleTeacher,
+  renderDashboard, toggleTeacher,
   ferpaExport, ferpaShowConfirm, ferpaHideConfirm, ferpaConfirmSync, ferpaDelete,
 });
 

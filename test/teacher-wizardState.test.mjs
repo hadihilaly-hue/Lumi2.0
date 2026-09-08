@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   MIN_WORDS, WELCOME_MIN_CHARS, WELCOME_SOFT_LIMIT,
   countWords, wordCountStatus, charCountStatus,
-  isStepValid, nextStepFrom, prevStepFrom,
+  isStepValid, nextStepFrom, prevStepFrom, firstInvalidStep,
   tierHasArtifact, missingTiers, hasAllWorkSampleTiers, missingTiersLabel,
   remainingPhotoSlots, isHeicFile, isSupportedImageType, summarizeTier, tierHasSampleContent,
   classStatus, filterClasses,
@@ -155,6 +155,20 @@ test('parseNotes tolerates null, garbage, and non-arrays', () => {
   assert.deepEqual(parseNotes('not json'), []);
   assert.deepEqual(parseNotes('{"a":1}'), []);
   assert.deepEqual(parseNotes('[{"text":"hi"}]'), [{ text: 'hi' }]);
+});
+
+test('firstInvalidStep: review-first entry cannot save past the step 1–4 gates', () => {
+  const ok = { title: 'Dr.', engagementRules: words(50), teachingVoice: words(50), courseInfo: words(50), welcomeMessage: 'w'.repeat(80) };
+  assert.equal(firstInvalidStep(ok), null);
+  assert.equal(firstInvalidStep({ ...ok, title: '' }), 1);
+  assert.equal(firstInvalidStep({ ...ok, engagementRules: words(49) }), 1);
+  assert.equal(firstInvalidStep({ ...ok, teachingVoice: words(49) }), 2);
+  assert.equal(firstInvalidStep({ ...ok, courseInfo: '' }), 3);
+  // Legacy completed profile from before the welcome-message step.
+  assert.equal(firstInvalidStep({ ...ok, welcomeMessage: '' }), 4);
+  assert.equal(firstInvalidStep({ ...ok, welcomeMessage: 'w'.repeat(79) }), 4);
+  assert.equal(firstInvalidStep({ ...ok, welcomeMessage: 'w'.repeat(601) }), null); // soft cap never blocks
+  assert.equal(firstInvalidStep(), 1);
 });
 
 test('sortByLastName sorts by last token, case-insensitive; nameless rows sort with "~"', () => {

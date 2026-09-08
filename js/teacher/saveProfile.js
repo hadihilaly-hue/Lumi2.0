@@ -8,18 +8,14 @@ import {
   upsertProfile, upsertWorkSample, uploadViaSignedUrl, fetchDownloadUrl, generateSuggestedPrompts,
 } from './profileApi.js';
 import {
-  SYLLABUS_TEXT_CAP, classSlug, cleanFileName, combineSyllabusText, tierHasSampleContent,
+  SYLLABUS_TEXT_CAP, classSlug, cleanFileName, combineSyllabusText, firstInvalidStep, tierHasSampleContent,
 } from './wizardState.js';
 import { extractPdfText } from './syllabus.js';
 import { saveTierArtifacts } from './workSamples.js';
-import { goHome } from './wizardUi.js';
+import { goHome, showStep } from './wizardUi.js';
 
 export async function saveTeacherProfile() {
   if (T.saving) return;
-  T.saving = true;
-  const btn = document.getElementById('saveProfileBtn');
-  btn.disabled = true;
-  btn.textContent = 'Saving…';
 
   const title = document.getElementById('titleSelect').value || null;
   const engagementRules = document.getElementById('engagementRulesInput').value.trim();
@@ -27,6 +23,18 @@ export async function saveTeacherProfile() {
   const courseInfo = document.getElementById('courseInfoInput').value.trim();
   const welcomeMessage = document.getElementById('welcomeMessageInput').value.trim();
   const shareCourseInfo = document.getElementById('shareCourseInfoCheckbox').checked;
+
+  const invalidStep = firstInvalidStep({ title, engagementRules, teachingVoice, courseInfo, welcomeMessage });
+  if (invalidStep) {
+    showToast(`Step ${invalidStep} still needs a bit more before saving.`, 'error');
+    showStep(invalidStep);
+    return;
+  }
+
+  T.saving = true;
+  const btn = document.getElementById('saveProfileBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
 
   try {
     // ─── MULTI-SYLLABUS UPLOAD + RECONCILIATION ──────────────────────────────

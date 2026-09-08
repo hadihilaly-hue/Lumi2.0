@@ -33,7 +33,7 @@ export const T = {
   syllabusNewFiles: [],
   syllabusExistingPaths: [],
   syllabusProcessing: false,
-  syllabusDefaultHint: '',
+  syllabusDefaultHint: null,
   templateData: null,
   recognition: null,
   recordingField: null,
