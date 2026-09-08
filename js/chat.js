@@ -136,6 +136,7 @@ async function generateTitle(convId, firstUserMsg) {
         saveConvs(c2);
         syncConvToRds(convId);
         renderSidebar();
+        document.dispatchEvent(new CustomEvent('lumi:conv-changed'));
       }
     }
   } catch { /* non-critical */ }

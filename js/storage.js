@@ -417,6 +417,9 @@ export function saveCurrentConv() {
   saveConvs(convs);
   localStorage.setItem('lumi_current', S.currentId);
   syncConvToRds(S.currentId);
+  // The class-view rail lists convs by title/preview, so a brand-new chat only
+  // becomes visible once its first message is saved.
+  try { document.dispatchEvent(new CustomEvent('lumi:conv-changed')); } catch { /* test env */ }
 }
 
 // ─── PHASE 5: ROLLING PROGRESS-NOTE FLUSH (best-effort session-end trigger) ────
