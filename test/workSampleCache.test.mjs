@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { beforeEach, test } from 'node:test';
 
 import {
-  MAX_AGE_MS, MAX_ENTRIES, _resetMemoryCache, cacheKey, getCachedImage, putCachedImage, selectEvictions,
+  MAX_AGE_MS, MAX_ENTRIES, _memorySize, _resetMemoryCache, cacheKey, getCachedImage, putCachedImage, selectEvictions,
 } from '../js/workSampleCache.js';
 
 // ── Minimal in-memory IndexedDB double ───────────────────────────────────────
@@ -95,6 +95,18 @@ test('IndexedDB writes are pruned to MAX_ENTRIES', async () => {
   assert.equal(globalThis.indexedDB.rows.size, MAX_ENTRIES);
   assert.ok(!globalThis.indexedDB.rows.has('k0'), 'oldest evicted');
   assert.ok(globalThis.indexedDB.rows.has(`k${MAX_ENTRIES + 4}`), 'newest kept');
+});
+
+test('the in-memory layer is bounded to MAX_ENTRIES, oldest first', async () => {
+  delete globalThis.indexedDB;
+  for (let i = 0; i < MAX_ENTRIES + 5; i++) {
+    await putCachedImage(`k${i}`, { base64: 'x', mediaType: 'image/png' }, { persistent: false });
+  }
+  assert.equal(_memorySize(), MAX_ENTRIES);
+  assert.equal(await getCachedImage('k0', { persistent: false }), null);
+  assert.equal(await getCachedImage('k4', { persistent: false }), null);
+  assert.ok(await getCachedImage('k5', { persistent: false }));
+  assert.ok(await getCachedImage(`k${MAX_ENTRIES + 4}`, { persistent: false }));
 });
 
 test('a stale IndexedDB row is ignored on read', async () => {

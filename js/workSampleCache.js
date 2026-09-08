@@ -96,16 +96,26 @@ export async function getCachedImage(key, { persistent = true } = {}) {
   if (!row || typeof row.base64 !== 'string' || !row.mediaType) return null;
   if (Date.now() - (row.storedAt || 0) > MAX_AGE_MS) return null;
   const img = { base64: row.base64, mediaType: row.mediaType };
-  _memory.set(key, img);
+  memorySet(key, img);
   return img;
+}
+
+// Memory layer is bounded like the store: insertion-ordered Map, oldest out
+// once MAX_ENTRIES is exceeded.
+function memorySet(key, img) {
+  _memory.delete(key);
+  _memory.set(key, img);
+  while (_memory.size > MAX_ENTRIES) _memory.delete(_memory.keys().next().value);
 }
 
 /** Stores in memory always; in IndexedDB only when `persistent` is true. */
 export async function putCachedImage(key, img, { persistent = true } = {}) {
-  _memory.set(key, img);
+  memorySet(key, img);
   if (!persistent) return;
   await idbPutAndPrune({ key, base64: img.base64, mediaType: img.mediaType, storedAt: Date.now() });
 }
+
+export function _memorySize() { return _memory.size; }
 
 // Test-only: forget the in-memory layer and the cached DB handle.
 export function _resetMemoryCache() {
