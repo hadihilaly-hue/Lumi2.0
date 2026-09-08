@@ -39,7 +39,7 @@ function wireSigninBtn() {
     try {
       const base = window.location.href.replace(/\/[^/]*$/, '/');
       const redirectTo = base + 'teacher.html';
-      const { error } = await sb.auth.signInWithOAuth({
+      const { error } = await auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo },
       });
@@ -80,7 +80,7 @@ async function handleUser(user) {
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 async function boot() {
   installTestModeReset();
-  const { data: { session } } = await sb.auth.getSession();
+  const { data: { session } } = await auth.getSession();
   if (!session) {
     showView('signinView');
     wireSigninBtn();

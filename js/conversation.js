@@ -5,10 +5,10 @@ import { getStudentName, teacherDisplayName, updateTestModeBanner } from './prom
 import { clearSearch, renderSidebar } from './sidebar.js';
 import { $, S, SB, _introShownFor, _saveIntroShown, currentUser, messagesEl, msgInput } from './state.js';
 import { flushProgressNote, genId, getConvs, saveConvs, saveCurrentConv } from './storage.js';
-import { getAvailableClassesSync, getTeacherProfile, loadWorkSampleImages, rdsFetch, resolveScheduleCourse } from './teachers.js';
+import { getAvailableClassesSync, getTeacherProfile, loadWorkSampleImages, apiFetch, resolveScheduleCourse } from './teachers.js';
 
 
-// ─── SUPABASE SYNC ────────────────────────────────────────────────────────────
+// ─── CONVERSATION LOAD / SYNC ─────────────────────────────────────────────────
 
 // Broadcast that the active conversation changed. The class-view rail
 // (js/classviewrail.js) listens for this to update its active-row highlight
@@ -70,9 +70,9 @@ export async function loadConv(id) {
   // the full messages on first open. Backward-compatible: convs saved within
   // this session — or served by an older Lambda that still inlines messages —
   // already have them, so this fetch is skipped.
-  if (conv.sbId && (!conv.messages || conv.messages.length === 0)) {
+  if (conv.serverId && (!conv.messages || conv.messages.length === 0)) {
     try {
-      const full = await rdsFetch(`conversations?id=${encodeURIComponent(conv.sbId)}`);
+      const full = await apiFetch(`conversations?id=${encodeURIComponent(conv.serverId)}`);
       if (full && Array.isArray(full.messages)) {
         conv.messages = full.messages;
         const store = getConvs();
@@ -113,7 +113,7 @@ export async function loadConv(id) {
   dispatchConvChanged();
 
   // AUDIT_FRONTEND H1: re-hydrate the teacher persona. Convs loaded from RDS
-  // (loadConvsFromRds) reconstruct tutorCtx from the teacher/course columns
+  // (loadConvs) reconstruct tutorCtx from the teacher/course columns
   // only — teacherProfile/notesInjection/workSamples are absent — so continuing
   // the chat would silently fall back to generic AI. Fetch them now.
   await hydrateTutorProfile();

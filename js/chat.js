@@ -5,7 +5,7 @@ import { getProjects } from './projects.js';
 import { buildCompanionSystem, buildTutorSystem, teacherDisplayName, teacherInitials } from './prompts.js';
 import { renderSidebar } from './sidebar.js';
 import { $, S, _currentProjId, attachPreview, fileInput, messagesEl, msgInput, pendingAttachment, setPendingAttachment } from './state.js';
-import { getConvs, saveConvs, saveCurrentConv, syncConvToRds } from './storage.js';
+import { getConvs, saveConvs, saveCurrentConv, syncConv } from './storage.js';
 import { escHtml, showToast, updateSendBtn } from './ui.js';
 import { _addSpeakerBtn } from './voice.js';
 
@@ -134,7 +134,7 @@ async function generateTitle(convId, firstUserMsg) {
       if (c2[convId]) {
         c2[convId].title = title;
         saveConvs(c2);
-        syncConvToRds(convId);
+        syncConv(convId);
         renderSidebar();
         document.dispatchEvent(new CustomEvent('lumi:conv-changed'));
       }

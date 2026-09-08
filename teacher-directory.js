@@ -7,7 +7,7 @@
 //     ADMIN_NAME, ALLOWED_TEACHER_EMAILS — which are EMPTY until the fetch
 //     resolves, and
 //   • window.loadTeacherDirectory(): a memoized promise that every page awaits
-//     right after sb.auth.getSession() and BEFORE any teacher-resolution consumer
+//     right after auth.getSession() and BEFORE any teacher-resolution consumer
 //     runs (app.js IIFE, teacher.html/admin.html auth IIFEs).
 // Consumers MUST read these globals LIVE (not snapshot them at load time) —
 // see js/teachers.js resolveTeacherEmail / isTeacherModeAllowed. MENLO_CURRICULUM
@@ -25,11 +25,11 @@
   g.loadTeacherDirectory = function () {
     if (_promise) return _promise;
     _promise = (async function () {
-      // `sb` is the cognito-auth.js global (loaded before this script on every
+      // `auth` is the cognito-auth.js global (loaded before this script on every
       // page). session.access_token is the Cognito ID token — same bearer the
-      // rdsFetch/fetchClaudeProxy helpers send.
+      // apiFetch/fetchClaudeProxy helpers send.
       var session = null;
-      try { session = (await sb.auth.getSession()).data.session; } catch { /* ignore */ }
+      try { session = (await auth.getSession()).data.session; } catch { /* ignore */ }
       var token = session && session.access_token;
       var res = await fetch(LAMBDA_BASE + "/teacher-directory", {
         headers: token ? { Authorization: "Bearer " + token } : {},

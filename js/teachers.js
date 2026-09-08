@@ -94,15 +94,15 @@ export async function preloadProfileStatuses() {
   } catch (e) { console.warn('[preloadProfileStatuses] failed:', e); }
 }
 
-// Generic RDS Lambda fetch (Workstream G). Same auth idiom as
+// Generic Lambda fetch (Workstream G). Same auth idiom as
 // fetchTeacherProfileLambda below: Cognito ID token as Bearer, JSON in/out.
 // 404 -> null (not-found is a data state, not an error); any other non-2xx
 // throws so call sites fail VISIBLY — never silently swallow errors.
 // `path` starts without a slash (CLAUDE_PROXY_URL ends with one);
 // query params go in `path`, write payloads in `body`.
-export async function rdsFetch(path, { method = 'GET', body } = {}) {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session?.access_token) throw new Error('rdsFetch: no session');
+export async function apiFetch(path, { method = 'GET', body } = {}) {
+  const { data: { session } } = await auth.getSession();
+  if (!session?.access_token) throw new Error('apiFetch: no session');
   const res = await fetch(`${CLAUDE_PROXY_URL}${path}`, {
     method,
     headers: {
@@ -123,7 +123,7 @@ export async function rdsFetch(path, { method = 'GET', body } = {}) {
 // the caller falls back to the static catalog rather than showing an empty picker.
 export async function fetchAvailableClasses() {
   try {
-    const rows = await rdsFetch('available-classes');
+    const rows = await apiFetch('available-classes');
     return Array.isArray(rows) ? rows : null;
   } catch (err) {
     console.warn('[available-classes] fetch failed; using static fallback:', err);
@@ -171,7 +171,7 @@ export function resolveScheduleCourse(scheduleCourse) {
 // object, or null on 404). Auth is the same Cognito ID token the chat proxy uses. The route returns an array (teacher_email
 // is non-unique); we filter by course_name server-side and take the first row.
 export async function fetchTeacherProfileLambda(email, course) {
-  const { data: { session } } = await sb.auth.getSession();
+  const { data: { session } } = await auth.getSession();
   if (!session?.access_token) return null;
   const url = `${CLAUDE_PROXY_URL}teacher-profile?teacher_email=${encodeURIComponent(email)}&course_name=${encodeURIComponent(course)}`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${session.access_token}` } });
@@ -185,7 +185,7 @@ export async function fetchTeacherProfileLambda(email, course) {
 // RDS Lambda — one parallel request per email (the route takes a single teacher_email;
 // a student's schedule is only a handful of teachers). Returns a flat array of rows.
 export async function fetchTeacherProfilesByEmails(emails) {
-  const { data: { session } } = await sb.auth.getSession();
+  const { data: { session } } = await auth.getSession();
   if (!session?.access_token) return [];
   const lists = await Promise.all(emails.map(async (email) => {
     const url = `${CLAUDE_PROXY_URL}teacher-profile?teacher_email=${encodeURIComponent(email)}`;
@@ -257,7 +257,7 @@ export async function getTeacherProfile(teacherName, course) {
       if (data.id) {
         try {
           // 3s budget — never blocks profile usage.
-          const sQuery = rdsFetch(`work-samples?teacher_profile_id=${encodeURIComponent(data.id)}`)
+          const sQuery = apiFetch(`work-samples?teacher_profile_id=${encodeURIComponent(data.id)}`)
             .then(rows => ({ data: rows || [], error: null }), error => ({ data: null, error }));
           const sTimeout = new Promise(resolve => setTimeout(() => resolve(null), 3000));
           const sRes = await Promise.race([sQuery, sTimeout]);
@@ -419,7 +419,7 @@ export async function loadWorkSampleImages(profile) {
     // Get fresh session for auth on Lambda calls.
     let session;
     try {
-      const sessRes = await sb.auth.getSession();
+      const sessRes = await auth.getSession();
       session = sessRes && sessRes.data && sessRes.data.session;
       if (!session) {
         console.warn('[work_samples] no session');

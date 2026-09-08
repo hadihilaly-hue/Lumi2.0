@@ -2,7 +2,7 @@ import { fetchClaudeProxy, readProxyText } from './api.js';
 import { CONFIG } from './config.js';
 import { connectGoogleCalendar, saveStudyStyle, setCalendarConnected } from './homework.js';
 import { $, currentUser } from './state.js';
-import { rdsFetch } from './teachers.js';
+import { apiFetch } from './teachers.js';
 import { showToast } from './ui.js';
 
 
@@ -217,7 +217,7 @@ async function obSaveFullProfile() {
     onboarding_complete: true,
   };
   try {
-    await rdsFetch('profiles', { method: 'POST', body: obRow });
+    await apiFetch('profiles', { method: 'POST', body: obRow });
   } catch (e) {
     // Hardened (§2): onboarding continues, but the failure is now user-visible.
     console.warn('Profile save error:', e);

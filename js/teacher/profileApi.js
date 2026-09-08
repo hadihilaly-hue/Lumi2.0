@@ -1,4 +1,4 @@
-// Every Lambda call the teacher portal makes. `sb` is the cognito-auth.js shim
+// Every Lambda call the teacher portal makes. `auth` is the cognito-auth.js shim
 // (classic script, global) — read at call time so this module evaluates cleanly
 // offline (test/register.mjs).
 
@@ -6,16 +6,16 @@ import { LAMBDA_URL } from './config.js';
 import { parseSuggestedPrompts } from './wizardState.js';
 
 async function accessToken() {
-  const { data: { session } } = await sb.auth.getSession();
+  const { data: { session } } = await auth.getSession();
   return session?.access_token || null;
 }
 
-// Generic RDS Lambda fetch — mirror of rdsFetch in app.js (LAMBDA_URL here has
+// Generic Lambda fetch — mirror of apiFetch in js/teachers.js (LAMBDA_URL here has
 // no trailing slash). 404 -> null; other non-2xx throws so call sites fail
 // VISIBLY.
-export async function rdsFetch(path, { method = 'GET', body } = {}) {
+export async function apiFetch(path, { method = 'GET', body } = {}) {
   const token = await accessToken();
-  if (!token) throw new Error('rdsFetch: no session');
+  if (!token) throw new Error('apiFetch: no session');
   const res = await fetch(`${LAMBDA_URL}/${path}`, {
     method,
     headers: {
@@ -30,27 +30,27 @@ export async function rdsFetch(path, { method = 'GET', body } = {}) {
 }
 
 // ─── teacher-profile ─────────────────────────────────────────────────────────
-// GET /teacher-profile defaults to the caller's own rows; 404 (rdsFetch null) =
+// GET /teacher-profile defaults to the caller's own rows; 404 (apiFetch null) =
 // brand-new teacher with no profiles yet — same as empty.
 export async function fetchOwnProfiles() {
-  return (await rdsFetch('teacher-profile')) || [];
+  return (await apiFetch('teacher-profile')) || [];
 }
 
 // Returns an array (200 [] when no shared template). Server excludes the
 // caller's own rows.
 export function fetchTemplateForCourse(course) {
-  return rdsFetch(`teacher-profile?template_for_course=${encodeURIComponent(course)}`);
+  return apiFetch(`teacher-profile?template_for_course=${encodeURIComponent(course)}`);
 }
 
 // POST returns the upserted row directly (teacher_email + updated_at are
 // server-set).
 export function upsertProfile(profileRow) {
-  return rdsFetch('teacher-profile', { method: 'POST', body: profileRow });
+  return apiFetch('teacher-profile', { method: 'POST', body: profileRow });
 }
 
 // The Lambda PATCH scopes to the JWT email server-side.
 export function patchProfile(body) {
-  return rdsFetch('teacher-profile', { method: 'PATCH', body });
+  return apiFetch('teacher-profile', { method: 'PATCH', body });
 }
 
 // ─── work-samples / work-artifacts ───────────────────────────────────────────
@@ -59,24 +59,24 @@ function idsQuery(profileIds) {
 }
 
 export function fetchWorkSamples(profileIds) {
-  return rdsFetch(`work-samples?teacher_profile_ids=${idsQuery(profileIds)}`);
+  return apiFetch(`work-samples?teacher_profile_ids=${idsQuery(profileIds)}`);
 }
 
 export function fetchWorkArtifacts(profileIds) {
-  return rdsFetch(`work-artifacts?teacher_profile_ids=${idsQuery(profileIds)}`);
+  return apiFetch(`work-artifacts?teacher_profile_ids=${idsQuery(profileIds)}`);
 }
 
 // POST is a (teacher_profile_id, tier) upsert; updated_at is server-set.
 export function upsertWorkSample(body) {
-  return rdsFetch('work-samples', { method: 'POST', body });
+  return apiFetch('work-samples', { method: 'POST', body });
 }
 
 export function upsertWorkArtifact(body) {
-  return rdsFetch('work-artifacts', { method: 'POST', body });
+  return apiFetch('work-artifacts', { method: 'POST', body });
 }
 
 export function deleteWorkArtifact(id) {
-  return rdsFetch(`work-artifacts?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+  return apiFetch(`work-artifacts?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
 // ─── class-enrollments ───────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ export async function fetchTeachingEnrollments() {
 // PATCH authz is server-side (caller must own the linked class); 403 throws,
 // 404 resolves null.
 export function patchEnrollmentNotes(id, teacherNotes) {
-  return rdsFetch('class-enrollments', { method: 'PATCH', body: { id, teacher_notes: teacherNotes } });
+  return apiFetch('class-enrollments', { method: 'PATCH', body: { id, teacher_notes: teacherNotes } });
 }
 
 // ─── S3 via signed URLs ──────────────────────────────────────────────────────

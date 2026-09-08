@@ -1,11 +1,11 @@
 import { fmtBytes, showAttachPreview } from './chat.js';
 import { lookupSubjectForCourse, openTutor } from './conversation.js';
 import { showWelcome } from './emptystate.js';
-import { closeHwBackdrop, getHwTasks, openHwBackdrop, saveHwTasks, syncHwToRds, todayStr } from './homework.js';
+import { closeHwBackdrop, getHwTasks, openHwBackdrop, saveHwTasks, syncHw, todayStr } from './homework.js';
 import { renderSidebar, showInlineConfirm } from './sidebar.js';
 import { $, S, SB, _currentProjId, currentUser, messagesEl, msgInput, setCurrentProjId, setPendingAttachment } from './state.js';
-import { deleteConvFromRds, genId, getConvs, getSchedule, saveConvs } from './storage.js';
-import { rdsFetch } from './teachers.js';
+import { deleteServerConv, genId, getConvs, getSchedule, saveConvs } from './storage.js';
+import { apiFetch } from './teachers.js';
 import { autoGrow, showToast, updateSendBtn } from './ui.js';
 
 
@@ -495,7 +495,7 @@ function toggleProjectDayComplete(projId, dateStr) {
   saveProjects(projects);
   renderProjectPlan(proj);
   injectProjectTasksToHomework();
-  syncHwToRds();
+  syncHw();
 }
 
 // ── Progress carry-over ──────────────────────────────────
@@ -714,7 +714,7 @@ export function deleteProject(projId, anchorEl) {
       closeHwBackdrop();
     }
 
-    syncHwToRds();
+    syncHw();
     renderSidebar();
     showToast('Project deleted');
   };
@@ -729,7 +729,7 @@ export function deleteProject(projId, anchorEl) {
 export function clearAllChats() {
   const convs = getConvs();
   // Delete each from RDS
-  Object.keys(convs).forEach(id => deleteConvFromRds(id));
+  Object.keys(convs).forEach(id => deleteServerConv(id));
   // Clear local
   saveConvs({});
   S.currentId = genId(); S.messages = []; S.exchangeCount = 0; S.tutorCtx = null;
@@ -751,16 +751,16 @@ export function clearCompletedProjects() {
   saveHwTasks(tasks);
   // Keep only incomplete projects
   saveProjects(projects.filter(p => !p.isComplete));
-  syncHwToRds();
+  syncHw();
   renderSidebar();
   showToast(`${completed.length} completed project${completed.length > 1 ? 's' : ''} cleared`);
 }
 
 // hw_tasks column does not exist in profiles table — localStorage only
-export async function loadHwFromRds() {
+export async function loadHw() {
   if (!currentUser) return;
   try {
-    const data = await rdsFetch('homework-tasks');
+    const data = await apiFetch('homework-tasks');
     if (!data || !data.length) return;
     const tasks = data.map(row => ({
       id: row.id,

@@ -32,11 +32,11 @@ AWS Lambda  "lumi-claude-proxy"  (lambda/index.mjs)
 ```
 
 - **Auth:** AWS Cognito (Google as the sole IdP), code + PKCE. `cognito-auth.js`
-  exposes an `sb.auth.*` shim so call sites still read like the old supabase-js
+  exposes an `auth.*` shim so call sites still read like the old supabase-js
   API. `session.access_token` is the Cognito **ID token**; the Lambda verifies it
   and maps it to a stable Lumi user id via the `app_users` bridge.
 - **Data:** the frontend never talks to the database directly. All reads/writes
-  go through a per-file `rdsFetch(path, {method, body})` helper → Lambda data
+  go through a per-file `apiFetch(path, {method, body})` helper → Lambda data
   routes (`/teacher-profile`, `/profiles`, `/conversations`, `/homework-tasks`,
   `/class-enrollments`, `/work-samples`, `/sis-import`). Identity is always taken
   from the JWT, never from the request body.
@@ -54,11 +54,11 @@ AWS Lambda  "lumi-claude-proxy"  (lambda/index.mjs)
 ```
 index.html        Sign-in page (Google via Cognito)
 app.html          Student chat app
-app.js            Student-app logic (chat, schedule, sync via rdsFetch)
+app.js            Student-app logic (chat, schedule, sync via apiFetch)
 teacher.html      Teacher onboarding wizard + roster
 admin.html        SIS admin console
 privacy.html      Privacy page
-cognito-auth.js   Cognito PKCE auth (exposes the sb.auth.* shim)
+cognito-auth.js   Cognito PKCE auth (exposes the auth.* shim)
 style.css         The single live stylesheet
 lambda/           AWS Lambda proxy (index.mjs, db.js, package.json)
 migration/        Live RDS schema (rds-schema.sql + rds-*.sql) and ops docs

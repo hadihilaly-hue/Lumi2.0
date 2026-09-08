@@ -1,7 +1,8 @@
 // ─── COGNITO AUTH (Workstream I, Phase 3) ─────────────────────────────────────
-// Cognito PKCE auth shim. Exposes the same globals the
-// pages already consume: `sb` (with sb.auth.getSession / signInWithOAuth /
-// signOut / onAuthStateChange), `isAllowedEmail`, `doSignOut`.
+// Cognito PKCE auth shim. Exposes the globals the pages consume: `auth`
+// (auth.getSession / signInWithOAuth / signOut / onAuthStateChange),
+// `isAllowedEmail`, `doSignOut`. `sb` (`sb.auth.*`) is a deprecated alias of
+// `auth` kept for one release.
 //
 // Flow: authorization code + PKCE against the Cognito hosted endpoints with
 // identity_provider=Google (users bounce straight to Google — no Cognito page).
@@ -9,7 +10,7 @@
 // expects token_use=id and resolves cognito_sub → preserved lumi uuid via the
 // app_users table server-side.
 
-/* exported isAllowedEmail, doSignOut */
+/* exported auth, sb, isAllowedEmail, doSignOut */
 // AUDIT_FRONTEND F6: all infra values for this (classic, non-module) script live
 // in one CONFIG object. This is a classic script shared by teacher/admin/lumi
 // pages, so it cannot import js/config.js — lambdaBaseUrl mirrors that module's
@@ -200,81 +201,81 @@ async function refreshTokens(tokens) {
   return refreshInFlight;
 }
 
-// ─── the `sb.auth.*` surface consumed by the pages ─────────────────────────────────────────
+// ─── the `auth.*` surface consumed by the pages ───────────────────────────────
 
-const sb = {
-  auth: {
-    async getSession() {
-      await bootPromise;
-      let tokens = loadTokens();
-      if (tokens && tokens.expires_at - Date.now() < REFRESH_SKEW_MS) {
-        tokens = await refreshTokens(tokens);
-      }
-      return { data: { session: buildSession(tokens) }, error: null };
-    },
+const auth = {
+  async getSession() {
+    await bootPromise;
+    let tokens = loadTokens();
+    if (tokens && tokens.expires_at - Date.now() < REFRESH_SKEW_MS) {
+      tokens = await refreshTokens(tokens);
+    }
+    return { data: { session: buildSession(tokens) }, error: null };
+  },
 
-    async signInWithOAuth({ options } = {}) {
-      try {
-        const redirectTo = options?.redirectTo || window.location.href;
-        const redirectUri = redirectTo.split(/[?#]/)[0];
-        const verifier = randomToken();
-        const state = randomToken();
-        sessionStorage.setItem(PKCE_STORAGE_KEY, JSON.stringify({ verifier, state, redirectTo, redirectUri }));
-        const challenge = await pkceChallenge(verifier);
-        const params = new URLSearchParams({
-          client_id: COGNITO_CLIENT_ID,
-          response_type: 'code',
-          scope: 'openid email profile',
-          redirect_uri: redirectUri,
-          identity_provider: 'Google',
-          code_challenge_method: 'S256',
-          code_challenge: challenge,
-          state,
-        });
-        window.location.assign(`${COGNITO_DOMAIN}/oauth2/authorize?${params}`);
-        return new Promise(() => {}); // navigating away — never settle
-      } catch (error) {
-        return { error };
-      }
-    },
-
-    // Clears local tokens AND the Cognito hosted session (otherwise a
-    // sign-out → sign-in-as-someone-else loop silently re-signs-in the same
-    // account off the Cognito cookie). Never resolves: the page is navigating,
-    // and letting callers run their own follow-up redirect would cancel the
-    // logout round trip.
-    signOut() {
-      clearTokens();
-      fireAuthEvent('SIGNED_OUT', null);
-      const base = window.location.href.replace(/\/[^/]*$/, '/');
+  async signInWithOAuth({ options } = {}) {
+    try {
+      const redirectTo = options?.redirectTo || window.location.href;
+      const redirectUri = redirectTo.split(/[?#]/)[0];
+      const verifier = randomToken();
+      const state = randomToken();
+      sessionStorage.setItem(PKCE_STORAGE_KEY, JSON.stringify({ verifier, state, redirectTo, redirectUri }));
+      const challenge = await pkceChallenge(verifier);
       const params = new URLSearchParams({
         client_id: COGNITO_CLIENT_ID,
-        logout_uri: base + 'index.html',
+        response_type: 'code',
+        scope: 'openid email profile',
+        redirect_uri: redirectUri,
+        identity_provider: 'Google',
+        code_challenge_method: 'S256',
+        code_challenge: challenge,
+        state,
       });
-      window.location.assign(`${COGNITO_DOMAIN}/logout?${params}`);
-      return new Promise(() => {});
-    },
+      window.location.assign(`${COGNITO_DOMAIN}/oauth2/authorize?${params}`);
+      return new Promise(() => {}); // navigating away — never settle
+    } catch (error) {
+      return { error };
+    }
+  },
 
-    onAuthStateChange(callback) {
-      authListeners.push(callback);
-      if (pendingSignedInSession) {
-        const s = pendingSignedInSession;
-        pendingSignedInSession = null;
-        try { callback('SIGNED_IN', s); } catch (e) { console.error('[auth] listener error:', e); }
-      }
-      return {
-        data: {
-          subscription: {
-            unsubscribe() {
-              const i = authListeners.indexOf(callback);
-              if (i >= 0) authListeners.splice(i, 1);
-            },
+  // Clears local tokens AND the Cognito hosted session (otherwise a
+  // sign-out → sign-in-as-someone-else loop silently re-signs-in the same
+  // account off the Cognito cookie). Never resolves: the page is navigating,
+  // and letting callers run their own follow-up redirect would cancel the
+  // logout round trip.
+  signOut() {
+    clearTokens();
+    fireAuthEvent('SIGNED_OUT', null);
+    const base = window.location.href.replace(/\/[^/]*$/, '/');
+    const params = new URLSearchParams({
+      client_id: COGNITO_CLIENT_ID,
+      logout_uri: base + 'index.html',
+    });
+    window.location.assign(`${COGNITO_DOMAIN}/logout?${params}`);
+    return new Promise(() => {});
+  },
+
+  onAuthStateChange(callback) {
+    authListeners.push(callback);
+    if (pendingSignedInSession) {
+      const s = pendingSignedInSession;
+      pendingSignedInSession = null;
+      try { callback('SIGNED_IN', s); } catch (e) { console.error('[auth] listener error:', e); }
+    }
+    return {
+      data: {
+        subscription: {
+          unsubscribe() {
+            const i = authListeners.indexOf(callback);
+            if (i >= 0) authListeners.splice(i, 1);
           },
         },
-      };
-    },
+      },
+    };
   },
 };
+
+const sb = { auth }; // deprecated alias (`sb.auth.*`), remove after one release
 
 // ─── HELPERS (same surface auth.js provided) ──────────────────────────────────
 
@@ -304,6 +305,6 @@ async function isAllowedEmail(email) {
 }
 
 async function doSignOut() {
-  await sb.auth.signOut();
+  await auth.signOut();
   window.location.href = 'index.html'; // unreachable — signOut navigates; kept for shape parity
 }

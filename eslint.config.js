@@ -11,7 +11,8 @@ const frontendGlobals = {
   renderMathInElement: "readonly",
   CONFIG: "readonly",
   SCHOOL_CONFIG: "readonly",
-  sb: "readonly",
+  auth: "readonly",
+  sb: "readonly", // deprecated alias of `auth`
   isAllowedEmail: "readonly",
   doSignOut: "readonly",
 };
@@ -50,8 +51,8 @@ export default [
   },
   {
     // Classic <script src> files: top-level declarations are window globals.
-    // cognito-auth.js *defines* CONFIG/sb/isAllowedEmail/doSignOut (see its
-    // `/* exported */` directive); teacher-directory.js only consumes `sb`.
+    // cognito-auth.js *defines* CONFIG/auth/sb/isAllowedEmail/doSignOut (see its
+    // `/* exported */` directive); teacher-directory.js only consumes `auth`.
     files: ["cognito-auth.js"],
     languageOptions: {
       ecmaVersion: "latest",
@@ -64,7 +65,7 @@ export default [
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "script",
-      globals: { ...globals.browser, sb: "readonly" },
+      globals: { ...globals.browser, auth: "readonly" },
     },
   },
   {

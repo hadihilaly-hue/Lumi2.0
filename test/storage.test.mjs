@@ -1,7 +1,7 @@
 // js/storage.js — localStorage persistence for schedule + conversations, plus
 // the legacy-data migration. Only the pure/localStorage-backed functions are in
-// scope. The RDS sync functions (syncConvToRds, loadProfileFromRds,
-// loadTestModeSchedule, …) are out of scope: they require currentUser + rdsFetch
+// scope. The server sync functions (syncConv, loadProfile,
+// loadTestModeSchedule, …) are out of scope: they require currentUser + apiFetch
 // (network). They are gated `if (!currentUser) return`, so with the default null
 // currentUser the functions exercised here never touch the network.
 
@@ -16,6 +16,7 @@ import {
   saveConvs,
   saveCurrentConv,
   migrateOldData,
+  migrateConvServerIds,
   hasAllWorkSampleTiers,
 } from '../js/storage.js';
 import { S } from '../js/state.js';
@@ -103,7 +104,7 @@ test('saveCurrentConv persists the current session with a 60-char preview', () =
   assert.equal(stored.id, 'conv_now');
   assert.equal(stored.preview.length, 60); // sliced to 60 chars
   assert.equal(stored.exchangeCount, 1);
-  assert.equal(stored.sbId, null);
+  assert.equal(stored.serverId, null);
   assert.deepEqual(stored.messages, S.messages);
   // lumi_current is stamped so a reload can restore the open conversation.
   assert.equal(globalThis.localStorage.getItem('lumi_current'), 'conv_now');
@@ -147,14 +148,39 @@ test('saveCurrentConv is a no-op with no currentId or no messages', () => {
   assert.deepEqual(getConvs(), {});
 });
 
-test('saveCurrentConv preserves existing sbId and ts across re-saves', () => {
-  saveConvs({ conv_keep: { id: 'conv_keep', sbId: 'uuid-123', ts: 777, messages: [] } });
+test('saveCurrentConv preserves existing serverId and ts across re-saves', () => {
+  saveConvs({ conv_keep: { id: 'conv_keep', serverId: 'uuid-123', ts: 777, messages: [] } });
   S.currentId = 'conv_keep';
   S.messages = [{ role: 'user', content: 'follow-up' }];
   saveCurrentConv();
   const stored = getConvs()['conv_keep'];
-  assert.equal(stored.sbId, 'uuid-123');
+  assert.equal(stored.serverId, 'uuid-123');
   assert.equal(stored.ts, 777);
+});
+
+test('getConvs migrates legacy sbId to serverId once and writes it back', () => {
+  globalThis.localStorage.setItem('lumi_convs', JSON.stringify({
+    conv_old:  { id: 'conv_old',  sbId: 'uuid-old', ts: 1, messages: [] },
+    conv_both: { id: 'conv_both', sbId: 'uuid-stale', serverId: 'uuid-new', ts: 2, messages: [] },
+    conv_new:  { id: 'conv_new',  serverId: 'uuid-kept', ts: 3, messages: [] },
+    conv_none: { id: 'conv_none', ts: 4, messages: [] },
+  }));
+  const convs = getConvs();
+  assert.equal(convs.conv_old.serverId, 'uuid-old');
+  assert.equal(convs.conv_both.serverId, 'uuid-new');   // existing serverId wins
+  assert.equal(convs.conv_new.serverId, 'uuid-kept');
+  assert.equal(convs.conv_none.serverId, undefined);
+  assert.ok(!('sbId' in convs.conv_old) && !('sbId' in convs.conv_both));
+  // Written back: the raw localStorage payload no longer carries sbId.
+  const raw = globalThis.localStorage.getItem('lumi_convs');
+  assert.ok(!raw.includes('sbId'));
+  assert.ok(raw.includes('"serverId":"uuid-old"'));
+});
+
+test('migrateConvServerIds returns false when nothing needs migrating', () => {
+  assert.equal(migrateConvServerIds({ a: { id: 'a', serverId: 'x' }, b: { id: 'b' } }), false);
+  assert.equal(migrateConvServerIds({}), false);
+  assert.equal(migrateConvServerIds(null), false);
 });
 
 test('saveCurrentConv caps stored conversations at 50, evicting the oldest', () => {

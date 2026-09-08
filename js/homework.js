@@ -4,7 +4,7 @@ import { teacherDisplayName } from './prompts.js';
 import { addLongPress, renderSidebar } from './sidebar.js';
 import { $, S, currentUser } from './state.js';
 import { getSchedule } from './storage.js';
-import { _profileCache, fetchTeacherProfileLambda, rdsFetch, resolveTeacherEmail } from './teachers.js';
+import { _profileCache, fetchTeacherProfileLambda, apiFetch, resolveTeacherEmail } from './teachers.js';
 import { closeSidebar, showToast } from './ui.js';
 
 
@@ -59,12 +59,12 @@ export function getStudyStyle() {
   } catch { return { work_minutes: 25, break_minutes: 5, label: 'Short Bursts' }; }
 }
 export function saveStudyStyle(style) { localStorage.setItem('lumi_study_style', JSON.stringify(style)); }
-export async function syncStudyStyleToRds(style) {
+export async function syncStudyStyle(style) {
   if (!currentUser) return;
   // TM-2: don't write student-shaped fields into the teacher's auth user record.
   if (S.isTestMode) return;
   try {
-    await rdsFetch('profiles', { method: 'POST', body: { study_style: style } });
+    await apiFetch('profiles', { method: 'POST', body: { study_style: style } });
   } catch (e) {
     // Hardened (§2): this was app.js's only fully-silent catch; now logged + toasted.
     console.warn('Study style sync error:', e);
@@ -98,7 +98,7 @@ export function setCalendarConnected(val) {
 async function fetchCalendarToken() {
   if (!currentUser) return null;
   try {
-    const { data: { session } } = await sb.auth.getSession();
+    const { data: { session } } = await auth.getSession();
     const token = session?.provider_token || null;
     if (token) _calToken = token;
     return token;
@@ -522,7 +522,7 @@ export function closeHwPopup() {
   setTimeout(() => { popup.style.display = 'none'; }, 200);
   renderSidebar(); // refresh sidebar checklist
   dispatchHwChanged();
-  syncHwToRds();
+  syncHw();
 }
 
 export function showHwAddModal(prefillClass) {
@@ -668,7 +668,7 @@ function toggleHwTask(id) {
   saveHwTasks(tasks);
   renderHwPopupTasks();
   renderSidebar();
-  syncHwToRds();
+  syncHw();
 }
 
 function deleteHwTask(id) {
@@ -676,7 +676,7 @@ function deleteHwTask(id) {
   saveHwTasks(tasks);
   renderHwPopupTasks();
   renderSidebar();
-  syncHwToRds();
+  syncHw();
 }
 
 export function addHwTask(task) {
@@ -1355,7 +1355,7 @@ export function activeHwForClass(course) {
 }
 
 // ── RDS sync ──────────────────────────────────────────
-export function syncHwToRds() {
+export function syncHw() {
   if (!currentUser) return;
   const tasks = getHwTasks();
   const rows = tasks.map(t => ({
@@ -1371,14 +1371,14 @@ export function syncHwToRds() {
   if (!rows.length) {
     // Hardened (§2/§3): the empty-list wipe was the codebase's only fully
     // silent destructive write — now logged AND toasted on failure.
-    rdsFetch('homework-tasks?all=true', { method: 'DELETE' }).catch(err => {
+    apiFetch('homework-tasks?all=true', { method: 'DELETE' }).catch(err => {
       console.warn('[syncHw] delete error:', err);
       showToast('Could not sync homework — see console');
     });
     return;
   }
   // user_id in each row is ignored server-side (always the JWT user).
-  rdsFetch('homework-tasks', { method: 'POST', body: rows }).then(res => {
+  apiFetch('homework-tasks', { method: 'POST', body: rows }).then(res => {
     if (res && res.upserted !== rows.length) {
       console.warn('[syncHw] upsert error:', `only ${res.upserted}/${rows.length} rows written (foreign id skipped)`);
     }

@@ -60,7 +60,7 @@ beforeEach(() => {
   resetState();
   _resetMemoryCache();
   delete globalThis.indexedDB;
-  globalThis.sb = { auth: { getSession: async () => ({ data: { session: { access_token: 'tok' } } }) } };
+  globalThis.auth = { getSession: async () => ({ data: { session: { access_token: 'tok' } } }) };
 });
 afterEach(() => {
   CONFIG.debug = savedDebug;

@@ -7,7 +7,7 @@ import { getSchedule } from './storage.js';
 export function getStudentName() { return localStorage.getItem('lumi_name') || 'there'; }
 
 // Sidebar user-card subtitle: "11th · Menlo" if grade is known, else "Menlo".
-// Called at initial auth and after Supabase profile load (covers fresh-device case).
+// Called at initial auth and after server profile load (covers fresh-device case).
 export function setSidebarUserSubtitle() {
   const grade = localStorage.getItem('lumi_grade');
   const subtitle = grade ? `${grade}th · Menlo` : 'Menlo';
