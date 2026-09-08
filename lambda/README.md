@@ -29,6 +29,9 @@ routes/
   teacherProfiles.mjs  /teacher-profile, /work-samples, /work-artifacts
   enrollments.mjs  /class-enrollments
   conversations.mjs  /conversations
+  bootstrap.mjs    /bootstrap (student boot: profile + schedule + enrollments +
+                   available classes + conversation metadata; reuses the
+                   select* query functions exported by the routes above)
   homework.mjs     /homework-tasks
   uploads.mjs      /upload-url, /download-url, /download-urls (batch)
   admin.mjs        adminSql direct-invoke, /admin/delete-student, /admin/student-data, /sis-import

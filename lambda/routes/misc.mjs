@@ -173,26 +173,30 @@ export async function teacherDirectory(ctx) {
 // already exposed via /teacher-directory and the cross-teacher /teacher-profile
 // read. `subject` is best-effort from sections (SIS) — null for manually
 // created profiles, which the client buckets under a generic header.
+export async function selectAvailableClasses() {
+  const result = await dbQuery(
+    `SELECT tp.course_name,
+            tp.teacher_email,
+            tp.title,
+            sd.name AS teacher_name,
+            (SELECT s.subject FROM public.sections s
+               WHERE s.teacher_profile_id = tp.id
+               LIMIT 1) AS subject
+       FROM public.teacher_profiles tp
+       LEFT JOIN public.staff_directory sd
+         ON lower(sd.email) = lower(tp.teacher_email)
+      WHERE tp.done = true AND tp.deleted_at IS NULL
+      ORDER BY tp.course_name`
+  );
+  return result.rows;
+}
+
 export async function availableClasses(ctx) {
   const { event, sendJson } = ctx;
     const method = event.requestContext?.http?.method || "GET";
     if (method !== "GET") return sendJson(405, { error: "Method not allowed" });
     try {
-      const result = await dbQuery(
-        `SELECT tp.course_name,
-                tp.teacher_email,
-                tp.title,
-                sd.name AS teacher_name,
-                (SELECT s.subject FROM public.sections s
-                   WHERE s.teacher_profile_id = tp.id
-                   LIMIT 1) AS subject
-           FROM public.teacher_profiles tp
-           LEFT JOIN public.staff_directory sd
-             ON lower(sd.email) = lower(tp.teacher_email)
-          WHERE tp.done = true AND tp.deleted_at IS NULL
-          ORDER BY tp.course_name`
-      );
-      return sendJson(200, result.rows);
+      return sendJson(200, await selectAvailableClasses());
     } catch (err) {
       console.error("available-classes error:", safeErr(err));
       return sendJson(500, { error: "available-classes failed" });

@@ -12,6 +12,7 @@ import { classEnrollments } from "./routes/enrollments.mjs";
 import { conversations } from "./routes/conversations.mjs";
 import { homeworkTasks } from "./routes/homework.mjs";
 import { uploadUrl, downloadUrl, downloadUrls } from "./routes/uploads.mjs";
+import { bootstrap } from "./routes/bootstrap.mjs";
 
 // Test-only re-exports (see bottom of file).
 import { checkRateLimit, logUsage } from "./lib/usage.mjs";
@@ -44,6 +45,7 @@ const ROUTES = {
   "/consent": misc.consent,
   "/teacher-directory": misc.teacherDirectory,
   "/available-classes": misc.availableClasses,
+  "/bootstrap": bootstrap,
   "/teacher-profile": teacherProfile,
   "/profiles": profiles,
   "/conversations": conversations,
