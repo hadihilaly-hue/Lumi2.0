@@ -61,6 +61,16 @@ export async function callAPI(msgs, system, onChunk) {
     throw new Error(msg);
   }
 
+  // Session 6: the caller renders as it arrives. Hand it only the text a
+  // student should see — the trailing profile blob is stripped here the
+  // same way parseResponse strips it from the final string.
+  const full = await readProxyText(res, onChunk && (acc => onChunk(streamVisibleText(acc))));
+  return parseResponse(full);
+}
+
+// The Lambda always answers the chat route as an SSE stream (never a JSON
+// body), so every caller must drain it. Returns the full assistant text.
+export async function readProxyText(res, onChunk) {
   const reader = res.body.getReader(), dec = new TextDecoder();
   let buf = '', full = '';
   let streamErr = null;
@@ -74,13 +84,10 @@ export async function callAPI(msgs, system, onChunk) {
     for (const ev of events) {
       if (ev.type === 'text') {
         full += ev.text;
-        // Session 6: the caller renders as it arrives. Hand it only the text a
-        // student should see — the trailing profile blob is stripped here the
-        // same way parseResponse strips it from the final string.
-        if (onChunk) { try { onChunk(streamVisibleText(full)); } catch (e) { console.warn('[stream] onChunk threw:', e); } }
+        if (onChunk) { try { onChunk(full); } catch (e) { console.warn('[stream] onChunk threw:', e); } }
       } else if (ev.type === 'error') {
-        // Previously dropped on the floor: an error event carries no `type`, so
-        // the old delta test skipped it and the stream ended with empty text.
+        // An error event carries no `type`, so a delta-only test would skip it
+        // and the stream would end with empty text.
         streamErr = ev.message; break outer;
       } else if (ev.type === 'done') {
         break outer;
@@ -88,7 +95,7 @@ export async function callAPI(msgs, system, onChunk) {
     }
   }
   if (streamErr) throw new Error(streamErr);
-  return parseResponse(full);
+  return full;
 }
 
 // ─── SSE ─────────────────────────────────────────────────────────────────────
