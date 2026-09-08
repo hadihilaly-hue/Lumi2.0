@@ -1,14 +1,63 @@
 # lumi-claude-proxy (Lambda source)
 
 Source for the **`lumi-claude-proxy`** AWS Lambda (us-east-1) — the streamified
-backend behind the function URL. Routes (in `index.mjs`): `/db-health`,
-`/admin/sql` (temporary), `/teacher-profile`, `/upload-url`, `/download-url`, `/download-urls` (batch),
-and the default chat SSE stream. `db.js` is the IAM-authenticated `pg` pool that
-connects through the RDS Proxy to `lumi-db`.
+backend behind the function URL.
 
-Tracked here: `index.mjs`, `db.js`, `package.json`, `package-lock.json`.
-`node_modules/` and the build zip are **gitignored** (build artifacts) — recreate
-them with the steps below.
+## Layout
+
+```
+index.mjs          entrypoint: parse event -> direct-invoke/public routes -> verifyAuth
+                   -> dispatch table -> route. Exports `handler`
+                   (awslambda.streamifyResponse) and the test-only `__test__` surface.
+lib/
+  config.mjs       AWS_REGION, SCHOOL_CONFIG (admins, rate tiers, default model), safeErr
+  db.mjs           IAM-authenticated `pg` pool through the RDS Proxy to `lumi-db` (was db.js)
+  auth.mjs         Cognito JWKS verification, app_users bridge, allowed-domains cache,
+                   teacherStatus(user) -> { isAdmin, isProvisioned, isDone }
+  sse.mjs          HttpResponseStream wrapping (jsonResponder / openEventStream) + SSE writers
+  s3.mjs           S3 key building + presigned upload (300s) / download (3600s) URLs
+  prompt.mjs       system-prompt assembly: teacher-notes / work-artifacts / progress-note
+                   marker swaps (string or Anthropic content-block array; cache_control kept)
+  progressNotes.mjs  Phase 5 cross-session memory (summarizer, fetch, store)
+  bedrock.mjs      Bedrock client + callClaude / generateResponse
+  usage.mjs        checkRateLimit + logUsage (api_usage)
+  columns.mjs      per-table write allowlists + pickColumns
+  ferpa.mjs        /my-data export + soft-delete helpers
+routes/
+  chat.mjs         default SSE chat, /suggested-prompts, /progress-note/flush
+  profiles.mjs     /profiles
+  teacherProfiles.mjs  /teacher-profile, /work-samples, /work-artifacts
+  enrollments.mjs  /class-enrollments
+  conversations.mjs  /conversations
+  homework.mjs     /homework-tasks
+  uploads.mjs      /upload-url, /download-url, /download-urls (batch)
+  admin.mjs        adminSql direct-invoke, /admin/delete-student, /admin/student-data, /sis-import
+  misc.mjs         /db-health, /allowed-domains, /my-data, /delete-my-account, /consent,
+                   /teacher-directory, /available-classes
+test/              node:test suite (`npm test`); harness.mjs + hooks.mjs stub AWS/pg
+```
+
+A route module exports `async (ctx)` handlers receiving
+`{ event, body, user, sendJson, responseStream }`. `sendJson(status, payload)`
+may be called once per request; the chat route opens its own SSE stream instead.
+
+### Teacher authorization
+
+`teacherStatus(user)` in `lib/auth.mjs` is the single teacher-authz check:
+
+| flag | source | cached | used by |
+|---|---|---|---|
+| `isAdmin` | `SCHOOL_CONFIG.adminEmails` | — | admins are always provisioned + done, no DB hit |
+| `isProvisioned` | `sis_map` roster row OR `teacher_profiles` row with `deleted_at IS NULL` | no | teacher-profile writes, `/upload-url` |
+| `isDone` | `teacher_profiles.done = true` | 120s, FIFO-bounded 1000 entries, invalidated on profile writes | chat rate tier, `/suggested-prompts` |
+
+Both DB-backed flags fail closed to `false` on a DB error. Pass
+`{ done: false }` / `{ provisioned: false }` to skip a lookup you don't need.
+`isTeacher(email)` / `isProvisionedTeacher(user)` survive as one-line wrappers.
+
+Tracked here: `index.mjs`, `lib/`, `routes/`, `test/`, `package.json`,
+`package-lock.json`. `node_modules/` and the build zip are **gitignored** (build
+artifacts) — recreate them with the steps below.
 
 ## Rebuild the deployment zip
 
@@ -16,11 +65,12 @@ them with the steps below.
 cd lambda
 npm install                       # restores node_modules from package-lock.json (seconds, cached)
 rm -f lumi-claude-proxy.zip
-zip -r -X lumi-claude-proxy.zip index.mjs db.js package.json node_modules -x '*.DS_Store'
+zip -r -X lumi-claude-proxy.zip index.mjs lib routes package.json node_modules -x '*.DS_Store'
 ```
 
 Run `zip` from **inside** `lambda/` so `index.mjs` lands at the zip root (the
-handler is `index.handler`), not nested in a subfolder.
+handler is `index.handler`), not nested in a subfolder. `lib/` and `routes/`
+**must** be in the zip — `index.mjs` imports from both at module load.
 
 ## Deploy
 
@@ -30,57 +80,6 @@ aws lambda update-function-code \
   --zip-file fileb://lumi-claude-proxy.zip
 ```
 
-## CI deploy (GitHub Actions)
-
-`.github/workflows/deploy-lambda.yml` does the rebuild + `update-function-code`
-above automatically on every push to `main` that touches `lambda/**` (and on
-demand via **Actions → Deploy Lambda → Run workflow**). It zips `lambda/` minus
-`test/` and waits for `aws lambda wait function-updated`.
-
-It is **inactive until two repository secrets exist**. The workflow never
-creates them; add them by hand:
-
-1. Create an IAM user (e.g. `lumi-github-lambda-deploy`) with **no console
-   access** and attach this inline policy — the minimum the workflow needs:
-
-   ```json
-   {
-     "Version": "2012-10-17",
-     "Statement": [
-       {
-         "Effect": "Allow",
-         "Action": [
-           "lambda:UpdateFunctionCode",
-           "lambda:GetFunction",
-           "lambda:GetFunctionConfiguration"
-         ],
-         "Resource": "arn:aws:lambda:us-east-1:613136968914:function:lumi-claude-proxy"
-       }
-     ]
-   }
-   ```
-
-   ```bash
-   aws iam create-user --user-name lumi-github-lambda-deploy
-   aws iam put-user-policy --user-name lumi-github-lambda-deploy \
-     --policy-name lumi-claude-proxy-update-code --policy-document file://policy.json
-   aws iam create-access-key --user-name lumi-github-lambda-deploy
-   ```
-
-2. In the GitHub repo: **Settings → Secrets and variables → Actions → New
-   repository secret**, and add:
-
-   | Secret name | Value |
-   |---|---|
-   | `AWS_LAMBDA_DEPLOY_ACCESS_KEY_ID` | `AccessKeyId` from `create-access-key` |
-   | `AWS_LAMBDA_DEPLOY_SECRET_ACCESS_KEY` | `SecretAccessKey` from `create-access-key` |
-
-   Or with the CLI: `gh secret set AWS_LAMBDA_DEPLOY_ACCESS_KEY_ID` (prompts for
-   the value), then the same for the secret key.
-
-Rotate by issuing a new access key for the user, updating both secrets, and
-deleting the old key.
-
 ## Verify no drift vs. the live function
 
 A rebuilt zip's `CodeSha256` will **not** match the deployed one — zip embeds file
@@ -89,7 +88,7 @@ mtimes and entry order, so it isn't byte-reproducible. Compare the **source** in
 ```bash
 URL=$(aws lambda get-function --function-name lumi-claude-proxy --region us-east-1 --query Code.Location --output text)
 curl -s "$URL" -o /tmp/deployed.zip
-for f in index.mjs db.js package.json; do diff <(unzip -p /tmp/deployed.zip "$f") "$f" && echo "$f OK"; done
+for f in index.mjs lib/*.mjs routes/*.mjs package.json; do diff <(unzip -p /tmp/deployed.zip "$f") "$f" && echo "$f OK"; done
 ```
 
 ## Dependencies

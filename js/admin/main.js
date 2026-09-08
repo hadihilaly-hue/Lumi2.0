@@ -8,7 +8,6 @@ import {
 import { ferpaExport, ferpaShowConfirm, ferpaHideConfirm, ferpaConfirmSync, ferpaDelete } from './ferpa.js';
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
-let _aUser     = null;
 let aProfiles  = {};   // "email|course" → profile row
 let aLoaded    = false; // true once any GET ?scope=all has succeeded
 let aLastError = null;  // error from the most recent load, if it failed
@@ -30,7 +29,6 @@ async function boot() {
     window.location.replace('index.html');
     return;
   }
-  _aUser = session.user;
   document.getElementById('authLoading').style.display = 'none';
   document.getElementById('adminApp').style.display = 'block';
   await loadAndRender();

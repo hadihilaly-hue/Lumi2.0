@@ -44,7 +44,7 @@ function wireSigninBtn() {
         options: { redirectTo },
       });
       if (error) throw error;
-    } catch (_err) {
+    } catch {
       btn.disabled = false;
       btn.innerHTML = `${GOOGLE_SVG} Sign in with Google`;
       document.getElementById('tSigninError').textContent = 'Something went wrong. Please try again.';
