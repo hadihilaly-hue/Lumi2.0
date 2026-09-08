@@ -2,7 +2,7 @@
 // /suggested-prompts, and the flag-gated /progress-note/flush.
 import { query as dbQuery } from "../lib/db.mjs";
 import { SCHOOL_CONFIG, safeErr } from "../lib/config.mjs";
-import { isTeacher } from "../lib/auth.mjs";
+import { teacherStatus } from "../lib/auth.mjs";
 import { checkRateLimit, logUsage } from "../lib/usage.mjs";
 import { callClaude, generateResponse } from "../lib/bedrock.mjs";
 import { assembleSystemPrompt, fetchTeacherNotes } from "../lib/prompt.mjs";
@@ -30,7 +30,7 @@ export async function suggestedPrompts(ctx) {
       const notesText = notes.map(n => n.text || "").filter(Boolean).join("\n\n");
       if (!notesText) return sendJson(200, { mode: "fallback" });
 
-      const isTeacherUser = await isTeacher(user.email);
+      const isTeacherUser = (await teacherStatus(user, { provisioned: false })).isDone;
       const rateLimit = await checkRateLimit(user.id, isTeacherUser);
       if (!rateLimit.allowed) return sendJson(200, { mode: "fallback" });
 
@@ -145,7 +145,7 @@ export async function chat(ctx) {
   const { body, user, sendJson, responseStream } = ctx;
   let isTeacherUser;
   try {
-    isTeacherUser = await isTeacher(user.email);
+    isTeacherUser = (await teacherStatus(user, { provisioned: false })).isDone;
     const rateLimit = await checkRateLimit(user.id, isTeacherUser);
     if (!rateLimit.allowed) {
       return sendJson(429, { error: `Rate limit exceeded (${rateLimit.limit}/day)` });

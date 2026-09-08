@@ -1,13 +1,13 @@
 // routes/uploads.mjs — /upload-url, /download-url (S3 presigning).
 import { SCHOOL_CONFIG, safeErr } from "../lib/config.mjs";
-import { isProvisionedTeacher } from "../lib/auth.mjs";
+import { teacherStatus } from "../lib/auth.mjs";
 import { BUCKETS, buildS3Key, generateUploadURL, generateDownloadURL } from "../lib/s3.mjs";
 
 // === Route: POST /upload-url ===
 export async function uploadUrl(ctx) {
   const { event, body, user, sendJson } = ctx;
     try {
-      if (!(await isProvisionedTeacher(user))) return sendJson(403, { error: "Teachers only" });
+      if (!(await teacherStatus(user, { done: false })).isProvisioned) return sendJson(403, { error: "Teachers only" });
 
       const { bucket, filename, contentType, classId, tier } = body;
       if (!bucket || !filename) return sendJson(400, { error: "Missing bucket or filename" });

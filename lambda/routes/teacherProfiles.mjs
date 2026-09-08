@@ -1,7 +1,7 @@
 // routes/teacherProfiles.mjs — /teacher-profile, /work-samples, /work-artifacts.
 import { query as dbQuery } from "../lib/db.mjs";
 import { SCHOOL_CONFIG, safeErr } from "../lib/config.mjs";
-import { isProvisionedTeacher, invalidateTeacherStatus } from "../lib/auth.mjs";
+import { teacherStatus, invalidateTeacherStatus } from "../lib/auth.mjs";
 import { TEACHER_PROFILE_COLS, pickColumns } from "../lib/columns.mjs";
 
 // === Route: /teacher-profile (GET, POST, PATCH) ===
@@ -86,7 +86,7 @@ export async function teacherProfile(ctx) {
         }
         // AUDIT_LAMBDA_BUGS H1: gate teacher-profile creation on server-controlled
         // teacher authorization so `done` cannot be self-asserted by a student.
-        if (!(await isProvisionedTeacher(user))) {
+        if (!(await teacherStatus(user, { done: false })).isProvisioned) {
           return sendJson(403, { error: "Not authorized to create a teacher profile" });
         }
         const { cols, vals } = pickColumns(body, TEACHER_PROFILE_COLS);
@@ -111,7 +111,7 @@ export async function teacherProfile(ctx) {
         }
         // AUDIT_LAMBDA_BUGS H1: same server-controlled gate as POST — `done` is a
         // PATCH-able column, so an edit path must not become a self-promotion path.
-        if (!(await isProvisionedTeacher(user))) {
+        if (!(await teacherStatus(user, { done: false })).isProvisioned) {
           return sendJson(403, { error: "Not authorized to edit a teacher profile" });
         }
         const { cols, vals } = pickColumns(body, TEACHER_PROFILE_COLS);

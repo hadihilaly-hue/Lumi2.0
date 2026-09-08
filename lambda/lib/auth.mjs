@@ -127,17 +127,48 @@ export async function verifyCognitoAuth(token) {
   }
 }
 
-// === Teacher check ===
-// Cutover 2026-07-01: reads RDS (teacher_profiles is authoritative there).
-// Fail-closed to "not a teacher" on DB error — same posture as the old
-// Supabase REST path.
+// === Teacher authorization: ONE status check ===
+// teacherStatus(user) -> { isAdmin, isProvisioned, isDone }
 //
-// AUDIT_LAMBDA_PERF #1: isTeacher runs on every chat (hot path), /suggested-prompts,
-// and /upload-url — the only cacheable one of the ~3 serial chat-path round-trips.
-// Container-scoped cache keyed by lowercased email with a short TTL (status flips
-// only when a teacher completes onboarding). Bounded with FIFO eviction like
-// appUserCache. Invalidated on teacher-profile POST/PATCH so a teacher who just
-// finished setup isn't stuck as "not a teacher" for the TTL window.
+// isAdmin       — email is in SCHOOL_CONFIG.adminEmails. Admins are always
+//                 provisioned AND done, with no DB round-trip.
+// isProvisioned — WRITE authorization (AUDIT_LAMBDA_BUGS H1). teacher_profiles.done
+//                 is client-writable through POST /teacher-profile, so any student
+//                 could insert a row for their own email with done=true and
+//                 self-promote to "teacher" everywhere the boundary is checked
+//                 (/upload-url S3 PUTs, the 500/day rate tier, selectable-persona
+//                 visibility). Teacher status must derive from data the SERVER
+//                 controls, never from the request. A caller may create/edit a
+//                 teacher profile iff one of these holds:
+//                   1. admin, or
+//                   2. roster teacher — a sis_map row (entity_type='teacher') for
+//                      this lumi_id, written ONLY by the admin-only /sis-import, or
+//                   3. already provisioned — an existing non-soft-deleted
+//                      teacher_profiles row for this email (an admin/SIS-seeded
+//                      stub, or a prior authorized onboarding).
+//                 Not circular: a fresh student satisfies none of the three, so
+//                 they can never mint the FIRST teacher_profiles row. The
+//                 existing-row clause only grandfathers rows the server itself
+//                 provisioned. Once the write is gated, teacher_profiles.done is
+//                 trustworthy and isDone (the read side) rests on server-controlled
+//                 data. /upload-url uses this check too, since a teacher uploads
+//                 syllabi/photos during onboarding, before their profile is done.
+//                 NOT cached: the row must be visible immediately after provisioning.
+// isDone        — READ-side "finished onboarding" flag (teacher_profiles.done = true).
+//                 Cutover 2026-07-01: reads RDS. AUDIT_LAMBDA_PERF #1: runs on every
+//                 chat (hot path) and /suggested-prompts — the only cacheable one of
+//                 the ~3 serial chat-path round-trips. Container-scoped cache keyed by
+//                 lowercased email with a short TTL (status flips only when a teacher
+//                 completes onboarding). Bounded with FIFO eviction. Invalidated on
+//                 teacher-profile POST/PATCH so a teacher who just finished setup
+//                 isn't stuck as "not a teacher" for the TTL window.
+//
+// Both DB-backed flags fail CLOSED (false) on a DB error, independently.
+//
+// Callers that only need one flag pass { done: false } / { provisioned: false }
+// to skip the other lookup — this keeps the per-route query sequence identical
+// to the pre-unification isTeacher / isProvisionedTeacher calls. A skipped
+// flag is returned as `null` (unknown) for non-admins.
 const TEACHER_CACHE_TTL_MS = 120000;
 const TEACHER_CACHE_MAX = 1000;
 const teacherStatusCache = new Map(); // lowercased email -> { value: bool, exp: ms }
@@ -146,61 +177,33 @@ export function invalidateTeacherStatus(email) {
   teacherStatusCache.delete(email.toLowerCase());
 }
 
-export async function isTeacher(email) {
-  const key = email.toLowerCase();
-  if (SCHOOL_CONFIG.adminEmails.has(key)) return true;
-
+async function lookupDone(email) {
   const now = Date.now();
-  const hit = teacherStatusCache.get(key);
+  const hit = teacherStatusCache.get(email);
   if (hit && hit.exp > now) return hit.value;
 
   try {
     const result = await dbQuery(
       "SELECT 1 FROM public.teacher_profiles WHERE teacher_email = $1 AND done = true LIMIT 1",
-      [key]
+      [email]
     );
     const value = result.rowCount > 0;
     if (teacherStatusCache.size >= TEACHER_CACHE_MAX) {
       teacherStatusCache.delete(teacherStatusCache.keys().next().value);
     }
-    teacherStatusCache.set(key, { value, exp: now + TEACHER_CACHE_TTL_MS });
+    teacherStatusCache.set(email, { value, exp: now + TEACHER_CACHE_TTL_MS });
     return value;
   } catch (err) {
-    console.error("isTeacher error:", safeErr(err));
+    console.error("teacherStatus(done) error:", safeErr(err));
     return false;
   }
 }
 
-// === Teacher WRITE authorization (AUDIT_LAMBDA_BUGS H1) ===
-// isTeacher() reads teacher_profiles.done — but that column is client-writable
-// through POST /teacher-profile, so any student could insert a row for their own
-// email with done=true and self-promote to "teacher" everywhere the boundary is
-// checked (/upload-url S3 PUTs, the 500/day rate tier, selectable-persona
-// visibility). Teacher status must derive from data the SERVER controls, never
-// from the request.
-//
-// A caller may create/edit a teacher profile iff one of these holds:
-//   1. admin (SCHOOL_CONFIG.adminEmails), or
-//   2. roster teacher — a sis_map row (entity_type='teacher') for this lumi_id,
-//      written ONLY by the admin-only /sis-import, or
-//   3. already provisioned — an existing teacher_profiles row for this email (an
-//      admin/SIS-seeded stub, or a prior authorized onboarding).
-//
-// Not circular: a fresh student satisfies none of the three, so they can never
-// mint the FIRST teacher_profiles row (the self-promotion vector). The
-// existing-row clause only grandfathers rows the server itself provisioned. Once
-// the write is gated, teacher_profiles.done is trustworthy and isTeacher (the
-// read side, used by the rate tier) rests on server-controlled data. /upload-url
-// uses this check too, since a teacher uploads syllabi/photos during onboarding,
-// before their profile is marked done.
-// Fail-closed to "not authorized" on DB error — same posture as isTeacher.
-export async function isProvisionedTeacher(user) {
-  const email = user.email.toLowerCase();
-  if (SCHOOL_CONFIG.adminEmails.has(email)) return true;
+async function lookupProvisioned(userId, email) {
   try {
     const roster = await dbQuery(
       "SELECT 1 FROM public.sis_map WHERE lumi_id = $1 AND entity_type = 'teacher' LIMIT 1",
-      [user.id]
+      [userId]
     );
     if (roster.rowCount > 0) return true;
     const provisioned = await dbQuery(
@@ -209,7 +212,25 @@ export async function isProvisionedTeacher(user) {
     );
     return provisioned.rowCount > 0;
   } catch (err) {
-    console.error("isProvisionedTeacher error:", safeErr(err));
+    console.error("teacherStatus(provisioned) error:", safeErr(err));
     return false;
   }
+}
+
+export async function teacherStatus(user, { provisioned = true, done = true } = {}) {
+  const email = user.email.toLowerCase();
+  if (SCHOOL_CONFIG.adminEmails.has(email)) {
+    return { isAdmin: true, isProvisioned: true, isDone: true };
+  }
+  const isProvisioned = provisioned ? await lookupProvisioned(user.id, email) : null;
+  const isDone = done ? await lookupDone(email) : null;
+  return { isAdmin: false, isProvisioned, isDone };
+}
+
+// Legacy names, kept as one-line wrappers for the test surface (index.mjs __test__).
+export async function isTeacher(email) {
+  return (await teacherStatus({ email }, { provisioned: false })).isDone;
+}
+export async function isProvisionedTeacher(user) {
+  return (await teacherStatus(user, { done: false })).isProvisioned;
 }
