@@ -3,7 +3,7 @@ import { CONFIG } from './config.js';
 import { lookupSubjectForCourse } from './conversation.js';
 import { setSidebarUserSubtitle } from './prompts.js';
 import { S, currentUser } from './state.js';
-import { fetchTeacherProfilesByEmails, rdsFetch, resolveTeacherEmail, setTestModeTeacher } from './teachers.js';
+import { fetchTeacherProfilesByEmails, apiFetch, resolveTeacherEmail, setTestModeTeacher } from './teachers.js';
 import { showToast } from './ui.js';
 
 
@@ -63,7 +63,7 @@ export async function loadTestModeSchedule() {
       const idsQs = profileIds.map(encodeURIComponent).join(',');
       let sampleRows = null;
       try {
-        sampleRows = await rdsFetch(`work-samples?teacher_profile_ids=${idsQs}`);
+        sampleRows = await apiFetch(`work-samples?teacher_profile_ids=${idsQs}`);
       } catch (err) {
         console.warn('[test-mode] work_samples fetch failed:', err.message);
       }
@@ -72,7 +72,7 @@ export async function loadTestModeSchedule() {
       });
       let artifactRows = null;
       try {
-        artifactRows = await rdsFetch(`work-artifacts?teacher_profile_ids=${idsQs}`);
+        artifactRows = await apiFetch(`work-artifacts?teacher_profile_ids=${idsQs}`);
       } catch (err) {
         console.warn('[test-mode] work_artifacts fetch failed:', err.message);
       }
@@ -113,14 +113,14 @@ export async function loadTestModeSchedule() {
   }
 }
 
-export function syncScheduleToRds(schedule) {
+export function syncSchedule(schedule) {
   if (!currentUser) return;
   // TM-2: never write a teacher's synthetic schedule into their auth
   // user's profiles row — they're not a student.
   if (S.isTestMode) return;
   // Hardened (MIGRATION_HARDENING §2): awaited-in-promise with a real error
   // surface instead of console-only fire-and-forget.
-  rdsFetch('profiles', { method: 'POST', body: {
+  apiFetch('profiles', { method: 'POST', body: {
     schedule,
     schedule_updated_at: new Date().toISOString(),
   } }).catch(err => {
@@ -136,7 +136,7 @@ export function syncScheduleToRds(schedule) {
 
 function syncEnrollments(schedule) {
   if (!currentUser) return;
-  // TM-2: enrollment writes would put the teacher's auth.uid() into
+  // TM-2: enrollment writes would put the teacher's user id into
   // class_enrollments.student_id and corrupt the roster. Hard skip.
   if (S.isTestMode) return;
   const studentName = localStorage.getItem('lumi_name') || '';
@@ -163,14 +163,14 @@ function syncEnrollments(schedule) {
   // we get here, so an empty desired set means "no current classes", not
   // "couldn't resolve them".
   const prune = (desiredKeys) =>
-    rdsFetch('class-enrollments') // student-scope GET: caller's own rows only
+    apiFetch('class-enrollments') // student-scope GET: caller's own rows only
       .then(current => {
         const drop = (current || []).filter(
           e => !desiredKeys.has(e.teacher_profile_id + '__' + e.block)
         );
         if (!drop.length) return 0;
         return Promise.all(drop.map(e =>
-          rdsFetch(`class-enrollments?id=${encodeURIComponent(e.id)}`, { method: 'DELETE' })
+          apiFetch(`class-enrollments?id=${encodeURIComponent(e.id)}`, { method: 'DELETE' })
         )).then(() => drop.length);
       })
       .then(n => { if (n) console.log('[enrollment] pruned', n, 'dropped class(es)'); })
@@ -205,7 +205,7 @@ function syncEnrollments(schedule) {
       // Hardened (§2): failure surfaces to the user. student_id in each row is
       // ignored server-side (always the JWT user).
       const upsert = rows.length
-        ? rdsFetch('class-enrollments', { method: 'POST', body: rows })
+        ? apiFetch('class-enrollments', { method: 'POST', body: rows })
             .then(res => console.log('[enrollment] synced', res?.upserted ?? rows.length, 'enrollment(s)'))
         : Promise.resolve();
 
@@ -225,11 +225,11 @@ function syncEnrollments(schedule) {
 // same query functions. Resolves null when the deployed Lambda predates the
 // route (404) or the call fails, in which case boot falls back to the
 // individual calls. Student mode only: test mode never loads profile state.
-export async function loadBootstrapFromRds() {
+export async function loadBootstrap() {
   if (!currentUser || S.isTestMode) return null;
   const t0 = performance.now();
   try {
-    const data = await rdsFetch('bootstrap');
+    const data = await apiFetch('bootstrap');
     if (CONFIG.debug) {
       console.log(`[boot] /bootstrap ${data ? 'hit' : '404 (fallback)'} in ${Math.round(performance.now() - t0)}ms`);
     }
@@ -242,7 +242,7 @@ export async function loadBootstrapFromRds() {
 
 // Load all conversations from RDS into localStorage (called once on fresh device).
 // `prefetched` (from /bootstrap) replaces the GET when supplied.
-export async function loadConvsFromRds({ prefetched } = {}) {
+export async function loadConvs({ prefetched } = {}) {
   if (!currentUser) return;
   try {
     // TM-2: filter by is_teacher_test so test convs never appear in
@@ -250,7 +250,7 @@ export async function loadConvsFromRds({ prefetched } = {}) {
     // the JWT user server-side.
     const data = prefetched !== undefined
       ? prefetched
-      : await rdsFetch(`conversations?is_teacher_test=${!!S.isTestMode}`);
+      : await apiFetch(`conversations?is_teacher_test=${!!S.isTestMode}`);
     if (!data || !data.length) return;
 
     const convs = {};
@@ -274,11 +274,11 @@ export async function loadConvsFromRds({ prefetched } = {}) {
         ? { ...lookupSubjectForCourse(row.course), course: row.course, teacher: row.teacher }
         : null;
 
-      // Use the RDS row UUID as both local ID and sbId
+      // Use the RDS row UUID as both local ID and serverId
       const localId = 'sb_' + row.id.replace(/-/g, '').slice(0, 16);
       convs[localId] = {
         id:           localId,
-        sbId:         row.id,
+        serverId:         row.id,
         ts:           new Date(row.created_at).getTime(),
         title:        row.title || null,
         preview:      preview || 'Chat',
@@ -297,7 +297,7 @@ export async function loadConvsFromRds({ prefetched } = {}) {
 }
 
 // ─── CONVERSATION SYNC (INSERT first time, debounced PATCH after) ──────────────
-// Creation (POST) is immediate so the row exists (and sbId is captured) before
+// Creation (POST) is immediate so the row exists (and serverId is captured) before
 // anything else depends on it. Subsequent updates are coalesced per conversation
 // with a trailing debounce: a streaming reply calls saveCurrentConv many times,
 // but only the last snapshot is worth a PATCH. Metadata edits (title, class)
@@ -344,18 +344,18 @@ function _metaChanged(convId, row) {
   return prev.title !== row.title || prev.teacher !== row.teacher || prev.course !== row.course;
 }
 
-export function syncConvToRds(convId) {
+export function syncConv(convId) {
   if (!currentUser) return;
   const conv = getConvs()[convId];
   if (!conv || !conv.messages.length) return;
 
-  if (!conv.sbId && !_convCreating.has(convId)) {
+  if (!conv.serverId && !_convCreating.has(convId)) {
     _createConv(convId).catch(err => console.warn('Conv sync:', err));
     return;
   }
 
   _convSyncPending.add(convId);
-  if (conv.sbId && _metaChanged(convId, _convRow(conv))) {
+  if (conv.serverId && _metaChanged(convId, _convRow(conv))) {
     _clearConvTimer(convId);
     _patchConv(convId).catch(err => console.warn('Conv sync:', err));
     return;
@@ -380,12 +380,12 @@ async function _createConv(convId) {
   const p = (async () => {
     let newId;
     try {
-      const res = await rdsFetch('conversations', { method: 'POST', body: { ...row, updated_at: new Date().toISOString() } });
+      const res = await apiFetch('conversations', { method: 'POST', body: { ...row, updated_at: new Date().toISOString() } });
       newId = res?.id || null;
     } catch (err) { console.warn('Conversation insert error:', err); return; }
     if (!newId) return;
     const c2 = getConvs();
-    if (c2[convId]) { c2[convId].sbId = newId; saveConvs(c2); }
+    if (c2[convId]) { c2[convId].serverId = newId; saveConvs(c2); }
     _convLastSynced.set(convId, serialized);
   })();
   _convCreating.set(convId, p);
@@ -418,7 +418,7 @@ async function _patchConv(convId, opts = {}) {
 async function _patchConvNow(convId, { keepalive = false, budget = null } = {}) {
   const conv = getConvs()[convId];
   if (!conv || !conv.messages.length) { _convSyncPending.delete(convId); return; }
-  if (!conv.sbId) {
+  if (!conv.serverId) {
     // Creation failed (or never happened) — retry the insert instead.
     _convSyncPending.delete(convId);
     if (!_convCreating.has(convId)) await _createConv(convId);
@@ -429,8 +429,8 @@ async function _patchConvNow(convId, { keepalive = false, budget = null } = {}) 
   if (_convLastSynced.get(convId) === serialized) { _convSyncPending.delete(convId); return; }
 
   // Lambda PATCH scopes to the JWT user server-side and 404s on an
-  // unowned/unknown id (surfaced via the rdsFetch null → warn).
-  const body = { id: conv.sbId, ...row, updated_at: new Date().toISOString() };
+  // unowned/unknown id (surfaced via the apiFetch null → warn).
+  const body = { id: conv.serverId, ...row, updated_at: new Date().toISOString() };
   const json = JSON.stringify(body);
   const bytes = new TextEncoder().encode(json).byteLength;
   // The keepalive quota is shared by every outstanding keepalive request, so a
@@ -439,8 +439,8 @@ async function _patchConvNow(convId, { keepalive = false, budget = null } = {}) 
   if (keepalive && fits && budget) budget.remaining -= bytes;
   try {
     const res = keepalive && fits
-      ? await _rdsPatchKeepalive('conversations', json)
-      : await rdsFetch('conversations', { method: 'PATCH', body });
+      ? await _apiPatchKeepalive('conversations', json)
+      : await apiFetch('conversations', { method: 'PATCH', body });
     if (!res) { console.warn('Conversation update error:', 'conversation not found (404)'); return; }
     _convLastSynced.set(convId, serialized);
     // Only clear if nothing newer was saved while the request was in flight.
@@ -450,11 +450,11 @@ async function _patchConvNow(convId, { keepalive = false, budget = null } = {}) 
   }
 }
 
-// Same wire format as rdsFetch, plus `keepalive` so the browser lets the
-// request complete after pagehide. Mirrors rdsFetch's 404 → null contract.
-async function _rdsPatchKeepalive(path, json) {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session?.access_token) throw new Error('rdsFetch: no session');
+// Same wire format as apiFetch, plus `keepalive` so the browser lets the
+// request complete after pagehide. Mirrors apiFetch's 404 → null contract.
+async function _apiPatchKeepalive(path, json) {
+  const { data: { session } } = await auth.getSession();
+  if (!session?.access_token) throw new Error('apiFetch: no session');
   const res = await fetch(`${CLAUDE_PROXY_URL}${path}`, {
     method: 'PATCH',
     keepalive: true,
@@ -504,14 +504,14 @@ export function __resetConvSyncState() {
   _convPatching.clear();
 }
 
-// Delete a conversation from RDS by its sbId
-export function deleteConvFromRds(convId) {
+// Delete a conversation from RDS by its serverId
+export function deleteServerConv(convId) {
   if (!currentUser) return;
   const convs = getConvs();
-  const sbId  = convs[convId]?.sbId;
-  if (!sbId) return;
+  const serverId  = convs[convId]?.serverId;
+  if (!serverId) return;
   // Hardened (§2): failure now surfaces to the user, not just the console.
-  rdsFetch(`conversations?id=${encodeURIComponent(sbId)}`, { method: 'DELETE' })
+  apiFetch(`conversations?id=${encodeURIComponent(serverId)}`, { method: 'DELETE' })
     .catch(err => {
       console.warn('Conversation delete error:', err);
       showToast('Could not delete the conversation on the server — see console');
@@ -520,7 +520,7 @@ export function deleteConvFromRds(convId) {
 
 // Load profile from RDS on new device (only if localStorage has no name).
 // `prefetched` (from /bootstrap; null = no row) replaces the GET when supplied.
-export async function loadProfileFromRds({ prefetched } = {}) {
+export async function loadProfile({ prefetched } = {}) {
   if (!currentUser) return;
   // TM-2: this pulls student profile state (name, grade, schedule, etc.)
   // into localStorage. In test mode that would overwrite the browser's
@@ -530,7 +530,7 @@ export async function loadProfileFromRds({ prefetched } = {}) {
   try {
     // GET /profiles returns the caller's row as a single object; null on 404
     // (no profile yet).
-    const data = prefetched !== undefined ? prefetched : await rdsFetch('profiles');
+    const data = prefetched !== undefined ? prefetched : await apiFetch('profiles');
     if (!data) return;
     // Always restore name/grade (overwrite if the server copy is newer)
     if (!hasName && data.name)  localStorage.setItem('lumi_name',  data.name);
@@ -569,7 +569,23 @@ export function getConvs() {
   // TM-2: in test mode read from the in-memory cache; the lumi_convs
   // localStorage key belongs to the student persona on this browser.
   if (S.isTestMode) return S.testConvs;
-  try { return JSON.parse(localStorage.getItem('lumi_convs') || '{}'); } catch { return {}; }
+  let convs;
+  try { convs = JSON.parse(localStorage.getItem('lumi_convs') || '{}'); } catch { return {}; }
+  if (migrateConvServerIds(convs)) saveConvs(convs);
+  return convs;
+}
+
+// One-time read-side migration: conversations persisted before the rename
+// carry `sbId`; rewrite to `serverId` (existing `serverId` wins).
+export function migrateConvServerIds(convs) {
+  let changed = false;
+  for (const conv of Object.values(convs || {})) {
+    if (!conv || typeof conv !== 'object' || !('sbId' in conv)) continue;
+    conv.serverId = conv.serverId ?? conv.sbId;
+    delete conv.sbId;
+    changed = true;
+  }
+  return changed;
 }
 export function saveConvs(c) {
   if (S.isTestMode) { S.testConvs = c; return; }
@@ -589,7 +605,7 @@ export function saveCurrentConv() {
         : '');
   convs[S.currentId] = {
     id:           S.currentId,
-    sbId:         existing.sbId || null,    // preserve RDS row UUID across saves
+    serverId:         existing.serverId || null,    // preserve RDS row UUID across saves
     ts:           existing.ts || Date.now(),
     title:        existing.title || null,
     preview:      previewText.slice(0, 60) || 'New chat',
@@ -605,7 +621,7 @@ export function saveCurrentConv() {
   if (keys.length > 50) keys.slice(0, keys.length - 50).forEach(k => delete convs[k]);
   saveConvs(convs);
   localStorage.setItem('lumi_current', S.currentId);
-  syncConvToRds(S.currentId);
+  syncConv(S.currentId);
   // The class-view rail lists convs by title/preview, so a brand-new chat only
   // becomes visible once its first message is saved.
   try { document.dispatchEvent(new CustomEvent('lumi:conv-changed')); } catch { /* test env */ }
@@ -618,7 +634,7 @@ export function saveCurrentConv() {
 // real student's tenant has persistence OFF, so this is a no-op write for them,
 // and the note never comes back to the client. Skipped in test mode (a teacher
 // persona must never write student-shaped state — the TM-2 checklist). Uses the
-// server conversation id (sbId); if the session hasn't synced yet or has no
+// server conversation id (serverId); if the session hasn't synced yet or has no
 // class/substance, it silently does nothing. Tab-close (sendBeacon) is a
 // documented follow-up — this covers the reliable in-app exit points.
 export function flushProgressNote() {
@@ -626,10 +642,10 @@ export function flushProgressNote() {
   const tpid = S.tutorCtx?.notesInjection?.teacher_profile_id;
   if (!tpid || !S.currentId) return;
   const conv = getConvs()[S.currentId];
-  const cid = conv?.sbId;
+  const cid = conv?.serverId;
   if (!cid) return;                                                  // not yet persisted server-side
   if (!Array.isArray(conv.messages) || conv.messages.length < 2) return;  // nothing substantive to summarize
-  rdsFetch('progress-note/flush', {
+  apiFetch('progress-note/flush', {
     method: 'POST',
     body: { teacher_profile_id: tpid, conversation_id: cid },
   }).catch(err => console.warn('[progress_note] flush:', err));

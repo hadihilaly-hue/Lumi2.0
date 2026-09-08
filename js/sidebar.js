@@ -4,7 +4,7 @@ import { showWelcome } from './emptystate.js';
 import { renderHwSidebar } from './homework.js';
 import { initScheduleSetup } from './schedule.js';
 import { S, SB, messagesEl, sbNav, sbSearch } from './state.js';
-import { deleteConvFromRds, genId, getConvs, getSchedule, saveConvs, saveCurrentConv, syncConvToRds } from './storage.js';
+import { deleteServerConv, genId, getConvs, getSchedule, saveConvs, saveCurrentConv, syncConv } from './storage.js';
 import { _profileCache, _profileStatusCache, resolveTeacherEmail } from './teachers.js';
 import { closeSidebar, escHtml } from './ui.js';
 
@@ -133,7 +133,7 @@ function startRename(convId) {
       if (c2[convId]) {
         c2[convId].title = newTitle;
         saveConvs(c2);
-        syncConvToRds(convId);
+        syncConv(convId);
         renderSidebar();
       }
     }
@@ -155,7 +155,7 @@ function deleteConv(convId, anchorEl) {
         const convs = getConvs();
         delete convs[convId];
         saveConvs(convs);
-        deleteConvFromRds(convId);
+        deleteServerConv(convId);
         if (S.currentId === convId) {
           S.currentId = genId(); S.messages = []; S.exchangeCount = 0; S.tutorCtx = null;
           S.ready = false; S.values.clear(); S.goals.clear(); S.interests.clear();
@@ -169,7 +169,7 @@ function deleteConv(convId, anchorEl) {
       const convs = getConvs();
       delete convs[convId];
       saveConvs(convs);
-      deleteConvFromRds(convId);
+      deleteServerConv(convId);
       if (S.currentId === convId) {
         S.currentId = genId(); S.messages = []; S.exchangeCount = 0; S.tutorCtx = null;
         S.ready = false; S.values.clear(); S.goals.clear(); S.interests.clear();

@@ -1,9 +1,9 @@
 import { MENLO_CURRICULUM } from './data.js';
-import { getStudyStyle, saveStudyStyle, syncStudyStyleToRds, todayStr } from './homework.js';
+import { getStudyStyle, saveStudyStyle, syncStudyStyle, todayStr } from './homework.js';
 import { setSidebarUserSubtitle } from './prompts.js';
 import { renderSidebar } from './sidebar.js';
 import { $ } from './state.js';
-import { getSchedule, saveScheduleLocal, syncScheduleToRds } from './storage.js';
+import { getSchedule, saveScheduleLocal, syncSchedule } from './storage.js';
 import { fetchAvailableClasses } from './teachers.js';
 
 // Build a MENLO_CURRICULUM-shaped map ({ subject: { course: [teacherNames] } })
@@ -526,8 +526,8 @@ export function initScheduleSetup(onDone, prefill = []) {
     if (chosenGrade) localStorage.setItem('lumi_grade', chosenGrade);
     setSidebarUserSubtitle();
     saveStudyStyle(chosenStyle);
-    syncScheduleToRds(schedule);
-    syncStudyStyleToRds(chosenStyle);
+    syncSchedule(schedule);
+    syncStudyStyle(chosenStyle);
     el.classList.add('hidden');
     setTimeout(() => { el.style.display = 'none'; onDone(); }, 350);
   });

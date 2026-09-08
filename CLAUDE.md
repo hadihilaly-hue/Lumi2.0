@@ -64,17 +64,22 @@ gives direct answers, only guides reasoning.
 - Loads the selected teacher's profile from **RDS via the Lambda — the ONLY
   data layer since the 2026-07-01 cutover + teardown.** The old `USE_RDS`
   flag and every Supabase data branch are deleted; all reads/writes go
-  through the per-file `rdsFetch(path, {method, body})` helper (app.js +
+  through the per-file `apiFetch(path, {method, body})` helper (js/teachers.js +
   js/teacher/profileApi.js; js/admin/adminApi.js wraps its fetches). Failures surface
   VISIBLY (console.error + showToast at hardened writes; chat-area banner
   for the main tutor fetch) — there is no fallback store. Auth is AWS
   Cognito via `cognito-auth.js` (Workstream I, complete 2026-07-02);
-  the `sb.auth.*` surface survives as the shim's API. **No live Supabase
-  calls/clients/deps remain** (all data I/O goes through `rdsFetch` →
-  Lambda); the paused Supabase project awaits final deletion. The sync
-  helpers in `js/storage.js` / `js/homework.js` / `js/projects.js` are named
-  `*ToRds` / `*FromRds` (e.g. `syncScheduleToRds`, `loadProfileFromRds`).
-  **Conversation writes are debounced (W6):** `syncConvToRds(convId)` POSTs
+  the shim exposes a global `auth` object (`auth.getSession()`,
+  `auth.signInWithOAuth()`, `auth.signOut()`, `auth.onAuthStateChange()`);
+  `sb` (`sb.auth.*`) is a deprecated alias slated for removal after one
+  release. **No live Supabase calls/clients/deps remain** (all data I/O goes
+  through `apiFetch` → Lambda); the paused Supabase project awaits final
+  deletion. The sync helpers in `js/storage.js` / `js/homework.js` /
+  `js/projects.js` use plain names (`syncSchedule`, `loadProfile`,
+  `syncConv`, `loadConvs`, `deleteServerConv`, `syncStudyStyle`, `syncHw`,
+  `loadHw`). A conversation's server row id is `conv.serverId`; `getConvs()`
+  migrates the pre-rename `sbId` field on read.
+  **Conversation writes are debounced (W6):** `syncConv(convId)` POSTs
   a brand-new conversation immediately (creation is never delayed; saves that
   land while the POST is in flight are folded into one follow-up PATCH), but
   subsequent PATCHes are coalesced per conversation behind a 1.5 s trailing
@@ -178,7 +183,7 @@ gives direct answers, only guides reasoning.
   now enforced in the Lambda `PATCH /class-enrollments` route (2-step
   email-ownership check) instead.
 - Enrollment rows are written by syncEnrollments() in app.js, called at
-  the end of syncScheduleToRds() after the student finalizes their
+  the end of syncSchedule() after the student finalizes their
   schedule. It looks up teacher_profiles by (teacher_email, course_name)
   and only enrolls the student in classes where a matching
   teacher_profiles row exists. Classes whose teacher hasn't onboarded
@@ -421,9 +426,9 @@ live with spoofed ids.
   created_at, updated_at, is_teacher_test, preview, exchange_count — never
   `messages`; bodies still load lazily via `GET /conversations?id=`).
   `?is_teacher_test=true` mirrors the /conversations filter. Any DB error →
-  500 with no partial payload. Frontend: `loadBootstrapFromRds()` in
+  500 with no partial payload. Frontend: `loadBootstrap()` in
   `js/storage.js` calls it at boot and passes the pieces as `{ prefetched }`
-  into `loadProfileFromRds` / `loadConvsFromRds`; a 404 (deployed Lambda
+  into `loadProfile` / `loadConvs`; a 404 (deployed Lambda
   older than `main`) or any failure returns `null` and app.js falls back to
   the individual routes. The individual routes are untouched and still used
   for later refreshes.
@@ -915,8 +920,8 @@ live with spoofed ids.
     after completing the wizard.
 - **Plumbing (TM-2).** Every write path is gated behind
   `if (S.isTestMode) return;` to prevent a teacher from writing
-  student-shaped state into shared tables: syncEnrollments, syncScheduleToRds, syncStudyStyleToRds,
-  loadProfileFromRds. `getSchedule` / `getConvs` / `saveConvs`
+  student-shaped state into shared tables: syncEnrollments, syncSchedule, syncStudyStyle,
+  loadProfile. `getSchedule` / `getConvs` / `saveConvs`
   branch to in-memory state (`S.testSchedule` / `S.testConvs`) so
   localStorage keys belonging to the student persona on a shared
   browser are never touched.
@@ -1113,7 +1118,7 @@ live with spoofed ids.
   The live student app is app.html → app.js. teacher.html loads
   `js/teacher/main.js` (boot/auth gate/`window` handler exposure) →
   `state.js` (shared `T` state), `config.js`, `wizardState.js` (pure
-  gating/list helpers — unit-tested), `profileApi.js` (every `rdsFetch`),
+  gating/list helpers — unit-tested), `profileApi.js` (every `apiFetch`),
   `home.js`, `wizardUi.js`, `workSamples.js`, `syllabus.js`, `speech.js`,
   `saveProfile.js`, `roster.js`, `studentMode.js`, `consentGate.js`,
   `ui.js`. admin.html loads `js/admin/main.js` → `adminApi.js`,
@@ -1123,7 +1128,7 @@ live with spoofed ids.
   hardcoded staff names.)
 - **Styling:** style.css is the single live stylesheet (~160 KB), loaded by
   index/app/teacher/admin/privacy; Inter font via Google Fonts.
-- **Auth:** AWS Cognito (pool `lumi-users` / `us-east-1_C0xhKzu94`, app client `lumi-web`, hosted domain `lumi-auth-613136968914`) with Google as the sole IdP — code+PKCE via `cognito-auth.js` (repo root; exposes the old `sb.auth.*` surface, so call sites still read like supabase-js). `session.access_token` = the Cognito ID token; the Lambda verifies it locally (aws-jwt-verify, module-cached JWKS — zero per-request egress) and resolves it to the preserved lumi uuid via the `app_users` bridge (link-by-verified-email on first sign-in). Sign-in domains are data-driven off `schools.allowed_domains` (client UX check via `GET /allowed-domains` fails open; server enforcement in verifyCognitoAuth + the route gate fails closed; SCHOOL_CONFIG.adminEmails bypass). **Supabase is retired** (Workstream I complete 2026-07-02): no live Supabase calls/clients/deps remain, project paused pending deletion; `docs/archive/supabase_setup.sql` + `docs/archive/RLS_AUDIT.md` remain in-tree as historical records (the `supabase/` dir itself is gone).
+- **Auth:** AWS Cognito (pool `lumi-users` / `us-east-1_C0xhKzu94`, app client `lumi-web`, hosted domain `lumi-auth-613136968914`) with Google as the sole IdP — code+PKCE via `cognito-auth.js` (repo root; exposes the global `auth.*` surface — the supabase-js-shaped `sb.auth.*` alias is deprecated). `session.access_token` = the Cognito ID token; the Lambda verifies it locally (aws-jwt-verify, module-cached JWKS — zero per-request egress) and resolves it to the preserved lumi uuid via the `app_users` bridge (link-by-verified-email on first sign-in). Sign-in domains are data-driven off `schools.allowed_domains` (client UX check via `GET /allowed-domains` fails open; server enforcement in verifyCognitoAuth + the route gate fails closed; SCHOOL_CONFIG.adminEmails bypass). **Supabase is retired** (Workstream I complete 2026-07-02): no live Supabase calls/clients/deps remain, project paused pending deletion; `docs/archive/supabase_setup.sql` + `docs/archive/RLS_AUDIT.md` remain in-tree as historical records (the `supabase/` dir itself is gone).
 - **Database:** AWS RDS Postgres (`lumi-db`) behind the `lumi-claude-proxy` Lambda — per-route JWT authz replaced RLS (see "RDS Lambda data routes"). Direct DB access for migrations/ops: the Lambda's direct-invoke admin branch ONLY (`aws lambda invoke --payload '{"adminSql":..., "params":[...]}'` — IAM-gated, unreachable via the function URL; replaced the deleted /admin/sql + ADMIN_TOKEN at teardown).
 - **AI API:** Claude via **Amazon Bedrock** (streamed with
   `InvokeModelWithResponseStreamCommand`) behind AWS Lambda lumi-claude-proxy

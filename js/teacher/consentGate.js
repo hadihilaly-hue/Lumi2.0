@@ -18,6 +18,6 @@ async function gate(session) {
 }
 
 export async function runConsentGate() {
-  try { const s = (await sb.auth.getSession()).data.session; if (s && s.user) { gate(s); return; } } catch { /* no session yet */ }
-  sb.auth.onAuthStateChange((ev, s) => { if (ev === 'SIGNED_IN') gate(s); });
+  try { const s = (await auth.getSession()).data.session; if (s && s.user) { gate(s); return; } } catch { /* no session yet */ }
+  auth.onAuthStateChange((ev, s) => { if (ev === 'SIGNED_IN') gate(s); });
 }

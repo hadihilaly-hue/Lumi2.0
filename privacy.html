@@ -163,7 +163,7 @@
 
   (async function () {
     let session = null;
-    try { session = (await sb.auth.getSession()).data.session; } catch (e) {}
+    try { session = (await auth.getSession()).data.session; } catch (e) {}
     if (!session || !session.user) { location.replace('index.html'); return; }  // must be signed in
     const token = session.access_token;
     const email = (session.user.email || '').toLowerCase();

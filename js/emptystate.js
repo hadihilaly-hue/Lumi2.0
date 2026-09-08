@@ -4,7 +4,7 @@ import { dateDiffDays } from './projects.js';
 import { renderSidebar } from './sidebar.js';
 import { S, SB, messagesEl, msgInput } from './state.js';
 import { getConvs } from './storage.js';
-import { rdsFetch } from './teachers.js';
+import { apiFetch } from './teachers.js';
 import { autoGrow, escHtml, openSidebar, updateSendBtn } from './ui.js';
 
 
@@ -97,7 +97,7 @@ export async function prepareSuggestedPrompts() {
       const path = `suggested-prompts?teacher_profile_id=${encodeURIComponent(inj.teacher_profile_id)}`
         + `&course=${encodeURIComponent(ctx.course || '')}`;
       const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000));
-      const res = await Promise.race([rdsFetch(path), timeout]);
+      const res = await Promise.race([apiFetch(path), timeout]);
       if (res?.mode === 'influenced' && Array.isArray(res.prompts) && res.prompts.length === 3) {
         ctx.suggestedPrompts = res.prompts;
         console.log('[suggested_prompts] mode=influenced count=3');

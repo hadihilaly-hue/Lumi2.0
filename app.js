@@ -3,7 +3,7 @@ import { cancelIntroSlide, newChat } from './js/conversation.js';
 import { showWelcome } from './js/emptystate.js';
 import { _calEvents, addHwTask, advancePlannerBlock, buildStudyPlan, buildStudyPlanWithCalendar, checkDailyHwPrompt, closeHwAddModal, closeHwBackdrop, closeHwPlanModal, closeHwPopup, closeTimelineModal, genHwId, getHwTasks, loadCalendarEvents, renderHwPopupTasks, setCalendarConnected, showHwAddModal, showHwPlanModal, showHwPopup, startPlannerStrip, todayStr, updateCalUi, wireCalListeners } from './js/homework.js';
 import { initOnboarding } from './js/onboarding.js';
-import { _projPendingFile, clearAllChats, clearCompletedProjects, clearProjFile, closeProjectCreateModal, closeProjectPlanModal, closeWorkTypeChooser, createProject, injectProjectTasksToHomework, loadHwFromRds, renderProjectPlan, showProjectCreateModal, showWorkTypeChooser, wireProjDropzone } from './js/projects.js';
+import { _projPendingFile, clearAllChats, clearCompletedProjects, clearProjFile, closeProjectCreateModal, closeProjectPlanModal, closeWorkTypeChooser, createProject, injectProjectTasksToHomework, loadHw, renderProjectPlan, showProjectCreateModal, showWorkTypeChooser, wireProjDropzone } from './js/projects.js';
 import { setSidebarUserSubtitle } from './js/prompts.js';
 import { checkSemesterBanner, initScheduleSetup } from './js/schedule.js';
 import { activeDropdownEl, closeOpenMenu, renderSearchDropdown, renderSidebar, showInlineConfirm } from './js/sidebar.js';
@@ -13,20 +13,20 @@ import { mountClass, mountGeneral } from './js/classview.js';
 import { mountPlan } from './js/studyplanview.js';
 import { initRouter } from './js/router.js';
 import { $, S, SB, currentUser, fileInput, msgInput, sbSearch, sendBtn, setCurrentProjId, setCurrentUser, themeToggle } from './js/state.js';
-import { flushPendingConvSyncs, flushProgressNote, genId, getSchedule, initConvSyncFlush, loadBootstrapFromRds, loadConvsFromRds, loadProfileFromRds, loadTestModeSchedule, migrateOldData, saveCurrentConv } from './js/storage.js';
-import { isTeacherModeAllowed, preloadAvailableClasses, preloadProfileStatuses, rdsFetch, signedInDestination } from './js/teachers.js';
+import { flushPendingConvSyncs, flushProgressNote, genId, getSchedule, initConvSyncFlush, loadBootstrap, loadConvs, loadProfile, loadTestModeSchedule, migrateOldData, saveCurrentConv } from './js/storage.js';
+import { isTeacherModeAllowed, preloadAvailableClasses, preloadProfileStatuses, apiFetch, signedInDestination } from './js/teachers.js';
 import { autoGrow, closeSettings, closeSidebar, openSettings, openSidebar, showToast, updateSendBtn } from './js/ui.js';
 import { initVoice, wireVoiceListeners } from './js/voice.js';
 
 
 (async () => {
   // Simple auth check — getSession() reads from localStorage, no network needed
-  const { data: { session } } = await sb.auth.getSession();
+  const { data: { session } } = await auth.getSession();
   if (!session) { window.location.href = 'index.html'; return; }
 
   if (!(await isAllowedEmail(session.user.email))) {
     sessionStorage.setItem('lumi_auth_error', "Your school isn't set up with Lumi yet.");
-    await sb.auth.signOut();
+    await auth.signOut();
     window.location.href = 'index.html';
     return;
   }
@@ -143,8 +143,8 @@ import { initVoice, wireVoiceListeners } from './js/voice.js';
   // to the individual calls below. Full conversation `messages` still load
   // lazily on open either way.
   const bootT0 = performance.now();
-  const boot = await loadBootstrapFromRds();
-  await loadProfileFromRds(boot ? { prefetched: boot.profile } : {});
+  const boot = await loadBootstrap();
+  await loadProfile(boot ? { prefetched: boot.profile } : {});
 
   // One-time privacy scrub: earlier builds persisted tutorCtx.teacherNotes
   // (confidential teacher observations) into localStorage via saveCurrentConv.
@@ -169,7 +169,7 @@ import { initVoice, wireVoiceListeners } from './js/voice.js';
   // to is_teacher_test=true). In student mode, only on fresh device
   // where lumi_convs hasn't been cached.
   if (S.isTestMode || !localStorage.getItem('lumi_convs')) {
-    await loadConvsFromRds(boot ? { prefetched: boot.recentConversations } : {});
+    await loadConvs(boot ? { prefetched: boot.recentConversations } : {});
   }
   if (CONFIG.debug) {
     console.log(`[boot] profile+convs via ${boot ? '/bootstrap' : 'individual routes'} in ${Math.round(performance.now() - bootT0)}ms`);
@@ -299,8 +299,8 @@ function wireListeners() {
             values_profile: { values: [], goals: [], interests: [] },
           };
           await Promise.all([
-            rdsFetch('conversations?all=true', { method: 'DELETE' }),
-            rdsFetch('profiles', { method: 'POST', body: profileReset }),
+            apiFetch('conversations?all=true', { method: 'DELETE' }),
+            apiFetch('profiles', { method: 'POST', body: profileReset }),
           ]);
         } catch (e) {
           console.warn('Server memory clear failed:', e);
@@ -373,7 +373,7 @@ function startApp() {
   updateCalUi();
 
   // If we just returned from Google OAuth, mark calendar as connected
-  sb.auth.getSession().then(({ data: { session } }) => {
+  auth.getSession().then(({ data: { session } }) => {
     if (session?.provider_token && session?.user?.app_metadata?.provider === 'google') {
       setCalendarConnected(true);
       updateCalUi();
@@ -389,7 +389,7 @@ function startApp() {
   // the DB's canonical course_name. Non-blocking chain: profile statuses are
   // scheduled after so their lookup keys land on canonical names.
   preloadAvailableClasses().finally(() => preloadProfileStatuses());
-  loadHwFromRds().then(async () => {
+  loadHw().then(async () => {
     injectProjectTasksToHomework();
     await loadCalendarEvents();
     renderSidebar();

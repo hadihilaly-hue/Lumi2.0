@@ -1,7 +1,7 @@
-// js/storage.js — debounced conversation sync (syncConvToRds / flushPendingConvSyncs)
-// and the /bootstrap boot path (loadBootstrapFromRds, prefetched loadProfileFromRds /
-// loadConvsFromRds). Network is stubbed at the fetch + sb.auth.getSession level
-// so the real rdsFetch wire format is exercised.
+// js/storage.js — debounced conversation sync (syncConv / flushPendingConvSyncs)
+// and the /bootstrap boot path (loadBootstrap, prefetched loadProfile /
+// loadConvs). Network is stubbed at the fetch + auth.getSession level
+// so the real apiFetch wire format is exercised.
 
 import { test, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,11 +14,11 @@ import {
   getConvs,
   hasPendingConvSync,
   initConvSyncFlush,
-  loadBootstrapFromRds,
-  loadConvsFromRds,
-  loadProfileFromRds,
+  loadBootstrap,
+  loadConvs,
+  loadProfile,
   saveConvs,
-  syncConvToRds,
+  syncConv,
 } from '../js/storage.js';
 import { reset } from './harness.mjs';
 
@@ -31,7 +31,7 @@ let responder;    // (call) => { status, json }
 function installFetch() {
   calls = [];
   responder = () => ({ status: 200, json: { id: 'row-1', updated_at: 'now' } });
-  globalThis.sb = { auth: { getSession: async () => ({ data: { session: { access_token: 'tok' } } }) } };
+  globalThis.auth = { getSession: async () => ({ data: { session: { access_token: 'tok' } } }) };
   globalThis.fetch = async (url, init = {}) => {
     const call = {
       method: init.method || 'GET',
@@ -52,10 +52,10 @@ const posts = () => calls.filter(c => c.method === 'POST');
 const tick = () => new Promise(r => setImmediate(r));
 async function settle() { for (let i = 0; i < 5; i++) await tick(); }
 
-function seedConv(id, { sbId = 'row-1', messages, title = null } = {}) {
+function seedConv(id, { serverId = 'row-1', messages, title = null } = {}) {
   const convs = getConvs();
   convs[id] = {
-    id, sbId, ts: 1, title, preview: 'x',
+    id, serverId, ts: 1, title, preview: 'x',
     messages: messages || [{ role: 'user', content: 'hi' }],
     values: [], goals: [], interests: [], exchangeCount: 0,
     tutorCtx: { course: 'Algebra 2', teacher: 'Ms. T' },
@@ -84,11 +84,11 @@ afterEach(() => {
 
 test('rapid saves to an existing conversation coalesce into ONE trailing PATCH', async () => {
   seedConv('c1');
-  syncConvToRds('c1');
+  syncConv('c1');
   appendMsg('c1', 'a');
-  syncConvToRds('c1');
+  syncConv('c1');
   appendMsg('c1', 'b');
-  syncConvToRds('c1');
+  syncConv('c1');
   await settle();
   assert.equal(patches().length, 0, 'nothing sent before the debounce elapses');
   assert.equal(hasPendingConvSync('c1'), true);
@@ -111,10 +111,10 @@ test('rapid saves to an existing conversation coalesce into ONE trailing PATCH',
 
 test('each save restarts the trailing window (true debounce, not throttle)', async () => {
   seedConv('c1');
-  syncConvToRds('c1');
+  syncConv('c1');
   mock.timers.tick(CONV_SYNC_DEBOUNCE_MS - 100);
   appendMsg('c1', 'a');
-  syncConvToRds('c1');
+  syncConv('c1');
   mock.timers.tick(CONV_SYNC_DEBOUNCE_MS - 100);
   await settle();
   assert.equal(patches().length, 0);
@@ -123,19 +123,19 @@ test('each save restarts the trailing window (true debounce, not throttle)', asy
   assert.equal(patches().length, 1);
 });
 
-test('new-conversation creation POSTs immediately (not debounced) and captures sbId', async () => {
-  seedConv('c1', { sbId: null });
+test('new-conversation creation POSTs immediately (not debounced) and captures serverId', async () => {
+  seedConv('c1', { serverId: null });
   responder = () => ({ status: 200, json: { id: 'new-uuid' } });
-  syncConvToRds('c1');
+  syncConv('c1');
   await settle();
   assert.equal(posts().length, 1);
   assert.equal(posts()[0].body.user_id, USER.id);
-  assert.equal(getConvs().c1.sbId, 'new-uuid');
+  assert.equal(getConvs().c1.serverId, 'new-uuid');
   assert.equal(patches().length, 0);
 });
 
 test('saves during an in-flight POST do not double-insert; they become one PATCH after creation', async () => {
-  seedConv('c1', { sbId: null });
+  seedConv('c1', { serverId: null });
   let release;
   responder = (c) => c.method === 'POST'
     ? ({ status: 200, json: { id: 'new-uuid' } })
@@ -145,12 +145,12 @@ test('saves during an in-flight POST do not double-insert; they become one PATCH
     if (init.method === 'POST') await new Promise(r => { release = r; });
     return origFetch(url, init);
   };
-  syncConvToRds('c1');
+  syncConv('c1');
   await tick();
   appendMsg('c1', 'a');
-  syncConvToRds('c1');
+  syncConv('c1');
   appendMsg('c1', 'b');
-  syncConvToRds('c1');
+  syncConv('c1');
   await settle();
   release();
   await settle();
@@ -167,13 +167,13 @@ test('saves during an in-flight POST do not double-insert; they become one PATCH
 
 test('a title change (generated title / rename) PATCHes promptly without waiting for the debounce', async () => {
   seedConv('c1');
-  syncConvToRds('c1');
+  syncConv('c1');
   mock.timers.tick(CONV_SYNC_DEBOUNCE_MS);
   await settle();
   assert.equal(patches().length, 1);
 
   const convs = getConvs(); convs.c1.title = 'Quadratics'; saveConvs(convs);
-  syncConvToRds('c1');
+  syncConv('c1');
   await settle();
   assert.equal(patches().length, 2, 'title save is immediate');
   assert.equal(patches()[1].body.title, 'Quadratics');
@@ -183,19 +183,19 @@ test('a title change (generated title / rename) PATCHes promptly without waiting
 
 test('skips the PATCH when the serialized payload is unchanged since the last successful write', async () => {
   seedConv('c1');
-  syncConvToRds('c1');
+  syncConv('c1');
   mock.timers.tick(CONV_SYNC_DEBOUNCE_MS);
   await settle();
   assert.equal(patches().length, 1);
 
-  syncConvToRds('c1');           // same messages, same title
+  syncConv('c1');           // same messages, same title
   mock.timers.tick(CONV_SYNC_DEBOUNCE_MS);
   await settle();
   assert.equal(patches().length, 1, 'no second PATCH');
   assert.equal(hasPendingConvSync('c1'), false);
 
   appendMsg('c1', 'changed');
-  syncConvToRds('c1');
+  syncConv('c1');
   mock.timers.tick(CONV_SYNC_DEBOUNCE_MS);
   await settle();
   assert.equal(patches().length, 2, 'a real change writes again');
@@ -205,9 +205,9 @@ test('skips the PATCH when the serialized payload is unchanged since the last su
 
 test('flushPendingConvSyncs sends pending writes immediately with keepalive and cancels the timer', async () => {
   seedConv('c1');
-  seedConv('c2', { sbId: 'row-2' });
-  syncConvToRds('c1');
-  syncConvToRds('c2');
+  seedConv('c2', { serverId: 'row-2' });
+  syncConv('c1');
+  syncConv('c2');
   await flushPendingConvSyncs();
   assert.equal(patches().length, 2);
   assert.ok(patches().every(p => p.keepalive === true));
@@ -224,7 +224,7 @@ test('initConvSyncFlush flushes on visibilitychange→hidden and on pagehide', a
   initConvSyncFlush(doc, win);
 
   seedConv('c1');
-  syncConvToRds('c1');
+  syncConv('c1');
   doc.visibilityState = 'visible';
   docHandlers.visibilitychange();
   await settle();
@@ -237,7 +237,7 @@ test('initConvSyncFlush flushes on visibilitychange→hidden and on pagehide', a
   assert.equal(patches()[0].keepalive, true);
 
   appendMsg('c1', 'more');
-  syncConvToRds('c1');
+  syncConv('c1');
   winHandlers.pagehide();
   await settle();
   assert.equal(patches().length, 2);
@@ -249,7 +249,7 @@ test('initConvSyncFlush flushes on visibilitychange→hidden and on pagehide', a
 test('a failed PATCH leaves the payload pending; the next flush retries it', async () => {
   seedConv('c1');
   responder = () => ({ status: 500, json: { error: 'boom' } });
-  syncConvToRds('c1');
+  syncConv('c1');
   mock.timers.tick(CONV_SYNC_DEBOUNCE_MS);
   await settle();
   assert.equal(patches().length, 1);
@@ -265,7 +265,7 @@ test('a failed PATCH leaves the payload pending; the next flush retries it', asy
 test('a network error (fetch rejects) also keeps the payload pending', async () => {
   seedConv('c1');
   responder = () => new Error('offline');
-  syncConvToRds('c1');
+  syncConv('c1');
   mock.timers.tick(CONV_SYNC_DEBOUNCE_MS);
   await settle();
   assert.equal(hasPendingConvSync('c1'), true);
@@ -276,7 +276,7 @@ test('a network error (fetch rejects) also keeps the payload pending', async () 
 });
 
 test('flush during an in-flight creation waits for the POST and then PATCHes what was saved meanwhile', async () => {
-  seedConv('c1', { sbId: null });
+  seedConv('c1', { serverId: null });
   let release;
   responder = (c) => ({ status: 200, json: c.method === 'POST' ? { id: 'new-uuid' } : { id: 'new-uuid' } });
   const origFetch = globalThis.fetch;
@@ -284,10 +284,10 @@ test('flush during an in-flight creation waits for the POST and then PATCHes wha
     if (init.method === 'POST') await new Promise(r => { release = r; });
     return origFetch(url, init);
   };
-  syncConvToRds('c1');
+  syncConv('c1');
   await tick();
   appendMsg('c1', 'typed while creating');
-  syncConvToRds('c1');
+  syncConv('c1');
   let flushed = false;
   const flush = flushPendingConvSyncs({ keepalive: false }).then(() => { flushed = true; });
   await settle();
@@ -303,7 +303,7 @@ test('flush during an in-flight creation waits for the POST and then PATCHes wha
 
 test('PATCHes are serialized per conversation: a newer save waits for the in-flight request and wins', async () => {
   seedConv('c1');
-  syncConvToRds('c1');
+  syncConv('c1');
   mock.timers.tick(CONV_SYNC_DEBOUNCE_MS);
   await settle();
   assert.equal(patches().length, 1);
@@ -317,12 +317,12 @@ test('PATCHes are serialized per conversation: a newer save waits for the in-fli
     return res;
   };
   const convs = getConvs(); convs.c1.title = 'Renamed'; saveConvs(convs);
-  syncConvToRds('c1');
+  syncConv('c1');
   await settle();
   assert.equal(patches().length, 2);
   // … while a third save (newer messages) is requested and its timer fires.
   appendMsg('c1', 'newest');
-  syncConvToRds('c1');
+  syncConv('c1');
   mock.timers.tick(CONV_SYNC_DEBOUNCE_MS);
   await settle();
   assert.equal(patches().length, 2, 'third write is queued, not overlapped');
@@ -338,7 +338,7 @@ test('PATCHes are serialized per conversation: a newer save waits for the in-fli
 
 test('payloads above the 64 KiB keepalive quota are flushed with a normal (non-keepalive) request', async () => {
   seedConv('c1', { messages: [{ role: 'user', content: 'x'.repeat(70 * 1024) }] });
-  syncConvToRds('c1');
+  syncConv('c1');
   await flushPendingConvSyncs({ keepalive: true });
   assert.equal(patches().length, 1);
   assert.equal(patches()[0].keepalive, false);
@@ -348,7 +348,7 @@ test('payloads above the 64 KiB keepalive quota are flushed with a normal (non-k
 test('keepalive size check uses UTF-8 bytes, not string length', async () => {
   // 35k 3-byte chars: 35k JS chars (< 60 KiB) but ~105 KiB on the wire.
   seedConv('c1', { messages: [{ role: 'user', content: '€'.repeat(35 * 1024) }] });
-  syncConvToRds('c1');
+  syncConv('c1');
   await flushPendingConvSyncs({ keepalive: true });
   assert.equal(patches().length, 1);
   assert.equal(patches()[0].keepalive, false);
@@ -356,9 +356,9 @@ test('keepalive size check uses UTF-8 bytes, not string length', async () => {
 
 test('the 64 KiB keepalive quota is shared across a multi-conversation flush', async () => {
   seedConv('c1', { messages: [{ role: 'user', content: 'a'.repeat(40 * 1024) }] });
-  seedConv('c2', { sbId: 'row-2', messages: [{ role: 'user', content: 'b'.repeat(40 * 1024) }] });
-  syncConvToRds('c1');
-  syncConvToRds('c2');
+  seedConv('c2', { serverId: 'row-2', messages: [{ role: 'user', content: 'b'.repeat(40 * 1024) }] });
+  syncConv('c1');
+  syncConv('c2');
   await flushPendingConvSyncs({ keepalive: true });
   assert.equal(patches().length, 2);
   assert.deepEqual(patches().map(p => p.keepalive).sort(), [false, true], 'only one fits the shared budget');
@@ -368,7 +368,7 @@ test('the 64 KiB keepalive quota is shared across a multi-conversation flush', a
 
 test('unload flush does not wait behind an unresolved in-page PATCH', async () => {
   seedConv('c1');
-  syncConvToRds('c1');
+  syncConv('c1');
   mock.timers.tick(CONV_SYNC_DEBOUNCE_MS);
   await settle();
   assert.equal(patches().length, 1);
@@ -380,23 +380,23 @@ test('unload flush does not wait behind an unresolved in-page PATCH', async () =
     return res;
   };
   const convs = getConvs(); convs.c1.title = 'Renamed'; saveConvs(convs);
-  syncConvToRds('c1');                       // immediate PATCH, stuck in flight
+  syncConv('c1');                       // immediate PATCH, stuck in flight
   await settle();
   assert.equal(patches().length, 2);
   appendMsg('c1', 'newest');
-  syncConvToRds('c1');
+  syncConv('c1');
   await flushPendingConvSyncs({ keepalive: true });  // pagehide
   assert.equal(patches().length, 3);
   assert.equal(patches()[2].keepalive, true);
   assert.equal(patches()[2].body.messages.length, 2);
 });
 
-test('syncConvToRds is a no-op without a signed-in user or an empty conversation', async () => {
+test('syncConv is a no-op without a signed-in user or an empty conversation', async () => {
   seedConv('c1', { messages: [] });
-  syncConvToRds('c1');
+  syncConv('c1');
   setCurrentUser(null);
   seedConv('c2');
-  syncConvToRds('c2');
+  syncConv('c2');
   mock.timers.tick(CONV_SYNC_DEBOUNCE_MS);
   await settle();
   assert.equal(calls.length, 0);
@@ -416,28 +416,28 @@ const BOOT = {
   }],
 };
 
-test('loadBootstrapFromRds returns the payload from GET /bootstrap', async () => {
+test('loadBootstrap returns the payload from GET /bootstrap', async () => {
   responder = () => ({ status: 200, json: BOOT });
-  const boot = await loadBootstrapFromRds();
+  const boot = await loadBootstrap();
   assert.deepEqual(boot, BOOT);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].method, 'GET');
   assert.equal(calls[0].path, 'bootstrap');
 });
 
-test('loadBootstrapFromRds returns null on 404 (older Lambda) and on failure, and in test mode', async () => {
+test('loadBootstrap returns null on 404 (older Lambda) and on failure, and in test mode', async () => {
   responder = () => ({ status: 404, json: {} });
-  assert.equal(await loadBootstrapFromRds(), null);
+  assert.equal(await loadBootstrap(), null);
   responder = () => ({ status: 500, json: {} });
-  assert.equal(await loadBootstrapFromRds(), null);
+  assert.equal(await loadBootstrap(), null);
   S.isTestMode = true;
   responder = () => ({ status: 200, json: BOOT });
-  assert.equal(await loadBootstrapFromRds(), null);
+  assert.equal(await loadBootstrap(), null);
   assert.equal(calls.length, 2, 'test mode never calls /bootstrap');
 });
 
-test('loadProfileFromRds({prefetched}) restores profile state without a GET /profiles', async () => {
-  await loadProfileFromRds({ prefetched: BOOT.profile });
+test('loadProfile({prefetched}) restores profile state without a GET /profiles', async () => {
+  await loadProfile({ prefetched: BOOT.profile });
   assert.equal(calls.length, 0);
   assert.equal(localStorage.getItem('lumi_name'), 'Sam');
   assert.equal(localStorage.getItem('lumi_grade'), '10');
@@ -445,26 +445,26 @@ test('loadProfileFromRds({prefetched}) restores profile state without a GET /pro
   assert.equal(localStorage.getItem('lumi_onboarding_complete'), 'true');
 });
 
-test('loadProfileFromRds({prefetched: null}) means "no row yet" and does NOT fall back to a GET', async () => {
-  await loadProfileFromRds({ prefetched: null });
+test('loadProfile({prefetched: null}) means "no row yet" and does NOT fall back to a GET', async () => {
+  await loadProfile({ prefetched: null });
   assert.equal(calls.length, 0);
   assert.equal(localStorage.getItem('lumi_name'), null);
 });
 
-test('loadProfileFromRds() without prefetched data still GETs /profiles (fallback path)', async () => {
+test('loadProfile() without prefetched data still GETs /profiles (fallback path)', async () => {
   responder = () => ({ status: 200, json: BOOT.profile });
-  await loadProfileFromRds();
+  await loadProfile();
   assert.equal(calls.length, 1);
   assert.equal(calls[0].path, 'profiles');
   assert.equal(localStorage.getItem('lumi_name'), 'Sam');
 });
 
-test('loadConvsFromRds({prefetched}) builds the local conv map from metadata, no GET, no messages', async () => {
-  await loadConvsFromRds({ prefetched: BOOT.recentConversations });
+test('loadConvs({prefetched}) builds the local conv map from metadata, no GET, no messages', async () => {
+  await loadConvs({ prefetched: BOOT.recentConversations });
   assert.equal(calls.length, 0);
   const convs = getConvs();
   const [c] = Object.values(convs);
-  assert.equal(c.sbId, BOOT.recentConversations[0].id);
+  assert.equal(c.serverId, BOOT.recentConversations[0].id);
   assert.equal(c.title, 'Quadratics');
   assert.equal(c.preview, 'help with quadratics');
   assert.equal(c.exchangeCount, 3);
@@ -472,9 +472,9 @@ test('loadConvsFromRds({prefetched}) builds the local conv map from metadata, no
   assert.equal(c.tutorCtx.course, 'Algebra 2');
 });
 
-test('loadConvsFromRds() without prefetched data GETs /conversations?is_teacher_test=false (fallback path)', async () => {
+test('loadConvs() without prefetched data GETs /conversations?is_teacher_test=false (fallback path)', async () => {
   responder = () => ({ status: 200, json: BOOT.recentConversations });
-  await loadConvsFromRds();
+  await loadConvs();
   assert.equal(calls.length, 1);
   assert.equal(calls[0].path, 'conversations?is_teacher_test=false');
   assert.equal(Object.keys(getConvs()).length, 1);

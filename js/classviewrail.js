@@ -136,7 +136,7 @@ export function closeRailDrawer() {
 // ── Boot-hydration skeletons ────────────────────────────────────────────────
 // The rail's datasets arrive at different times: conversations hydrate before
 // the router mounts (storage.js), projects are local-only, and homework tasks
-// stream in after first paint (projects.js:loadHwFromRds — non-blocking from
+// stream in after first paint (projects.js:loadHw — non-blocking from
 // app.js). While that fetch is unresolved the rail would paint empty
 // sections, so each section shows shimmer rows until the hw store exists.
 // RDS failures only log a warning (no event fires), so RAIL_SKELETON_MS is
@@ -156,7 +156,7 @@ export function railDataPending() {
   return true;
 }
 
-// loadHwFromRds() writes the store without dispatching 'lumi:hw-changed', so
+// loadHw() writes the store without dispatching 'lumi:hw-changed', so
 // poll the key on a short interval; the RAIL_SKELETON_MS ceiling doubles as
 // the settle-on-error path (RDS failures only log a warning).
 function armRailSettleWatch() {
@@ -291,9 +291,9 @@ function handleConvClick(convId) {
       teacher: conv.tutorCtx.teacher,
     };
   }
-  // loadConv lazy-fetches messages when the conv has an sbId but no cached
+  // loadConv lazy-fetches messages when the conv has an serverId but no cached
   // messages — shimmer bubbles fill that gap instead of a blank panel.
-  if (conv && conv.sbId && !(conv.messages && conv.messages.length)) showChatSkeleton();
+  if (conv && conv.serverId && !(conv.messages && conv.messages.length)) showChatSkeleton();
   loadConv(convId);
   // Re-render the rail so the newly-active row highlights.
   refreshActiveRow(convId);

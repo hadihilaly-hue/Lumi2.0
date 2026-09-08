@@ -9,7 +9,7 @@ export const CLAUDE_PROXY_URL = CONFIG.claudeProxyUrl;
 
 // Helper to make authenticated API calls to the Claude proxy
 export async function fetchClaudeProxy(body, options = {}) {
-  const { data: { session } } = await sb.auth.getSession();
+  const { data: { session } } = await auth.getSession();
   if (!session?.access_token) {
     throw new Error('Not authenticated. Please sign in again.');
   }

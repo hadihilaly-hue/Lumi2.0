@@ -16,7 +16,7 @@ let aRefreshTimer = null;
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 async function boot() {
-  const { data: { session } } = await sb.auth.getSession();
+  const { data: { session } } = await auth.getSession();
   if (!session) { window.location.replace('index.html'); return; }
   // Compliance Phase 2b: fetch the directory before the admin gate reads it.
   // Fail-closed — if the fetch fails, ADMIN_EMAIL stays null and the check below
@@ -25,7 +25,7 @@ async function boot() {
   catch (e) { console.error('[admin] directory load failed:', e); }
   const adminEmail = window.ADMIN_EMAIL;
   if (session.user.email.toLowerCase() !== adminEmail) {
-    await sb.auth.signOut();
+    await auth.signOut();
     window.location.replace('index.html');
     return;
   }

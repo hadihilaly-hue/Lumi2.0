@@ -57,18 +57,18 @@ const destination = 'app.html';
   }
 
   // If already signed in, redirect immediately
-  const { data: { session } } = await sb.auth.getSession();
+  const { data: { session } } = await auth.getSession();
   if (session?.user && await isAllowedEmail(session.user.email)) {
     window.location.href = 'app.html';
     return;
   }
 
   // After Google OAuth completes, onAuthStateChange fires and we redirect
-  sb.auth.onAuthStateChange(async (event, session) => {
+  auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session?.user) {
       if (!(await isAllowedEmail(session.user.email))) {
         sessionStorage.setItem('lumi_auth_error', "Your school isn't set up with Lumi yet.");
-        sb.auth.signOut(); // navigates: Cognito logout → back here → parked error shows
+        auth.signOut(); // navigates: Cognito logout → back here → parked error shows
         return;
       }
       window.location.href = destination;
@@ -84,7 +84,7 @@ const destination = 'app.html';
     try {
       const base       = window.location.href.replace(/\/[^/]*$/, '/');
       const redirectTo = base + destination;
-      const { error }  = await sb.auth.signInWithOAuth({
+      const { error }  = await auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo },
       });

@@ -219,7 +219,7 @@ export async function sendNote() {
 
   let error = null;
   // PATCH authz is server-side (caller must own the linked class); a 404/403
-  // throws in rdsFetch and lands in the error toast below.
+  // throws in apiFetch and lands in the error toast below.
   try {
     const res = await patchEnrollmentNotes(enrollment.id, serialized);
     if (!res) error = new Error('enrollment not found (404)');
