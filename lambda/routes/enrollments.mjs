@@ -23,6 +23,19 @@ import { safeErr } from "../lib/config.mjs";
 //   drops that student's teacher_notes for the class; that is the intended semantics
 //   (the enrollment relationship ended). Returns {deleted}. The student-side
 //   syncEnrollments prune calls this for every class no longer in the schedule.
+
+// Student scope: the caller's own enrollments, teacher_notes EXCLUDED. Shared by
+// GET /class-enrollments (default scope) and GET /bootstrap.
+export async function selectStudentEnrollments(userId) {
+  const result = await dbQuery(
+    `SELECT id, teacher_profile_id, block, student_name, created_at, updated_at
+       FROM public.class_enrollments WHERE student_id = $1 AND deleted_at IS NULL
+      ORDER BY teacher_profile_id, block`,
+    [userId]
+  );
+  return result.rows;
+}
+
 export async function classEnrollments(ctx) {
   const { event, body, user, sendJson } = ctx;
     const method = event.requestContext?.http?.method || "GET";
@@ -124,14 +137,7 @@ export async function classEnrollments(ctx) {
         );
         return sendJson(200, result.rows);
       }
-      // Student scope: caller's own enrollments only, teacher_notes EXCLUDED.
-      const result = await dbQuery(
-        `SELECT id, teacher_profile_id, block, student_name, created_at, updated_at
-           FROM public.class_enrollments WHERE student_id = $1 AND deleted_at IS NULL
-          ORDER BY teacher_profile_id, block`,
-        [user.id]
-      );
-      return sendJson(200, result.rows);
+      return sendJson(200, await selectStudentEnrollments(user.id));
     } catch (err) {
       console.error("class-enrollments error:", safeErr(err));
       return sendJson(500, { error: "Database error" });

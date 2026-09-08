@@ -1,3 +1,5 @@
+import { CLAUDE_PROXY_URL } from './api.js';
+import { CONFIG } from './config.js';
 import { lookupSubjectForCourse } from './conversation.js';
 import { setSidebarUserSubtitle } from './prompts.js';
 import { S, currentUser } from './state.js';
@@ -217,14 +219,38 @@ function syncEnrollments(schedule) {
     .catch(err => console.error('Enrollment sync failed:', err));
 }
 
-// Load all conversations from RDS into localStorage (called once on fresh device)
-export async function loadConvs() {
+// ─── BOOT: one-round-trip student payload ────────────────────────────────────
+// GET /bootstrap returns { profile, schedule, enrollments, availableClasses,
+// recentConversations } — the same rows the individual routes return, from the
+// same query functions. Resolves null when the deployed Lambda predates the
+// route (404) or the call fails, in which case boot falls back to the
+// individual calls. Student mode only: test mode never loads profile state.
+export async function loadBootstrap() {
+  if (!currentUser || S.isTestMode) return null;
+  const t0 = performance.now();
+  try {
+    const data = await apiFetch('bootstrap');
+    if (CONFIG.debug) {
+      console.log(`[boot] /bootstrap ${data ? 'hit' : '404 (fallback)'} in ${Math.round(performance.now() - t0)}ms`);
+    }
+    return data && typeof data === 'object' ? data : null;
+  } catch (err) {
+    console.warn('Bootstrap load failed (falling back to individual calls):', err);
+    return null;
+  }
+}
+
+// Load all conversations from RDS into localStorage (called once on fresh device).
+// `prefetched` (from /bootstrap) replaces the GET when supplied.
+export async function loadConvs({ prefetched } = {}) {
   if (!currentUser) return;
   try {
     // TM-2: filter by is_teacher_test so test convs never appear in
     // the student sidebar (and vice versa). The Lambda scopes rows to
     // the JWT user server-side.
-    const data = await apiFetch(`conversations?is_teacher_test=${!!S.isTestMode}`);
+    const data = prefetched !== undefined
+      ? prefetched
+      : await apiFetch(`conversations?is_teacher_test=${!!S.isTestMode}`);
     if (!data || !data.length) return;
 
     const convs = {};
@@ -248,11 +274,11 @@ export async function loadConvs() {
         ? { ...lookupSubjectForCourse(row.course), course: row.course, teacher: row.teacher }
         : null;
 
-      // Use the server row UUID as both local ID and serverId
+      // Use the RDS row UUID as both local ID and serverId
       const localId = 'sb_' + row.id.replace(/-/g, '').slice(0, 16);
       convs[localId] = {
         id:           localId,
-        serverId:     row.id,
+        serverId:         row.id,
         ts:           new Date(row.created_at).getTime(),
         title:        row.title || null,
         preview:      preview || 'Chat',
@@ -270,18 +296,30 @@ export async function loadConvs() {
   }
 }
 
-// Sync a single conversation to RDS — INSERT first time, UPDATE after
-export function syncConv(convId) {
-  if (!currentUser) return;
-  _doSyncConv(convId).catch(err => console.warn('Conv sync:', err));
-}
+// ─── CONVERSATION SYNC (INSERT first time, debounced PATCH after) ──────────────
+// Creation (POST) is immediate so the row exists (and serverId is captured) before
+// anything else depends on it. Subsequent updates are coalesced per conversation
+// with a trailing debounce: a streaming reply calls saveCurrentConv many times,
+// but only the last snapshot is worth a PATCH. Metadata edits (title, class)
+// bypass the debounce so a rename / generated title lands promptly. Pending
+// writes are flushed with `keepalive` when the tab hides or unloads, and a
+// PATCH is skipped when the payload is byte-identical to the last one the
+// server accepted. A failed PATCH leaves the payload pending so the next flush
+// retries it.
+export const CONV_SYNC_DEBOUNCE_MS = 1500;
 
-async function _doSyncConv(convId) {
-  const convs = getConvs();
-  const conv  = convs[convId];
-  if (!conv || !conv.messages.length) return;
+const _convSyncTimers   = new Map(); // convId -> timeout handle
+const _convSyncPending  = new Set(); // convIds with an unsent snapshot
+const _convLastSynced   = new Map(); // convId -> serialized row last accepted by the server
+const _convCreating     = new Map(); // convId -> in-flight POST promise
+const _convPatching     = new Map(); // convId -> in-flight PATCH promise (writes are serialized per conv)
 
-  const row = {
+// Browsers cap the total body size of outstanding keepalive requests at 64 KiB;
+// larger payloads are sent as a normal request instead of being rejected.
+const KEEPALIVE_BODY_LIMIT = 60 * 1024;
+
+function _convRow(conv) {
+  return {
     user_id:         currentUser.id,
     title:           conv.title   || null,
     messages:        conv.messages,
@@ -291,38 +329,186 @@ async function _doSyncConv(convId) {
     // teacher-test convs from real student convs. Default false in the
     // schema; only test-mode writes flip it to true.
     is_teacher_test: !!S.isTestMode,
-    updated_at:      new Date().toISOString(),
   };
+}
 
-  if (conv.serverId) {
-    // Already exists — update. Lambda PATCH scopes to the JWT user server-side
-    // and 404s on an unowned/unknown id (surfaced via the apiFetch null → warn).
+// Serialization used for the changed-since-last-write check (updated_at is
+// added at send time and deliberately excluded here).
+function _serializeRow(row) { return JSON.stringify(row); }
+
+function _metaChanged(convId, row) {
+  const last = _convLastSynced.get(convId);
+  if (!last) return false;
+  let prev;
+  try { prev = JSON.parse(last); } catch { return true; }
+  return prev.title !== row.title || prev.teacher !== row.teacher || prev.course !== row.course;
+}
+
+export function syncConv(convId) {
+  if (!currentUser) return;
+  const conv = getConvs()[convId];
+  if (!conv || !conv.messages.length) return;
+
+  if (!conv.serverId && !_convCreating.has(convId)) {
+    _createConv(convId).catch(err => console.warn('Conv sync:', err));
+    return;
+  }
+
+  _convSyncPending.add(convId);
+  if (conv.serverId && _metaChanged(convId, _convRow(conv))) {
+    _clearConvTimer(convId);
+    _patchConv(convId).catch(err => console.warn('Conv sync:', err));
+    return;
+  }
+  _clearConvTimer(convId);
+  _convSyncTimers.set(convId, setTimeout(() => {
+    _convSyncTimers.delete(convId);
+    _patchConv(convId).catch(err => console.warn('Conv sync:', err));
+  }, CONV_SYNC_DEBOUNCE_MS));
+}
+
+function _clearConvTimer(convId) {
+  const t = _convSyncTimers.get(convId);
+  if (t !== undefined) { clearTimeout(t); _convSyncTimers.delete(convId); }
+}
+
+async function _createConv(convId) {
+  const conv = getConvs()[convId];
+  if (!conv) return;
+  const row = _convRow(conv);
+  const serialized = _serializeRow(row);
+  const p = (async () => {
+    let newId;
     try {
-      const res = await apiFetch('conversations', { method: 'PATCH', body: { id: conv.serverId, ...row } });
-      if (!res) console.warn('Conversation update error:', 'conversation not found (404)');
-    } catch (err) { console.warn('Conversation update error:', err); }
-  } else {
-    // New conversation — insert and capture the UUID
-    // TODO(lint): initializer is overwritten before use; kept as-is to avoid touching control flow.
-    // eslint-disable-next-line no-useless-assignment
-    let newId = null;
-    try {
-      const res = await apiFetch('conversations', { method: 'POST', body: row });
+      const res = await apiFetch('conversations', { method: 'POST', body: { ...row, updated_at: new Date().toISOString() } });
       newId = res?.id || null;
     } catch (err) { console.warn('Conversation insert error:', err); return; }
-    if (newId) {
-      // Store serverId back into local storage
-      const c2 = getConvs();
-      if (c2[convId]) { c2[convId].serverId = newId; saveConvs(c2); }
-    }
+    if (!newId) return;
+    const c2 = getConvs();
+    if (c2[convId]) { c2[convId].serverId = newId; saveConvs(c2); }
+    _convLastSynced.set(convId, serialized);
+  })();
+  _convCreating.set(convId, p);
+  try { await p; } finally { _convCreating.delete(convId); }
+  // Anything saved while the POST was in flight is now due as a PATCH.
+  if (_convSyncPending.has(convId) && !_convSyncTimers.has(convId)) {
+    _convSyncTimers.set(convId, setTimeout(() => {
+      _convSyncTimers.delete(convId);
+      _patchConv(convId).catch(err => console.warn('Conv sync:', err));
+    }, CONV_SYNC_DEBOUNCE_MS));
   }
+}
+
+// Send the current snapshot of one conversation. `keepalive` is used by the
+// hide/unload flush so the request outlives the document.
+async function _patchConv(convId, opts = {}) {
+  const creating = _convCreating.get(convId);
+  if (creating) await creating;
+  // One PATCH in flight per conversation: a save that lands mid-request waits
+  // for it to settle, then sends the newest snapshot (no stale overwrite).
+  // The unload flush cannot afford to wait (the document may be gone before
+  // the earlier request settles), so it fires its keepalive request at once;
+  // the row's updated_at lets the server-side history show which was newest.
+  if (!opts.keepalive) { while (_convPatching.has(convId)) await _convPatching.get(convId); }
+  const p = _patchConvNow(convId, opts);
+  _convPatching.set(convId, p);
+  try { await p; } finally { if (_convPatching.get(convId) === p) _convPatching.delete(convId); }
+}
+
+async function _patchConvNow(convId, { keepalive = false, budget = null } = {}) {
+  const conv = getConvs()[convId];
+  if (!conv || !conv.messages.length) { _convSyncPending.delete(convId); return; }
+  if (!conv.serverId) {
+    // Creation failed (or never happened) — retry the insert instead.
+    _convSyncPending.delete(convId);
+    if (!_convCreating.has(convId)) await _createConv(convId);
+    return;
+  }
+  const row = _convRow(conv);
+  const serialized = _serializeRow(row);
+  if (_convLastSynced.get(convId) === serialized) { _convSyncPending.delete(convId); return; }
+
+  // Lambda PATCH scopes to the JWT user server-side and 404s on an
+  // unowned/unknown id (surfaced via the apiFetch null → warn).
+  const body = { id: conv.serverId, ...row, updated_at: new Date().toISOString() };
+  const json = JSON.stringify(body);
+  const bytes = new TextEncoder().encode(json).byteLength;
+  // The keepalive quota is shared by every outstanding keepalive request, so a
+  // flush of several conversations draws from one budget.
+  const fits = bytes <= (budget ? budget.remaining : KEEPALIVE_BODY_LIMIT);
+  if (keepalive && fits && budget) budget.remaining -= bytes;
+  try {
+    const res = keepalive && fits
+      ? await _apiPatchKeepalive('conversations', json)
+      : await apiFetch('conversations', { method: 'PATCH', body });
+    if (!res) { console.warn('Conversation update error:', 'conversation not found (404)'); return; }
+    _convLastSynced.set(convId, serialized);
+    // Only clear if nothing newer was saved while the request was in flight.
+    if (_serializeRow(_convRow(getConvs()[convId] || conv)) === serialized) _convSyncPending.delete(convId);
+  } catch (err) {
+    console.warn('Conversation update error:', err);
+  }
+}
+
+// Same wire format as apiFetch, plus `keepalive` so the browser lets the
+// request complete after pagehide. Mirrors apiFetch's 404 → null contract.
+async function _apiPatchKeepalive(path, json) {
+  const { data: { session } } = await auth.getSession();
+  if (!session?.access_token) throw new Error('apiFetch: no session');
+  const res = await fetch(`${CLAUDE_PROXY_URL}${path}`, {
+    method: 'PATCH',
+    keepalive: true,
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: json,
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`${path} ${res.status}`);
+  return res.json();
+}
+
+// Send every pending snapshot now (cancelling their timers). Used on tab hide /
+// unload; safe to call any time.
+export function flushPendingConvSyncs({ keepalive = true } = {}) {
+  // In-flight creations count as pending: wait for the POST (and any PATCH
+  // queued behind it) so sign-out / unload can't strand a brand-new thread.
+  const ids = [...new Set([..._convSyncPending, ..._convCreating.keys()])];
+  for (const id of ids) _clearConvTimer(id);
+  const budget = { remaining: KEEPALIVE_BODY_LIMIT };
+  return Promise.all(ids.map(async (id) => {
+    try {
+      const creating = _convCreating.get(id);
+      if (creating) await creating;
+      if (_convSyncPending.has(id) || _convPatching.has(id)) await _patchConv(id, { keepalive, budget });
+    } catch (err) { console.warn('Conv sync:', err); }
+  }));
+}
+
+export function hasPendingConvSync(convId) { return _convSyncPending.has(convId); }
+
+// Wire the hide/unload flush. Called once at app boot.
+export function initConvSyncFlush(doc = globalThis.document, win = globalThis.window) {
+  const onHide = () => { flushPendingConvSyncs({ keepalive: true }); };
+  doc?.addEventListener?.('visibilitychange', () => { if (doc.visibilityState === 'hidden') onHide(); });
+  win?.addEventListener?.('pagehide', onHide);
+}
+
+// Test-only: drop all in-memory sync state.
+export function __resetConvSyncState() {
+  for (const id of _convSyncTimers.keys()) _clearConvTimer(id);
+  _convSyncPending.clear();
+  _convLastSynced.clear();
+  _convCreating.clear();
+  _convPatching.clear();
 }
 
 // Delete a conversation from RDS by its serverId
 export function deleteServerConv(convId) {
   if (!currentUser) return;
   const convs = getConvs();
-  const serverId = convs[convId]?.serverId;
+  const serverId  = convs[convId]?.serverId;
   if (!serverId) return;
   // Hardened (§2): failure now surfaces to the user, not just the console.
   apiFetch(`conversations?id=${encodeURIComponent(serverId)}`, { method: 'DELETE' })
@@ -332,8 +518,9 @@ export function deleteServerConv(convId) {
     });
 }
 
-// Load profile from RDS on new device (only if localStorage has no name)
-export async function loadProfile() {
+// Load profile from RDS on new device (only if localStorage has no name).
+// `prefetched` (from /bootstrap; null = no row) replaces the GET when supplied.
+export async function loadProfile({ prefetched } = {}) {
   if (!currentUser) return;
   // TM-2: this pulls student profile state (name, grade, schedule, etc.)
   // into localStorage. In test mode that would overwrite the browser's
@@ -343,7 +530,7 @@ export async function loadProfile() {
   try {
     // GET /profiles returns the caller's row as a single object; null on 404
     // (no profile yet).
-    const data = await apiFetch('profiles');
+    const data = prefetched !== undefined ? prefetched : await apiFetch('profiles');
     if (!data) return;
     // Always restore name/grade (overwrite if the server copy is newer)
     if (!hasName && data.name)  localStorage.setItem('lumi_name',  data.name);
@@ -388,8 +575,8 @@ export function getConvs() {
   return convs;
 }
 
-// One-time read-side migration: conversations persisted before the `serverId`
-// rename carry the server row id under `sbId`. Returns true when anything moved.
+// One-time read-side migration: conversations persisted before the rename
+// carry `sbId`; rewrite to `serverId` (existing `serverId` wins).
 export function migrateConvServerIds(convs) {
   let changed = false;
   for (const conv of Object.values(convs || {})) {
@@ -418,7 +605,7 @@ export function saveCurrentConv() {
         : '');
   convs[S.currentId] = {
     id:           S.currentId,
-    serverId:     existing.serverId || null,    // preserve server row UUID across saves
+    serverId:         existing.serverId || null,    // preserve RDS row UUID across saves
     ts:           existing.ts || Date.now(),
     title:        existing.title || null,
     preview:      previewText.slice(0, 60) || 'New chat',

@@ -19,6 +19,41 @@ import { CONVERSATION_COLS, pickColumns } from "../lib/columns.mjs";
 //         hundreds of KB and the caller already has them). 404 when not owned.
 // DELETE — ?id=<uuid> single delete, or ?all=true wipe (Clear-memory button).
 //         Both scoped to the caller. Returns {deleted: n}.
+
+// The caller's 50 most recent conversations (newest first) as metadata + a
+// server-computed `preview` + `exchange_count` — NO `messages` blob. Shared by
+// the GET /conversations list path and GET /bootstrap.
+// AUDIT_LAMBDA_PERF #3: the list endpoint used to ship every conversation's
+// full `messages` jsonb (hundreds of KB × 50) on every app open. The preview
+// (first user message, 60 chars) and exchange_count (assistant-turn count) are
+// the only two things the sidebar derives from messages. The CASE guards
+// tolerate a null/non-array messages.
+export async function selectConversationList(userId, isTest) {
+  const result = await dbQuery(
+    `SELECT id, title, teacher, course, created_at, updated_at,
+            (SELECT count(*) FROM jsonb_array_elements(
+               CASE WHEN jsonb_typeof(messages) = 'array' THEN messages ELSE '[]'::jsonb END) m
+              WHERE m->>'role' = 'assistant')::int AS exchange_count,
+            (SELECT left(
+                      CASE jsonb_typeof(m->'content')
+                        WHEN 'string' THEN m->>'content'
+                        WHEN 'array'  THEN COALESCE(
+                          (SELECT p->>'text' FROM jsonb_array_elements(m->'content') p
+                            WHERE p->>'type' = 'text' LIMIT 1), '')
+                        ELSE ''
+                      END, 60)
+               FROM jsonb_array_elements(
+                      CASE WHEN jsonb_typeof(messages) = 'array' THEN messages ELSE '[]'::jsonb END) m
+              WHERE m->>'role' = 'user' LIMIT 1) AS preview
+       FROM public.conversations
+      WHERE user_id = $1 AND is_teacher_test = $2 AND deleted_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT 50`,
+    [userId, isTest]
+  );
+  return result.rows;
+}
+
 export async function conversations(ctx) {
   const { event, body, user, sendJson } = ctx;
     const method = event.requestContext?.http?.method || "GET";
@@ -38,36 +73,8 @@ export async function conversations(ctx) {
           if (one.rowCount === 0) return sendJson(404, { error: "No conversation found" });
           return sendJson(200, one.rows[0]);
         }
-        // AUDIT_LAMBDA_PERF #3: the list endpoint used to ship every
-        // conversation's full `messages` jsonb (hundreds of KB × 50) on every
-        // app open. It now returns metadata plus a server-computed `preview`
-        // (first user message, 60 chars) and `exchange_count` (assistant-turn
-        // count) — the only two things the sidebar derives from messages —
-        // without the blob. The CASE guards tolerate a null/non-array messages.
         const isTest = qs.is_teacher_test === "true";
-        const result = await dbQuery(
-          `SELECT id, title, teacher, course, created_at, updated_at,
-                  (SELECT count(*) FROM jsonb_array_elements(
-                     CASE WHEN jsonb_typeof(messages) = 'array' THEN messages ELSE '[]'::jsonb END) m
-                    WHERE m->>'role' = 'assistant')::int AS exchange_count,
-                  (SELECT left(
-                            CASE jsonb_typeof(m->'content')
-                              WHEN 'string' THEN m->>'content'
-                              WHEN 'array'  THEN COALESCE(
-                                (SELECT p->>'text' FROM jsonb_array_elements(m->'content') p
-                                  WHERE p->>'type' = 'text' LIMIT 1), '')
-                              ELSE ''
-                            END, 60)
-                     FROM jsonb_array_elements(
-                            CASE WHEN jsonb_typeof(messages) = 'array' THEN messages ELSE '[]'::jsonb END) m
-                    WHERE m->>'role' = 'user' LIMIT 1) AS preview
-             FROM public.conversations
-            WHERE user_id = $1 AND is_teacher_test = $2 AND deleted_at IS NULL
-            ORDER BY created_at DESC
-            LIMIT 50`,
-          [user.id, isTest]
-        );
-        return sendJson(200, result.rows);
+        return sendJson(200, await selectConversationList(user.id, isTest));
       }
 
       if (method === "POST") {

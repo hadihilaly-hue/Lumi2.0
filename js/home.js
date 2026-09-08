@@ -576,7 +576,9 @@ export function renderHome() {
   // finishes settling (RDS error — it only logs), the poll times out and the
   // real grid renders fail-open, matching the pre-existing default.
   const schedule = S.isTestMode ? S.testSchedule : getSchedule();
-  if (isHomeGridPending(schedule, _profileStatusCache, S.isTestMode)) {
+  const settledSig = scheduleSig(schedule);
+  if (settledSig !== _gridSettledSig) _gridSettledSig = null;  // schedule changed → fresh probe round
+  if (!_gridSettledSig && isHomeGridPending(schedule, _profileStatusCache, S.isTestMode)) {
     armGridProbePoll();
     grid.innerHTML = '';
     for (let i = 0; i < Math.min(schedule.length, 6); i++) {
@@ -628,6 +630,17 @@ const GRID_PROBE_POLL_MS = 400;
 const GRID_PROBE_TIMEOUT_MS = 8000;
 let _gridPoll = null;
 let _gridPollStart = 0;
+// Signature of the schedule whose probe round has already settled — a timed-
+// out probe leaves the cache unchanged, so without this record renderHome
+// would re-enter the skeleton gate and re-arm the poll forever (skeletons
+// permanently replacing every class after a probe failure).
+let _gridSettledSig = null;
+
+function scheduleSig(schedule) {
+  return (Array.isArray(schedule) ? schedule : [])
+    .map(e => `${e.course}::${e.teacher}`)
+    .join('|');
+}
 
 function armGridProbePoll() {
   if (_gridPoll) return;
@@ -635,7 +648,12 @@ function armGridProbePoll() {
   _gridPoll = setInterval(() => {
     const settled = !isHomeGridPending(getSchedule(), _profileStatusCache, S.isTestMode)
       || Date.now() - _gridPollStart > GRID_PROBE_TIMEOUT_MS;
-    if (settled) { clearInterval(_gridPoll); _gridPoll = null; renderHome(); }
+    if (settled) {
+      clearInterval(_gridPoll);
+      _gridPoll = null;
+      _gridSettledSig = scheduleSig(getSchedule());
+      renderHome();
+    }
   }, GRID_PROBE_POLL_MS);
 }
 
