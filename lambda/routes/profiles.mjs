@@ -13,23 +13,31 @@ import { PROFILE_COLS, pickColumns } from "../lib/columns.mjs";
 // POST — partial-column upsert: INSERT .. ON CONFLICT (id) DO UPDATE SET only the
 //   provided allowlisted columns (matches Supabase upsert semantics at all 5 sites).
 // PATCH — update-only variant (no insert); 404 when the row doesn't exist yet.
+
+// The caller's own profile row (or null when none). Shared by GET /profiles
+// and GET /bootstrap so both read the identical column projection.
+// AUDIT_LAMBDA_PERF #4: explicit column list instead of SELECT * so the
+// google_calendar_token PII (never read by the frontend — it only reads
+// the calendar_connected boolean) stays server-side.
+export async function selectOwnProfile(userId) {
+  const result = await dbQuery(
+    `SELECT id, name, grade, values_profile, created_at, schedule, schedule_updated_at,
+            semester_banner_dismissed_at, study_style, calendar_connected, learning_style,
+            pain_points, typical_activities, onboarding_complete, homework_start_time
+       FROM public.profiles WHERE id = $1 AND deleted_at IS NULL`,
+    [userId]
+  );
+  return result.rowCount === 0 ? null : result.rows[0];
+}
+
 export async function profiles(ctx) {
   const { event, body, user, sendJson } = ctx;
     const method = event.requestContext?.http?.method || "GET";
     try {
       if (method === "GET") {
-        // AUDIT_LAMBDA_PERF #4: explicit column list instead of SELECT * so the
-        // google_calendar_token PII (never read by the frontend — it only reads
-        // the calendar_connected boolean) stays server-side.
-        const result = await dbQuery(
-          `SELECT id, name, grade, values_profile, created_at, schedule, schedule_updated_at,
-                  semester_banner_dismissed_at, study_style, calendar_connected, learning_style,
-                  pain_points, typical_activities, onboarding_complete, homework_start_time
-             FROM public.profiles WHERE id = $1 AND deleted_at IS NULL`,
-          [user.id]
-        );
-        if (result.rowCount === 0) return sendJson(404, { error: "No profile found" });
-        return sendJson(200, result.rows[0]);
+        const row = await selectOwnProfile(user.id);
+        if (!row) return sendJson(404, { error: "No profile found" });
+        return sendJson(200, row);
       }
 
       if (method === "POST") {

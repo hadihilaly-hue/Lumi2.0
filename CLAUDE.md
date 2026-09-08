@@ -74,6 +74,18 @@ gives direct answers, only guides reasoning.
   Lambda); the paused Supabase project awaits final deletion. The sync
   helpers in `js/storage.js` / `js/homework.js` / `js/projects.js` are named
   `*ToRds` / `*FromRds` (e.g. `syncScheduleToRds`, `loadProfileFromRds`).
+  **Conversation writes are debounced (W6):** `syncConvToRds(convId)` POSTs
+  a brand-new conversation immediately (creation is never delayed; saves that
+  land while the POST is in flight are folded into one follow-up PATCH), but
+  subsequent PATCHes are coalesced per conversation behind a 1.5 s trailing
+  debounce (`CONV_SYNC_DEBOUNCE_MS`). A title/teacher/course change bypasses
+  the debounce so generated titles persist promptly. The PATCH is skipped
+  when the serialized row is unchanged since the last SUCCESSFUL write; a
+  failed PATCH keeps the payload pending for the next flush.
+  `initConvSyncFlush()` (app.js) flushes everything pending on
+  `visibilitychange`→hidden and `pagehide` with `fetch(..., {keepalive:
+  true})`; sign-out awaits `flushPendingConvSyncs()` first. Tests:
+  `test/convSync.test.mjs` (fake timers via `node:test` `mock.timers`).
   Teacher notes are injected server-side by the chat Lambda and never reach
   the client (see "Per-student teacher notes injection").
   `docs/archive/SMOKE_TEST.md` and `docs/archive/CUTOVER_PLAN.md` are
@@ -361,7 +373,9 @@ surface. Everything else lives in two folders (see `lambda/README.md`):
   `enrollments.mjs`, `conversations.mjs`, `homework.mjs`, `uploads.mjs`,
   `admin.mjs` (adminSql direct-invoke, /admin/*, /sis-import), `misc.mjs`
   (/db-health, /allowed-domains, /my-data, /delete-my-account, /consent,
-  /teacher-directory, /available-classes).
+  /teacher-directory, /available-classes), `bootstrap.mjs` (W6 — GET
+  /bootstrap, student boot aggregate; composes the `select*` query functions
+  exported by profiles/enrollments/misc/conversations so authz is identical).
 - Teacher authz semantics: `isAdmin` = SCHOOL_CONFIG.adminEmails (admins are
   always provisioned + done, zero DB hits); `isProvisioned` = sis_map roster
   row OR teacher_profiles row with `deleted_at IS NULL` (write gate, never
@@ -395,6 +409,24 @@ live with spoofed ids.
 - **/conversations** GET (`?is_teacher_test=` splits TM-1 threads, newest 50)
   + POST (returns `{id}` only) + PATCH (`{id, updated_at}` back — messages
   jsonb never echoed) + DELETE (`?id=` / `?all=true`).
+- **/bootstrap** (W6) GET only → `{ profile, schedule, enrollments,
+  availableClasses, recentConversations }` in ONE round trip; the four reads
+  run in parallel (`Promise.all`) via the shared `selectOwnProfile`,
+  `selectStudentEnrollments`, `selectAvailableClasses`,
+  `selectConversationList` functions the individual routes call, so scoping
+  (JWT sub) is the same. `profile` is `null` when no row; `schedule` is
+  `profile.schedule` (the frontend persists schedule on the profile row);
+  `enrollments` is the student projection (never `teacher_notes`);
+  `recentConversations` is METADATA ONLY (id, title, teacher, course,
+  created_at, updated_at, is_teacher_test, preview, exchange_count — never
+  `messages`; bodies still load lazily via `GET /conversations?id=`).
+  `?is_teacher_test=true` mirrors the /conversations filter. Any DB error →
+  500 with no partial payload. Frontend: `loadBootstrapFromRds()` in
+  `js/storage.js` calls it at boot and passes the pieces as `{ prefetched }`
+  into `loadProfileFromRds` / `loadConvsFromRds`; a 404 (deployed Lambda
+  older than `main`) or any failure returns `null` and app.js falls back to
+  the individual routes. The individual routes are untouched and still used
+  for later refreshes.
 - **/homework-tasks** GET + POST (bulk upsert, client uuids; conflict-update
   arm carries `WHERE user_id = EXCLUDED.user_id` so a guessed uuid can't
   hijack a foreign row — returned `{upserted}` count exposes skips) + PATCH +

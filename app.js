@@ -7,12 +7,13 @@ import { _projPendingFile, clearAllChats, clearCompletedProjects, clearProjFile,
 import { setSidebarUserSubtitle } from './js/prompts.js';
 import { checkSemesterBanner, initScheduleSetup } from './js/schedule.js';
 import { activeDropdownEl, closeOpenMenu, renderSearchDropdown, renderSidebar, showInlineConfirm } from './js/sidebar.js';
+import { CONFIG } from './js/config.js';
 import { mountHome, renderHome } from './js/home.js';
 import { mountClass, mountGeneral } from './js/classview.js';
 import { mountPlan } from './js/studyplanview.js';
 import { initRouter } from './js/router.js';
 import { $, S, SB, currentUser, fileInput, msgInput, sbSearch, sendBtn, setCurrentProjId, setCurrentUser, themeToggle } from './js/state.js';
-import { flushProgressNote, genId, getSchedule, loadConvsFromRds, loadProfileFromRds, loadTestModeSchedule, migrateOldData, saveCurrentConv } from './js/storage.js';
+import { flushPendingConvSyncs, flushProgressNote, genId, getSchedule, initConvSyncFlush, loadBootstrapFromRds, loadConvsFromRds, loadProfileFromRds, loadTestModeSchedule, migrateOldData, saveCurrentConv } from './js/storage.js';
 import { isTeacherModeAllowed, preloadAvailableClasses, preloadProfileStatuses, rdsFetch, signedInDestination } from './js/teachers.js';
 import { autoGrow, closeSettings, closeSidebar, openSettings, openSidebar, showToast, updateSendBtn } from './js/ui.js';
 import { initVoice, wireVoiceListeners } from './js/voice.js';
@@ -137,7 +138,13 @@ import { initVoice, wireVoiceListeners } from './js/voice.js';
     } else { homeAvatar.textContent = initials; }
   }
 
-  await loadProfileFromRds();
+  // One round trip for profile + schedule + conversation metadata when the
+  // deployed Lambda has /bootstrap; null (404 / error / test mode) falls back
+  // to the individual calls below. Full conversation `messages` still load
+  // lazily on open either way.
+  const bootT0 = performance.now();
+  const boot = await loadBootstrapFromRds();
+  await loadProfileFromRds(boot ? { prefetched: boot.profile } : {});
 
   // One-time privacy scrub: earlier builds persisted tutorCtx.teacherNotes
   // (confidential teacher observations) into localStorage via saveCurrentConv.
@@ -161,7 +168,12 @@ import { initVoice, wireVoiceListeners } from './js/voice.js';
   // TM-2: in test mode, always load convs fresh from RDS (filtered
   // to is_teacher_test=true). In student mode, only on fresh device
   // where lumi_convs hasn't been cached.
-  if (S.isTestMode || !localStorage.getItem('lumi_convs')) await loadConvsFromRds();
+  if (S.isTestMode || !localStorage.getItem('lumi_convs')) {
+    await loadConvsFromRds(boot ? { prefetched: boot.recentConversations } : {});
+  }
+  if (CONFIG.debug) {
+    console.log(`[boot] profile+convs via ${boot ? '/bootstrap' : 'individual routes'} in ${Math.round(performance.now() - bootT0)}ms`);
+  }
   // TM-2: synthesize the teacher's own classes into S.testSchedule.
   if (S.isTestMode) await loadTestModeSchedule();
 
@@ -191,6 +203,7 @@ function init() {
   const hasSchedule  = getSchedule().length > 0;
 
   wireListeners();
+  initConvSyncFlush();
 
   // Show conversational onboarding for brand-new users (no name at all),
   // then hand off to the class/grade picker box
@@ -271,6 +284,7 @@ function wireListeners() {
       // (best-effort, server-gated no-op for real students).
       saveCurrentConv();
       flushProgressNote();
+      await flushPendingConvSyncs({ keepalive: false });
       await doSignOut();
     }
   });

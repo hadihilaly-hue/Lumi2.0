@@ -1,3 +1,5 @@
+import { CLAUDE_PROXY_URL } from './api.js';
+import { CONFIG } from './config.js';
 import { lookupSubjectForCourse } from './conversation.js';
 import { setSidebarUserSubtitle } from './prompts.js';
 import { S, currentUser } from './state.js';
@@ -217,14 +219,38 @@ function syncEnrollments(schedule) {
     .catch(err => console.error('Enrollment sync failed:', err));
 }
 
-// Load all conversations from RDS into localStorage (called once on fresh device)
-export async function loadConvsFromRds() {
+// ─── BOOT: one-round-trip student payload ────────────────────────────────────
+// GET /bootstrap returns { profile, schedule, enrollments, availableClasses,
+// recentConversations } — the same rows the individual routes return, from the
+// same query functions. Resolves null when the deployed Lambda predates the
+// route (404) or the call fails, in which case boot falls back to the
+// individual calls. Student mode only: test mode never loads profile state.
+export async function loadBootstrapFromRds() {
+  if (!currentUser || S.isTestMode) return null;
+  const t0 = performance.now();
+  try {
+    const data = await rdsFetch('bootstrap');
+    if (CONFIG.debug) {
+      console.log(`[boot] /bootstrap ${data ? 'hit' : '404 (fallback)'} in ${Math.round(performance.now() - t0)}ms`);
+    }
+    return data && typeof data === 'object' ? data : null;
+  } catch (err) {
+    console.warn('Bootstrap load failed (falling back to individual calls):', err);
+    return null;
+  }
+}
+
+// Load all conversations from RDS into localStorage (called once on fresh device).
+// `prefetched` (from /bootstrap) replaces the GET when supplied.
+export async function loadConvsFromRds({ prefetched } = {}) {
   if (!currentUser) return;
   try {
     // TM-2: filter by is_teacher_test so test convs never appear in
     // the student sidebar (and vice versa). The Lambda scopes rows to
     // the JWT user server-side.
-    const data = await rdsFetch(`conversations?is_teacher_test=${!!S.isTestMode}`);
+    const data = prefetched !== undefined
+      ? prefetched
+      : await rdsFetch(`conversations?is_teacher_test=${!!S.isTestMode}`);
     if (!data || !data.length) return;
 
     const convs = {};
@@ -270,18 +296,25 @@ export async function loadConvsFromRds() {
   }
 }
 
-// Sync a single conversation to RDS — INSERT first time, UPDATE after
-export function syncConvToRds(convId) {
-  if (!currentUser) return;
-  _doSyncConv(convId).catch(err => console.warn('Conv sync:', err));
-}
+// ─── CONVERSATION SYNC (INSERT first time, debounced PATCH after) ──────────────
+// Creation (POST) is immediate so the row exists (and sbId is captured) before
+// anything else depends on it. Subsequent updates are coalesced per conversation
+// with a trailing debounce: a streaming reply calls saveCurrentConv many times,
+// but only the last snapshot is worth a PATCH. Metadata edits (title, class)
+// bypass the debounce so a rename / generated title lands promptly. Pending
+// writes are flushed with `keepalive` when the tab hides or unloads, and a
+// PATCH is skipped when the payload is byte-identical to the last one the
+// server accepted. A failed PATCH leaves the payload pending so the next flush
+// retries it.
+export const CONV_SYNC_DEBOUNCE_MS = 1500;
 
-async function _doSyncConv(convId) {
-  const convs = getConvs();
-  const conv  = convs[convId];
-  if (!conv || !conv.messages.length) return;
+const _convSyncTimers   = new Map(); // convId -> timeout handle
+const _convSyncPending  = new Set(); // convIds with an unsent snapshot
+const _convLastSynced   = new Map(); // convId -> serialized row last accepted by the server
+const _convCreating     = new Map(); // convId -> in-flight POST promise
 
-  const row = {
+function _convRow(conv) {
+  return {
     user_id:         currentUser.id,
     title:           conv.title   || null,
     messages:        conv.messages,
@@ -291,31 +324,151 @@ async function _doSyncConv(convId) {
     // teacher-test convs from real student convs. Default false in the
     // schema; only test-mode writes flip it to true.
     is_teacher_test: !!S.isTestMode,
-    updated_at:      new Date().toISOString(),
   };
+}
 
-  if (conv.sbId) {
-    // Already exists — update. Lambda PATCH scopes to the JWT user server-side
-    // and 404s on an unowned/unknown id (surfaced via the rdsFetch null → warn).
+// Serialization used for the changed-since-last-write check (updated_at is
+// added at send time and deliberately excluded here).
+function _serializeRow(row) { return JSON.stringify(row); }
+
+function _metaChanged(convId, row) {
+  const last = _convLastSynced.get(convId);
+  if (!last) return false;
+  let prev;
+  try { prev = JSON.parse(last); } catch { return true; }
+  return prev.title !== row.title || prev.teacher !== row.teacher || prev.course !== row.course;
+}
+
+export function syncConvToRds(convId) {
+  if (!currentUser) return;
+  const conv = getConvs()[convId];
+  if (!conv || !conv.messages.length) return;
+
+  if (!conv.sbId && !_convCreating.has(convId)) {
+    _createConv(convId).catch(err => console.warn('Conv sync:', err));
+    return;
+  }
+
+  _convSyncPending.add(convId);
+  if (conv.sbId && _metaChanged(convId, _convRow(conv))) {
+    _clearConvTimer(convId);
+    _patchConv(convId).catch(err => console.warn('Conv sync:', err));
+    return;
+  }
+  _clearConvTimer(convId);
+  _convSyncTimers.set(convId, setTimeout(() => {
+    _convSyncTimers.delete(convId);
+    _patchConv(convId).catch(err => console.warn('Conv sync:', err));
+  }, CONV_SYNC_DEBOUNCE_MS));
+}
+
+function _clearConvTimer(convId) {
+  const t = _convSyncTimers.get(convId);
+  if (t !== undefined) { clearTimeout(t); _convSyncTimers.delete(convId); }
+}
+
+async function _createConv(convId) {
+  const conv = getConvs()[convId];
+  if (!conv) return;
+  const row = _convRow(conv);
+  const serialized = _serializeRow(row);
+  const p = (async () => {
+    let newId;
     try {
-      const res = await rdsFetch('conversations', { method: 'PATCH', body: { id: conv.sbId, ...row } });
-      if (!res) console.warn('Conversation update error:', 'conversation not found (404)');
-    } catch (err) { console.warn('Conversation update error:', err); }
-  } else {
-    // New conversation — insert and capture the UUID
-    // TODO(lint): initializer is overwritten before use; kept as-is to avoid touching control flow.
-    // eslint-disable-next-line no-useless-assignment
-    let newId = null;
-    try {
-      const res = await rdsFetch('conversations', { method: 'POST', body: row });
+      const res = await rdsFetch('conversations', { method: 'POST', body: { ...row, updated_at: new Date().toISOString() } });
       newId = res?.id || null;
     } catch (err) { console.warn('Conversation insert error:', err); return; }
-    if (newId) {
-      // Store sbId back into local storage
-      const c2 = getConvs();
-      if (c2[convId]) { c2[convId].sbId = newId; saveConvs(c2); }
-    }
+    if (!newId) return;
+    const c2 = getConvs();
+    if (c2[convId]) { c2[convId].sbId = newId; saveConvs(c2); }
+    _convLastSynced.set(convId, serialized);
+  })();
+  _convCreating.set(convId, p);
+  try { await p; } finally { _convCreating.delete(convId); }
+  // Anything saved while the POST was in flight is now due as a PATCH.
+  if (_convSyncPending.has(convId) && !_convSyncTimers.has(convId)) {
+    _convSyncTimers.set(convId, setTimeout(() => {
+      _convSyncTimers.delete(convId);
+      _patchConv(convId).catch(err => console.warn('Conv sync:', err));
+    }, CONV_SYNC_DEBOUNCE_MS));
   }
+}
+
+// Send the current snapshot of one conversation. `keepalive` is used by the
+// hide/unload flush so the request outlives the document.
+async function _patchConv(convId, { keepalive = false } = {}) {
+  const creating = _convCreating.get(convId);
+  if (creating) await creating;
+  const conv = getConvs()[convId];
+  if (!conv || !conv.messages.length) { _convSyncPending.delete(convId); return; }
+  if (!conv.sbId) {
+    // Creation failed (or never happened) — retry the insert instead.
+    _convSyncPending.delete(convId);
+    if (!_convCreating.has(convId)) await _createConv(convId);
+    return;
+  }
+  const row = _convRow(conv);
+  const serialized = _serializeRow(row);
+  if (_convLastSynced.get(convId) === serialized) { _convSyncPending.delete(convId); return; }
+
+  // Lambda PATCH scopes to the JWT user server-side and 404s on an
+  // unowned/unknown id (surfaced via the rdsFetch null → warn).
+  const body = { id: conv.sbId, ...row, updated_at: new Date().toISOString() };
+  try {
+    const res = keepalive
+      ? await _rdsPatchKeepalive('conversations', body)
+      : await rdsFetch('conversations', { method: 'PATCH', body });
+    if (!res) { console.warn('Conversation update error:', 'conversation not found (404)'); return; }
+    _convLastSynced.set(convId, serialized);
+    // Only clear if nothing newer was saved while the request was in flight.
+    if (_serializeRow(_convRow(getConvs()[convId] || conv)) === serialized) _convSyncPending.delete(convId);
+  } catch (err) {
+    console.warn('Conversation update error:', err);
+  }
+}
+
+// Same wire format as rdsFetch, plus `keepalive` so the browser lets the
+// request complete after pagehide. Mirrors rdsFetch's 404 → null contract.
+async function _rdsPatchKeepalive(path, body) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session?.access_token) throw new Error('rdsFetch: no session');
+  const res = await fetch(`${CLAUDE_PROXY_URL}${path}`, {
+    method: 'PATCH',
+    keepalive: true,
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`${path} ${res.status}`);
+  return res.json();
+}
+
+// Send every pending snapshot now (cancelling their timers). Used on tab hide /
+// unload; safe to call any time.
+export function flushPendingConvSyncs({ keepalive = true } = {}) {
+  const ids = [..._convSyncPending];
+  for (const id of ids) _clearConvTimer(id);
+  return Promise.all(ids.map(id => _patchConv(id, { keepalive }).catch(err => console.warn('Conv sync:', err))));
+}
+
+export function hasPendingConvSync(convId) { return _convSyncPending.has(convId); }
+
+// Wire the hide/unload flush. Called once at app boot.
+export function initConvSyncFlush(doc = globalThis.document, win = globalThis.window) {
+  const onHide = () => { flushPendingConvSyncs({ keepalive: true }); };
+  doc?.addEventListener?.('visibilitychange', () => { if (doc.visibilityState === 'hidden') onHide(); });
+  win?.addEventListener?.('pagehide', onHide);
+}
+
+// Test-only: drop all in-memory sync state.
+export function __resetConvSyncState() {
+  for (const id of _convSyncTimers.keys()) _clearConvTimer(id);
+  _convSyncPending.clear();
+  _convLastSynced.clear();
+  _convCreating.clear();
 }
 
 // Delete a conversation from RDS by its sbId
@@ -332,8 +485,9 @@ export function deleteConvFromRds(convId) {
     });
 }
 
-// Load profile from RDS on new device (only if localStorage has no name)
-export async function loadProfileFromRds() {
+// Load profile from RDS on new device (only if localStorage has no name).
+// `prefetched` (from /bootstrap; null = no row) replaces the GET when supplied.
+export async function loadProfileFromRds({ prefetched } = {}) {
   if (!currentUser) return;
   // TM-2: this pulls student profile state (name, grade, schedule, etc.)
   // into localStorage. In test mode that would overwrite the browser's
@@ -343,7 +497,7 @@ export async function loadProfileFromRds() {
   try {
     // GET /profiles returns the caller's row as a single object; null on 404
     // (no profile yet).
-    const data = await rdsFetch('profiles');
+    const data = prefetched !== undefined ? prefetched : await rdsFetch('profiles');
     if (!data) return;
     // Always restore name/grade (overwrite if the server copy is newer)
     if (!hasName && data.name)  localStorage.setItem('lumi_name',  data.name);
