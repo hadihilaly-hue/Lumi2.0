@@ -109,3 +109,32 @@ test('railRelativeTs: bad input → ""', () => {
   assert.equal(railRelativeTs(null, NOW_MS), '');
   assert.equal(railRelativeTs('nope', NOW_MS), '');
 });
+
+// ── Mobile drawer + boot skeleton gates (W7) ────────────────────────────────
+import { railIsDrawer, localStoreHas, railDataPending } from '../js/classviewrail.js';
+import { reset, seedLocalStorage } from './harness.mjs';
+import { S } from '../js/state.js';
+
+test('railIsDrawer: no window.matchMedia stub → not drawer (desktop fallback)', () => {
+  // The offline harness exposes no matchMedia — the drawer must degrade to
+  // the desktop collapse behavior rather than throw.
+  assert.equal(railIsDrawer(), false);
+});
+
+// NOTE: railDataPending latches _railSettled once the hw store appears — the
+// "pending" assertion must run before any test that seeds lumi_hw_tasks.
+test('railDataPending: hw store absent and not test mode → pending', () => {
+  reset();   // clears storage; module latch still false at this point
+  S.isTestMode = false;
+  assert.equal(localStoreHas('lumi_hw_tasks'), false);
+  assert.equal(railDataPending(), true);
+});
+
+test('railDataPending: hw store present → settled (and latches)', () => {
+  reset();
+  seedLocalStorage({ lumi_hw_tasks: [] });
+  assert.equal(railDataPending(), false);
+  // Latch persists even if the key is later removed.
+  reset();
+  assert.equal(railDataPending(), false);
+});

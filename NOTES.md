@@ -20,10 +20,10 @@ debug `testProjectButton`. Everything else moves into `js/`:
 | `js/prompts.js` | student context + system-prompt builders |
 | `js/teachers.js` | teacher-profile Lambda/RDS fetching |
 | `js/storage.js` | localStorage + Supabase conv/profile/schedule sync |
-| `js/ui.js` | low-level UI helpers (toast, escHtml, drawer open/close, fmt) |
+| `js/ui.js` | low-level UI helpers (toast, escHtml, drawer open/close, fmt, `wireMobileViewport` → `--vv-height` for the mobile composer) |
 | `js/sidebar.js` | sidebar render, history menu, search dropdown |
 | `js/conversation.js` | loadConv, openTutor, newChat, openGeneralChat |
-| `js/emptystate.js` | welcome + suggested prompts + empty state |
+| `js/emptystate.js` | welcome + suggested prompts + empty state + `renderEmptyStatePanel` (unified empty state) + `showChatSkeleton` (shimmer bubbles while profile/conv fetches) |
 | `js/schedule.js` | grade courses, schedule setup, semester banner |
 | `js/onboarding.js` | conversational-AI onboarding |
 | `js/voice.js` | voice / speech |

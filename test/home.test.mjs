@@ -10,7 +10,7 @@ import { S } from '../js/state.js';
 import { reset, seedLocalStorage } from './harness.mjs';
 import {
   buildCards, sortCards, relativeTs, dueLabel, isUrgentDue,
-  timeOfDayGreeting, weekSummary, pickDueSoon,
+  timeOfDayGreeting, weekSummary, pickDueSoon, isHomeGridPending,
 } from '../js/home.js';
 
 // Fixed "today" for date-math tests. Mid-week so weekday-name output
@@ -271,4 +271,29 @@ test('pickDueSoon: sorted ascending by dueDate, sliced to N, urgent flagged', ()
 
 test('pickDueSoon: empty input returns empty array (no throw)', () => {
   assert.deepEqual(pickDueSoon([], 4, NOW), []);
+});
+
+// ── isHomeGridPending ───────────────────────────────────────────────────────
+// Skeleton gate: true while the profile-status probe hasn't covered every
+// scheduled class yet ('course::teacher' key absent from the cache).
+test('isHomeGridPending: any schedule row without a cache key → pending', () => {
+  const schedule = [
+    { course: 'Algebra II', teacher: 'Ana Ferraro' },
+    { course: 'Biology', teacher: 'Priya Ramaswamy' },
+  ];
+  assert.equal(isHomeGridPending(schedule, {}, false), true);
+  const partial = { 'Algebra II::Ana Ferraro': 'ready' };
+  assert.equal(isHomeGridPending(schedule, partial, false), true);
+  const full = { 'Algebra II::Ana Ferraro': 'ready', 'Biology::Priya Ramaswamy': 'pending' };
+  assert.equal(isHomeGridPending(schedule, full, false), false);
+});
+
+test('isHomeGridPending: empty / bad schedule → not pending', () => {
+  assert.equal(isHomeGridPending([], {}, false), false);
+  assert.equal(isHomeGridPending(null, {}, false), false);
+});
+
+test('isHomeGridPending: test mode never pending (own ready flags)', () => {
+  const schedule = [{ course: 'X', teacher: 'Y' }];
+  assert.equal(isHomeGridPending(schedule, {}, true), false);
 });

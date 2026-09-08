@@ -10,11 +10,13 @@
 
 import { openGeneralChat, openTutor } from './conversation.js';
 import { closestCourseCandidates, resolveCanonicalCourse } from './courseNormalize.js';
+import { showChatSkeleton } from './emptystate.js';
 import { unmountHome } from './home.js';
 import { navHome } from './router.js';
 import { S, SB } from './state.js';
 import { mountRail, unmountRail } from './classviewrail.js';
 import { getAvailableClassesSync } from './teachers.js';
+import { wireMobileViewport } from './ui.js';
 
 // Look up subjectId for a course name. Mirrors the same lookup the sidebar's
 // openTutor callers do — we import lookupSubjectForCourse from conversation.js
@@ -75,6 +77,10 @@ export function mountClass(route) {
   // still refreshes the rail (e.g. after loadConv from the rail).
   mountRail(course, teacher);
 
+  // Keep the composer pinned above the on-screen keyboard on small screens
+  // (tracks window.visualViewport into a --vv-height custom property).
+  wireMobileViewport();
+
   // Skip openTutor if the same class is already the active tutor context
   // (route re-mount, hashchange no-op, or Session 1 second visit).
   const ctx = S.tutorCtx;
@@ -100,6 +106,11 @@ export function mountClass(route) {
     );
   }
   openTutor(subjectId, course, teacher);
+  // Shimmer bubbles in #messages while openTutor → finishOpenTutor awaits the
+  // teacher-profile fetch — otherwise the panel sits blank for seconds.
+  // Called AFTER openTutor (it clears #messages synchronously); the skeleton
+  // removes itself on the first real node or times out harmlessly.
+  showChatSkeleton();
 }
 
 /**
@@ -136,6 +147,8 @@ export function mountGeneral() {
   if (rail) rail.style.display = 'none';
   if (railToggle) railToggle.style.display = 'none';
   unmountRail();
+
+  wireMobileViewport();
 
   // Mirror mountClass's re-entry short-circuit: if a General Chat session
   // is already active (tutorCtx null + SB.mode==='general' + a session id),

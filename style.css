@@ -107,7 +107,7 @@ html,body{
   overflow:hidden;
   -webkit-font-smoothing:antialiased;
 }
-body{display:flex;height:100vh}
+body{display:flex;height:100vh;height:100dvh}
 
 ::selection{background:var(--surface-2);color:var(--text)}
 
@@ -529,7 +529,7 @@ a{color:inherit;text-decoration:none}
 .sb-overlay.open{opacity:1;pointer-events:all}
 
 /* ─── CONTENT ─────────────────────────────────────────────── */
-.content{flex:1;display:flex;flex-direction:column;min-width:0;height:100vh;overflow:hidden;}
+.content{flex:1;display:flex;flex-direction:column;min-width:0;height:100vh;height:100dvh;overflow:hidden;}
 
 /* mobile header */
 .mob-header{
@@ -763,7 +763,25 @@ a{color:inherit;text-decoration:none}
   .send-btn{width:44px;height:44px}
   .attach-btn{width:44px;height:44px}
   .messages{padding:var(--space-4) var(--space-3)}
-  .input-area{padding:var(--space-2) var(--space-3)}
+  .input-area{padding:var(--space-2) var(--space-3) calc(var(--space-2) + env(safe-area-inset-bottom, 0px))}
+  /* Pin the shell to the VISUAL viewport so the chat composer stays above the
+     on-screen keyboard. --vv-height is maintained by ui.js:wireMobileViewport
+     (window.visualViewport); falls back to 100dvh when unset. */
+  .content{height:100dvh;height:var(--vv-height, 100dvh)}
+  .home-redesign-v1 .content,
+  .home-redesign-v1 .main{height:100dvh;height:var(--vv-height, 100dvh)}
+  /* Class-view rail → slide-in drawer, same pattern as .sidebar/.sb-overlay.
+     The drawer is always full-width-or-320 and off-canvas until .open; the
+     desktop collapse pref's width:0 rule must not apply here. */
+  .class-view-rail{
+    position:fixed;left:0;top:0;bottom:0;z-index:300;
+    width:min(320px,88vw);flex-shrink:0;
+    transform:translateX(-105%);transition:transform var(--dur-2) var(--ease);
+    box-shadow:var(--shadow-overlay);
+  }
+  .class-view-rail.collapsed{width:min(320px,88vw);border-right-color:var(--border)}
+  .class-view-rail.open{transform:translateX(0)}
+  .cv-rail-overlay{display:block}
   /* .msg.user and .msg.lumi each carry min(measure, 100%), which already
      caps them on a narrow viewport. The old blanket 92% was a max-width, so
      it lost to those on specificity for user messages but capped .msg.lumi's
@@ -1943,11 +1961,8 @@ body.home-redesign-v1:has(#homeView.home-view:not([style*="none"])) .home-view {
   grid-auto-rows:1fr;          /* every card the same height, whatever it holds */
   gap:var(--space-3);
 }
-.home-empty {
-  grid-column:1 / -1;
-  padding:var(--space-8); text-align:center;
-  color:var(--text-2); font-size:var(--t-strong);
-}
+/* .home-empty was replaced by the unified .es panel (js/emptystate.js) —
+   the grid-column span moved to .es so the panel still fills the row. */
 
 .home-card {
   display:flex; flex-direction:column;
@@ -2347,24 +2362,64 @@ g);
 .class-view-rail-toggle:hover { border-color:var(--border-strong); background:var(--surface); }
 .class-view-rail-toggle svg { width:16px; height:16px; }
 
-/* Mobile: rail overlays the chat rather than pushing it, so the message area
-   keeps its full width. Also collapse by default (readCollapsedPref uses
-   matchMedia so this is redundant, but a real ≤640 first-visit reads the
-   same). */
-@media (max-width: 640px) {
-  .class-view-rail {
-    position:absolute;
-    top:0; left:0; bottom:0;
-    z-index:30;
-    width:88%;
-    max-width:320px;
-    
-  }
-  .class-view-rail.collapsed {
-    width:0;
-    
-  }
+/* Scrim for the mobile rail drawer — mirrors .sb-overlay. */
+.cv-rail-overlay{
+  display:none;position:fixed;inset:0;background:var(--scrim);
+  z-index:299;opacity:0;pointer-events:none;transition:opacity .25s;
 }
+.cv-rail-overlay.open{opacity:1;pointer-events:all}
+
+/* ─── SKELETONS + EMPTY STATES ─────────────────────────────────────────────
+   --surface-2 is the documented skeleton tone (docs/DESIGN.md §tokens); the
+   shimmer sweeps a --surface highlight left→right. The global
+   prefers-reduced-motion rule already flattens the animation, plus an
+   explicit kill below. */
+.skel{position:relative;overflow:hidden;background:var(--surface-2);border-radius:var(--radius-sm)}
+.skel::after{
+  content:'';position:absolute;inset:0;transform:translateX(-100%);
+  background:linear-gradient(90deg, transparent, var(--surface), transparent);
+  animation:skel-shimmer 1.4s var(--ease) infinite;
+}
+@keyframes skel-shimmer{to{transform:translateX(100%)}}
+@media (prefers-reduced-motion:reduce){ .skel::after{animation:none;display:none} }
+
+/* Chat-thread shimmer bubbles (js/emptystate.js showChatSkeleton). */
+.skel-msg{gap:var(--space-2)}
+.skel-line{height:13px}
+
+/* Class-view rail rows. */
+.cv-rail-skel-row{height:34px;border-radius:var(--radius-md)}
+
+/* Home grid cards while the profile-status probe resolves. */
+.home-card--skel{cursor:default;padding:var(--space-4);gap:var(--space-3)}
+.home-card--skel:hover{border-color:var(--border)}
+.home-skel-line{height:14px;width:62%}
+.home-skel-line.short{width:38%}
+.home-skel-block{height:12px;width:80%;margin-top:auto}
+
+/* Unified empty-state panel — js/emptystate.js:renderEmptyStatePanel. */
+.es{
+  display:flex;flex-direction:column;align-items:center;gap:var(--space-2);
+  padding:var(--space-8) var(--space-4);text-align:center;
+  grid-column:1 / -1;              /* fills the home-grid row */
+}
+.es-icon{font-size:var(--t-title);color:var(--text-3)}
+.es-title{font-size:var(--t-strong);font-weight:var(--w-medium);color:var(--text)}
+.es-hint{font-size:var(--t-ui);color:var(--text-2);max-width:280px}
+.es-cta{
+  margin-top:var(--space-2);padding:var(--space-2) var(--space-4);
+  background:var(--surface-2);color:var(--text);
+  border:1px solid var(--border);border-radius:var(--radius-md);
+  font-family:inherit;font-size:var(--t-ui);font-weight:var(--w-semi);
+  cursor:pointer;transition:border-color var(--dur) var(--ease);
+  min-height:44px;
+}
+.es-cta:hover{border-color:var(--border-strong)}
+/* Compact variant for the class-view rail lists. */
+.es-compact{align-items:flex-start;text-align:left;padding:var(--space-2) var(--space-2);gap:var(--space-1)}
+.es-compact .es-title{font-size:var(--t-meta);font-weight:var(--w-normal);color:var(--text-3);font-style:italic}
+.es-compact .es-hint{font-size:var(--t-meta)}
+.es-compact .es-cta{margin-top:var(--space-1);padding:var(--space-1) var(--space-3);font-size:var(--t-meta);font-weight:var(--w-medium);min-height:0}
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
