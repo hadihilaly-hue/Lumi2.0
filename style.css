@@ -155,6 +155,16 @@ a{color:inherit;text-decoration:none}
 /* Lumi prose — the one serif surface in the product. Hoisted from CHAT PANEL. */
 .msg-bubble p{margin:0}
 .msg-bubble p+p{margin-top:var(--space-3)}
+.msg-bubble ul,.msg-bubble ol{margin:var(--space-3) 0;padding-left:var(--space-6)}
+.msg-bubble li+li{margin-top:var(--space-1)}
+.msg-bubble li>ul,.msg-bubble li>ol{margin:var(--space-1) 0 0}
+.msg-bubble h1,.msg-bubble h2,.msg-bubble h3,.msg-bubble h4{
+  font-size:var(--t-prose);font-weight:var(--w-semi);line-height:var(--lh-prose);margin:var(--space-4) 0 var(--space-1);
+}
+.msg-bubble blockquote{margin:var(--space-3) 0;padding-left:var(--space-3);border-left:2px solid var(--border);color:var(--text-2)}
+.msg-bubble table{border-collapse:collapse;margin:var(--space-3) 0;font-size:var(--t-ui);font-family:var(--font-sans)}
+.msg-bubble th,.msg-bubble td{text-align:left;padding:var(--space-1) var(--space-2);border-bottom:1px solid var(--border);vertical-align:top}
+.msg-bubble th{color:var(--text-2);font-weight:var(--w-semi)}
 .msg-bubble strong{font-weight:var(--w-semi);color:var(--text)}
 .msg-bubble em{font-style:italic;color:var(--text)}
 .msg-bubble a{color:var(--accent)}
@@ -614,11 +624,12 @@ a{color:inherit;text-decoration:none}
   font-size:var(--t-user);line-height:var(--lh-user);color:var(--text);
 }
 
-/* Session 6: plain-text body while a reply streams. pre-wrap so newlines
-   show without any markdown being interpreted mid-stream. Width comes from
-   .msg.lumi above — the streaming node and the finished message are the
-   same width, so the swap is invisible. */
-.msg-stream{white-space:pre-wrap}
+/* Session 6: plain-text body while a reply streams — one <p> per blank-line
+   paragraph, pre-wrap inside so single newlines show without any markdown
+   being interpreted mid-stream. Width and paragraph rhythm come from
+   .msg.lumi / .msg-bubble p above, so the swap to the final render is
+   invisible. */
+.msg-stream p{white-space:pre-wrap}
 
 /* Error — text only, no fill, no border. */
 .msg-error{font-size:var(--t-ui);line-height:var(--lh-ui);color:var(--danger);}
@@ -2705,27 +2716,27 @@ body.a-admin #authLoading{display:flex}
    button uses the shared primitives; the bar keeps the one permitted
    overlay shadow because it is a fixed overlay.
    ═══════════════════════════════════════════════════════════════════════════ */
-html{height:auto;overflow-y:auto}
+html:has(body.privacy-page){height:auto;overflow-y:auto}
 body.privacy-page{background:var(--bg);color:var(--text);font-family:'Inter', system-ui, sans-serif;margin:0;line-height:var(--lh-user);display:block;height:auto;min-height:100vh;overflow-y:auto}
 .pp-wrap{max-width:760px;margin:0 auto;padding:var(--space-12) var(--space-6) var(--space-16)}
 .pp-logo{display:flex;align-items:baseline;gap:var(--space-2);margin-bottom:var(--space-2)}
 .pp-name{font-size:var(--t-title);font-weight:var(--w-semi);letter-spacing:var(--track-title)}
 .pp-school{color:var(--text-2);font-size:var(--t-ui)}
-h1{font-size:var(--t-display);letter-spacing:var(--track-title);margin:var(--space-6) 0 var(--space-1)}
+.privacy-page h1{font-size:var(--t-display);letter-spacing:var(--track-title);margin:var(--space-6) 0 var(--space-1)}
 .pp-sub{color:var(--text-2);font-size:var(--t-strong);margin-bottom:var(--space-6)}
 .pp-draft{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);margin-bottom:var(--space-8);font-size:var(--t-ui);line-height:var(--lh-ui);color:var(--text-2)}
 .pp-draft strong{color:var(--text);font-weight:var(--w-semi)}
-h2{font-size:var(--t-title);margin:var(--space-8) 0 var(--space-2);letter-spacing:var(--track-title);border-bottom:1px solid var(--border);padding-bottom:var(--space-1)}
-h3{font-size:var(--t-user);margin:var(--space-4) 0 var(--space-1)}
-p, li{font-size:var(--t-user);color:var(--text)}
-ul{padding-left:var(--space-4)}
-li{margin-bottom:var(--space-1)}
-a{color:var(--accent)}
-table{width:100%;border-collapse:collapse;margin:var(--space-3) 0;font-size:var(--t-ui)}
-th, td{text-align:left;padding:var(--space-2) var(--space-2);border-bottom:1px solid var(--border);vertical-align:top}
-th{color:var(--text-2);font-weight:var(--w-semi)}
+.privacy-page h2{font-size:var(--t-title);margin:var(--space-8) 0 var(--space-2);letter-spacing:var(--track-title);border-bottom:1px solid var(--border);padding-bottom:var(--space-1)}
+.privacy-page h3{font-size:var(--t-user);margin:var(--space-4) 0 var(--space-1)}
+.privacy-page p, .privacy-page li{font-size:var(--t-user);color:var(--text)}
+.privacy-page ul{padding-left:var(--space-4)}
+.privacy-page li{margin-bottom:var(--space-1)}
+.privacy-page a{color:var(--accent)}
+.privacy-page table{width:100%;border-collapse:collapse;margin:var(--space-3) 0;font-size:var(--t-ui)}
+.privacy-page th, .privacy-page td{text-align:left;padding:var(--space-2) var(--space-2);border-bottom:1px solid var(--border);vertical-align:top}
+.privacy-page th{color:var(--text-2);font-weight:var(--w-semi)}
 .pp-foot{margin-top:var(--space-12);padding-top:var(--space-4);border-top:1px solid var(--border);color:var(--text-3);font-size:var(--t-ui)}
-code, .pp-ph{background:var(--surface-2);border-radius:var(--radius-sm);padding:var(--space-1) var(--space-1);font-size:var(--t-ui)}
+.privacy-page code, .pp-ph{background:var(--surface-2);border-radius:var(--radius-sm);padding:var(--space-1) var(--space-1);font-size:var(--t-ui)}
 .consent-bar{display:none}
 body.consent-mode .consent-bar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--surface);border-top:1px solid var(--border);padding:var(--space-3) var(--space-6);justify-content:center;box-shadow:var(--shadow-overlay)}
 body.consent-mode .pp-wrap{padding-bottom:var(--space-16)}
