@@ -283,7 +283,7 @@ async function isProvisionedTeacher(user) {
     );
     if (roster.rowCount > 0) return true;
     const provisioned = await dbQuery(
-      "SELECT 1 FROM public.teacher_profiles WHERE teacher_email = $1 LIMIT 1",
+      "SELECT 1 FROM public.teacher_profiles WHERE teacher_email = $1 AND deleted_at IS NULL LIMIT 1",
       [email]
     );
     return provisioned.rowCount > 0;

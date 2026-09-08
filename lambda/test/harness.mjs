@@ -81,7 +81,7 @@ export function makeRouter(opts = {}) {
     if (/FROM public\.sis_map WHERE lumi_id = \$1 AND entity_type = 'teacher'/.test(text)) {
       return provisionedTeacher ? result([{ ok: 1 }]) : result([]);
     }
-    if (/FROM public\.teacher_profiles WHERE teacher_email = \$1 LIMIT 1/.test(text)) {
+    if (/FROM public\.teacher_profiles WHERE teacher_email = \$1 AND deleted_at IS NULL LIMIT 1/.test(text)) {
       return provisionedTeacher ? result([{ ok: 1 }]) : result([]);
     }
     if (/count\(\*\)::int AS n FROM public\.api_usage/.test(text)) {
