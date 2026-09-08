@@ -9,6 +9,7 @@
 // expects token_use=id and resolves cognito_sub → preserved lumi uuid via the
 // app_users table server-side.
 
+/* exported isAllowedEmail, doSignOut */
 // AUDIT_FRONTEND F6: all infra values for this (classic, non-module) script live
 // in one CONFIG object. This is a classic script shared by teacher/admin/lumi
 // pages, so it cannot import js/config.js — lambdaBaseUrl mirrors that module's
@@ -129,7 +130,7 @@ const bootPromise = (async () => {
   };
 
   let stored = null;
-  try { stored = JSON.parse(sessionStorage.getItem(PKCE_STORAGE_KEY) || 'null'); } catch {}
+  try { stored = JSON.parse(sessionStorage.getItem(PKCE_STORAGE_KEY) || 'null'); } catch { /* ignore */ }
   if (!stored || stored.state !== state) {
     console.warn('[auth] callback code with missing/mismatched state — ignoring');
     scrubUrl();

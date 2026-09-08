@@ -101,12 +101,12 @@ function _startRecording() {
   _hideConfirmBar();
   msgInput.value = '';
   updateSendBtn();
-  try { _recognition.start(); } catch(e) {}
+  try { _recognition.start(); } catch { /* ignore */ }
 }
 
 function _stopRecording() {
   clearTimeout(_silenceTimer);
-  if (_recognition && _isRecording) { try { _recognition.stop(); } catch(e) {} }
+  if (_recognition && _isRecording) { try { _recognition.stop(); } catch { /* ignore */ } }
   // onend fires next and handles showing the confirm bar
 }
 
@@ -203,7 +203,7 @@ function speakResponse(text) {
   };
   utterance.onerror = () => { _isSpeaking = false; };
 
-  try { speechSynthesis.speak(utterance); } catch(e) {}
+  try { speechSynthesis.speak(utterance); } catch { /* ignore */ }
 }
 
 // Attach a speaker button to a Lumi message element

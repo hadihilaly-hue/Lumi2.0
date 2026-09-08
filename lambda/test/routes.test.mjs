@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   loadHandler, resetContext, invoke, makeRouter, findQuery, findQueries,
-  STUDENT, TEACHER, ADMIN, DOMAIN, tokenFor,
+  STUDENT, TEACHER, ADMIN, tokenFor,
 } from './harness.mjs';
 
 const res = (rows) => ({ rows, rowCount: rows.length });
@@ -660,7 +660,7 @@ test('PATCH /class-enrollments (teacher note) requires the owning teacher — 40
 
 test('PATCH /class-enrollments succeeds for the owning teacher', async () => {
   const { handler } = await loadHandler();
-  const ctx = resetContext({
+  resetContext({
     dbRouter: makeRouter({
       userId: TEACHER.userId, isTeacher: true,
       onRoute: (t) => {
@@ -1208,7 +1208,7 @@ test('POST /admin/delete-student also clears the target\'s Calendar token', asyn
 
 test('GET /my-data exports the caller\'s rows scoped to the JWT id', async () => {
   const { handler } = await loadHandler();
-  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId, onRoute: () => res([]) }) });
+  resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId, onRoute: () => res([]) }) });
   const r = await invoke(handler, { method: 'GET', path: '/my-data', token: tokenFor(STUDENT) });
   assert.equal(r.statusCode, 200);
   assert.equal(r.json().subject.lumi_id, STUDENT.userId);

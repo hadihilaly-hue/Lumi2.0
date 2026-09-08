@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   loadHandler, resetContext, invoke, makeRouter, findQuery,
-  STUDENT, ADMIN, DOMAIN, tokenFor, authToken,
+  STUDENT, ADMIN, tokenFor, authToken,
 } from './harness.mjs';
 
 // Every authenticated route sits below the gate; these are representative.

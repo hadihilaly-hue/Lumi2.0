@@ -303,6 +303,8 @@ async function _doSyncConv(convId) {
     } catch (err) { console.warn('Conversation update error:', err); }
   } else {
     // New conversation — insert and capture the UUID
+    // TODO(lint): initializer is overwritten before use; kept as-is to avoid touching control flow.
+    // eslint-disable-next-line no-useless-assignment
     let newId = null;
     try {
       const res = await rdsFetch('conversations', { method: 'POST', body: row });
@@ -465,5 +467,5 @@ export function migrateOldData() {
     saveConvs(convs);
     localStorage.setItem('lumi_current', id);
     localStorage.removeItem('lumi_data');
-  } catch {}
+  } catch { /* ignore */ }
 }

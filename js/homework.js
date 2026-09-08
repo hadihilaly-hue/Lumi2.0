@@ -624,7 +624,6 @@ export function renderHwPopupTasks() {
     return;
   }
   tasks.forEach(task => {
-    const tier      = classifyTask(task.title);
     const isTonight = task.dueDate === today || !task.dueDate;
 
     const card = document.createElement('div');
@@ -1128,8 +1127,6 @@ export function renderHwSidebar(container) {
     const toShow = [...incomplete, ...complete].slice(0, 7);
 
     toShow.forEach(task => {
-      const tier      = task.tier || classifyTask(task.title);
-        const isTonight = task.isTonight !== undefined ? task.isTonight : (task.dueDate === today || !task.dueDate);
 
       const item = document.createElement('div');
       item.className = 'sb-hw-item' + (task.isComplete ? ' done' : '');
@@ -1191,8 +1188,6 @@ export function renderHwSidebar(container) {
     container.appendChild(projHd);
 
     projects.forEach(proj => {
-      const today = todayStr();
-      const daysLeft = dateDiffDays(today, proj.dueDate);
       const completedDays = proj.plan.filter(d => d.isComplete).length;
       const totalDays = proj.plan.length;
 

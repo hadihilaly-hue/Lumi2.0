@@ -5,6 +5,12 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "lint": "eslint .",
     "test": "node --import ./test/register.mjs --test \"test/*.test.mjs\""
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.9.1",
+    "globals": "17.11.0"
   }
 }

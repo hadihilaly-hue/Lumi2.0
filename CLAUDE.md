@@ -1024,6 +1024,22 @@ live with spoofed ids.
 ---
 
 ## Stack Notes
+- **Commands (Node 22 required — the root test glob silently matches nothing on
+  Node 20):** `npm ci && (cd lambda && npm ci)`; `npm run lint` (ESLint flat
+  config `eslint.config.js` — browser/ESM for `app.js` + `js/`, classic-script
+  for `cognito-auth.js` / `teacher-directory.js`, node/ESM for `lambda/` and
+  both `test/` dirs; CDN/window globals such as `pdfjsLib`, `heic2any`,
+  `marked`, `awslambda` are declared there, not disabled); `npm test`
+  (frontend node:test suite); `(cd lambda && npm test)` (Lambda suite).
+  Lint must stay at 0 errors — for a finding whose fix would change behavior,
+  add an `// eslint-disable-next-line <rule>` with a `// TODO(lint):` note
+  rather than changing logic.
+- **CI:** `.github/workflows/ci.yml` runs lint + both test suites on every PR
+  and push to `main`. `.github/workflows/deploy-lambda.yml` deploys `lambda/`
+  to `lumi-claude-proxy` on pushes to `main` touching `lambda/**` (or manually);
+  it needs the `AWS_LAMBDA_DEPLOY_ACCESS_KEY_ID` /
+  `AWS_LAMBDA_DEPLOY_SECRET_ACCESS_KEY` repo secrets (IAM policy in
+  `lambda/README.md`) and is a no-op failure until they exist.
 - **Type:** Static site (no build step, no bundler)
 - **Frontend:** Vanilla HTML/CSS/JS — no framework
 - **Pages:** index.html (sign-in), app.html (student chat), teacher.html

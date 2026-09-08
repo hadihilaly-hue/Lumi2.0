@@ -3,11 +3,11 @@
 // fetchTeacherNotes (3s) and the suggested-prompts generation race (8s) — the
 // uncleared timers are AUDIT_LAMBDA_BUGS H4). We enable node:test fake timers so
 // those pending timers don't keep the event loop alive / slow the run.
-import { test, mock } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   loadHandler, resetContext, invoke, makeRouter, findQuery, findQueries, flush,
-  STUDENT, TEACHER, tokenFor,
+  STUDENT, tokenFor,
 } from './harness.mjs';
 
 const res = (rows) => ({ rows, rowCount: rows.length });

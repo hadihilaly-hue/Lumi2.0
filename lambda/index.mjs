@@ -441,10 +441,12 @@ async function* callClaude({ systemPrompt, messages, maxTokens, modelId, tempera
   }
 }
 
+// eslint-disable-next-line require-yield -- provider stub: throws before yielding
 async function* callGemini() {
   throw new Error("Gemini provider not yet implemented");
 }
 
+// eslint-disable-next-line require-yield -- provider stub: throws before yielding
 async function* callGPT() {
   throw new Error("GPT provider not yet implemented");
 }
@@ -1229,6 +1231,8 @@ async function handleRequest(event, responseStream) {
   }
 
   // --- Parse body ---
+  // TODO(lint): initializer is overwritten before use; kept as-is to avoid touching control flow.
+  // eslint-disable-next-line no-useless-assignment
   let body = {};
   try {
     body = JSON.parse(event.body || "{}");

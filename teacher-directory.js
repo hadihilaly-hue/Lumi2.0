@@ -29,7 +29,7 @@
       // page). session.access_token is the Cognito ID token — same bearer the
       // rdsFetch/fetchClaudeProxy helpers send.
       var session = null;
-      try { session = (await sb.auth.getSession()).data.session; } catch (e) {}
+      try { session = (await sb.auth.getSession()).data.session; } catch { /* ignore */ }
       var token = session && session.access_token;
       var res = await fetch(LAMBDA_BASE + "/teacher-directory", {
         headers: token ? { Authorization: "Bearer " + token } : {},
