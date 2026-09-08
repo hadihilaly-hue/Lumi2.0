@@ -6,7 +6,7 @@ test-transcripts/ plus three crafted stress cases. For each case it runs ONE
 Bedrock InvokeModel call with the summarizer prompt and checks the output against
 the PERSISTENCE_SPEC (§1 fields, §3 failure/validation rules).
 
-MODEL: read from lambda/index.mjs (SCHOOL_CONFIG.defaultModel) — NOT hardcoded.
+MODEL: read from lambda/lib/config.mjs (SCHOOL_CONFIG.defaultModel) — NOT hardcoded.
 Override with LUMI_SUMMARIZER_MODEL. Note: PERSISTENCE_SPEC §3 proposes
 claude-haiku-4-5 for this task, but no Haiku model constant exists in the Lambda
 today; the only configured model is defaultModel. When the summarizer route ships
@@ -55,11 +55,11 @@ def lambda_model_id():
     override = os.environ.get("LUMI_SUMMARIZER_MODEL")
     if override:
         return override, "env:LUMI_SUMMARIZER_MODEL"
-    src = open(os.path.join(REPO, "lambda", "index.mjs")).read()
+    src = open(os.path.join(REPO, "lambda", "lib", "config.mjs")).read()
     m = re.search(r'defaultModel:\s*"([^"]+)"', src)
     if not m:
-        raise RuntimeError("could not read defaultModel from lambda/index.mjs")
-    return m.group(1), "lambda/index.mjs:SCHOOL_CONFIG.defaultModel"
+        raise RuntimeError("could not read defaultModel from lambda/lib/config.mjs")
+    return m.group(1), "lambda/lib/config.mjs:SCHOOL_CONFIG.defaultModel"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
