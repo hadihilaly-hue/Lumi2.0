@@ -528,6 +528,14 @@ a{color:inherit;text-decoration:none}
 }
 .sb-overlay.open{opacity:1;pointer-events:all}
 
+/* Scrim for the mobile class-view rail drawer — mirrors .sb-overlay. Must
+   sit BEFORE the mobile block below so its display:block override wins. */
+.cv-rail-overlay{
+  display:none;position:fixed;inset:0;background:var(--scrim);
+  z-index:299;opacity:0;pointer-events:none;transition:opacity .25s;
+}
+.cv-rail-overlay.open{opacity:1;pointer-events:all}
+
 /* ─── CONTENT ─────────────────────────────────────────────── */
 .content{flex:1;display:flex;flex-direction:column;min-width:0;height:100vh;height:100dvh;overflow:hidden;}
 
@@ -2361,13 +2369,6 @@ g);
 }
 .class-view-rail-toggle:hover { border-color:var(--border-strong); background:var(--surface); }
 .class-view-rail-toggle svg { width:16px; height:16px; }
-
-/* Scrim for the mobile rail drawer — mirrors .sb-overlay. */
-.cv-rail-overlay{
-  display:none;position:fixed;inset:0;background:var(--scrim);
-  z-index:299;opacity:0;pointer-events:none;transition:opacity .25s;
-}
-.cv-rail-overlay.open{opacity:1;pointer-events:all}
 
 /* ─── SKELETONS + EMPTY STATES ─────────────────────────────────────────────
    --surface-2 is the documented skeleton tone (docs/DESIGN.md §tokens); the
