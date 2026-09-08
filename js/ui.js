@@ -22,3 +22,22 @@ export function showToast(msg, type) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('show'), 4000);
 }
+
+// ─── Mobile viewport (composer above the on-screen keyboard) ───────────────
+// On mobile, 100vh/100dvh don't always shrink when the keyboard opens —
+// visualViewport does. Track vv.height into --vv-height; CSS consumes it at
+// ≤768px so .content/.main (and the pinned composer) stay inside the visible
+// region. Idempotent; safe to call from every chat-surface mount.
+let _vvWired = false;
+export function wireMobileViewport() {
+  if (_vvWired) return;
+  _vvWired = true;
+  if (typeof window === 'undefined' || !window.visualViewport) return;
+  const vv = window.visualViewport;
+  const apply = () => {
+    document.documentElement.style.setProperty('--vv-height', `${vv.height}px`);
+  };
+  vv.addEventListener('resize', apply);
+  vv.addEventListener('scroll', apply);
+  apply();
+}

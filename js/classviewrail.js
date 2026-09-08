@@ -17,8 +17,9 @@
 // boot in the browser (spec §12.7).
 
 import { loadConv, openTutor, lookupSubjectForCourse } from './conversation.js';
-import { getHwTasks } from './homework.js';
-import { getProjects, showProjectPlanModal } from './projects.js';
+import { renderEmptyStatePanel, showChatSkeleton } from './emptystate.js';
+import { getHwTasks, openHwBackdrop, showHwAddModal } from './homework.js';
+import { getProjects, showProjectPlanModal, showProjectCreateModal } from './projects.js';
 import { S, SB } from './state.js';
 import { getConvs } from './storage.js';
 import { showToast } from './ui.js';
@@ -90,8 +91,8 @@ export function railRelativeTs(ts, now = Date.now()) {
 }
 
 // ── Collapse state ──────────────────────────────────────────────────────────
-// Persist across nav so the student's preference sticks. Default: expanded on
-// desktop, collapsed on ≤640px (checked at first mount).
+// Persist across nav so the student's preference sticks. Desktop-only: at
+// ≤768px the rail is a slide-in drawer instead (see railIsDrawer below).
 
 const COLLAPSE_KEY = 'lumi_classview_rail_collapsed';
 
@@ -110,6 +111,67 @@ function readCollapsedPref() {
 
 function writeCollapsedPref(collapsed) {
   try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch {}
+}
+
+// ── Mobile drawer (≤768px) ──────────────────────────────────────────────────
+// Below RAIL_DRAWER_BP the rail is a slide-in drawer — same pattern as the
+// mobile sidebar (fixed off-canvas, .open + scrim overlay, header toggle).
+// Drawer state is transient; it never writes the desktop collapse pref.
+export const RAIL_DRAWER_BP = 768;
+
+export function railIsDrawer() {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && window.matchMedia(`(max-width:${RAIL_DRAWER_BP}px)`).matches;
+}
+
+export function closeRailDrawer() {
+  const rail = document.getElementById('classViewRail');
+  const overlay = document.getElementById('cvRailOverlay');
+  const toggle = document.getElementById('classViewRailToggle');
+  if (rail) rail.classList.remove('open');
+  if (overlay) overlay.classList.remove('open');
+  if (toggle) toggle.setAttribute('aria-expanded', 'false');
+}
+
+// ── Boot-hydration skeletons ────────────────────────────────────────────────
+// The rail's datasets arrive at different times: conversations hydrate before
+// the router mounts (storage.js), projects are local-only, and homework tasks
+// stream in after first paint (projects.js:loadHwFromRds — non-blocking from
+// app.js). While that fetch is unresolved the rail would paint empty
+// sections, so each section shows shimmer rows until the hw store exists.
+// RDS failures only log a warning (no event fires), so RAIL_SKELETON_MS is
+// the ceiling: on error the skeleton settles to the real (empty) state.
+const RAIL_SKELETON_MS = 6000;
+const RAIL_SKELETON_POLL_MS = 300;
+let _railSettled = false;
+let _railSettleTimer = null;
+
+export function localStoreHas(key) {
+  try { return localStorage.getItem(key) !== null; } catch { return true; }
+}
+
+export function railDataPending() {
+  if (_railSettled) return false;
+  if (S.isTestMode || localStoreHas('lumi_hw_tasks')) { settleRail(false); return false; }
+  return true;
+}
+
+// loadHwFromRds() writes the store without dispatching 'lumi:hw-changed', so
+// poll the key on a short interval; the RAIL_SKELETON_MS ceiling doubles as
+// the settle-on-error path (RDS failures only log a warning).
+function armRailSettleWatch() {
+  if (_railSettleTimer) return;
+  const started = Date.now();
+  _railSettleTimer = setInterval(() => {
+    if (localStoreHas('lumi_hw_tasks') || S.isTestMode
+        || Date.now() - started > RAIL_SKELETON_MS) settleRail(true);
+  }, RAIL_SKELETON_POLL_MS);
+}
+
+function settleRail(rerender) {
+  _railSettled = true;
+  if (_railSettleTimer) { clearInterval(_railSettleTimer); _railSettleTimer = null; }
+  if (rerender) refreshRail();
 }
 
 // ── DOM helpers ─────────────────────────────────────────────────────────────
@@ -147,6 +209,13 @@ function dueChip(dueDateStr, now = new Date()) {
 
 // ── Section renderers ───────────────────────────────────────────────────────
 
+function startNewChat(course, teacher) {
+  // Route matches the existing sidebar "click a class" flow: openTutor()
+  // resets S.messages, sets fresh tutorCtx, and hydrates the profile again.
+  const { subjectId } = lookupSubjectForCourse(course);
+  openTutor(subjectId, course, teacher);
+}
+
 function renderNewChatBtn(course, teacher) {
   const btn = el('button', {
     class: 'cv-rail-newchat',
@@ -156,13 +225,20 @@ function renderNewChatBtn(course, teacher) {
   btn.innerHTML = `
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     <span>New chat in ${escHtml(course)}</span>`;
-  btn.addEventListener('click', () => {
-    // Route matches the existing sidebar "click a class" flow: openTutor()
-    // resets S.messages, sets fresh tutorCtx, and hydrates the profile again.
-    const { subjectId } = lookupSubjectForCourse(course);
-    openTutor(subjectId, course, teacher);
-  });
+  btn.addEventListener('click', () => { closeRailDrawer(); startNewChat(course, teacher); });
   return btn;
+}
+
+// Shimmer rows while the hw boot-load is unresolved (see railDataPending).
+function renderSkeletonSection(label, rows) {
+  const section = el('section', { class: 'cv-rail-section' });
+  section.appendChild(el('div', { class: 'cv-rail-section-label', text: label }));
+  const list = el('div', { class: 'cv-rail-list' });
+  for (let i = 0; i < rows; i++) {
+    list.appendChild(el('div', { class: 'skel cv-rail-skel-row' }));
+  }
+  section.appendChild(list);
+  return section;
 }
 
 function renderConvsSection(course, teacher) {
@@ -174,7 +250,11 @@ function renderConvsSection(course, teacher) {
   const rows = listConvsForClass(convs, course, teacher);
 
   if (!rows.length) {
-    list.appendChild(el('div', { class: 'cv-rail-empty', text: 'No chats yet. Start one below.' }));
+    list.appendChild(renderEmptyStatePanel({
+      title: 'No chats yet',
+      compact: true,
+      cta: { label: 'New chat', onClick: () => { closeRailDrawer(); startNewChat(course, teacher); } },
+    }));
   } else {
     const now = Date.now();
     for (const conv of rows) {
@@ -200,6 +280,7 @@ function handleConvClick(convId) {
   // Reuse the EXACT load path the old sidebar used (js/sidebar.js:442-452).
   // loadConv() rehydrates S.currentId/messages/tutorCtx, re-renders messages,
   // and awaits hydrateTutorProfile — the whole persona chain unchanged.
+  closeRailDrawer();
   SB.mode = 'tutor';
   const convs = getConvs();
   const conv = convs[convId];
@@ -210,6 +291,9 @@ function handleConvClick(convId) {
       teacher: conv.tutorCtx.teacher,
     };
   }
+  // loadConv lazy-fetches messages when the conv has an sbId but no cached
+  // messages — shimmer bubbles fill that gap instead of a blank panel.
+  if (conv && conv.sbId && !(conv.messages && conv.messages.length)) showChatSkeleton();
   loadConv(convId);
   // Re-render the rail so the newly-active row highlights.
   refreshActiveRow(convId);
@@ -233,10 +317,20 @@ function renderHwSection(course, teacher) {
   const rows = S.isTestMode ? [] : listHwForClass(getHwTasks(), course);
 
   if (!rows.length) {
-    list.appendChild(el('div', {
-      class: 'cv-rail-empty',
-      text: S.isTestMode ? 'Hidden in test mode.' : 'Nothing due right now.',
-    }));
+    // 'Hidden in test mode' stays a plain line — hidden data isn't an
+    // actionable empty state, so no CTA there.
+    if (S.isTestMode) {
+      list.appendChild(el('div', { class: 'cv-rail-empty', text: 'Hidden in test mode.' }));
+    } else {
+      list.appendChild(renderEmptyStatePanel({
+        title: 'Nothing due right now.',
+        compact: true,
+        cta: {
+          label: 'Add homework',
+          onClick: () => { closeRailDrawer(); openHwBackdrop(); showHwAddModal(course); },
+        },
+      }));
+    }
   } else {
     const now = new Date();
     for (const task of rows) {
@@ -266,10 +360,18 @@ function renderProjectsSection(course, teacher) {
   const rows = S.isTestMode ? [] : listProjectsForClass(getProjects(), course);
 
   if (!rows.length) {
-    list.appendChild(el('div', {
-      class: 'cv-rail-empty',
-      text: S.isTestMode ? 'Hidden in test mode.' : 'No active projects.',
-    }));
+    if (S.isTestMode) {
+      list.appendChild(el('div', { class: 'cv-rail-empty', text: 'Hidden in test mode.' }));
+    } else {
+      list.appendChild(renderEmptyStatePanel({
+        title: 'No active projects',
+        compact: true,
+        cta: {
+          label: 'New project',
+          onClick: () => { closeRailDrawer(); openHwBackdrop(); showProjectCreateModal({ className: course }); },
+        },
+      }));
+    }
   } else {
     for (const proj of rows) {
       const item = el('button', {
@@ -282,6 +384,7 @@ function renderProjectsSection(course, teacher) {
       const metaParts = ['Due ' + (chipText || (proj.dueDate || 'TBD'))];
       item.appendChild(el('div', { class: 'cv-rail-project-meta', text: metaParts.join(' · ') }));
       item.addEventListener('click', () => {
+        closeRailDrawer();
         try { showProjectPlanModal(proj); }
         catch (e) {
           console.warn('[cv-rail] project plan open failed:', e);
@@ -307,9 +410,21 @@ function wireToggleOnce() {
   btn.addEventListener('click', () => {
     const rail = document.getElementById('classViewRail');
     if (!rail) return;
+    if (railIsDrawer()) {
+      const open = rail.classList.toggle('open');
+      const overlay = document.getElementById('cvRailOverlay');
+      if (overlay) overlay.classList.toggle('open', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      return;
+    }
     const isCollapsed = rail.classList.toggle('collapsed');
     btn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
     writeCollapsedPref(isCollapsed);
+  });
+  const overlay = document.getElementById('cvRailOverlay');
+  if (overlay) overlay.addEventListener('click', closeRailDrawer);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && railIsDrawer()) closeRailDrawer();
   });
   _wiredToggle = true;
 }
@@ -322,6 +437,10 @@ function wireRefreshListenerOnce() {
   if (_wiredRefreshListener) return;
   if (typeof document === 'undefined' || !document.addEventListener) return;
   document.addEventListener('lumi:conv-changed', () => refreshRail());
+  // 'lumi:hw-changed' fires whenever the hw store is written (homework.js).
+  // It settles the boot skeleton AND refreshes the Homework section — the
+  // rail otherwise never sees hw rows that arrive after first paint.
+  document.addEventListener('lumi:hw-changed', () => { settleRail(false); refreshRail(); });
   _wiredRefreshListener = true;
 }
 
@@ -352,14 +471,28 @@ export function mountRail(course, teacher) {
 
   rail.style.display = '';
 
-  // Restore collapsed pref (first mount → viewport-based default).
-  const collapsed = readCollapsedPref();
-  rail.classList.toggle('collapsed', collapsed);
-  if (toggle) toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  if (railIsDrawer()) {
+    // Drawer mode: stays closed until the header toggle opens it; the
+    // collapse pref (and its width:0 rule) is desktop-only.
+    rail.classList.remove('collapsed');
+    closeRailDrawer();
+  } else {
+    // Restore collapsed pref (first mount → viewport-based default).
+    const collapsed = readCollapsedPref();
+    rail.classList.toggle('collapsed', collapsed);
+    if (toggle) toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  }
 
   // Re-render inner contents. Cheap — a handful of DOM nodes per section.
   inner.innerHTML = '';
   inner.appendChild(renderNewChatBtn(course, teacher));
+  if (railDataPending()) {
+    armRailSettleWatch();
+    inner.appendChild(renderSkeletonSection('Chats', 3));
+    inner.appendChild(renderSkeletonSection('Homework', 2));
+    inner.appendChild(renderSkeletonSection('Projects', 2));
+    return;
+  }
   inner.appendChild(renderConvsSection(course, teacher));
   inner.appendChild(renderHwSection(course, teacher));
   inner.appendChild(renderProjectsSection(course, teacher));
@@ -372,6 +505,7 @@ export function mountRail(course, teacher) {
 export function unmountRail() {
   const rail = document.getElementById('classViewRail');
   const toggle = document.getElementById('classViewRailToggle');
+  closeRailDrawer();
   if (rail) rail.style.display = 'none';
   if (toggle) toggle.style.display = 'none';
 }

@@ -25,11 +25,14 @@
 // Deferred to later sessions:
 //   Session 6: tomorrow-schedule peek (D4-A hidden silently until then).
 
+import { renderEmptyStatePanel } from './emptystate.js';
 import { navClass, navGeneral, navPlan } from './router.js';
+import { initScheduleSetup } from './schedule.js';
+import { renderSidebar } from './sidebar.js';
 import { S } from './state.js';
 import { getConvs, getSchedule } from './storage.js';
 import { getHwTasks } from './homework.js';
-import { _profileStatusCache } from './teachers.js';
+import { _profileStatusCache, preloadAvailableClasses, preloadProfileStatuses } from './teachers.js';
 import { buildStudyPlan, remainingTotals, loadCheckedMap } from './studyplan.js';
 import { showToast } from './ui.js';
 
@@ -566,17 +569,85 @@ function escHtml(s) {
 export function renderHome() {
   const grid = document.getElementById('homeGrid');
   if (!grid) return;
+
+  // While preloadProfileStatuses() is still resolving, cards would render
+  // 'ready' and then flip to locked on late reply — show shimmer cards
+  // instead (docs/STUDENT_HOME_REDESIGN.md §4.1.1). If the probe never
+  // finishes settling (RDS error — it only logs), the poll times out and the
+  // real grid renders fail-open, matching the pre-existing default.
+  const schedule = S.isTestMode ? S.testSchedule : getSchedule();
+  if (isHomeGridPending(schedule, _profileStatusCache, S.isTestMode)) {
+    armGridProbePoll();
+    grid.innerHTML = '';
+    for (let i = 0; i < Math.min(schedule.length, 6); i++) {
+      grid.appendChild(renderSkeletonCard());
+    }
+    return;
+  }
+
   const cards = sortCards(buildCards(), S.isTestMode);
   grid.innerHTML = '';
 
   if (cards.length === 0) {
     // Empty-schedule state. In practice the boot flow already routes new users
-    // through the schedule wizard before app.js hands off to the router.
-    grid.appendChild(el('div', { class: 'home-empty', text: 'No classes on your schedule yet.' }));
+    // through the schedule wizard before app.js hands off to the router; the
+    // CTA re-opens it (same handler as settings' "Update schedule").
+    grid.appendChild(renderEmptyStatePanel({
+      icon: '✦',
+      title: 'No classes on your schedule yet.',
+      hint: 'Add your classes to meet your tutors.',
+      cta: { label: 'Add your classes', onClick: openScheduleWizardFromHome },
+    }));
     return;
   }
 
   for (const card of cards) grid.appendChild(renderCard(card));
+}
+
+// True while the profile-status probe hasn't covered every scheduled class
+// yet — i.e. some 'course::teacher' key is still absent from the cache.
+// Test mode uses its own ready flags and never consults the probe.
+export function isHomeGridPending(schedule, statusCache, isTestMode) {
+  if (isTestMode) return false;
+  if (!Array.isArray(schedule) || !schedule.length) return false;
+  return schedule.some(e => statusCache[`${e.course}::${e.teacher}`] === undefined);
+}
+
+function renderSkeletonCard() {
+  const card = el('article', { class: 'home-card home-card--skel', 'aria-hidden': 'true' });
+  card.appendChild(el('div', { class: 'skel home-skel-line' }));
+  card.appendChild(el('div', { class: 'skel home-skel-line short' }));
+  card.appendChild(el('div', { class: 'skel home-skel-block' }));
+  return card;
+}
+
+// No event fires when preloadProfileStatuses() lands, so poll the cache on a
+// short interval while the grid is pending; the timeout doubles as the
+// settle-on-error path (the probe only logs failures).
+const GRID_PROBE_POLL_MS = 400;
+const GRID_PROBE_TIMEOUT_MS = 8000;
+let _gridPoll = null;
+let _gridPollStart = 0;
+
+function armGridProbePoll() {
+  if (_gridPoll) return;
+  _gridPollStart = Date.now();
+  _gridPoll = setInterval(() => {
+    const settled = !isHomeGridPending(getSchedule(), _profileStatusCache, S.isTestMode)
+      || Date.now() - _gridPollStart > GRID_PROBE_TIMEOUT_MS;
+    if (settled) { clearInterval(_gridPoll); _gridPoll = null; renderHome(); }
+  }, GRID_PROBE_POLL_MS);
+}
+
+// Same wiring as the settings "Update schedule" flow (app.js).
+function openScheduleWizardFromHome() {
+  initScheduleSetup(() => {
+    renderSidebar();
+    renderHome();
+    preloadAvailableClasses()
+      .finally(() => preloadProfileStatuses())
+      .finally(() => renderHome());
+  }, getSchedule());
 }
 
 /** Show the home view and render it. Called by the router on 'home' route. */
@@ -613,4 +684,5 @@ export function mountHome() {
 export function unmountHome() {
   const home = document.getElementById('homeView');
   if (home) home.style.display = 'none';
+  if (_gridPoll) { clearInterval(_gridPoll); _gridPoll = null; }
 }

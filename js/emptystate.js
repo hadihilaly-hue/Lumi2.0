@@ -177,3 +177,85 @@ export function renderEmptyState(profile, course) {
 
   messagesEl.appendChild(el);
 }
+
+/* ─── Unified empty-state panel ─────────────────────────────────────────────
+   renderEmptyState(profile, course) above is the chat's suggested-prompts
+   panel — the name predates the generic component, so the shared block is
+   renderEmptyStatePanel(). One call per surface (class-view rail sections,
+   home grid); each takes at most one CTA. Returns the node — callers own
+   placement. */
+export function renderEmptyStatePanel({ icon = '', title = '', hint = '', cta = null, compact = false } = {}) {
+  const panel = document.createElement('div');
+  panel.className = 'es' + (compact ? ' es-compact' : '');
+  if (icon) {
+    const i = document.createElement('div');
+    i.className = 'es-icon';
+    i.textContent = icon;
+    panel.appendChild(i);
+  }
+  if (title) {
+    const t = document.createElement('div');
+    t.className = 'es-title';
+    t.textContent = title;
+    panel.appendChild(t);
+  }
+  if (hint) {
+    const h = document.createElement('div');
+    h.className = 'es-hint';
+    h.textContent = hint;
+    panel.appendChild(h);
+  }
+  if (cta && cta.label && typeof cta.onClick === 'function') {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'es-cta';
+    b.textContent = cta.label;
+    b.addEventListener('click', (e) => { e.stopPropagation(); cta.onClick(); });
+    panel.appendChild(b);
+  }
+  return panel;
+}
+
+/* ─── Chat skeleton ─────────────────────────────────────────────────────────
+   Shimmer bubbles in #messages while a class open (openTutor →
+   finishOpenTutor awaits the teacher-profile fetch) or a lazy conversation
+   fetch (loadConv) is in flight — otherwise the panel sits blank for seconds.
+   Removed when the first real node lands in #messages, on explicit cleanup,
+   or after a safety timeout. Error paths keep their existing toast/banner;
+   the skeleton just stops. */
+const CHAT_SKEL_MS = 15000;
+let _chatSkelObserver = null;
+let _chatSkelTimer = null;
+
+export function showChatSkeleton() {
+  if (!messagesEl) return;
+  clearChatSkeleton();
+  messagesEl.setAttribute('aria-busy', 'true');
+  for (let i = 0; i < 2; i++) {
+    const b = document.createElement('div');
+    b.className = 'msg lumi skel-msg';
+    b.setAttribute('aria-hidden', 'true');
+    b.innerHTML = `
+      <div class="skel skel-line" style="width:${88 - i * 16}%"></div>
+      <div class="skel skel-line" style="width:${64 - i * 12}%"></div>
+      <div class="skel skel-line" style="width:36%"></div>`;
+    messagesEl.appendChild(b);
+  }
+  if (typeof MutationObserver === 'function') {
+    _chatSkelObserver = new MutationObserver(() => {
+      for (const n of messagesEl.children) {
+        if (!n.classList || !n.classList.contains('skel-msg')) { clearChatSkeleton(); return; }
+      }
+    });
+    _chatSkelObserver.observe(messagesEl, { childList: true });
+  }
+  _chatSkelTimer = setTimeout(clearChatSkeleton, CHAT_SKEL_MS);
+}
+
+export function clearChatSkeleton() {
+  if (_chatSkelObserver) { _chatSkelObserver.disconnect(); _chatSkelObserver = null; }
+  if (_chatSkelTimer) { clearTimeout(_chatSkelTimer); _chatSkelTimer = null; }
+  if (!messagesEl) return;
+  messagesEl.removeAttribute('aria-busy');
+  messagesEl.querySelectorAll('.skel-msg').forEach(n => n.remove());
+}
