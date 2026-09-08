@@ -833,7 +833,7 @@ test('POST /sis-import passes the admin gate (reaches validation, not 403)', asy
 
 test('POST /upload-url is teacher-only (403 for a student)', async () => {
   const { handler } = await loadHandler();
-  resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId, isTeacher: false }) });
+  resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId, isTeacher: false, provisionedTeacher: false }) });
   const r = await invoke(handler, {
     method: 'POST', path: '/upload-url', token: tokenFor(STUDENT),
     body: { bucket: 'syllabi', filename: 'x.pdf' },
@@ -841,9 +841,19 @@ test('POST /upload-url is teacher-only (403 for a student)', async () => {
   assert.equal(r.statusCode, 403);
 });
 
+test('POST /upload-url admits a provisioned teacher who has not finished onboarding (done=false)', async () => {
+  const { handler } = await loadHandler();
+  resetContext({ dbRouter: makeRouter({ userId: TEACHER.userId, isTeacher: false, provisionedTeacher: true }) });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/upload-url', token: tokenFor(TEACHER),
+    body: { bucket: 'syllabi', filename: 'syllabus.pdf' },
+  });
+  assert.equal(r.statusCode, 200);
+});
+
 test('POST /upload-url signs a key namespaced to the JWT user id (not a body-supplied id)', async () => {
   const { handler } = await loadHandler();
-  const ctx = resetContext({ dbRouter: makeRouter({ userId: TEACHER.userId, isTeacher: true }) });
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: TEACHER.userId, provisionedTeacher: true }) });
   const r = await invoke(handler, {
     method: 'POST', path: '/upload-url', token: tokenFor(TEACHER),
     body: { bucket: 'syllabi', filename: 'syllabus.pdf', userId: 'ATTACKER', classId: 'c1' },

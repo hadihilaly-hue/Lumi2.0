@@ -269,7 +269,9 @@ async function isTeacher(email) {
 // mint the FIRST teacher_profiles row (the self-promotion vector). The
 // existing-row clause only grandfathers rows the server itself provisioned. Once
 // the write is gated, teacher_profiles.done is trustworthy and isTeacher (the
-// read side, used by /upload-url + the rate tier) rests on server-controlled data.
+// read side, used by the rate tier) rests on server-controlled data. /upload-url
+// uses this check too, since a teacher uploads syllabi/photos during onboarding,
+// before their profile is marked done.
 // Fail-closed to "not authorized" on DB error — same posture as isTeacher.
 async function isProvisionedTeacher(user) {
   const email = user.email.toLowerCase();
@@ -2653,9 +2655,8 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
   // === Route: POST /upload-url ===
   if (path === "/upload-url") {
     try {
-      const isTeacherUser = await isTeacher(user.email);
-      if (!isTeacherUser) return sendJson(403, { error: "Teachers only" });
-      
+      if (!(await isProvisionedTeacher(user))) return sendJson(403, { error: "Teachers only" });
+
       const { bucket, filename, contentType, classId, tier } = body;
       if (!bucket || !filename) return sendJson(400, { error: "Missing bucket or filename" });
       
