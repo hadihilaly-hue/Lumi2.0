@@ -14,10 +14,10 @@ async function gate(session) {
     if (j.accepted) { localStorage.setItem('lumi_privacy_ok', email); return; }
     const dest = (location.pathname.split('/').pop() || 'teacher.html');
     location.replace('privacy.html?consent=1&next=' + encodeURIComponent(dest));
-  } catch (e) { /* fail open */ }
+  } catch (_e) { /* fail open */ }
 }
 
 export async function runConsentGate() {
-  try { const s = (await sb.auth.getSession()).data.session; if (s && s.user) { gate(s); return; } } catch (e) {}
+  try { const s = (await sb.auth.getSession()).data.session; if (s && s.user) { gate(s); return; } } catch (_e) { /* ignore — the listener below still gates the next sign-in */ }
   sb.auth.onAuthStateChange((ev, s) => { if (ev === 'SIGNED_IN') gate(s); });
 }

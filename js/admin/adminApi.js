@@ -28,7 +28,7 @@ export async function adminApi(path, opts = {}) {
   });
   const text = await res.text();
   let json = null;
-  try { json = text ? JSON.parse(text) : null; } catch {}
+  try { json = text ? JSON.parse(text) : null; } catch { /* non-JSON body — fall through to the status check */ }
   if (!res.ok) throw new Error((json && json.error) || `HTTP ${res.status}`);
   return json;
 }

@@ -62,7 +62,7 @@ export function profileHasAllWorkSampleTiers(profileId) {
 // Subject is no longer derivable from a hardcoded curriculum. teacher_profiles
 // carries no subject column, so class cards show a neutral label. (Cosmetic only
 // — the card's course name and onboarding status are the meaningful fields.)
-export function lookupSubjectForCourse(courseName) {
+export function lookupSubjectForCourse(_courseName) {
   return 'General';
 }
 
