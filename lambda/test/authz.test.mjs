@@ -21,7 +21,7 @@ function ok(rows) { return { rows, rowCount: rows.length }; }
 // Router over the raw teacher-status tables so soft-deleted / not-done rows can
 // be modelled precisely (the harness's makeRouter flags are coarser).
 function teacherDb({ roster = false, profile = null, throwOn = null } = {}) {
-  return (text, params) => {
+  return (text, _params) => {
     if (throwOn && throwOn.test(text)) throw new Error('simulated DB error');
     if (ROSTER_SQL.test(text)) return roster ? ok([{ ok: 1 }]) : ok([]);
     if (DONE_SQL.test(text)) return profile && profile.done && !profile.deleted ? ok([{ ok: 1 }]) : ok([]);

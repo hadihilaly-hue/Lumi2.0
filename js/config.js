@@ -11,9 +11,15 @@
 // derived from this one literal so a host swap touches a single string.
 const LAMBDA_HOST = 'https://44d5lnv7ir7q4xgapsukc4tlnq0jtjxz.lambda-url.us-east-1.on.aws';
 
+// Opt-in diagnostics (timing logs etc.): `localStorage.lumi_debug = '1'`.
+function readDebugFlag() {
+  try { return globalThis.localStorage?.getItem('lumi_debug') === '1'; } catch { return false; }
+}
+
 export const CONFIG = {
   lambdaHost:     LAMBDA_HOST,
   claudeProxyUrl: LAMBDA_HOST + '/',
+  debug:          readDebugFlag(),
   models: {
     chat:   'claude-sonnet-4-20250514', // main tutor + onboarding conversations
     titler: 'claude-haiku-4-5',         // cheap conversation-title generation

@@ -462,7 +462,7 @@ function fmtText(text) {
   let processed = text;
   // Display math first ($$...$$), then inline ($...$)
   processed = processed.replace(/\$\$([\s\S]+?)\$\$/g, (m) => { mathBlocks.push(m); return `\x00MATH${mathBlocks.length - 1}\x00`; });
-  processed = processed.replace(/\$([^\$\n]+?)\$/g, (m) => { mathBlocks.push(m); return `\x00MATH${mathBlocks.length - 1}\x00`; });
+  processed = processed.replace(/\$([^$\n]+?)\$/g, (m) => { mathBlocks.push(m); return `\x00MATH${mathBlocks.length - 1}\x00`; });
 
   let html;
   if (typeof marked !== 'undefined') {

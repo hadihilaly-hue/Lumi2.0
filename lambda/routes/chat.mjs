@@ -17,7 +17,7 @@ import { isPersistenceEnabled, summarizeAndStoreProgressNote } from "../lib/prog
 // 'fallback'} and the client uses its static list. Counts against the same
 // per-user rate limit as chat and logs usage.
 export async function suggestedPrompts(ctx) {
-  const { event, body, user, sendJson } = ctx;
+  const { event, user, sendJson } = ctx;
     const method = event.requestContext?.http?.method || "GET";
     if (method !== "GET") return sendJson(405, { error: "Method not allowed" });
     const qs = event.queryStringParameters || {};

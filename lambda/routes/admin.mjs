@@ -95,7 +95,7 @@ export async function adminDeleteStudent(ctx) {
 // window still resolves. Response carries the target email (authorized admin read);
 // logs carry ids only.
 export async function adminStudentData(ctx) {
-  const { event, body, user, sendJson } = ctx;
+  const { event, user, sendJson } = ctx;
     const method = event.requestContext?.http?.method || "GET";
     if (method !== "GET") return sendJson(405, { error: "Method not allowed" });
     if (!SCHOOL_CONFIG.adminEmails.has(user.email.toLowerCase())) {

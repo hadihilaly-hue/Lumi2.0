@@ -65,7 +65,7 @@ gives direct answers, only guides reasoning.
   data layer since the 2026-07-01 cutover + teardown.** The old `USE_RDS`
   flag and every Supabase data branch are deleted; all reads/writes go
   through the per-file `rdsFetch(path, {method, body})` helper (app.js +
-  teacher.html; admin.html inlines its single fetch). Failures surface
+  js/teacher/profileApi.js; js/admin/adminApi.js wraps its fetches). Failures surface
   VISIBLY (console.error + showToast at hardened writes; chat-area banner
   for the main tutor fetch) — there is no fallback store. Auth is AWS
   Cognito via `cognito-auth.js` (Workstream I, complete 2026-07-02);
@@ -319,15 +319,24 @@ gives direct answers, only guides reasoning.
   URLs valid for 1 hour (longer than syllabi's 5min because the
   runtime vision pipeline fans out to per-image fetches at
   chat-open). **Runtime vision pipeline:** `loadWorkSampleImages()`
-  in app.js fetches signed URLs in parallel via `POST /download-url`,
-  then fetches each image blob, converts to base64, and sends them
-  to Claude as vision content blocks — same end shape as before,
-  only the signed-URL source changed. **Auth chain:** Cognito ID token
+  in `js/teachers.js` first consults the image cache
+  (`js/workSampleCache.js`: in-memory Map for the tab + IndexedDB
+  `lumi_work_samples`, keyed by `(teacher_profile_id, s3_path,
+  work_samples.updated_at)`, capped at 50 images / 30 days; re-saving
+  a tier bumps `updated_at` and so invalidates it). Misses are signed
+  in one round-trip via `POST /download-urls` (`{bucket, paths[]}` ≤
+  30 → `{urls[]}`; falls back to per-path `POST /download-url` if the
+  batch route is missing), then each image blob is fetched, converted
+  to base64, and sent to Claude as vision content blocks. A warm cache
+  skips the network entirely. In Teacher Test Mode only the in-memory
+  layer is used (TM-2: no persistent state left on a shared browser).
+  Timings log under `[work_samples][timing]` when `CONFIG.debug` is on
+  (`localStorage.lumi_debug = '1'`). **Auth chain:** Cognito ID token
   → Lambda `verifyAuth` (local JWKS + app_users) → allowed-domains
   check (teachers-only on upload, any authenticated user on
   download). Written from
   `saveTeacherProfile()` in teacher.html; read from openWizard's
-  thumbnail batch and from `loadWorkSampleImages()` in app.js.
+  thumbnail batch and from `loadWorkSampleImages()` in js/teachers.js.
 
 ### Lambda source layout (W3 router split)
 `lambda/index.mjs` is a thin entrypoint: parse event → direct-invoke /
@@ -707,7 +716,7 @@ live with spoofed ids.
   Banner click opens the wizard at `{ jumpToStep: 4 }`. The `done` flag
   stays true so students aren't blocked while the teacher fills the
   gap.
-- **Single-source-of-truth gate.** `loadWorkSampleImages()` in app.js
+- **Single-source-of-truth gate.** `loadWorkSampleImages()` in js/teachers.js
   returns null on any shortfall — missing tier, no photos, no
   description, signed-URL failure, fetch failure. The result lives at
   `S.tutorCtx.workSamples`. Both `buildTutorSystem()` (description
@@ -1049,11 +1058,35 @@ live with spoofed ids.
 ---
 
 ## Stack Notes
+- **Commands (Node 22 required — the root test glob silently matches nothing on
+  Node 20):** `npm ci && (cd lambda && npm ci)`; `npm run lint` (ESLint flat
+  config `eslint.config.js` — browser/ESM for `app.js` + `js/`, classic-script
+  for `cognito-auth.js` / `teacher-directory.js`, node/ESM for `lambda/` and
+  both `test/` dirs; CDN/window globals such as `pdfjsLib`, `heic2any`,
+  `marked`, `awslambda` are declared there, not disabled); `npm test`
+  (frontend node:test suite); `(cd lambda && npm test)` (Lambda suite).
+  Lint must stay at 0 errors — for a finding whose fix would change behavior,
+  add an `// eslint-disable-next-line <rule>` with a `// TODO(lint):` note
+  rather than changing logic.
+- **CI:** `.github/workflows/ci.yml` runs lint + both test suites on every PR
+  and push to `main`. `.github/workflows/deploy-lambda.yml` deploys `lambda/`
+  to `lumi-claude-proxy` on pushes to `main` touching `lambda/**` (or manually);
+  it needs the `AWS_LAMBDA_DEPLOY_ACCESS_KEY_ID` /
+  `AWS_LAMBDA_DEPLOY_SECRET_ACCESS_KEY` repo secrets (IAM policy in
+  `lambda/README.md`) and is a no-op failure until they exist.
 - **Type:** Static site (no build step, no bundler)
 - **Frontend:** Vanilla HTML/CSS/JS — no framework
 - **Pages:** index.html (sign-in), app.html (student chat), teacher.html
   (teacher onboarding), admin.html (SIS admin console), privacy.html.
-  The live student app is app.html → app.js. (The legacy orphaned `lumi.html`
+  The live student app is app.html → app.js. teacher.html loads
+  `js/teacher/main.js` (boot/auth gate/`window` handler exposure) →
+  `state.js` (shared `T` state), `config.js`, `wizardState.js` (pure
+  gating/list helpers — unit-tested), `profileApi.js` (every `rdsFetch`),
+  `home.js`, `wizardUi.js`, `workSamples.js`, `syllabus.js`, `speech.js`,
+  `saveProfile.js`, `roster.js`, `studentMode.js`, `consentGate.js`,
+  `ui.js`. admin.html loads `js/admin/main.js` → `adminApi.js`,
+  `dashboardState.js` (pure — unit-tested), `ferpa.js`. Tests for both
+  live in `test/teacher-*.test.mjs` (incl. a module-graph boot smoke). (The legacy orphaned `lumi.html`
   copy was deleted in Compliance Phase 2b — it was unlinked dead code carrying
   hardcoded staff names.)
 - **Styling:** style.css is the single live stylesheet (~160 KB), loaded by

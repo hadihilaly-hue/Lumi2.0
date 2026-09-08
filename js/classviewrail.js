@@ -109,7 +109,7 @@ function readCollapsedPref() {
 }
 
 function writeCollapsedPref(collapsed) {
-  try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch {}
+  try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch { /* ignore */ }
 }
 
 // ── DOM helpers ─────────────────────────────────────────────────────────────
@@ -224,7 +224,7 @@ function refreshActiveRow(newActiveId) {
   });
 }
 
-function renderHwSection(course, teacher) {
+function renderHwSection(course, _teacher) {
   const section = el('section', { class: 'cv-rail-section' });
   section.appendChild(el('div', { class: 'cv-rail-section-label', text: 'Homework' }));
 
@@ -256,7 +256,7 @@ function renderHwSection(course, teacher) {
   return section;
 }
 
-function renderProjectsSection(course, teacher) {
+function renderProjectsSection(course, _teacher) {
   const section = el('section', { class: 'cv-rail-section' });
   section.appendChild(el('div', { class: 'cv-rail-section-label', text: 'Projects' }));
 

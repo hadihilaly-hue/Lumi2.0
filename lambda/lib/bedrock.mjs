@@ -43,10 +43,12 @@ export async function* callClaude({ systemPrompt, messages, maxTokens, modelId, 
   }
 }
 
+// eslint-disable-next-line require-yield -- provider stub: throws before yielding
 async function* callGemini() {
   throw new Error("Gemini provider not yet implemented");
 }
 
+// eslint-disable-next-line require-yield -- provider stub: throws before yielding
 async function* callGPT() {
   throw new Error("GPT provider not yet implemented");
 }

@@ -30,7 +30,7 @@ routes/
   enrollments.mjs  /class-enrollments
   conversations.mjs  /conversations
   homework.mjs     /homework-tasks
-  uploads.mjs      /upload-url, /download-url
+  uploads.mjs      /upload-url, /download-url, /download-urls (batch)
   admin.mjs        adminSql direct-invoke, /admin/delete-student, /admin/student-data, /sis-import
   misc.mjs         /db-health, /allowed-domains, /my-data, /delete-my-account, /consent,
                    /teacher-directory, /available-classes

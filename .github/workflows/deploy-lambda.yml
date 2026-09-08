@@ -1,0 +1,53 @@
+name: Deploy Lambda
+
+# Deploys lambda/ to the lumi-claude-proxy function (us-east-1).
+# Requires the AWS_LAMBDA_DEPLOY_ACCESS_KEY_ID / AWS_LAMBDA_DEPLOY_SECRET_ACCESS_KEY
+# repository secrets — see lambda/README.md ("CI deploy") for the IAM policy.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'lambda/**'
+
+concurrency:
+  group: deploy-lambda
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lambda/package-lock.json
+
+      - name: Install production dependencies
+        run: npm ci --omit=dev
+        working-directory: lambda
+
+      - name: Build deployment zip
+        # Run from inside lambda/ so index.mjs lands at the zip root (handler is index.handler).
+        run: zip -r -X ../lambda.zip . -x 'test/*' -x '*.DS_Store' -x 'README.md'
+        working-directory: lambda
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_LAMBDA_DEPLOY_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_LAMBDA_DEPLOY_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Update function code
+        run: |
+          aws lambda update-function-code \
+            --function-name lumi-claude-proxy \
+            --zip-file fileb://lambda.zip
+          aws lambda wait function-updated --function-name lumi-claude-proxy

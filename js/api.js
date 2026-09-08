@@ -57,7 +57,7 @@ export async function callAPI(msgs, system, onChunk) {
 
   if (!res.ok) {
     let msg = `API error ${res.status}`;
-    try { const e = await res.json(); msg = e.error?.message || msg; } catch {}
+    try { const e = await res.json(); msg = e.error?.message || msg; } catch { /* ignore */ }
     throw new Error(msg);
   }
 
@@ -148,9 +148,9 @@ function parseResponse(text) {
       const p = JSON.parse(cand);
       if ('values' in p && 'goals' in p && 'interests' in p)
         return { clean: text.slice(0, lb).trim(), data: p };
-    } catch {}
+    } catch { /* ignore */ }
   }
   const m = text.match(/\n?\{"values"\s*:[\s\S]*?\}(?:\s*)$/);
-  if (m) { try { return { clean: text.slice(0, text.length - m[0].length).trim(), data: JSON.parse(m[0].trim()) }; } catch {} }
+  if (m) { try { return { clean: text.slice(0, text.length - m[0].length).trim(), data: JSON.parse(m[0].trim()) }; } catch { /* ignore */ } }
   return { clean: text.trim(), data: null };
 }

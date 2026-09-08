@@ -11,7 +11,7 @@ import { teacherProfile, workSamples, workArtifacts } from "./routes/teacherProf
 import { classEnrollments } from "./routes/enrollments.mjs";
 import { conversations } from "./routes/conversations.mjs";
 import { homeworkTasks } from "./routes/homework.mjs";
-import { uploadUrl, downloadUrl } from "./routes/uploads.mjs";
+import { uploadUrl, downloadUrl, downloadUrls } from "./routes/uploads.mjs";
 
 // Test-only re-exports (see bottom of file).
 import { checkRateLimit, logUsage } from "./lib/usage.mjs";
@@ -56,6 +56,7 @@ const ROUTES = {
   "/sis-import": admin.sisImport,
   "/upload-url": uploadUrl,
   "/download-url": downloadUrl,
+  "/download-urls": downloadUrls,
 };
 
 // === Main Handler (path-routed) ===
@@ -94,6 +95,8 @@ async function handleRequest(event, responseStream) {
   if (publicRoute) return publicRoute({ event, sendJson });
 
   // --- Parse body ---
+  // TODO(lint): initializer is overwritten before use; kept as-is to avoid touching control flow.
+  // eslint-disable-next-line no-useless-assignment
   let body = {};
   try {
     body = JSON.parse(event.body || "{}");

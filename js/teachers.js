@@ -1,7 +1,10 @@
 import { CLAUDE_PROXY_URL } from './api.js';
+import { CONFIG } from './config.js';
 import { findUnresolvedScheduleCourses, resolveCanonicalCourse } from './courseNormalize.js';
 import { renderSidebar } from './sidebar.js';
+import { S } from './state.js';
 import { getSchedule } from './storage.js';
+import { cacheKey, getCachedImage, putCachedImage } from './workSampleCache.js';
 
 
 // Teacher access config — the directory (teacher-directory.js) is now fetched
@@ -153,7 +156,7 @@ export async function preloadAvailableClasses() {
         unresolved
       );
     }
-  } catch (e) { /* diagnostic only */ }
+  } catch { /* diagnostic only */ }
   return rows;
 }
 
@@ -306,6 +309,87 @@ export async function getTeacherProfile(teacherName, course) {
 // Returns null on ANY shortfall — missing tier, no photos, no description,
 // signed-URL failure, fetch failure. The "all 3 tiers required" gate. Both
 // gates downstream check this same single return value.
+//
+// Images are cached (js/workSampleCache.js) keyed by
+// (teacher_profile_id, s3_path, work_samples.updated_at); only misses hit the
+// network. Signed URLs come from the batch `POST /download-urls` route, falling
+// back to per-path `POST /download-url` when the Lambda does not serve it yet.
+
+export const DOWNLOAD_URLS_BATCH_MAX = 30;
+
+function authHeaders(accessToken) {
+  return { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
+}
+
+async function signWorkSampleUrlsSingular(paths, accessToken) {
+  return Promise.all(paths.map(async (path) => {
+    const res = await fetch(`${CLAUDE_PROXY_URL}download-url`, {
+      method: 'POST',
+      headers: authHeaders(accessToken),
+      body: JSON.stringify({ bucket: 'work-samples', key: path }),
+    });
+    if (!res.ok) throw new Error('download-url HTTP ' + res.status + ' for ' + path);
+    const json = await res.json();
+    if (!json.downloadUrl) throw new Error('missing downloadUrl for ' + path);
+    return json.downloadUrl;
+  }));
+}
+
+// Returns signed URLs in the same order as `paths`. The batch route is tried in
+// chunks of DOWNLOAD_URLS_BATCH_MAX; a non-2xx or malformed reply (an
+// un-redeployed Lambda has no such route) falls back to the singular route.
+export async function signWorkSampleUrls(paths, accessToken) {
+  const out = [];
+  for (let i = 0; i < paths.length; i += DOWNLOAD_URLS_BATCH_MAX) {
+    const chunk = paths.slice(i, i + DOWNLOAD_URLS_BATCH_MAX);
+    let urls = null;
+    try {
+      const res = await fetch(`${CLAUDE_PROXY_URL}download-urls`, {
+        method: 'POST',
+        headers: authHeaders(accessToken),
+        body: JSON.stringify({ bucket: 'work-samples', paths: chunk }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (Array.isArray(json.urls) && json.urls.length === chunk.length && json.urls.every(u => typeof u === 'string' && u)) {
+          urls = json.urls;
+        }
+      } else if (CONFIG.debug) {
+        console.log('[work_samples] download-urls HTTP ' + res.status + '; falling back to /download-url');
+      }
+    } catch (e) {
+      if (CONFIG.debug) console.log('[work_samples] download-urls failed; falling back to /download-url:', e);
+    }
+    if (!urls) urls = await signWorkSampleUrlsSingular(chunk, accessToken);
+    out.push(...urls);
+  }
+  return out;
+}
+
+function bytesToBase64(bytes) {
+  let bin = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+}
+
+async function fetchImageAsBase64(signedUrl, path) {
+  const res = await fetch(signedUrl);
+  if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + path);
+  const blob = await res.blob();
+  const base64 = bytesToBase64(new Uint8Array(await blob.arrayBuffer()));
+  let mediaType = blob.type;
+  if (!/^image\/(jpeg|png|webp|gif)$/i.test(mediaType)) {
+    const ext = (path.split('.').pop() || '').toLowerCase();
+    mediaType = ext === 'png' ? 'image/png'
+              : ext === 'webp' ? 'image/webp'
+              : 'image/jpeg';
+  }
+  return { base64, mediaType };
+}
+
 export async function loadWorkSampleImages(profile) {
   const ws = profile && profile.workSamples;
   const tiers = ['progressing','proficient','exemplary'];
@@ -316,79 +400,67 @@ export async function loadWorkSampleImages(profile) {
     if (!(row.description || '').trim()) return null;
   }
 
-  const allPaths = tiers.flatMap(tier => ws[tier].photo_paths.map(path => ({ tier, path })));
+  const t0 = Date.now();
+  const allPaths = tiers.flatMap(tier => ws[tier].photo_paths.map(path => ({
+    tier, path, key: cacheKey(profile.id, path, ws[tier].updated_at),
+  })));
 
-  // Get fresh session for auth on Lambda calls.
-  let session;
-  try {
-    const sessRes = await sb.auth.getSession();
-    session = sessRes && sessRes.data && sessRes.data.session;
-    if (!session) {
-      console.warn('[work_samples] no session');
+  // TM-2: a teacher in Test Mode never leaves persistent state on a shared
+  // browser; the per-tab memory layer is still used.
+  const persistent = !S.isTestMode;
+
+  // Cache lookups first — a full hit skips the network entirely.
+  const cached = await Promise.all(allPaths.map(p => getCachedImage(p.key, { persistent })));
+  const misses = allPaths.filter((_, i) => !cached[i]);
+  const tCache = Date.now();
+
+  let fetched = new Map();
+  if (misses.length) {
+    // Get fresh session for auth on Lambda calls.
+    let session;
+    try {
+      const sessRes = await sb.auth.getSession();
+      session = sessRes && sessRes.data && sessRes.data.session;
+      if (!session) {
+        console.warn('[work_samples] no session');
+        return null;
+      }
+    } catch (e) {
+      console.warn('[work_samples] getSession failed:', e);
       return null;
     }
-  } catch (e) {
-    console.warn('[work_samples] getSession failed:', e);
-    return null;
-  }
 
-  // Fetch signed download URLs in parallel via Lambda /download-url.
-  let signedResolutions;
-  try {
-    signedResolutions = await Promise.all(allPaths.map(async (p) => {
-      const res = await fetch(`${CLAUDE_PROXY_URL}download-url`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ bucket: 'work-samples', key: p.path }),
-      });
-      if (!res.ok) throw new Error('download-url HTTP ' + res.status + ' for ' + p.path);
-      const json = await res.json();
-      if (!json.downloadUrl) throw new Error('missing downloadUrl for ' + p.path);
-      return { signedUrl: json.downloadUrl };
-    }));
-  } catch (e) {
-    console.warn('[work_samples] signed URL fetch failed:', e);
-    return null;
-  }
+    let signedUrls;
+    try {
+      signedUrls = await signWorkSampleUrls(misses.map(p => p.path), session.access_token);
+    } catch (e) {
+      console.warn('[work_samples] signed URL fetch failed:', e);
+      return null;
+    }
 
-  let imageBlobs;
-  try {
-    imageBlobs = await Promise.all(signedResolutions.map(async (entry, i) => {
-      const meta = allPaths[i];
-      if (!entry || !entry.signedUrl) throw new Error('missing signed URL for ' + (meta && meta.path));
-      const res = await fetch(entry.signedUrl);
-      if (!res.ok) throw new Error('HTTP ' + res.status + ' for ' + meta.path);
-      const blob = await res.blob();
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const r = reader.result || '';
-          const idx = r.indexOf(',');
-          resolve(idx >= 0 ? r.slice(idx + 1) : r);
-        };
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(blob);
-      });
-      let mediaType = blob.type;
-      if (!/^image\/(jpeg|png|webp|gif)$/i.test(mediaType)) {
-        const ext = (meta.path.split('.').pop() || '').toLowerCase();
-        mediaType = ext === 'png' ? 'image/png'
-                  : ext === 'webp' ? 'image/webp'
-                  : 'image/jpeg';
-      }
-      return { tier: meta.tier, base64, mediaType };
-    }));
-  } catch (e) {
-    console.warn('[work_samples] image fetch failed:', e);
-    return null;
+    try {
+      const imgs = await Promise.all(signedUrls.map((signedUrl, i) => fetchImageAsBase64(signedUrl, misses[i].path)));
+      imgs.forEach((img, i) => fetched.set(misses[i].key, img));
+    } catch (e) {
+      console.warn('[work_samples] image fetch failed:', e);
+      return null;
+    }
+    // Populate the cache in the background — never block chat-open on IndexedDB.
+    for (const [key, img] of fetched) putCachedImage(key, img, { persistent }).catch(() => {});
   }
 
   const result = {};
   tiers.forEach(tier => { result[tier] = { description: ws[tier].description.trim(), images: [] }; });
-  imageBlobs.forEach(item => { result[item.tier].images.push({ base64: item.base64, mediaType: item.mediaType }); });
+  allPaths.forEach((p, i) => {
+    const img = cached[i] || fetched.get(p.key);
+    if (img) result[p.tier].images.push({ base64: img.base64, mediaType: img.mediaType });
+  });
+
+  if (CONFIG.debug) {
+    const tEnd = Date.now();
+    console.log(`[work_samples][timing] images=${allPaths.length} cacheHits=${allPaths.length - misses.length} `
+      + `cacheLookup=${tCache - t0}ms network=${misses.length ? tEnd - tCache : 0}ms total=${tEnd - t0}ms`);
+  }
 
   // Final integrity: every tier must have at least one image now.
   if (tiers.some(tier => result[tier].images.length === 0)) return null;

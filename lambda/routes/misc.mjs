@@ -46,7 +46,7 @@ export async function allowedDomains(ctx) {
 // deliberately EXCLUDED (notes others wrote about the caller), and no other
 // person's rows are ever returned.
 export async function myData(ctx) {
-  const { event, body, user, sendJson } = ctx;
+  const { event, user, sendJson } = ctx;
     const method = event.requestContext?.http?.method || "GET";
     if (method !== "GET") return sendJson(405, { error: "Method not allowed" });
     try {
@@ -101,7 +101,7 @@ export async function deleteMyAccount(ctx) {
 // their OWN consent. Auditable per-account consent record for the first-run
 // privacy gate.
 export async function consent(ctx) {
-  const { event, body, user, sendJson } = ctx;
+  const { event, user, sendJson } = ctx;
     const method = event.requestContext?.http?.method || "GET";
     try {
       if (method === "GET") {
@@ -135,7 +135,7 @@ export async function consent(ctx) {
 // no longer in the public repo. Any authenticated + domain-gated caller may read
 // it (students need it to resolve their teacher's persona). Read-only.
 export async function teacherDirectory(ctx) {
-  const { event, body, user, sendJson } = ctx;
+  const { event, sendJson } = ctx;
     const method = event.requestContext?.http?.method || "GET";
     if (method !== "GET") return sendJson(405, { error: "Method not allowed" });
     try {
@@ -174,7 +174,7 @@ export async function teacherDirectory(ctx) {
 // read. `subject` is best-effort from sections (SIS) — null for manually
 // created profiles, which the client buckets under a generic header.
 export async function availableClasses(ctx) {
-  const { event, body, user, sendJson } = ctx;
+  const { event, sendJson } = ctx;
     const method = event.requestContext?.http?.method || "GET";
     if (method !== "GET") return sendJson(405, { error: "Method not allowed" });
     try {

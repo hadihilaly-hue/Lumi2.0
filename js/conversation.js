@@ -134,6 +134,8 @@ async function hydrateTutorProfile() {
   // first and resolve null, dropping a valid profile that lands at 5-8s (work
   // samples add up to 3s) and forcing this resumed chat back to generic AI on a
   // slow-but-successful hydrate.
+  // TODO(lint): initializer is overwritten before use; kept as-is to avoid touching control flow.
+  // eslint-disable-next-line no-useless-assignment
   let profile = null;
   try {
     profile = await getTeacherProfile(ctx.teacher, ctx.course);
@@ -261,7 +263,7 @@ function showIntroSlide(course, onGo) {
   goBtn.addEventListener('click', handler);
 }
 
-async function finishOpenTutor(subjectId, course, teacher, subjectName) {
+async function finishOpenTutor(subjectId, course, teacher, _subjectName) {
   // AUDIT_FRONTEND H2: capture the class this open is for. openTutor set
   // S.tutorCtx to a fresh object synchronously right before calling us; if the
   // user opens another class while we await below, S.tutorCtx is reassigned and

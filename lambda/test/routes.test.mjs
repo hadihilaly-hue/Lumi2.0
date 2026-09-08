@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   loadHandler, resetContext, invoke, makeRouter, findQuery, findQueries,
-  STUDENT, TEACHER, ADMIN, DOMAIN, tokenFor,
+  STUDENT, TEACHER, ADMIN, tokenFor,
 } from './harness.mjs';
 
 const res = (rows) => ({ rows, rowCount: rows.length });
@@ -660,7 +660,7 @@ test('PATCH /class-enrollments (teacher note) requires the owning teacher — 40
 
 test('PATCH /class-enrollments succeeds for the owning teacher', async () => {
   const { handler } = await loadHandler();
-  const ctx = resetContext({
+  resetContext({
     dbRouter: makeRouter({
       userId: TEACHER.userId, isTeacher: true,
       onRoute: (t) => {
@@ -940,6 +940,85 @@ test('POST /download-url 400s without bucket/key', async () => {
   assert.equal(r.statusCode, 400);
 });
 
+// =============================== /download-urls =============================
+// Batch form of /download-url (W5). Same bucket validation + per-key authz as
+// the singular route; `urls` comes back in request order.
+
+test('POST /download-urls signs every work-sample key in order for any authed caller', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
+  let n = 0;
+  Object.defineProperty(ctx, 'signedUrl', { get: () => `https://s3.example/signed-${++n}` });
+  const paths = ['teachers/t/algebra/progressing/1.jpg', 'teachers/t/algebra/proficient/2.jpg', 'teachers/t/algebra/exemplary/3.png'];
+  const r = await invoke(handler, {
+    method: 'POST', path: '/download-urls', token: tokenFor(STUDENT),
+    body: { bucket: 'work-samples', paths },
+  });
+  assert.equal(r.statusCode, 200);
+  assert.deepEqual(r.json().urls, ['https://s3.example/signed-1', 'https://s3.example/signed-2', 'https://s3.example/signed-3']);
+  assert.deepEqual(ctx.signRequests.map(s => s.command.Key), paths);
+  assert.ok(ctx.signRequests.every(s => s.command.Bucket === ctx.signRequests[0].command.Bucket));
+});
+
+test('POST /download-urls refuses the whole batch when any syllabus key is not owned (H2 parity)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: TEACHER.userId }) });
+  const r = await invoke(handler, {
+    method: 'POST', path: '/download-urls', token: tokenFor(TEACHER),
+    body: { bucket: 'syllabi', paths: [`teachers/${TEACHER.userId}/general/1.pdf`, 'teachers/some-other-teacher/general/2.pdf'] },
+  });
+  assert.equal(r.statusCode, 403);
+  assert.equal(ctx.signRequests.length, 0, 'nothing signed when one key is forbidden');
+});
+
+test('POST /download-urls signs owned syllabus keys and lets an admin sign any', async () => {
+  const { handler } = await loadHandler();
+  let ctx = resetContext({ dbRouter: makeRouter({ userId: TEACHER.userId }) });
+  let r = await invoke(handler, {
+    method: 'POST', path: '/download-urls', token: tokenFor(TEACHER),
+    body: { bucket: 'syllabi', paths: [`teachers/${TEACHER.userId}/general/1.pdf`] },
+  });
+  assert.equal(r.statusCode, 200);
+  assert.equal(ctx.signRequests.length, 1);
+
+  ctx = resetContext({ dbRouter: makeRouter({ userId: ADMIN.userId, domains: [] }) });
+  r = await invoke(handler, {
+    method: 'POST', path: '/download-urls', token: tokenFor(ADMIN),
+    body: { bucket: 'syllabi', paths: ['teachers/some-other-teacher/general/2.pdf'] },
+  });
+  assert.equal(r.statusCode, 200);
+  assert.equal(ctx.signRequests.length, 1);
+});
+
+test('POST /download-urls 400s on bad input (missing/empty paths, >30, non-string, unknown bucket)', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
+  const bad = [
+    { bucket: 'work-samples' },
+    { bucket: 'work-samples', paths: [] },
+    { bucket: 'work-samples', paths: 'teachers/x/y.jpg' },
+    { bucket: 'work-samples', paths: Array.from({ length: 31 }, (_, i) => `teachers/x/${i}.jpg`) },
+    { bucket: 'work-samples', paths: ['teachers/x/1.jpg', 42] },
+    { bucket: 'evil', paths: ['teachers/x/1.jpg'] },
+    { paths: ['teachers/x/1.jpg'] },
+  ];
+  for (const body of bad) {
+    const r = await invoke(handler, { method: 'POST', path: '/download-urls', token: tokenFor(STUDENT), body });
+    assert.equal(r.statusCode, 400, JSON.stringify(body).slice(0, 80));
+  }
+  assert.equal(ctx.signRequests.length, 0);
+});
+
+test('POST /download-urls accepts exactly 30 paths', async () => {
+  const { handler } = await loadHandler();
+  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId }) });
+  const paths = Array.from({ length: 30 }, (_, i) => `teachers/x/${i}.jpg`);
+  const r = await invoke(handler, { method: 'POST', path: '/download-urls', token: tokenFor(STUDENT), body: { bucket: 'work-samples', paths } });
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.json().urls.length, 30);
+  assert.equal(ctx.signRequests.length, 30);
+});
+
 // ============================== method fallthrough ==========================
 
 test('unsupported method on a data route returns 405', async () => {
@@ -1129,7 +1208,7 @@ test('POST /admin/delete-student also clears the target\'s Calendar token', asyn
 
 test('GET /my-data exports the caller\'s rows scoped to the JWT id', async () => {
   const { handler } = await loadHandler();
-  const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId, onRoute: () => res([]) }) });
+  resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId, onRoute: () => res([]) }) });
   const r = await invoke(handler, { method: 'GET', path: '/my-data', token: tokenFor(STUDENT) });
   assert.equal(r.statusCode, 200);
   assert.equal(r.json().subject.lumi_id, STUDENT.userId);
