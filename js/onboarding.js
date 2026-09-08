@@ -1,4 +1,4 @@
-import { fetchClaudeProxy } from './api.js';
+import { fetchClaudeProxy, readProxyText } from './api.js';
 import { CONFIG } from './config.js';
 import { connectGoogleCalendar, saveStudyStyle, setCalendarConnected } from './homework.js';
 import { $, currentUser } from './state.js';
@@ -243,8 +243,7 @@ async function startObConversation() {
     });
     obHideTyping();
     if (!res.ok) throw new Error('API error ' + res.status);
-    const resp = await res.json();
-    const full = resp.content?.[0]?.text || '';
+    const full = await readProxyText(res);
     const profileData = obParseProfile(full);
     const clean = obStripProfile(full);
     OB.messages = [
@@ -286,8 +285,7 @@ async function obSend() {
     });
     obHideTyping();
     if (!res.ok) throw new Error('API error ' + res.status);
-    const resp = await res.json();
-    const full  = resp.content?.[0]?.text || '';
+    const full = await readProxyText(res);
     const profileData = obParseProfile(full);
     const clean = obStripProfile(full);
     OB.messages.push({ role: 'assistant', content: clean });

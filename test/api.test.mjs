@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { consumeSseBuffer, streamVisibleText } from '../js/api.js';
+import { consumeSseBuffer, readProxyText, streamVisibleText } from '../js/api.js';
 
 // ── consumeSseBuffer ─────────────────────────────────────────────────────────
 // The Lambda writes Bedrock's chunks through verbatim, one per `data:` line,
@@ -11,6 +11,30 @@ import { consumeSseBuffer, streamVisibleText } from '../js/api.js';
 
 const delta = (t) =>
   `data: ${JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: t } })}\n`;
+
+const sseResponse = (...chunks) => ({
+  body: {
+    getReader() {
+      const enc = new TextEncoder();
+      let i = 0;
+      return { read: async () => (i < chunks.length ? { done: false, value: enc.encode(chunks[i++]) } : { done: true }) };
+    },
+  },
+});
+
+// ── readProxyText ────────────────────────────────────────────────────────────
+// The chat route always streams SSE; non-streaming callers (onboarding, title
+// generation) must drain it rather than call res.json().
+
+test('readProxyText: concatenates deltas across reads and stops at [DONE]', async () => {
+  const res = sseResponse(delta('Hey'), delta(' there'), 'data: [DONE]\n' + delta('ignored'));
+  assert.equal(await readProxyText(res), 'Hey there');
+});
+
+test('readProxyText: an error event rejects with its message', async () => {
+  const res = sseResponse(delta('x'), 'data: {"error":"boom"}\n');
+  await assert.rejects(readProxyText(res), /boom/);
+});
 
 test('consumeSseBuffer: one complete delta yields one text event', () => {
   const { events, rest } = consumeSseBuffer(delta('Hello'));
