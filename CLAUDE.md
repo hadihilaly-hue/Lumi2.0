@@ -319,15 +319,24 @@ gives direct answers, only guides reasoning.
   URLs valid for 1 hour (longer than syllabi's 5min because the
   runtime vision pipeline fans out to per-image fetches at
   chat-open). **Runtime vision pipeline:** `loadWorkSampleImages()`
-  in app.js fetches signed URLs in parallel via `POST /download-url`,
-  then fetches each image blob, converts to base64, and sends them
-  to Claude as vision content blocks — same end shape as before,
-  only the signed-URL source changed. **Auth chain:** Cognito ID token
+  in `js/teachers.js` first consults the image cache
+  (`js/workSampleCache.js`: in-memory Map for the tab + IndexedDB
+  `lumi_work_samples`, keyed by `(teacher_profile_id, s3_path,
+  work_samples.updated_at)`, capped at 50 images / 30 days; re-saving
+  a tier bumps `updated_at` and so invalidates it). Misses are signed
+  in one round-trip via `POST /download-urls` (`{bucket, paths[]}` ≤
+  30 → `{urls[]}`; falls back to per-path `POST /download-url` if the
+  batch route is missing), then each image blob is fetched, converted
+  to base64, and sent to Claude as vision content blocks. A warm cache
+  skips the network entirely. In Teacher Test Mode only the in-memory
+  layer is used (TM-2: no persistent state left on a shared browser).
+  Timings log under `[work_samples][timing]` when `CONFIG.debug` is on
+  (`localStorage.lumi_debug = '1'`). **Auth chain:** Cognito ID token
   → Lambda `verifyAuth` (local JWKS + app_users) → allowed-domains
   check (teachers-only on upload, any authenticated user on
   download). Written from
   `saveTeacherProfile()` in teacher.html; read from openWizard's
-  thumbnail batch and from `loadWorkSampleImages()` in app.js.
+  thumbnail batch and from `loadWorkSampleImages()` in js/teachers.js.
 
 ### RDS Lambda data routes (Workstream F — complete 2026-07-01)
 All six route groups live on `lumi-claude-proxy` (source: `lambda/index.mjs`),
@@ -673,7 +682,7 @@ live with spoofed ids.
   Banner click opens the wizard at `{ jumpToStep: 4 }`. The `done` flag
   stays true so students aren't blocked while the teacher fills the
   gap.
-- **Single-source-of-truth gate.** `loadWorkSampleImages()` in app.js
+- **Single-source-of-truth gate.** `loadWorkSampleImages()` in js/teachers.js
   returns null on any shortfall — missing tier, no photos, no
   description, signed-URL failure, fetch failure. The result lives at
   `S.tutorCtx.workSamples`. Both `buildTutorSystem()` (description
