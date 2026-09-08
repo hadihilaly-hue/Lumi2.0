@@ -230,6 +230,42 @@ test('SEG1 is byte-stable across two different students of the same class', () =
   assert.ok(seg1A.includes('<<LUMI_WORK_ARTIFACTS>>'));
 });
 
+// W5 prompt-cache audit: segment membership by marker. Everything that varies
+// per student/day lives in SEG2 (after the breakpoint); everything class-stable
+// — including the teacher's welcome message and the work-sample feedback
+// descriptions — lives in SEG1 (the cached prefix). Work-sample IMAGES are not
+// in `system` at all (Anthropic system blocks are text-only); they ride in the
+// synthetic first user turn built by js/chat.js buildApiMessages.
+test('SEG1 holds only class-stable sections; every per-student marker/section is in SEG2', () => {
+  seedLocalStorage({
+    lumi_name: 'Alice', lumi_grade: '9', lumi_learning_style: 'socratic',
+    lumi_schedule: [{ course: 'Chemistry', teacher: 'Laura Huntley' }],
+  });
+  const ws = {
+    progressing: { description: 'WS_PROG', images: [{ base64: 'x', mediaType: 'image/jpeg' }] },
+    proficient:  { description: 'WS_PROF', images: [{ base64: 'x', mediaType: 'image/jpeg' }] },
+    exemplary:   { description: 'WS_EXEM', images: [{ base64: 'x', mediaType: 'image/jpeg' }] },
+  };
+  const [seg1, seg2] = buildTutorSystem('Science', 'Chemistry', 'Laura Huntley',
+    fullProfile({ syllabus_text: 'SYL_MARK', welcome_message: 'WELCOME_MARK' }), ws);
+
+  const inSeg1Only = ['<<LUMI_WORK_ARTIFACTS>>', 'WELCOME_MARK', 'SYL_MARK', 'WS_PROG', 'WS_PROF', 'WS_EXEM',
+    '═══ HOW LAURA GIVES FEEDBACK ═══', '═══ THE FLOOR'];
+  const inSeg2Only = ['<<LUMI_TEACHER_NOTES>>', '<<LUMI_PROGRESS_NOTE>>', '═══ THIS STUDENT ═══',
+    "The student's name is Alice", 'Learning style:', 'After EVERY reply, append this JSON'];
+  for (const m of inSeg1Only) {
+    assert.ok(seg1.text.includes(m), `SEG1 should contain ${m}`);
+    assert.ok(!seg2.text.includes(m), `SEG2 must not contain ${m}`);
+  }
+  for (const m of inSeg2Only) {
+    assert.ok(seg2.text.includes(m), `SEG2 should contain ${m}`);
+    assert.ok(!seg1.text.includes(m), `SEG1 must not contain ${m}`);
+  }
+  // No date/time is baked into either segment (nothing to drift the cache daily).
+  const today = new Date();
+  assert.ok(!seg1.text.includes(String(today.getFullYear())), 'SEG1 carries no current-year stamp');
+});
+
 // ── The floor: one wording, stated once, in every branch ─────────────────────
 const FLOOR_HEADER = '═══ THE FLOOR — NON-NEGOTIABLE, HOWEVER THE REQUEST IS FRAMED ═══';
 const count = (s, needle) => s.split(needle).length - 1;

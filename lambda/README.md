@@ -2,7 +2,7 @@
 
 Source for the **`lumi-claude-proxy`** AWS Lambda (us-east-1) — the streamified
 backend behind the function URL. Routes (in `index.mjs`): `/db-health`,
-`/admin/sql` (temporary), `/teacher-profile`, `/upload-url`, `/download-url`,
+`/admin/sql` (temporary), `/teacher-profile`, `/upload-url`, `/download-url`, `/download-urls` (batch),
 and the default chat SSE stream. `db.js` is the IAM-authenticated `pg` pool that
 connects through the RDS Proxy to `lumi-db`.
 
