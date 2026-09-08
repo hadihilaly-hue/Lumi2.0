@@ -312,6 +312,11 @@ const _convSyncTimers   = new Map(); // convId -> timeout handle
 const _convSyncPending  = new Set(); // convIds with an unsent snapshot
 const _convLastSynced   = new Map(); // convId -> serialized row last accepted by the server
 const _convCreating     = new Map(); // convId -> in-flight POST promise
+const _convPatching     = new Map(); // convId -> in-flight PATCH promise (writes are serialized per conv)
+
+// Browsers cap the total body size of outstanding keepalive requests at 64 KiB;
+// larger payloads are sent as a normal request instead of being rejected.
+const KEEPALIVE_BODY_LIMIT = 60 * 1024;
 
 function _convRow(conv) {
   return {
@@ -396,9 +401,18 @@ async function _createConv(convId) {
 
 // Send the current snapshot of one conversation. `keepalive` is used by the
 // hide/unload flush so the request outlives the document.
-async function _patchConv(convId, { keepalive = false } = {}) {
+async function _patchConv(convId, opts = {}) {
   const creating = _convCreating.get(convId);
   if (creating) await creating;
+  // One PATCH in flight per conversation: a save that lands mid-request waits
+  // for it to settle, then sends the newest snapshot (no stale overwrite).
+  while (_convPatching.has(convId)) await _convPatching.get(convId);
+  const p = _patchConvNow(convId, opts);
+  _convPatching.set(convId, p);
+  try { await p; } finally { if (_convPatching.get(convId) === p) _convPatching.delete(convId); }
+}
+
+async function _patchConvNow(convId, { keepalive = false } = {}) {
   const conv = getConvs()[convId];
   if (!conv || !conv.messages.length) { _convSyncPending.delete(convId); return; }
   if (!conv.sbId) {
@@ -414,9 +428,10 @@ async function _patchConv(convId, { keepalive = false } = {}) {
   // Lambda PATCH scopes to the JWT user server-side and 404s on an
   // unowned/unknown id (surfaced via the rdsFetch null → warn).
   const body = { id: conv.sbId, ...row, updated_at: new Date().toISOString() };
+  const json = JSON.stringify(body);
   try {
-    const res = keepalive
-      ? await _rdsPatchKeepalive('conversations', body)
+    const res = keepalive && json.length <= KEEPALIVE_BODY_LIMIT
+      ? await _rdsPatchKeepalive('conversations', json)
       : await rdsFetch('conversations', { method: 'PATCH', body });
     if (!res) { console.warn('Conversation update error:', 'conversation not found (404)'); return; }
     _convLastSynced.set(convId, serialized);
@@ -429,7 +444,7 @@ async function _patchConv(convId, { keepalive = false } = {}) {
 
 // Same wire format as rdsFetch, plus `keepalive` so the browser lets the
 // request complete after pagehide. Mirrors rdsFetch's 404 → null contract.
-async function _rdsPatchKeepalive(path, body) {
+async function _rdsPatchKeepalive(path, json) {
   const { data: { session } } = await sb.auth.getSession();
   if (!session?.access_token) throw new Error('rdsFetch: no session');
   const res = await fetch(`${CLAUDE_PROXY_URL}${path}`, {
@@ -439,7 +454,7 @@ async function _rdsPatchKeepalive(path, body) {
       Authorization: `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(body),
+    body: json,
   });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`${path} ${res.status}`);
@@ -449,9 +464,17 @@ async function _rdsPatchKeepalive(path, body) {
 // Send every pending snapshot now (cancelling their timers). Used on tab hide /
 // unload; safe to call any time.
 export function flushPendingConvSyncs({ keepalive = true } = {}) {
-  const ids = [..._convSyncPending];
+  // In-flight creations count as pending: wait for the POST (and any PATCH
+  // queued behind it) so sign-out / unload can't strand a brand-new thread.
+  const ids = [...new Set([..._convSyncPending, ..._convCreating.keys()])];
   for (const id of ids) _clearConvTimer(id);
-  return Promise.all(ids.map(id => _patchConv(id, { keepalive }).catch(err => console.warn('Conv sync:', err))));
+  return Promise.all(ids.map(async (id) => {
+    try {
+      const creating = _convCreating.get(id);
+      if (creating) await creating;
+      if (_convSyncPending.has(id) || _convPatching.has(id)) await _patchConv(id, { keepalive });
+    } catch (err) { console.warn('Conv sync:', err); }
+  }));
 }
 
 export function hasPendingConvSync(convId) { return _convSyncPending.has(convId); }
@@ -469,6 +492,7 @@ export function __resetConvSyncState() {
   _convSyncPending.clear();
   _convLastSynced.clear();
   _convCreating.clear();
+  _convPatching.clear();
 }
 
 // Delete a conversation from RDS by its sbId

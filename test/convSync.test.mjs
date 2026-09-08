@@ -275,6 +275,76 @@ test('a network error (fetch rejects) also keeps the payload pending', async () 
   assert.equal(patches()[1].keepalive, false);
 });
 
+test('flush during an in-flight creation waits for the POST and then PATCHes what was saved meanwhile', async () => {
+  seedConv('c1', { sbId: null });
+  let release;
+  responder = (c) => ({ status: 200, json: c.method === 'POST' ? { id: 'new-uuid' } : { id: 'new-uuid' } });
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (init.method === 'POST') await new Promise(r => { release = r; });
+    return origFetch(url, init);
+  };
+  syncConvToRds('c1');
+  await tick();
+  appendMsg('c1', 'typed while creating');
+  syncConvToRds('c1');
+  let flushed = false;
+  const flush = flushPendingConvSyncs({ keepalive: false }).then(() => { flushed = true; });
+  await settle();
+  assert.equal(flushed, false, 'sign-out flush does not resolve while the POST is in flight');
+  release();
+  await flush;
+  assert.equal(posts().length, 1);
+  assert.equal(patches().length, 1);
+  assert.equal(patches()[0].body.id, 'new-uuid');
+  assert.equal(patches()[0].body.messages.length, 2);
+  assert.equal(hasPendingConvSync('c1'), false);
+});
+
+test('PATCHes are serialized per conversation: a newer save waits for the in-flight request and wins', async () => {
+  seedConv('c1');
+  syncConvToRds('c1');
+  mock.timers.tick(CONV_SYNC_DEBOUNCE_MS);
+  await settle();
+  assert.equal(patches().length, 1);
+
+  // Second write (metadata change → immediate) is held in flight …
+  const gates = [];
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    const res = await origFetch(url, init);
+    if (init.method === 'PATCH') await new Promise(r => gates.push(r));
+    return res;
+  };
+  const convs = getConvs(); convs.c1.title = 'Renamed'; saveConvs(convs);
+  syncConvToRds('c1');
+  await settle();
+  assert.equal(patches().length, 2);
+  // … while a third save (newer messages) is requested and its timer fires.
+  appendMsg('c1', 'newest');
+  syncConvToRds('c1');
+  mock.timers.tick(CONV_SYNC_DEBOUNCE_MS);
+  await settle();
+  assert.equal(patches().length, 2, 'third write is queued, not overlapped');
+  gates.shift()();
+  await settle();
+  assert.equal(patches().length, 3, 'queued write sent after the earlier one settled');
+  assert.equal(patches()[2].body.messages.length, 2);
+  assert.equal(patches()[2].body.title, 'Renamed');
+  gates.shift()();
+  await settle();
+  assert.equal(hasPendingConvSync('c1'), false);
+});
+
+test('payloads above the 64 KiB keepalive quota are flushed with a normal (non-keepalive) request', async () => {
+  seedConv('c1', { messages: [{ role: 'user', content: 'x'.repeat(70 * 1024) }] });
+  syncConvToRds('c1');
+  await flushPendingConvSyncs({ keepalive: true });
+  assert.equal(patches().length, 1);
+  assert.equal(patches()[0].keepalive, false);
+  assert.equal(hasPendingConvSync('c1'), false);
+});
+
 test('syncConvToRds is a no-op without a signed-in user or an empty conversation', async () => {
   seedConv('c1', { messages: [] });
   syncConvToRds('c1');
