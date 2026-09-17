@@ -3,7 +3,7 @@
 import { query as dbQuery } from "../lib/db.mjs";
 import { SCHOOL_CONFIG, defaultModel, defaultProvider, safeErr } from "../lib/config.mjs";
 import { teacherStatus } from "../lib/auth.mjs";
-import { checkRateLimit, logUsage } from "../lib/usage.mjs";
+import { billedOutputTokens, checkRateLimit, logUsage } from "../lib/usage.mjs";
 import { generateResponse } from "../lib/bedrock.mjs";
 import { assembleSystemPrompt, fetchTeacherNotes } from "../lib/prompt.mjs";
 import { openEventStream, writeEvent, writeDone, writeError } from "../lib/sse.mjs";
@@ -64,7 +64,7 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
         })) {
           if (chunk.type === "message_start") inputTokens = chunk.message?.usage?.input_tokens || 0;
           if (chunk.type === "message_delta") {
-            outputTokens = chunk.usage?.output_tokens || outputTokens;
+            outputTokens = billedOutputTokens(chunk.usage) || outputTokens;
             inputTokens = chunk.usage?.input_tokens || inputTokens;
           }
           if (chunk.type === "content_block_delta" && chunk.delta?.text) text += chunk.delta.text;
@@ -163,7 +163,7 @@ export async function chat(ctx) {
   const chatStream = openEventStream(responseStream);
 
   try {
-    const provider = body.provider || defaultProvider();
+    const provider = defaultProvider();
     let inputTokens = 0;
     let outputTokens = 0;
 
@@ -192,7 +192,7 @@ export async function chat(ctx) {
         }
       }
       if (chunk.type === "message_delta") {
-        outputTokens = chunk.usage?.output_tokens || outputTokens;
+        outputTokens = billedOutputTokens(chunk.usage) || outputTokens;
         // OpenAI reports usage only in the final chunk.
         inputTokens = chunk.usage?.input_tokens || inputTokens;
       }

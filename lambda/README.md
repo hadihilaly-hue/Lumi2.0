@@ -109,11 +109,10 @@ at the wire. Lambda environment variables:
 | `OPENAI_API_KEY` | — | required when provider is `gpt` |
 | `OPENAI_MODEL` | `gpt-5.5` | |
 | `OPENAI_REASONING_EFFORT` | `low` | `minimal`/`low`/`medium`/`high`, or `none` to omit (then `temperature` is forwarded) |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | |
 | `BEDROCK_MODEL` | `global.anthropic.claude-sonnet-4-6` | provider `claude` only |
 | `LUMI_SUMMARIZER_MODEL` | provider default | must belong to the active provider |
 
-The client's `body.model` is ignored; `body.provider` may override the provider per request.
+The client's `body.model` and `body.provider` are ignored; the provider is fixed by `LUMI_PROVIDER`. OpenAI's `completion_tokens` is split into visible `output_tokens` (what the progress-note validator sizes against) and `reasoning_output_tokens`; `api_usage` logs the sum.
 
 ## Dependencies
 

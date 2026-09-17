@@ -8,7 +8,7 @@
 // base64 images / PDF documents) go in, Anthropic-shaped chunks come out.
 import { defaultModel, safeErr } from "./config.mjs";
 
-const openaiBaseUrl = () => (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
+const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
 // OPENAI_REASONING_EFFORT: minimal|low|medium|high, or "none"/"" to omit it.
 const reasoningEffortDefault = () => {
   const v = process.env.OPENAI_REASONING_EFFORT ?? "low";
@@ -104,12 +104,18 @@ export function translateChunk(chunk) {
     events.push({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text } });
   }
   if (chunk?.usage) {
+    // completion_tokens includes hidden reasoning. output_tokens keeps the
+    // Anthropic meaning (visible text, what validators size against);
+    // reasoning_output_tokens carries the rest for billing/usage logs.
+    const completion = chunk.usage.completion_tokens || 0;
+    const reasoning = chunk.usage.completion_tokens_details?.reasoning_tokens || 0;
     events.push({
       type: "message_delta",
       delta: { stop_reason: chunk.choices?.[0]?.finish_reason ?? "end_turn" },
       usage: {
         input_tokens: chunk.usage.prompt_tokens || 0,
-        output_tokens: chunk.usage.completion_tokens || 0,
+        output_tokens: Math.max(0, completion - reasoning),
+        reasoning_output_tokens: reasoning,
         cache_read_input_tokens: chunk.usage.prompt_tokens_details?.cached_tokens,
       },
     });
@@ -147,7 +153,7 @@ export async function* callGPT({ systemPrompt, messages, maxTokens, modelId, tem
   };
 
   try {
-    const response = await fetch(`${openaiBaseUrl()}/chat/completions`, {
+    const response = await fetch(OPENAI_CHAT_URL, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
       body: JSON.stringify(buildRequestBody({ systemPrompt, messages, maxTokens, modelId, temperature, reasoningEffort })),
@@ -165,17 +171,23 @@ export async function* callGPT({ systemPrompt, messages, maxTokens, modelId, tem
     arm(IDLE_TIMEOUT_MS, "openai stream idle timeout");
     const decoder = new TextDecoder();
     let buffer = "";
-    for await (const bytes of response.body) {
+    let done = false;
+    const body = response.body;
+    for await (const bytes of body) {
       arm(IDLE_TIMEOUT_MS, "openai stream idle timeout");
       buffer += decoder.decode(bytes, { stream: true });
       const { payloads, rest } = consumeSse(buffer);
       buffer = rest;
       for (const p of payloads) {
-        if (p.done) continue;
+        if (p.done) { done = true; break; }
         if (p.error) throw new Error(`openai: ${p.error.message || safeErr(p.error)}`);
         yield* translateChunk(p);
       }
+      if (done) break;
     }
+    // [DONE] is the protocol-level end; body EOF without it means truncation.
+    if (!done) throw new Error("openai stream ended before [DONE]");
+    controller.abort();
     yield { type: "content_block_stop", index: 0 };
     yield { type: "message_stop" };
   } catch (err) {
