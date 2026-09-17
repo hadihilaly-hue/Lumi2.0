@@ -3,7 +3,8 @@ import {
   BedrockRuntimeClient,
   InvokeModelWithResponseStreamCommand
 } from "@aws-sdk/client-bedrock-runtime";
-import { AWS_REGION, SCHOOL_CONFIG } from "./config.mjs";
+import { AWS_REGION, defaultModel, defaultProvider } from "./config.mjs";
+import { callGPT } from "./openai.mjs";
 
 // Timeouts (2026-07-02): the SDK default has NO socket timeout, so a stalled
 // Bedrock stream hung `for await (...response.body)` forever — one of the
@@ -22,7 +23,7 @@ export async function* callClaude({ systemPrompt, messages, maxTokens, modelId, 
     // modelId defaults to the forced tenant model; callers (e.g. the summarizer)
     // may override it. temperature is only sent when a caller sets it, so the
     // chat/chips paths are byte-identical to before.
-    modelId: modelId || SCHOOL_CONFIG.defaultModel,
+    modelId: modelId || defaultModel("claude"),
     contentType: "application/json",
     accept: "application/json",
     body: JSON.stringify({
@@ -48,16 +49,15 @@ async function* callGemini() {
   throw new Error("Gemini provider not yet implemented");
 }
 
-// eslint-disable-next-line require-yield -- provider stub: throws before yielding
-async function* callGPT() {
-  throw new Error("GPT provider not yet implemented");
-}
-
-export async function* generateResponse({ provider, systemPrompt, messages, maxTokens }) {
+// Provider dispatch. Every caller (chat, chips, summarizer) gets the same
+// Anthropic-shaped event stream regardless of provider; `modelId` and
+// `temperature` are per-provider overrides and default per provider.
+export async function* generateResponse({ provider = defaultProvider(), systemPrompt, messages, maxTokens, modelId, temperature }) {
+  const args = { systemPrompt, messages, maxTokens, modelId, temperature };
   switch (provider) {
-    case "claude": yield* callClaude({ systemPrompt, messages, maxTokens }); break;
-    case "gemini": yield* callGemini({ systemPrompt, messages, maxTokens }); break;
-    case "gpt":    yield* callGPT({ systemPrompt, messages, maxTokens }); break;
+    case "claude": yield* callClaude(args); break;
+    case "gemini": yield* callGemini(args); break;
+    case "gpt":    yield* callGPT(args); break;
     default: throw new Error(`Unknown provider: ${provider}`);
   }
 }

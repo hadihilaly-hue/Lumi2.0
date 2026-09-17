@@ -1,7 +1,7 @@
 // lib/progressNotes.mjs — Phase 5 rolling progress notes (Layer 3, server-internal).
 import { query as dbQuery } from "./db.mjs";
-import { SCHOOL_CONFIG, safeErr } from "./config.mjs";
-import { callClaude } from "./bedrock.mjs";
+import { defaultModel, safeErr } from "./config.mjs";
+import { generateResponse } from "./bedrock.mjs";
 
 // === Phase 5: cross-session student memory (rolling progress notes) ===
 // FLAG-GATED and OFF by default. TWO independent server-side gates must BOTH
@@ -19,15 +19,14 @@ const PERSISTENCE_ALLOWED_DOMAINS = new Set(
   (process.env.PERSISTENCE_ALLOWED_DOMAINS || "lumidemo.test")
     .split(",").map((d) => d.trim().toLowerCase()).filter(Boolean)
 );
-// Summarizer model. Spec §3 proposes claude-haiku-4-5, but the Lambda forces
-// Sonnet 4.6 for every Bedrock call today (SCHOOL_CONFIG.defaultModel; the
-// client's body.model is ignored) and carries no Haiku profile. So the
-// summarizer runs on Sonnet 4.6 unless LUMI_SUMMARIZER_MODEL overrides it.
+// Summarizer model. Spec §3 proposes a cheaper model, but the summarizer runs
+// on the default provider's default model unless LUMI_summarizerModel()
+// overrides it (the override must belong to the active provider).
 // COST NOTE (docs/SUMMARIZATION_PROMPT.md §2): a ≤350-token rolling summary on
-// Sonnet 4.6 costs ~5-8× the Haiku price the spec assumed — negligible at
-// synthetic-test volume, but add a Haiku profile (or set the env override)
-// before real-student rollout.
-const SUMMARIZER_MODEL = process.env.LUMI_SUMMARIZER_MODEL || SCHOOL_CONFIG.defaultModel;
+// the flagship model costs ~5-8× the small-model price the spec assumed —
+// negligible at synthetic-test volume, but set the env override before
+// real-student rollout.
+const summarizerModel = () => process.env.LUMI_SUMMARIZER_MODEL || defaultModel();
 const PROGRESS_NOTE_TOKEN_CAP = 350;      // spec §0 / SUMMARIZATION_PROMPT §4
 const PROGRESS_NOTE_MAX_TOKENS = 500;     // headroom so a valid note never truncates mid-JSON
 const PROGRESS_NOTE_TIMEOUT_MS = 8000;    // Bedrock budget; on timeout the note is left unchanged
@@ -247,11 +246,11 @@ export async function summarizeAndStoreProgressNote({ studentId, teacherProfileI
   let text = "";
   let outputTokens = 0;
   const generate = (async () => {
-    for await (const chunk of callClaude({
+    for await (const chunk of generateResponse({
       systemPrompt: SUMMARIZER_SYSTEM,
       messages: [{ role: "user", content: userMsg }],
       maxTokens: PROGRESS_NOTE_MAX_TOKENS,
-      modelId: SUMMARIZER_MODEL,
+      modelId: summarizerModel(),
       temperature: 0.3,
     })) {
       if (chunk.type === "message_delta") outputTokens = chunk.usage?.output_tokens || outputTokens;
@@ -265,7 +264,7 @@ export async function summarizeAndStoreProgressNote({ studentId, teacherProfileI
       new Promise((_, reject) => { genTimer = setTimeout(() => reject(new Error("summarizer timeout")), PROGRESS_NOTE_TIMEOUT_MS); genTimer.unref?.(); }),
     ]);
   } catch (err) {
-    console.warn(`[progress_note] skipped reason=${/timeout/.test(err.message) ? "bedrock_timeout" : "bedrock_error"}`);
+    console.warn(`[progress_note] skipped reason=${/timeout/.test(err.message) ? "bedrock_timeout" : "bedrock_error"} err=${safeErr(err)}`);
     return { status: "skipped", reason: "bedrock_error" };
   } finally {
     clearTimeout(genTimer);
@@ -291,13 +290,13 @@ export async function summarizeAndStoreProgressNote({ studentId, teacherProfileI
          source_session_count = public.student_progress_notes.source_session_count + 1,
          token_count = EXCLUDED.token_count,
          model_version = EXCLUDED.model_version`,
-      [studentId, teacherProfileId, JSON.stringify(v.note), outputTokens, SUMMARIZER_MODEL]
+      [studentId, teacherProfileId, JSON.stringify(v.note), outputTokens, summarizerModel()]
     );
   } catch (err) {
     console.warn("[progress_note] store failed:", safeErr(err));
     return { status: "skipped", reason: "store_error" };
   }
-  console.log(`[progress_note] updated class=${teacherProfileId} in=${msgCount}msgs out=${text.length}chars model=${SUMMARIZER_MODEL} ms=${Date.now() - t0}`);
+  console.log(`[progress_note] updated class=${teacherProfileId} in=${msgCount}msgs out=${text.length}chars model=${summarizerModel()} ms=${Date.now() - t0}`);
   return { status: "updated" };
 }
 

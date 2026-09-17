@@ -9,10 +9,22 @@ export const SCHOOL_CONFIG = {
   adminEmails: new Set(["hadi.hilaly@menloschool.org"]),
   studentRateLimit: 100,
   teacherRateLimit: 500,
-  defaultProvider: "claude",
-  defaultModel: "global.anthropic.claude-sonnet-4-6",
   maxTokensCap: 2500,
 };
+
+// Provider + model are resolved per call (not at import) so LUMI_PROVIDER /
+// OPENAI_MODEL can be flipped in the Lambda config without a redeploy.
+export const PROVIDER_MODELS = {
+  gpt:    () => process.env.OPENAI_MODEL || "gpt-5.5",
+  claude: () => process.env.BEDROCK_MODEL || "global.anthropic.claude-sonnet-4-6",
+};
+export function defaultProvider() {
+  const p = process.env.LUMI_PROVIDER || "gpt";
+  return PROVIDER_MODELS[p] ? p : "gpt";
+}
+export function defaultModel(provider = defaultProvider()) {
+  return PROVIDER_MODELS[provider]();
+}
 
 // === AWS Config ===
 export const AWS_REGION = "us-east-1";

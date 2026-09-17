@@ -19,7 +19,9 @@ lib/
   prompt.mjs       system-prompt assembly: teacher-notes / work-artifacts / progress-note
                    marker swaps (string or Anthropic content-block array; cache_control kept)
   progressNotes.mjs  Phase 5 cross-session memory (summarizer, fetch, store)
-  bedrock.mjs      Bedrock client + callClaude / generateResponse
+  bedrock.mjs      provider dispatch (generateResponse) + Bedrock callClaude
+  openai.mjs       OpenAI Chat Completions provider (callGPT) — Anthropic-shaped
+                   messages in, Anthropic-shaped stream events out
   usage.mjs        checkRateLimit + logUsage (api_usage)
   columns.mjs      per-table write allowlists + pickColumns
   ferpa.mjs        /my-data export + soft-delete helpers
@@ -93,6 +95,25 @@ URL=$(aws lambda get-function --function-name lumi-claude-proxy --region us-east
 curl -s "$URL" -o /tmp/deployed.zip
 for f in index.mjs lib/*.mjs routes/*.mjs package.json; do diff <(unzip -p /tmp/deployed.zip "$f") "$f" && echo "$f OK"; done
 ```
+
+## Model provider
+
+`generateResponse` picks the provider from `LUMI_PROVIDER` (`gpt` default, or
+`claude` for Bedrock). Every caller — chat, /suggested-prompts, the progress-note
+summarizer — speaks the Anthropic message/event shape; `lib/openai.mjs` translates
+at the wire. Lambda environment variables:
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `LUMI_PROVIDER` | `gpt` | `gpt` or `claude` |
+| `OPENAI_API_KEY` | — | required when provider is `gpt` |
+| `OPENAI_MODEL` | `gpt-5.5` | |
+| `OPENAI_REASONING_EFFORT` | `low` | `minimal`/`low`/`medium`/`high`, or `none` to omit (then `temperature` is forwarded) |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | |
+| `BEDROCK_MODEL` | `global.anthropic.claude-sonnet-4-6` | provider `claude` only |
+| `LUMI_SUMMARIZER_MODEL` | provider default | must belong to the active provider |
+
+The client's `body.model` is ignored; `body.provider` may override the provider per request.
 
 ## Dependencies
 
