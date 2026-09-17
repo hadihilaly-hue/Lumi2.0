@@ -46,3 +46,8 @@ globalThis.awslambda = {
 // verifier itself is the aws-jwt-verify stub, which ignores these values.
 process.env.COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || 'us-east-1_TESTPOOL';
 process.env.COGNITO_CLIENT_ID = process.env.COGNITO_CLIENT_ID || 'test-client-id';
+
+// Route tests drive the model through the Bedrock stub (ctx.bedrock). The
+// OpenAI provider is exercised separately in openai.test.mjs, which flips this
+// to 'gpt' and stubs globalThis.fetch.
+process.env.LUMI_PROVIDER = process.env.LUMI_PROVIDER || 'claude';

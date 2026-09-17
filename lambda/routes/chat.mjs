@@ -1,10 +1,10 @@
-// routes/chat.mjs — Bedrock-backed routes: the default SSE chat stream,
+// routes/chat.mjs — model-backed routes: the default SSE chat stream,
 // /suggested-prompts, and the flag-gated /progress-note/flush.
 import { query as dbQuery } from "../lib/db.mjs";
-import { SCHOOL_CONFIG, safeErr } from "../lib/config.mjs";
+import { SCHOOL_CONFIG, defaultModel, defaultProvider, safeErr } from "../lib/config.mjs";
 import { teacherStatus } from "../lib/auth.mjs";
 import { checkRateLimit, logUsage } from "../lib/usage.mjs";
-import { callClaude, generateResponse } from "../lib/bedrock.mjs";
+import { generateResponse } from "../lib/bedrock.mjs";
 import { assembleSystemPrompt, fetchTeacherNotes } from "../lib/prompt.mjs";
 import { openEventStream, writeEvent, writeDone, writeError } from "../lib/sse.mjs";
 import { isPersistenceEnabled, summarizeAndStoreProgressNote } from "../lib/progressNotes.mjs";
@@ -57,13 +57,16 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
       let inputTokens = 0;
       let outputTokens = 0;
       const generate = (async () => {
-        for await (const chunk of callClaude({
+        for await (const chunk of generateResponse({
           systemPrompt: chipSystem,
           messages: [{ role: "user", content: userMsg }],
           maxTokens: 300,
         })) {
           if (chunk.type === "message_start") inputTokens = chunk.message?.usage?.input_tokens || 0;
-          if (chunk.type === "message_delta") outputTokens = chunk.usage?.output_tokens || outputTokens;
+          if (chunk.type === "message_delta") {
+            outputTokens = chunk.usage?.output_tokens || outputTokens;
+            inputTokens = chunk.usage?.input_tokens || inputTokens;
+          }
           if (chunk.type === "content_block_delta" && chunk.delta?.text) text += chunk.delta.text;
         }
       })();
@@ -101,7 +104,7 @@ Output ONLY the JSON array. No prose, no code fences, no explanation.`;
         // name lookup failure is non-fatal — email check already ran
       }
 
-      logUsage({ userId: user.id, email: user.email, isTeacherUser, model: SCHOOL_CONFIG.defaultModel, inputTokens, outputTokens });
+      logUsage({ userId: user.id, email: user.email, isTeacherUser, model: defaultModel(), inputTokens, outputTokens });
       console.log("[suggested-prompts] mode=influenced");
       return sendJson(200, { mode: "influenced", prompts: chips });
     } catch (err) {
@@ -160,7 +163,7 @@ export async function chat(ctx) {
   const chatStream = openEventStream(responseStream);
 
   try {
-    const provider = body.provider || SCHOOL_CONFIG.defaultProvider;
+    const provider = body.provider || defaultProvider();
     let inputTokens = 0;
     let outputTokens = 0;
 
@@ -190,6 +193,8 @@ export async function chat(ctx) {
       }
       if (chunk.type === "message_delta") {
         outputTokens = chunk.usage?.output_tokens || outputTokens;
+        // OpenAI reports usage only in the final chunk.
+        inputTokens = chunk.usage?.input_tokens || inputTokens;
       }
       writeEvent(chatStream, chunk);
     }
@@ -202,7 +207,7 @@ export async function chat(ctx) {
       userId: user.id,
       email: user.email,
       isTeacherUser,
-      model: SCHOOL_CONFIG.defaultModel,
+      model: defaultModel(provider),
       inputTokens,
       outputTokens,
     });
