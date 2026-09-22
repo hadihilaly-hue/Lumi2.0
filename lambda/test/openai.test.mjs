@@ -46,7 +46,7 @@ const OPENAI_LINES = [
   'data: ' + JSON.stringify({ choices: [{ delta: { role: 'assistant', content: '' } }] }),
   'data: ' + JSON.stringify({ choices: [{ delta: { content: 'Hel' } }] }),
   'data: ' + JSON.stringify({ choices: [{ delta: { content: 'lo' }, finish_reason: 'stop' }] }),
-  'data: ' + JSON.stringify({ choices: [], usage: { prompt_tokens: 11, completion_tokens: 7 } }),
+  'data: ' + JSON.stringify({ choices: [], usage: { prompt_tokens: 11, completion_tokens: 7, completion_tokens_details: { reasoning_tokens: 5 } } }),
   'data: [DONE]',
 ];
 
@@ -108,7 +108,11 @@ test('translateChunk maps deltas to text_delta events and usage to message_delta
   assert.deepEqual(translateChunk({ choices: [{ delta: {} }] }), []);
   const [ev] = translateChunk({ choices: [], usage: { prompt_tokens: 3, completion_tokens: 4, prompt_tokens_details: { cached_tokens: 2 } } });
   assert.equal(ev.type, 'message_delta');
-  assert.deepEqual(ev.usage, { input_tokens: 3, output_tokens: 4, cache_read_input_tokens: 2 });
+  assert.deepEqual(ev.usage, { input_tokens: 3, output_tokens: 4, reasoning_output_tokens: 0, cache_read_input_tokens: 2 });
+  // Hidden reasoning is split out so output_tokens stays "visible text".
+  const [r] = translateChunk({ choices: [], usage: { prompt_tokens: 3, completion_tokens: 400, completion_tokens_details: { reasoning_tokens: 200 } } });
+  assert.equal(r.usage.output_tokens, 200);
+  assert.equal(r.usage.reasoning_output_tokens, 200);
 });
 
 test('consumeSse holds back a partial line and skips [DONE]/malformed payloads', () => {
@@ -123,7 +127,7 @@ test('/chat with LUMI_PROVIDER=gpt streams Anthropic-shaped SSE from the OpenAI 
   const ctx = resetContext({ dbRouter: makeRouter({ userId: STUDENT.userId, usageCount: 0 }) });
   const r = await invoke(handler, {
     method: 'POST', path: '/chat', token: tokenFor(STUDENT),
-    body: { system: 'You are Lumi.', messages: [{ role: 'user', content: 'hi' }], max_tokens: 2500 },
+    body: { system: 'You are Lumi.', messages: [{ role: 'user', content: 'hi' }], max_tokens: 2500, provider: 'claude' },
   });
   await flush();
 
@@ -142,13 +146,41 @@ test('/chat with LUMI_PROVIDER=gpt streams Anthropic-shaped SSE from the OpenAI 
   assert.deepEqual(deltas.map((d) => d.delta.text), ['Hel', 'lo']);
   assert.ok(deltas.every((d) => d.delta.type === 'text_delta'));
   assert.match(r.body, /data: \[DONE\]/);
-  assert.ok(!ctx.bedrock.commands, 'Bedrock must not be called');
+  assert.ok(!ctx.bedrock.commands, 'Bedrock must not be called (client body.provider is ignored)');
 
+  // Billed output = visible (2) + reasoning (5).
   const usage = findQuery(ctx, /INSERT INTO public\.api_usage/);
   assert.ok(usage, 'usage logged');
   assert.equal(usage.params[3], 'gpt-5.5');
   assert.equal(usage.params[4], 11);
   assert.equal(usage.params[5], 7);
+});
+
+test('callGPT completes on [DONE] without waiting for the body to close', async () => {
+  let pulledAfterDone = false;
+  globalThis.fetch = async () => ({
+    ok: true, status: 200,
+    body: (async function* () {
+      const enc = new TextEncoder();
+      for (const l of OPENAI_LINES) yield enc.encode(l + '\n\n');
+      pulledAfterDone = true;
+      await new Promise(() => {}); // body never closes
+    })(),
+  });
+  const { callGPT } = await import('../lib/openai.mjs');
+  const types = [];
+  for await (const ev of callGPT({ messages: [{ role: 'user', content: 'hi' }] })) types.push(ev.type);
+  assert.equal(types.at(-1), 'message_stop');
+  assert.equal(pulledAfterDone, false);
+});
+
+test('callGPT rejects a body that ends before [DONE] as truncated', async () => {
+  stubFetch({ lines: OPENAI_LINES.slice(0, 2) });
+  const { callGPT } = await import('../lib/openai.mjs');
+  await assert.rejects(
+    (async () => { for await (const _ of callGPT({ messages: [{ role: 'user', content: 'hi' }] })) { /* drain */ } })(),
+    /before \[DONE\]/,
+  );
 });
 
 test('/chat with LUMI_PROVIDER=gpt surfaces an OpenAI HTTP error as an in-band SSE error', async () => {

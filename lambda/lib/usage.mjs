@@ -2,6 +2,13 @@
 import { query as dbQuery } from "./db.mjs";
 import { SCHOOL_CONFIG, safeErr } from "./config.mjs";
 
+// Billed output = visible text + hidden reasoning (OpenAI reasoning models);
+// Anthropic usage has no reasoning field so this is just output_tokens.
+export function billedOutputTokens(usage) {
+  if (!usage) return 0;
+  return (usage.output_tokens || 0) + (usage.reasoning_output_tokens || 0);
+}
+
 // === Rate Limit ===
 // There is deliberately NO client-facing /api-usage route — a JWT-authed POST
 // would let any student forge usage rows. The Lambda's own checkRateLimit +
