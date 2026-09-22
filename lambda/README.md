@@ -116,14 +116,13 @@ The client's `body.model` and `body.provider` are ignored; the provider is fixed
 
 ## Infrastructure (us-east-1)
 
-The Lambda runs in the `lumi-rds-sg` security group inside the two private
-subnets of `vpc-053d0095358fdf6e2`:
+The Lambda runs in the two private subnets of `lumi-vpc`:
 
 | Piece | Value | Notes |
 | --- | --- | --- |
-| Database | `lumi-db` (db.t3.micro, PostgreSQL) | `DB_HOST=lumi-db.csvwioaseagx.us-east-1.rds.amazonaws.com`; `lumiadmin` has `rds_iam`, the execution role has `rds-db:connect` on it. There is **no RDS Proxy** any more (removed 2026-09 as a cost cut). |
-| Egress | EC2 `lumi-nat` (t4g.nano, fck-nat AMI, `lumi-nat-sg`, EIP `18.235.102.150`) | Replaces the NAT Gateway. Both private route tables send `0.0.0.0/0` to its ENI; source/dest check is off. If it is stopped, Cognito JWKS / OpenAI / Bedrock calls fail — start it again. |
-| S3 | gateway endpoint `vpce-0ecb37dc56e762595` | free; keeps S3 traffic off the NAT |
+| Database | `lumi-db` (db.t3.micro, PostgreSQL) | `DB_HOST` is the instance endpoint; `lumiadmin` has `rds_iam`, the execution role has `rds-db:connect` on it. There is **no RDS Proxy** any more (removed 2026-09 as a cost cut). |
+| Egress | EC2 `lumi-nat` (t4g.nano, fck-nat AMI, Elastic IP) | Replaces the NAT Gateway. Both private route tables send `0.0.0.0/0` to its ENI; source/dest check is off. If it is stopped, Cognito JWKS / OpenAI / Bedrock calls fail — start it again. |
+| S3 | gateway VPC endpoint | free; keeps S3 traffic off the NAT |
 | Logs | `/aws/lambda/lumi-claude-proxy` | 30-day retention |
 
 ## Dependencies
