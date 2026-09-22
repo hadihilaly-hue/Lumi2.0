@@ -11,7 +11,7 @@ index.mjs          entrypoint: parse event -> direct-invoke/public routes -> ver
                    (awslambda.streamifyResponse) and the test-only `__test__` surface.
 lib/
   config.mjs       AWS_REGION, SCHOOL_CONFIG (admins, rate tiers, default model), safeErr
-  db.mjs           IAM-authenticated `pg` pool through the RDS Proxy to `lumi-db` (was db.js)
+  db.mjs           IAM-authenticated `pg` pool straight to the `lumi-db` RDS instance (was db.js)
   auth.mjs         Cognito JWKS verification, app_users bridge, allowed-domains cache,
                    teacherStatus(user) -> { isAdmin, isProvisioned, isDone }
   sse.mjs          HttpResponseStream wrapping (jsonResponder / openEventStream) + SSE writers
@@ -113,6 +113,18 @@ at the wire. Lambda environment variables:
 | `LUMI_SUMMARIZER_MODEL` | provider default | must belong to the active provider |
 
 The client's `body.model` and `body.provider` are ignored; the provider is fixed by `LUMI_PROVIDER`. OpenAI's `completion_tokens` is split into visible `output_tokens` (what the progress-note validator sizes against) and `reasoning_output_tokens`; `api_usage` logs the sum.
+
+## Infrastructure (us-east-1)
+
+The Lambda runs in the `lumi-rds-sg` security group inside the two private
+subnets of `vpc-053d0095358fdf6e2`:
+
+| Piece | Value | Notes |
+| --- | --- | --- |
+| Database | `lumi-db` (db.t3.micro, PostgreSQL) | `DB_HOST=lumi-db.csvwioaseagx.us-east-1.rds.amazonaws.com`; `lumiadmin` has `rds_iam`, the execution role has `rds-db:connect` on it. There is **no RDS Proxy** any more (removed 2026-09 as a cost cut). |
+| Egress | EC2 `lumi-nat` (t4g.nano, fck-nat AMI, `lumi-nat-sg`, EIP `18.235.102.150`) | Replaces the NAT Gateway. Both private route tables send `0.0.0.0/0` to its ENI; source/dest check is off. If it is stopped, Cognito JWKS / OpenAI / Bedrock calls fail — start it again. |
+| S3 | gateway endpoint `vpce-0ecb37dc56e762595` | free; keeps S3 traffic off the NAT |
+| Logs | `/aws/lambda/lumi-claude-proxy` | 30-day retention |
 
 ## Dependencies
 
